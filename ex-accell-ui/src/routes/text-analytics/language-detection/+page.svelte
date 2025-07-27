@@ -1,0 +1,366 @@
+<script lang="ts">
+  import Navigation from '$lib/components/Navigation.svelte';
+  import { currentProject } from '$lib/stores/projectStore';
+  import { onMount } from 'svelte';
+  
+  // Redirect to projects if no current project
+  onMount(() => {
+    if (!$currentProject) {
+      window.location.href = '/projects';
+    }
+  });
+
+  // Mock language detection data
+  let languageStats = [
+    { code: 'en', name: 'English', count: 45230, percentage: 67.2, confidence: 0.95 },
+    { code: 'es', name: 'Spanish', count: 8945, percentage: 13.3, confidence: 0.92 },
+    { code: 'fr', name: 'French', count: 4521, percentage: 6.7, confidence: 0.89 },
+    { code: 'de', name: 'German', count: 3210, percentage: 4.8, confidence: 0.91 },
+    { code: 'pt', name: 'Portuguese', count: 2134, percentage: 3.2, confidence: 0.88 },
+    { code: 'it', name: 'Italian', count: 1567, percentage: 2.3, confidence: 0.90 },
+    { code: 'ja', name: 'Japanese', count: 987, percentage: 1.5, confidence: 0.87 },
+    { code: 'ko', name: 'Korean', count: 678, percentage: 1.0, confidence: 0.85 }
+  ];
+
+  let totalPosts = languageStats.reduce((sum, lang) => sum + lang.count, 0);
+  let selectedLanguage = 'all';
+  let confidenceThreshold = 0.8;
+  let timeRange = '7d';
+
+  // Sample posts for demonstration
+  let samplePosts = [
+    {
+      id: 1,
+      text: "This is an amazing product! I highly recommend it to everyone.",
+      language: 'en',
+      confidence: 0.98,
+      timestamp: '2025-01-27T10:30:00Z',
+      platform: 'twitter'
+    },
+    {
+      id: 2,
+      text: "¡Excelente servicio al cliente! Muy satisfecho con la compra.",
+      language: 'es',
+      confidence: 0.95,
+      timestamp: '2025-01-27T09:15:00Z',
+      platform: 'instagram'
+    },
+    {
+      id: 3,
+      text: "Le produit est fantastique, je le recommande vivement!",
+      language: 'fr',
+      confidence: 0.92,
+      timestamp: '2025-01-27T08:45:00Z',
+      platform: 'reddit'
+    },
+    {
+      id: 4,
+      text: "Das ist wirklich ein ausgezeichnetes Produkt. Sehr zu empfehlen!",
+      language: 'de',
+      confidence: 0.94,
+      timestamp: '2025-01-27T07:20:00Z',
+      platform: 'telegram'
+    }
+  ];
+
+  function getLanguageName(code: string) {
+    const lang = languageStats.find(l => l.code === code);
+    return lang ? lang.name : code.toUpperCase();
+  }
+
+  function getConfidenceColor(confidence: number) {
+    if (confidence >= 0.9) return 'bg-green-100 text-green-800';
+    if (confidence >= 0.8) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-red-100 text-red-800';
+  }
+
+  function formatTimestamp(timestamp: string) {
+    return new Date(timestamp).toLocaleString();
+  }
+
+  function exportLanguageData() {
+    const csvData = languageStats.map(lang => 
+      `${lang.name},${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
+    ).join('\n');
+    
+    const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
+    const csv = header + csvData;
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'language_detection_report.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  // Filter posts based on selected language and confidence
+  $: filteredPosts = samplePosts.filter(post => {
+    const matchesLanguage = selectedLanguage === 'all' || post.language === selectedLanguage;
+    const matchesConfidence = post.confidence >= confidenceThreshold;
+    return matchesLanguage && matchesConfidence;
+  });
+
+  $: filteredStats = selectedLanguage === 'all' 
+    ? languageStats 
+    : languageStats.filter(lang => lang.code === selectedLanguage);
+</script>
+
+<svelte:head>
+  <title>Language Detection - Text Analytics - Social Explorer</title>
+  <meta name="description" content="Language detection and analysis for social media content" />
+</svelte:head>
+
+<Navigation />
+
+<div class="min-h-screen bg-gray-50">
+  <!-- Page Header -->
+  <div class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <button 
+            on:click={() => window.location.href='/text-analytics'}
+            class="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+          <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">Language Detection</h1>
+            <p class="text-gray-600 mt-1">Analyze language distribution and detection confidence in your social media data</p>
+            {#if $currentProject}
+              <div class="flex items-center mt-2">
+                <span class="text-sm text-gray-500">Project:</span>
+                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {$currentProject.name}
+                </span>
+              </div>
+            {/if}
+          </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+          <button 
+            on:click={exportLanguageData}
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            Export Report
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Overview Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{totalPosts.toLocaleString()}</div>
+        <div class="text-sm text-gray-600">Total Posts Analyzed</div>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-green-600 mb-1">{languageStats.length}</div>
+        <div class="text-sm text-gray-600">Languages Detected</div>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-purple-600 mb-1">92%</div>
+        <div class="text-sm text-gray-600">Avg Confidence</div>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-orange-600 mb-1">{languageStats[0]?.name || 'N/A'}</div>
+        <div class="text-sm text-gray-600">Top Language</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Filters & Analysis Options</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
+          <select bind:value={selectedLanguage} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="all">All Languages</option>
+            {#each languageStats as lang}
+              <option value={lang.code}>{lang.name} ({lang.count.toLocaleString()})</option>
+            {/each}
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Min Confidence: {confidenceThreshold}</label>
+          <input 
+            type="range" 
+            bind:value={confidenceThreshold}
+            min="0.5" 
+            max="1" 
+            step="0.05"
+            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            <option value="1d">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Language Distribution -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-semibold text-gray-900">Language Distribution</h2>
+          <span class="text-sm text-gray-500">{filteredStats.length} languages</span>
+        </div>
+        
+        <div class="space-y-4">
+          {#each filteredStats as lang}
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div class="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-3">
+                  <span class="text-white font-bold text-xs">{lang.code.toUpperCase()}</span>
+                </div>
+                <div>
+                  <div class="font-medium text-gray-900">{lang.name}</div>
+                  <div class="text-sm text-gray-500">{lang.count.toLocaleString()} posts</div>
+                </div>
+              </div>
+              
+              <div class="flex items-center space-x-3">
+                <div class="text-right">
+                  <div class="font-semibold text-gray-900">{lang.percentage}%</div>
+                  <div class="text-xs text-gray-500">Confidence: {(lang.confidence * 100).toFixed(1)}%</div>
+                </div>
+                <div class="w-24 bg-gray-200 rounded-full h-2">
+                  <div 
+                    class="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                    style="width: {lang.percentage}%"></div>
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Detection Quality -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-6">Detection Quality Analysis</h2>
+        
+        <div class="space-y-6">
+          <!-- Confidence Distribution -->
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-3">Confidence Distribution</h3>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">High (90-100%)</span>
+                <div class="flex items-center">
+                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
+                    <div class="bg-green-600 h-2 rounded-full" style="width: 72%"></div>
+                  </div>
+                  <span class="text-sm font-medium">72%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Medium (80-90%)</span>
+                <div class="flex items-center">
+                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
+                    <div class="bg-yellow-600 h-2 rounded-full" style="width: 23%"></div>
+                  </div>
+                  <span class="text-sm font-medium">23%</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Low (50-80%)</span>
+                <div class="flex items-center">
+                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
+                    <div class="bg-red-600 h-2 rounded-full" style="width: 5%"></div>
+                  </div>
+                  <span class="text-sm font-medium">5%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Language Complexity -->
+          <div>
+            <h3 class="text-sm font-medium text-gray-700 mb-3">Detection Challenges</h3>
+            <div class="space-y-3">
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <div class="flex items-center">
+                  <svg class="w-4 h-4 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-21 12a9 9 0 1118 0 9 9 0 01-18 0z"></path>
+                  </svg>
+                  <span class="text-sm text-yellow-800">Mixed language posts: 3.2%</span>
+                </div>
+              </div>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-center">
+                  <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm text-blue-800">Short text (&lt;20 chars): 8.7%</span>
+                </div>
+              </div>
+              <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div class="flex items-center">
+                  <svg class="w-4 h-4 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm text-green-800">High quality detections: 88.1%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample Posts -->
+    <div class="mt-8 bg-white rounded-lg shadow-sm p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-gray-900">Sample Posts</h2>
+        <span class="text-sm text-gray-500">{filteredPosts.length} posts shown</span>
+      </div>
+      
+      <div class="space-y-4">
+        {#each filteredPosts as post}
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {post.platform}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {getLanguageName(post.language)}
+                </span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getConfidenceColor(post.confidence)}">
+                  {(post.confidence * 100).toFixed(1)}% confidence
+                </span>
+              </div>
+              <span class="text-xs text-gray-500">{formatTimestamp(post.timestamp)}</span>
+            </div>
+            
+            <p class="text-gray-900 mb-2">{post.text}</p>
+            
+            <div class="text-xs text-gray-500">
+              Post ID: {post.id} • Language: {post.language} • Detection confidence: {post.confidence}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  </div>
+</div>

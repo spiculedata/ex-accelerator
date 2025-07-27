@@ -50,7 +50,18 @@ pip freeze > requirements.txt
 
 ## Key Technical Details
 
-- The project appears to be focused on data extraction from the Junkipedia API
+- The project processes social media data from the Junkipedia API using a medallion architecture (Bronze → Silver → Gold)
+- Uses DuckDB as the analytical database for data storage and querying
 - Uses a Python virtual environment for dependency isolation
-- The main functionality is contained in a single `download.py` script
+- Main scripts: `download.py` (data fetching), `process_posts.py` (ETL pipeline), `setup.sh` (environment setup)
 - No testing framework or build system is currently configured
+
+## Documentation Requirements
+
+**IMPORTANT**: When making changes to the project structure, scripts, or functionality, you MUST update the following documentation files to keep them current:
+
+- **DEVELOPER_GUIDE.md**: Update architecture diagrams, usage examples, file structure, and development workflows
+- **CLAUDE.md**: Update project overview, technical details, and common commands
+- **setup.sh comments**: Update script descriptions and functionality explanations
+
+Always ensure documentation reflects the current state of the codebase and includes any new features, scripts, or architectural changes.
