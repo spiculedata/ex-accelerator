@@ -319,29 +319,32 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
             on:click={() => window.location.href='/text-analytics'}
-            class="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Research Investigation</h1>
-            <p class="text-gray-600 mt-1">Comprehensive research tools for investigating social media data patterns and insights</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Research Investigation</h1>
+            <p class="text-slate-300 text-lg font-medium">Comprehensive research tools for investigating social media data patterns and insights</p>
             {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-gray-500">Project:</span>
-                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <div class="flex items-center mt-3">
+                <span class="text-sm text-slate-400">Project:</span>
+                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                   {$currentProject.name}
                 </span>
               </div>
@@ -349,18 +352,18 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-4">
           {#if analysisResults}
             <button 
               on:click={exportResults}
-              class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+              class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
               Export Results
             </button>
           {/if}
           <button 
             on:click={runAnalysis}
             disabled={isAnalyzing || (!selectedDataset && !selectedCohort && !selectedQuery)}
-            class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            class="px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 disabled:bg-gray-400 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
             {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
           </button>
         </div>
@@ -584,20 +587,20 @@
             <div>
               <h3 class="font-medium text-gray-900 mb-3">Key Metrics</h3>
               <div class="grid grid-cols-2 gap-4">
-                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-3 text-center border border-purple-100">
                   <div class="text-lg font-bold text-purple-600">{analysisResults.metrics.totalRecords.toLocaleString()}</div>
                   <div class="text-xs text-gray-600">Records</div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-3 text-center">
-                  <div class="text-lg font-bold text-green-600">{analysisResults.metrics.averageEngagement}%</div>
+                <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-3 text-center border border-emerald-100">
+                  <div class="text-lg font-bold text-emerald-600">{analysisResults.metrics.averageEngagement}%</div>
                   <div class="text-xs text-gray-600">Avg Engagement</div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 text-center border border-blue-100">
                   <div class="text-lg font-bold text-blue-600">{analysisResults.metrics.sentimentScore}</div>
                   <div class="text-xs text-gray-600">Sentiment Score</div>
                 </div>
-                <div class="bg-gray-50 rounded-lg p-3 text-center">
-                  <div class="text-lg font-bold text-orange-600">{analysisResults.metrics.platforms.length}</div>
+                <div class="bg-gradient-to-br from-pink-50 to-rose-50 rounded-lg p-3 text-center border border-pink-100">
+                  <div class="text-lg font-bold text-pink-600">{analysisResults.metrics.platforms.length}</div>
                   <div class="text-xs text-gray-600">Platforms</div>
                 </div>
               </div>

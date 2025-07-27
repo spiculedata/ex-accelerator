@@ -21,22 +21,22 @@
 
   // Detailed sentiment categories
   let detailedSentiments = [
-    { label: 'Very Positive', count: 6234, color: '#10b981', percentage: 20.8 },
-    { label: 'Positive', count: 9613, color: '#34d399', percentage: 32.0 },
-    { label: 'Neutral', count: 5947, color: '#6b7280', percentage: 19.8 },
-    { label: 'Negative', count: 5890, color: '#f87171', percentage: 19.6 },
-    { label: 'Very Negative', count: 2344, color: '#dc2626', percentage: 7.8 }
+    { label: 'Very Positive', count: 6234, color: '#06d6a0', percentage: 20.8 },
+    { label: 'Positive', count: 9613, color: '#26d0ce', percentage: 32.0 },
+    { label: 'Neutral', count: 5947, color: '#8b5cf6', percentage: 19.8 },
+    { label: 'Negative', count: 5890, color: '#ff6b9d', percentage: 19.6 },
+    { label: 'Very Negative', count: 2344, color: '#f72585', percentage: 7.8 }
   ];
 
   // Emotion analysis data
   let emotionStats = [
-    { emotion: 'Joy', count: 8234, percentage: 27.4, color: '#fbbf24' },
-    { emotion: 'Trust', count: 6789, percentage: 22.6, color: '#34d399' },
+    { emotion: 'Joy', count: 8234, percentage: 27.4, color: '#ffd23f' },
+    { emotion: 'Trust', count: 6789, percentage: 22.6, color: '#06d6a0' },
     { emotion: 'Fear', count: 4567, percentage: 15.2, color: '#8b5cf6' },
-    { emotion: 'Surprise', count: 3456, percentage: 11.5, color: '#06b6d4' },
-    { emotion: 'Sadness', count: 3234, percentage: 10.8, color: '#64748b' },
-    { emotion: 'Disgust', count: 2456, percentage: 8.2, color: '#dc2626' },
-    { emotion: 'Anger', count: 1292, percentage: 4.3, color: '#ef4444' }
+    { emotion: 'Surprise', count: 3456, percentage: 11.5, color: '#26d0ce' },
+    { emotion: 'Sadness', count: 3234, percentage: 10.8, color: '#667eea' },
+    { emotion: 'Disgust', count: 2456, percentage: 8.2, color: '#f72585' },
+    { emotion: 'Anger', count: 1292, percentage: 4.3, color: '#ff6b9d' }
   ];
 
   // Sentiment over time data
@@ -132,13 +132,13 @@
 
   function getSentimentColor(sentiment: string) {
     const colors = {
-      'Very Positive': '#10b981',
-      'Positive': '#34d399',
-      'Neutral': '#6b7280',
-      'Negative': '#f87171',
-      'Very Negative': '#dc2626'
+      'Very Positive': '#06d6a0',
+      'Positive': '#26d0ce',
+      'Neutral': '#8b5cf6',
+      'Negative': '#ff6b9d',
+      'Very Negative': '#f72585'
     };
-    return colors[sentiment] || '#6b7280';
+    return colors[sentiment] || '#8b5cf6';
   }
 
   function getSentimentIcon(sentiment: string) {
@@ -356,19 +356,22 @@
           name: 'Positive',
           type: 'line',
           data: sentimentTrends.map(t => t.positive),
-          itemStyle: { color: '#10b981' },
+          itemStyle: { color: '#06d6a0' },
+          lineStyle: { width: 3 }
         },
         {
           name: 'Negative',
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
-          itemStyle: { color: '#dc2626' },
+          itemStyle: { color: '#f72585' },
+          lineStyle: { width: 3 }
         },
         {
           name: 'Neutral',
           type: 'line',
           data: sentimentTrends.map(t => t.neutral),
-          itemStyle: { color: '#6b7280' },
+          itemStyle: { color: '#8b5cf6' },
+          lineStyle: { width: 3 }
         }
       ]
     };
@@ -393,29 +396,32 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
             on:click={() => window.location.href='/text-analytics'}
-            class="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Sentiment Analysis</h1>
-            <p class="text-gray-600 mt-1">Analyze emotional tone and sentiment across social media posts with AI-powered classification</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Sentiment Analysis</h1>
+            <p class="text-slate-300 text-lg font-medium">Analyze emotional tone and sentiment across social media posts with AI-powered classification</p>
             {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-gray-500">Project:</span>
-                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <div class="flex items-center mt-3">
+                <span class="text-sm text-slate-400">Project:</span>
+                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                   {$currentProject.name}
                 </span>
               </div>
@@ -423,10 +429,10 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-4">
           <button 
             on:click={exportSentimentData}
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
             Export Analysis
           </button>
         </div>

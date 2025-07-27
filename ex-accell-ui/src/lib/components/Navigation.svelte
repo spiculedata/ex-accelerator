@@ -26,7 +26,8 @@
     { name: 'Dashboards', href: '/dashboards', current: false, requiresProject: true },
     { name: 'Text Analytics', href: '/text-analytics', current: false, requiresProject: true },
     { name: 'Image Processing', href: '/image-processing', current: false, requiresProject: true },
-    { name: 'Data Capture', href: '/data-capture', current: false, requiresProject: false }
+    { name: 'Data Capture', href: '/data-capture', current: false, requiresProject: true },
+    { name: 'Data Management', href: '/data-management', current: false, requiresProject: true }
   ];
 
   function navigateToApp(item: any, event: Event) {
@@ -61,10 +62,13 @@
             Social Explorer
           </h1>
         </div>
+      </div>
 
+      <!-- Center Navigation -->
+      <div class="flex items-center">
         <!-- Project Switcher -->
         {#if $currentProject}
-          <div class="ml-6 relative project-switcher">
+          <div class="mr-6 relative project-switcher">
             <button
               on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
               class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
@@ -81,7 +85,7 @@
 
             <!-- Project Dropdown -->
             {#if projectSwitcherOpen}
-              <div class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-[100]">
                 <div class="p-4 border-b border-gray-200">
                   <h3 class="text-sm font-medium text-gray-900">Switch Project</h3>
                 </div>
@@ -134,7 +138,7 @@
             {/if}
           </div>
         {:else}
-          <div class="ml-6">
+          <div class="mr-6">
             <button
               on:click={() => window.location.href = '/projects'}
               class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors border border-gray-300 border-dashed">
@@ -145,36 +149,39 @@
             </button>
           </div>
         {/if}
+
+        <!-- Desktop navigation -->
+        <div class="hidden lg:flex lg:items-center lg:space-x-4">
+          {#each updatedNavItems as item}
+            <a
+              href={item.href}
+              on:click={(e) => navigateToApp(item, e)}
+              class="px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
+                ? 'bg-blue-100 text-blue-700' 
+                : item.requiresProject && !$currentProject 
+                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+            >
+              {item.name}
+              {#if item.requiresProject && !$currentProject}
+                <span class="ml-1 text-xs text-gray-400">*</span>
+              {/if}
+            </a>
+          {/each}
+          
+          <!-- Project requirement notice -->
+          {#if !$currentProject}
+            <div class="px-2 py-1 text-xs text-gray-400">
+              * Needs project
+            </div>
+          {/if}
+        </div>
       </div>
 
-      <!-- Desktop navigation -->
-      <div class="hidden md:flex md:items-center md:space-x-6">
-        {#each updatedNavItems as item}
-          <a
-            href={item.href}
-            on:click={(e) => navigateToApp(item, e)}
-            class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
-              ? 'bg-blue-100 text-blue-700' 
-              : item.requiresProject && !$currentProject 
-                ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
-          >
-            {item.name}
-            {#if item.requiresProject && !$currentProject}
-              <span class="ml-1 text-xs text-gray-400">*</span>
-            {/if}
-          </a>
-        {/each}
-        
-        <!-- Project requirement notice -->
-        {#if !$currentProject}
-          <div class="px-3 py-1 text-xs text-gray-400">
-            * Requires project selection
-          </div>
-        {/if}
-        
+      <!-- Right Side - User Profile and Mobile Menu -->
+      <div class="flex items-center">
         <!-- User Profile -->
-        <div class="flex items-center space-x-3">
+        <div class="hidden lg:flex lg:items-center lg:space-x-2 mr-4">
           <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -190,10 +197,9 @@
             <span class="text-white font-medium text-sm">JD</span>
           </div>
         </div>
-      </div>
 
       <!-- Mobile menu button -->
-      <div class="md:hidden flex items-center">
+      <div class="lg:hidden flex items-center">
         <button
           type="button"
           class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 p-2 rounded-md"
@@ -218,7 +224,7 @@
 
   <!-- Mobile menu -->
   {#if mobileMenuOpen}
-    <div class="md:hidden border-t border-gray-200 bg-white">
+    <div class="lg:hidden border-t border-gray-200 bg-white">
       <div class="px-2 pt-2 pb-3 space-y-1">
         {#each updatedNavItems as item}
           <a

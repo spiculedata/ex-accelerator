@@ -2,6 +2,21 @@
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+
+  // Type definitions
+  interface Topic {
+    id: string;
+    name: string;
+    category: string;
+    size: number;
+    weight: number;
+    keywords: string[];
+  }
+
+  interface ChartData {
+    [key: string]: any;
+  }
   
   // Redirect to projects if no current project
   onMount(() => {
@@ -11,7 +26,7 @@
   });
 
   // Generate comprehensive topics data with 300+ topics
-  let topicsData = [
+  let topicsData: Topic[] = [
     // Technology & Computing
     { id: 'tech-ai', name: 'Artificial Intelligence', category: 'Technology', size: 4520, weight: 0.95, keywords: ['AI', 'machine learning', 'neural networks'] },
     { id: 'tech-blockchain', name: 'Blockchain & Cryptocurrency', category: 'Technology', size: 3890, weight: 0.89, keywords: ['Bitcoin', 'Ethereum', 'crypto'] },
@@ -318,12 +333,12 @@
   ];
 
   let selectedCategory = 'all';
-  let selectedTopic = null;
+  let selectedTopic: Topic | null = null;
   let searchQuery = '';
   let minTopicSize = 1000;
   let showNetworkDiagram = true;
-  let networkChart = null;
-  let treemapChart = null;
+  let networkChart: any = null;
+  let treemapChart: any = null;
 
   // Filter topics based on current filters
   $: filteredTopics = topicsData.filter(topic => {
@@ -361,6 +376,7 @@
   }
 
   function initNetworkChart() {
+    if (!browser) return;
     const networkContainer = document.getElementById('network-chart');
     if (!networkContainer) return;
 
@@ -369,6 +385,7 @@
   }
 
   function initTreemapChart() {
+    if (!browser) return;
     const treemapContainer = document.getElementById('treemap-chart');
     if (!treemapContainer) {
       console.error('Treemap container not found');
@@ -382,7 +399,7 @@
   }
 
   function updateNetworkChart() {
-    if (!networkChart) return;
+    if (!browser || !networkChart) return;
 
     const nodes = filteredTopics.map(topic => ({
       id: topic.id,
@@ -467,7 +484,7 @@
   }
 
   function updateTreemapChart() {
-    if (!treemapChart) {
+    if (!browser || !treemapChart) {
       console.error('Treemap chart not initialized');
       return;
     }
@@ -508,7 +525,7 @@
       // Convert to treemap format with proper value calculation and colors
       const treemapData = Object.keys(categoryGroups).map(category => {
         const children = categoryGroups[category];
-        const totalValue = children.reduce((sum, child) => sum + child.value, 0);
+        const totalValue = children.reduce((sum: number, child: any) => sum + child.value, 0);
         const categoryColor = getCategoryColor(category);
         
         return {
@@ -543,10 +560,10 @@
             color: '#fff',
             fontSize: 12
           },
-          formatter: function(params) {
+          formatter: function(params: any) {
             if (params.data.children) {
               // Category level
-              const totalPosts = params.data.children.reduce((sum, child) => sum + child.value, 0);
+              const totalPosts = params.data.children.reduce((sum: number, child: any) => sum + child.value, 0);
               return `<strong style="color: #fff;">${params.name}</strong><br/>
                       <span style="color: #ccc;">Total Posts: ${totalPosts.toLocaleString()}</span><br/>
                       <span style="color: #ccc;">Topics: ${params.data.children.length}</span>`;
@@ -572,7 +589,7 @@
           },
           label: {
             show: true,
-            formatter: function(params) {
+            formatter: function(params: any) {
               if (params.data.children) {
                 // Category label
                 return params.name;
@@ -581,7 +598,7 @@
                 return params.name.length > 20 ? params.name.substring(0, 20) + '...' : params.name;
               }
             },
-            fontSize: function(params) {
+            fontSize: function(params: any) {
               return params.data.children ? 14 : 10;
             },
             fontWeight: 'bold',
@@ -608,7 +625,7 @@
               shadowColor: 'transparent'
             },
             label: {
-              fontSize: function(params) {
+              fontSize: function(params: any) {
                 return params.data.children ? 16 : 12;
               },
               fontWeight: 'bold',
@@ -692,7 +709,7 @@
     }
   }
 
-  function getCategoryColor(category) {
+  function getCategoryColor(category: string): string {
     const colors = {
       'Technology': '#3b82f6',
       'Health': '#10b981',
@@ -718,7 +735,7 @@
   }
 
   // Update charts when filters change
-  $: if (filteredTopics) {
+  $: if (browser && filteredTopics) {
     if (networkChart) {
       updateNetworkChart();
     }
@@ -728,7 +745,7 @@
   }
 
   // Watch for visualization toggle changes
-  $: if (showNetworkDiagram !== undefined) {
+  $: if (browser && showNetworkDiagram !== undefined) {
     setTimeout(() => {
       if (showNetworkDiagram) {
         if (!networkChart) {
@@ -765,7 +782,7 @@
     window.URL.revokeObjectURL(url);
   }
 
-  function selectTopic(topic) {
+  function selectTopic(topic: Topic) {
     selectedTopic = topic;
   }
 </script>

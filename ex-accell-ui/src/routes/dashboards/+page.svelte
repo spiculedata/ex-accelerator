@@ -241,9 +241,9 @@
         type: 'pie',
         radius: ['40%', '70%'],
         data: [
-          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: '#10b981' } },
-          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: '#dc2626' } },
-          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: '#6b7280' } }
+          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: '#06d6a0' } },
+          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: '#f72585' } },
+          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: '#8b5cf6' } }
         ],
         label: { show: false },
         emphasis: {
@@ -288,10 +288,12 @@
       },
       series: [{
         type: 'bar',
-        data: dataSources.map(s => ({
+        data: dataSources.map((s, index) => ({
           value: s.posts,
           itemStyle: {
-            color: s.status === 'active' ? '#3b82f6' : '#fbbf24'
+            color: s.status === 'active' ? 
+              ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc', '#d946ef', '#e879f9', '#f0abfc'][index % 7] : 
+              '#f59e0b'
           }
         })),
         emphasis: {
@@ -329,14 +331,19 @@
       series: [{
         type: 'line',
         data: crawlingActivity.map(a => a.posts),
-        itemStyle: { color: '#8b5cf6' },
+        itemStyle: { color: '#06d6a0' },
+        lineStyle: { 
+          width: 3,
+          shadowColor: 'rgba(6, 214, 160, 0.3)',
+          shadowBlur: 8
+        },
         areaStyle: {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
-              { offset: 1, color: 'rgba(139, 92, 246, 0.1)' }
+              { offset: 0, color: 'rgba(6, 214, 160, 0.4)' },
+              { offset: 1, color: 'rgba(6, 214, 160, 0.05)' }
             ]
           }
         },
@@ -372,7 +379,7 @@
         data: textAnalytics.topTopics.map(t => ({
           value: t.posts,
           itemStyle: {
-            color: t.trend === 'up' ? '#10b981' : t.trend === 'down' ? '#dc2626' : '#6b7280'
+            color: t.trend === 'up' ? '#06d6a0' : t.trend === 'down' ? '#f72585' : '#8b5cf6'
           }
         })),
         emphasis: {
@@ -405,22 +412,25 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Interactive Dashboards</h1>
-            <p class="text-gray-600 mt-1">Comprehensive analytics and insights across all your social media data sources</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Interactive Dashboards</h1>
+            <p class="text-slate-300 text-lg font-medium">Comprehensive analytics and insights across all your social media data sources</p>
             {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-gray-500">Project:</span>
-                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <div class="flex items-center mt-3">
+                <span class="text-sm text-slate-400">Project:</span>
+                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                   {$currentProject.name}
                 </span>
               </div>
@@ -428,19 +438,19 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-3">
-          <div class="flex items-center space-x-2">
-            <span class="text-sm text-gray-600">Auto-refresh:</span>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-3 bg-white/10 rounded-xl px-4 py-3 border border-white/20 backdrop-blur-sm">
+            <span class="text-sm text-slate-300 font-medium">Auto-refresh:</span>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" bind:checked={autoRefresh} class="sr-only peer">
-              <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-md peer-checked:bg-gradient-to-r peer-checked:from-violet-500 peer-checked:to-purple-600"></div>
             </label>
           </div>
-          <select bind:value={timeRange} class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="1h">Last Hour</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
+          <select bind:value={timeRange} class="px-4 py-3 bg-white/10 border border-white/20 backdrop-blur-sm rounded-xl text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:border-violet-400/50">
+            <option value="1h" class="bg-slate-800 text-white">Last Hour</option>
+            <option value="24h" class="bg-slate-800 text-white">Last 24 Hours</option>
+            <option value="7d" class="bg-slate-800 text-white">Last 7 Days</option>
+            <option value="30d" class="bg-slate-800 text-white">Last 30 Days</option>
           </select>
         </div>
       </div>

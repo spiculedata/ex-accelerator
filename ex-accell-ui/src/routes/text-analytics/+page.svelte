@@ -20,21 +20,24 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-indigo-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center">
-        <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mr-4">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
         </div>
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Text Analytics Apps</h1>
-          <p class="text-gray-600 mt-1">Advanced NLP processing for sentiment analysis, topic modeling, and content insights</p>
+          <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Text Analytics Apps</h1>
+          <p class="text-slate-300 text-lg font-medium">Advanced NLP processing for sentiment analysis, topic modeling, and content insights</p>
           {#if $currentProject}
-            <div class="flex items-center mt-2">
-              <span class="text-sm text-gray-500">Project:</span>
-              <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <div class="flex items-center mt-3">
+              <span class="text-sm text-slate-400">Project:</span>
+              <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 {$currentProject.name}
               </span>
             </div>

@@ -314,19 +314,22 @@
           name: '#AI',
           type: 'line',
           data: hashtagTrends.map(t => t.aiCount),
-          itemStyle: { color: '#3b82f6' },
+          itemStyle: { color: '#6366f1' },
+          lineStyle: { width: 3 }
         },
         {
           name: '#ClimateChange',
           type: 'line',
           data: hashtagTrends.map(t => t.climateCount),
-          itemStyle: { color: '#10b981' },
+          itemStyle: { color: '#06d6a0' },
+          lineStyle: { width: 3 }
         },
         {
           name: '#Technology',
           type: 'line',
           data: hashtagTrends.map(t => t.techCount),
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: '#ff6b9d' },
+          lineStyle: { width: 3 }
         }
       ]
     };
@@ -361,9 +364,9 @@
         data: filteredHashtags.map(h => ({
           value: h.engagement,
           itemStyle: {
-            color: h.sentiment === 'positive' ? '#10b981' : 
-                   h.sentiment === 'negative' ? '#dc2626' : 
-                   h.sentiment === 'mixed' ? '#f59e0b' : '#6b7280'
+            color: h.sentiment === 'positive' ? '#06d6a0' : 
+                   h.sentiment === 'negative' ? '#f72585' : 
+                   h.sentiment === 'mixed' ? '#ffd23f' : '#8b5cf6'
           }
         })),
         emphasis: {
@@ -398,9 +401,9 @@
           name: h.hashtag,
           value: h.reach,
           itemStyle: {
-            color: h.sentiment === 'positive' ? '#10b981' : 
-                   h.sentiment === 'negative' ? '#dc2626' : 
-                   h.sentiment === 'mixed' ? '#f59e0b' : '#6b7280'
+            color: h.sentiment === 'positive' ? '#06d6a0' : 
+                   h.sentiment === 'negative' ? '#f72585' : 
+                   h.sentiment === 'mixed' ? '#ffd23f' : '#8b5cf6'
           }
         })),
         emphasis: {
@@ -437,29 +440,32 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-pink-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-pink-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
             on:click={() => window.location.href='/text-analytics'}
-            class="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Hashtag Analysis</h1>
-            <p class="text-gray-600 mt-1">Analyze trending hashtags, their reach, and impact across social media platforms</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Hashtag Analysis</h1>
+            <p class="text-slate-300 text-lg font-medium">Analyze trending hashtags, their reach, and impact across social media platforms</p>
             {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-gray-500">Project:</span>
-                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <div class="flex items-center mt-3">
+                <span class="text-sm text-slate-400">Project:</span>
+                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                   {$currentProject.name}
                 </span>
               </div>
@@ -467,15 +473,15 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-4">
           <button 
             on:click={exportHashtagData}
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
             Export Analysis
           </button>
           <button 
             on:click={() => window.location.href='/text-analytics/research-investigation'}
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+            class="px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
             Research Investigation
           </button>
         </div>
