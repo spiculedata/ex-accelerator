@@ -180,20 +180,20 @@
 
   onMount(async () => {
     // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !window.echarts) {
+    if (typeof window !== 'undefined' && !(window as any).echarts) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
       script.onload = () => {
         initializeCharts();
       };
       document.head.appendChild(script);
-    } else if (window.echarts) {
+    } else if ((window as any).echarts) {
       initializeCharts();
     }
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && window.echarts) {
+    if (typeof window !== 'undefined' && (window as any).echarts) {
       initSentimentChart();
       initEmotionChart();
       initTrendChart();
@@ -204,7 +204,7 @@
     const container = document.getElementById('sentiment-chart');
     if (!container) return;
 
-    sentimentChart = window.echarts.init(container);
+    sentimentChart = (window as any).echarts.init(container);
     updateSentimentChart();
   }
 
@@ -212,7 +212,7 @@
     const container = document.getElementById('emotion-chart');
     if (!container) return;
 
-    emotionChart = window.echarts.init(container);
+    emotionChart = (window as any).echarts.init(container);
     updateEmotionChart();
   }
 
@@ -220,7 +220,7 @@
     const container = document.getElementById('trend-chart');
     if (!container) return;
 
-    trendChart = window.echarts.init(container);
+    trendChart = (window as any).echarts.init(container);
     updateTrendChart();
   }
 

@@ -239,20 +239,20 @@
   // Chart initialization
   onMount(async () => {
     // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !window.echarts) {
+    if (typeof window !== 'undefined' && !(window as any).echarts) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
       script.onload = () => {
         initializeCharts();
       };
       document.head.appendChild(script);
-    } else if (window.echarts) {
+    } else if ((window as any).echarts) {
       initializeCharts();
     }
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && window.echarts) {
+    if (typeof window !== 'undefined' && (window as any).echarts) {
       initTrendChart();
       initEngagementChart();
       initReachChart();
@@ -263,7 +263,7 @@
     const container = document.getElementById('hashtag-trend-chart');
     if (!container) return;
 
-    trendChart = window.echarts.init(container);
+    trendChart = (window as any).echarts.init(container);
     updateTrendChart();
   }
 
@@ -271,7 +271,7 @@
     const container = document.getElementById('engagement-chart');
     if (!container) return;
 
-    engagementChart = window.echarts.init(container);
+    engagementChart = (window as any).echarts.init(container);
     updateEngagementChart();
   }
 
@@ -279,7 +279,7 @@
     const container = document.getElementById('reach-chart');
     if (!container) return;
 
-    reachChart = window.echarts.init(container);
+    reachChart = (window as any).echarts.init(container);
     updateReachChart();
   }
 

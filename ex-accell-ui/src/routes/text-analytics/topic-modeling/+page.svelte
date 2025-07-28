@@ -355,21 +355,19 @@
 
   // Initialize charts after component mounts
   onMount(async () => {
-    // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !window.echarts) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
-      script.onload = () => {
+    // ECharts is now loaded globally from app.html
+    if (typeof window !== 'undefined') {
+      // Wait for echarts to be available
+      if (!(window as any).echarts) {
+        setTimeout(initializeCharts, 100);
+      } else {
         initializeCharts();
-      };
-      document.head.appendChild(script);
-    } else if (window.echarts) {
-      initializeCharts();
+      }
     }
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && window.echarts) {
+    if (typeof window !== 'undefined' && (window as any).echarts) {
       initNetworkChart();
       initTreemapChart();
     }
@@ -380,7 +378,7 @@
     const networkContainer = document.getElementById('network-chart');
     if (!networkContainer) return;
 
-    networkChart = window.echarts.init(networkContainer);
+    networkChart = (window as any).echarts.init(networkContainer);
     updateNetworkChart();
   }
 
@@ -393,7 +391,7 @@
     }
 
     console.log('Initializing treemap chart...');
-    treemapChart = window.echarts.init(treemapContainer);
+    treemapChart = (window as any).echarts.init(treemapContainer);
     console.log('Treemap chart initialized:', treemapChart);
     updateTreemapChart();
   }

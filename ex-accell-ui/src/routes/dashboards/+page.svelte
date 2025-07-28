@@ -159,16 +159,14 @@
 
   // Initialize charts
   onMount(async () => {
-    // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !window.echarts) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
-      script.onload = () => {
+    // ECharts is now loaded globally from app.html
+    if (typeof window !== 'undefined') {
+      // Wait for echarts to be available
+      if (!(window as any).echarts) {
+        setTimeout(initializeCharts, 100);
+      } else {
         initializeCharts();
-      };
-      document.head.appendChild(script);
-    } else if (window.echarts) {
-      initializeCharts();
+      }
     }
 
     // Auto refresh setup
@@ -184,7 +182,7 @@
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && window.echarts) {
+    if (typeof window !== 'undefined' && (window as any).echarts) {
       initSentimentChart();
       initSourceChart();
       initActivityChart();
@@ -196,7 +194,7 @@
     const container = document.getElementById('sentiment-overview-chart');
     if (!container) return;
 
-    sentimentChart = window.echarts.init(container);
+    sentimentChart = (window as any).echarts.init(container);
     updateSentimentChart();
   }
 
@@ -204,7 +202,7 @@
     const container = document.getElementById('source-breakdown-chart');
     if (!container) return;
 
-    sourceChart = window.echarts.init(container);
+    sourceChart = (window as any).echarts.init(container);
     updateSourceChart();
   }
 
@@ -212,7 +210,7 @@
     const container = document.getElementById('activity-chart');
     if (!container) return;
 
-    activityChart = window.echarts.init(container);
+    activityChart = (window as any).echarts.init(container);
     updateActivityChart();
   }
 
@@ -220,7 +218,7 @@
     const container = document.getElementById('topics-chart');
     if (!container) return;
 
-    topicsChart = window.echarts.init(container);
+    topicsChart = (window as any).echarts.init(container);
     updateTopicsChart();
   }
 

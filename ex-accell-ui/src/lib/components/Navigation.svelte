@@ -24,6 +24,7 @@
   const navigationItems = [
     { name: 'Home', href: '/', current: false, requiresProject: false },
     { name: 'Dashboards', href: '/dashboards', current: false, requiresProject: true },
+    { name: 'GDELT Events', href: '/gdelt', current: false, requiresProject: false },
     { name: 'Text Analytics', href: '/text-analytics', current: false, requiresProject: true },
     { name: 'Image Processing', href: '/image-processing', current: false, requiresProject: true },
     { name: 'Data Capture', href: '/data-capture', current: false, requiresProject: true },
@@ -51,21 +52,21 @@
 
 <nav class="bg-white shadow-lg border-b border-gray-200">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex justify-between h-16">
+    <div class="grid grid-cols-[auto_1fr_auto] h-16 items-center gap-4">
       <!-- Logo and brand -->
       <div class="flex items-center">
-        <div class="flex-shrink-0 flex items-center">
+        <div class="flex items-center">
           <div class="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
             <span class="text-white font-bold text-lg">SE</span>
           </div>
-          <h1 class="ml-3 text-xl font-bold text-gray-900">
+          <h1 class="ml-3 text-xl font-bold text-gray-900 whitespace-nowrap">
             Social Explorer
           </h1>
         </div>
       </div>
 
       <!-- Center Navigation -->
-      <div class="flex items-center">
+      <div class="flex items-center justify-center">
         <!-- Project Switcher -->
         {#if $currentProject}
           <div class="mr-6 relative project-switcher">
@@ -179,7 +180,7 @@
       </div>
 
       <!-- Right Side - User Profile and Mobile Menu -->
-      <div class="flex items-center">
+      <div class="flex items-center justify-end">
         <!-- User Profile -->
         <div class="hidden lg:flex lg:items-center lg:space-x-2 mr-4">
           <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200">

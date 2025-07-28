@@ -9,7 +9,7 @@
   onMount(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
-    if (tabParam && ['schedule', 'crawler', 'upload'].includes(tabParam)) {
+    if (tabParam && ['schedule', 'crawler', 'upload', 'princeton-smart'].includes(tabParam)) {
       activeTab = tabParam;
     }
   });
@@ -188,11 +188,103 @@
   let uploadProgress = 0;
   let uploadStatus = 'idle'; // idle, uploading, completed, error
 
+  // Princeton SMART configuration state
+  let princetonSmartConfig = {
+    apiEndpoint: 'https://smart.princeton.edu/api/v1',
+    apiKey: '',
+    datasetId: '',
+    query: '',
+    dateRange: {
+      start: '',
+      end: ''
+    },
+    filters: {
+      location: '',
+      language: 'en',
+      contentType: 'all', // all, text, media, links
+      sentiment: 'all', // all, positive, negative, neutral
+      minEngagement: 0
+    },
+    outputFormat: 'json', // json, csv, xml
+    maxRecords: 10000,
+    includeMetadata: true,
+    includeAnalytics: false
+  };
+  
+  let princetonSmartStatus = 'idle'; // idle, connecting, fetching, completed, error
+  let princetonSmartProgress = 0;
+  let princetonSmartResults = null;
+
   // Log viewer state
   let showLogViewer = false;
   let currentLogJob = null;
   let logUpdateInterval = null;
   
+  // Princeton SMART functions
+  function resetPrincetonSmartForm() {
+    princetonSmartConfig = {
+      apiEndpoint: 'https://smart.princeton.edu/api/v1',
+      apiKey: '',
+      datasetId: '',
+      query: '',
+      dateRange: {
+        start: '',
+        end: ''
+      },
+      filters: {
+        location: '',
+        language: 'en',
+        contentType: 'all',
+        sentiment: 'all',
+        minEngagement: 0
+      },
+      outputFormat: 'json',
+      maxRecords: 10000,
+      includeMetadata: true,
+      includeAnalytics: false
+    };
+    princetonSmartStatus = 'idle';
+    princetonSmartProgress = 0;
+    princetonSmartResults = null;
+  }
+
+  async function handlePrincetonSmartImport() {
+    if (!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId) {
+      return;
+    }
+
+    princetonSmartStatus = 'connecting';
+    princetonSmartProgress = 0;
+
+    try {
+      // Simulate API connection
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      princetonSmartStatus = 'fetching';
+      
+      // Simulate data fetching with progress
+      for (let i = 0; i <= 100; i += 10) {
+        princetonSmartProgress = i;
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Mock successful import
+      princetonSmartResults = {
+        recordCount: Math.floor(Math.random() * princetonSmartConfig.maxRecords) + 100,
+        datasetId: princetonSmartConfig.datasetId,
+        query: princetonSmartConfig.query,
+        dateRange: princetonSmartConfig.dateRange,
+        format: princetonSmartConfig.outputFormat
+      };
+      
+      princetonSmartStatus = 'completed';
+      
+    } catch (error) {
+      console.error('Princeton SMART import error:', error);
+      princetonSmartStatus = 'error';
+    }
+  }
+
   function addUrl(url: string) {
     if (url.trim() && !crawlerConfig.urls.includes(url.trim())) {
       crawlerConfig.urls = [...crawlerConfig.urls, url.trim()];
@@ -439,6 +531,11 @@
           class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'upload' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
           on:click={() => activeTab = 'upload'}>
           File Upload
+        </button>
+        <button 
+          class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'princeton-smart' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+          on:click={() => activeTab = 'princeton-smart'}>
+          Princeton SMART
         </button>
       </div>
     </nav>
@@ -1364,6 +1461,260 @@
               class="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
               Upload Files
             </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Princeton SMART Tab -->
+    {#if activeTab === 'princeton-smart'}
+      <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-sm p-8">
+          <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mr-4">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-2xl font-semibold text-gray-900">Princeton SMART Data Import</h2>
+              <p class="text-gray-600">Connect to Princeton's Social Media Analysis and Research Toolkit</p>
+            </div>
+          </div>
+          
+          <!-- Connection Settings -->
+          <div class="border-b pb-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Connection Settings</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">API Endpoint</label>
+                <input 
+                  bind:value={princetonSmartConfig.apiEndpoint}
+                  type="url" 
+                  placeholder="https://smart.princeton.edu/api/v1"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                <input 
+                  bind:value={princetonSmartConfig.apiKey}
+                  type="password" 
+                  placeholder="Enter your SMART API key"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Dataset Configuration -->
+          <div class="border-b pb-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Dataset Configuration</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Dataset ID</label>
+                <input 
+                  bind:value={princetonSmartConfig.datasetId}
+                  type="text" 
+                  placeholder="e.g., twitter-2024-election, reddit-climate-change"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Search Query</label>
+                <textarea 
+                  bind:value={princetonSmartConfig.query}
+                  placeholder="Enter search terms, hashtags, or complex queries..."
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <p class="text-xs text-gray-500 mt-1">Use SMART query syntax for advanced filtering</p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input 
+                    bind:value={princetonSmartConfig.dateRange.start}
+                    type="date" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <input 
+                    bind:value={princetonSmartConfig.dateRange.end}
+                    type="date" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="border-b pb-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Advanced Filters</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input 
+                  bind:value={princetonSmartConfig.filters.location}
+                  type="text" 
+                  placeholder="e.g., United States, NYC"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                <select 
+                  bind:value={princetonSmartConfig.filters.language}
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="it">Italian</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="ru">Russian</option>
+                  <option value="zh">Chinese</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ar">Arabic</option>
+                  <option value="all">All Languages</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Content Type</label>
+                <select 
+                  bind:value={princetonSmartConfig.filters.contentType}
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="all">All Content</option>
+                  <option value="text">Text Only</option>
+                  <option value="media">Media Posts</option>
+                  <option value="links">Link Shares</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment Filter</label>
+                <select 
+                  bind:value={princetonSmartConfig.filters.sentiment}
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="all">All Sentiments</option>
+                  <option value="positive">Positive Only</option>
+                  <option value="negative">Negative Only</option>
+                  <option value="neutral">Neutral Only</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Min Engagement</label>
+                <input 
+                  bind:value={princetonSmartConfig.filters.minEngagement}
+                  type="number" 
+                  min="0"
+                  placeholder="0"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Max Records</label>
+                <input 
+                  bind:value={princetonSmartConfig.maxRecords}
+                  type="number" 
+                  min="1"
+                  max="100000"
+                  placeholder="10000"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Settings -->
+          <div class="border-b pb-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Output Settings</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Output Format</label>
+                <select 
+                  bind:value={princetonSmartConfig.outputFormat}
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="json">JSON</option>
+                  <option value="csv">CSV</option>
+                  <option value="xml">XML</option>
+                </select>
+              </div>
+              <div class="flex items-center space-x-6">
+                <label class="flex items-center">
+                  <input 
+                    bind:checked={princetonSmartConfig.includeMetadata}
+                    type="checkbox" 
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <span class="ml-2 text-sm text-gray-700">Include Metadata</span>
+                </label>
+                <label class="flex items-center">
+                  <input 
+                    bind:checked={princetonSmartConfig.includeAnalytics}
+                    type="checkbox" 
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                  <span class="ml-2 text-sm text-gray-700">Include Analytics</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status and Progress -->
+          {#if princetonSmartStatus === 'connecting'}
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div class="flex items-center">
+                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                <span class="text-sm font-medium text-blue-800">Connecting to Princeton SMART API...</span>
+              </div>
+            </div>
+          {:else if princetonSmartStatus === 'fetching'}
+            <div class="mb-6">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Fetching data from SMART...</span>
+                <span class="text-sm text-gray-500">{princetonSmartProgress}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {princetonSmartProgress}%"></div>
+              </div>
+            </div>
+          {:else if princetonSmartStatus === 'completed'}
+            <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-sm font-medium text-green-800">Data imported successfully!</span>
+                </div>
+                {#if princetonSmartResults}
+                  <span class="text-sm text-green-600">{princetonSmartResults.recordCount} records imported</span>
+                {/if}
+              </div>
+            </div>
+          {:else if princetonSmartStatus === 'error'}
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm font-medium text-red-800">Error connecting to Princeton SMART API</span>
+              </div>
+            </div>
+          {/if}
+
+          <!-- Actions -->
+          <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-600">
+              <a href="https://smart.princeton.edu/docs" target="_blank" class="text-blue-600 hover:text-blue-800 underline">
+                View SMART API Documentation
+              </a>
+            </div>
+            <div class="flex space-x-3">
+              <button 
+                on:click={resetPrincetonSmartForm}
+                class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Reset Form
+              </button>
+              <button 
+                on:click={handlePrincetonSmartImport}
+                disabled={!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId || princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'}
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
+                {princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'Importing...' : 'Import Data'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

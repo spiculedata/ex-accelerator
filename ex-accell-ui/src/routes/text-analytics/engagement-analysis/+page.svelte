@@ -234,20 +234,20 @@
   // Chart initialization
   onMount(async () => {
     // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !window.echarts) {
+    if (typeof window !== 'undefined' && !(window as any).echarts) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
       script.onload = () => {
         initializeCharts();
       };
       document.head.appendChild(script);
-    } else if (window.echarts) {
+    } else if ((window as any).echarts) {
       initializeCharts();
     }
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && window.echarts) {
+    if (typeof window !== 'undefined' && (window as any).echarts) {
       initPlatformChart();
       initContentChart();
       initTrendsChart();
@@ -258,7 +258,7 @@
     const container = document.getElementById('platform-engagement-chart');
     if (!container) return;
 
-    platformChart = window.echarts.init(container);
+    platformChart = (window as any).echarts.init(container);
     updatePlatformChart();
   }
 
@@ -266,7 +266,7 @@
     const container = document.getElementById('content-type-chart');
     if (!container) return;
 
-    contentChart = window.echarts.init(container);
+    contentChart = (window as any).echarts.init(container);
     updateContentChart();
   }
 
@@ -274,7 +274,7 @@
     const container = document.getElementById('engagement-trends-chart');
     if (!container) return;
 
-    trendsChart = window.echarts.init(container);
+    trendsChart = (window as any).echarts.init(container);
     updateTrendsChart();
   }
 

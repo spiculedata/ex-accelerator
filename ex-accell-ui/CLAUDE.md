@@ -23,6 +23,9 @@ This is the frontend UI component of the ex-accelerator project, built with Svel
 # Start development server
 npm run dev
 
+# Start development server with Jupyter Lab integration
+npm run dev:jupyter
+
 # Start development server with Dapr sidecar
 npm run dev:dapr
 
@@ -46,6 +49,18 @@ npm run dev:dapr
 
 # Preview with Dapr sidecar
 npm run preview:dapr
+```
+
+### Jupyter Lab Integration
+```bash
+# Bootstrap notebook environment (run once)
+npm run jupyter:bootstrap
+
+# Start only Jupyter Lab server
+npm run jupyter:start
+
+# Start both SvelteKit dev server and Jupyter Lab
+npm run dev:jupyter
 ```
 
 ### Building and Type Checking
@@ -93,6 +108,37 @@ This UI project is part of a larger ex-accelerator system that includes:
 - Superset (`../superset/`) for analytics dashboards
 
 The UI component is positioned to serve as the main user interface, potentially consuming data from the ETL pipeline and integrating with the analytics components.
+
+## Jupyter Lab Integration
+
+The project includes full Jupyter Lab integration for advanced text analytics research and experimentation.
+
+### Features
+- **Interactive Notebooks**: Pre-configured notebook templates for sentiment analysis, topic modeling, text classification, and more
+- **Embedded Viewer**: View and interact with notebooks directly within the web application
+- **Text Analytics Libraries**: Pre-installed with pandas, numpy, matplotlib, seaborn, scikit-learn, nltk, textblob, and more
+- **Automatic Setup**: Bootstrap script downloads required NLTK data and creates sample notebooks
+
+### Notebook Templates
+Located in `notebooks/` directory:
+- `sentiment_analysis.ipynb` - Sentiment analysis with TextBlob and VADER
+- `topic_modeling.ipynb` - Topic discovery with LDA
+- `text_classification.ipynb` - Custom text classifiers
+- `language_detection.ipynb` - Multi-language text analysis
+- `custom_research.ipynb` - Blank template for custom research
+
+### Getting Started
+1. **Bootstrap Environment**: `npm run jupyter:bootstrap` (run once)
+2. **Start Development**: `npm run dev:jupyter` (starts both SvelteKit and Jupyter Lab)
+3. **Access Interface**: Navigate to `/text-analytics/research-investigation`
+4. **Select Template**: Choose a notebook template and click "Start JupyterLab"
+5. **Analyze**: Use the embedded viewer or open directly in Jupyter Lab
+
+### Configuration
+- **Jupyter Lab**: Configured for iframe embedding with CORS support
+- **Python Environment**: Managed with Poetry (Python 3.12+)
+- **NLTK Data**: Automatically downloaded during bootstrap
+- **Server**: Runs on `http://localhost:8888` by default
 
 ## Dapr Integration
 

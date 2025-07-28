@@ -270,6 +270,34 @@
           </div>
         </div>
       </div>
+
+      <!-- Jupyter Lab -->
+      <div 
+        class="bg-white rounded-lg shadow-md hover:shadow-lg p-6 border-l-4 border-orange-500 cursor-pointer transition-all duration-200"
+        on:click={() => window.location.href='/text-analytics/jupyter'}>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
+              <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900">Jupyter Lab</h3>
+          </div>
+          <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Interactive</span>
+        </div>
+        <p class="text-gray-600 mb-4">Full Python environment with pre-installed text analytics libraries for custom research and experimentation.</p>
+        <div class="flex items-center justify-between">
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">pandas</span>
+            <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">scikit-learn</span>
+            <span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">nltk</span>
+          </div>
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+      </div>
     </div>
 
     <!-- Features Overview -->
