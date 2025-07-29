@@ -33,7 +33,15 @@
 	let mentions: any[] = [];
 	let loadingMentions = false;
 	let mentionsError = '';
+	let mentionsLimitationNotice = '';
 	let showMentions = false;
+	
+	// Mentions table state
+	let mentionsSortField = 'mentionTimeDate';
+	let mentionsSortDirection: 'asc' | 'desc' = 'desc';
+	let mentionsSearchTerm = '';
+	let mentionsTypeFilter = '';
+	let filteredMentions: any[] = [];
 	
 	// Global South countries list from BISA
 	const globalSouthCountries = [
@@ -519,6 +527,123 @@
 		}, 1000); // 1 second delay to avoid too many requests
 	}
 
+
+	// Reactive mentions filtering and sorting
+	$: {
+		let filtered = [...mentions];
+		
+		// Apply search filter
+		if (mentionsSearchTerm) {
+			const searchLower = mentionsSearchTerm.toLowerCase();
+			filtered = filtered.filter(mention => 
+				(mention.mentionSourceName?.toLowerCase().includes(searchLower)) ||
+				(mention.mentionIdentifier?.toLowerCase().includes(searchLower))
+			);
+		}
+		
+		// Apply type filter
+		if (mentionsTypeFilter) {
+			filtered = filtered.filter(mention => 
+				mention.mentionType?.toString() === mentionsTypeFilter
+			);
+		}
+		
+		// Apply sorting
+		filtered.sort((a, b) => {
+			let aVal = a[mentionsSortField];
+			let bVal = b[mentionsSortField];
+			
+			// Handle null/undefined values
+			if (aVal == null && bVal == null) return 0;
+			if (aVal == null) return mentionsSortDirection === 'asc' ? -1 : 1;
+			if (bVal == null) return mentionsSortDirection === 'asc' ? 1 : -1;
+			
+			// Convert to comparable values
+			if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+			if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+			
+			const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+			return mentionsSortDirection === 'asc' ? comparison : -comparison;
+		});
+		
+		filteredMentions = filtered;
+	}
+
+	function sortMentions(field: string) {
+		if (mentionsSortField === field) {
+			mentionsSortDirection = mentionsSortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			mentionsSortField = field;
+			mentionsSortDirection = 'desc';
+		}
+	}
+
+	function exportMentionsToCSV() {
+		if (filteredMentions.length === 0) return;
+		
+		// Define CSV headers
+		const headers = [
+			'Event ID',
+			'Source Name',
+			'Type',
+			'Mention Date',
+			'Confidence',
+			'Doc Tone',
+			'Doc Length',
+			'Identifier',
+			'Event Time Date',
+			'Sentence ID',
+			'In Raw Text',
+			'Translation Info'
+		];
+		
+		// Convert mentions to CSV rows
+		const rows = filteredMentions.map(mention => [
+			mention.globalEventId || '',
+			mention.mentionSourceName || '',
+			getMentionTypeLabel(mention.mentionType) || '',
+			gdeltDateToInputDate(mention.mentionTimeDate) || '',
+			mention.confidence || '',
+			mention.mentionDocTone || '',
+			mention.mentionDocLen || '',
+			mention.mentionIdentifier || '',
+			gdeltDateToInputDate(mention.eventTimeDate) || '',
+			mention.sentenceId || '',
+			mention.inRawText || '',
+			mention.mentionDocTranslationInfo || ''
+		]);
+		
+		// Create CSV content
+		const csvContent = [
+			headers.join(','),
+			...rows.map(row => row.map(field => {
+				// Escape fields that contain commas, quotes, or newlines
+				const stringField = String(field);
+				if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+					return `"${stringField.replace(/"/g, '""')}"`;
+				}
+				return stringField;
+			}).join(','))
+		].join('\n');
+		
+		// Create and trigger download
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		const url = URL.createObjectURL(blob);
+		link.setAttribute('href', url);
+		
+		// Generate filename with timestamp
+		const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+		const eventContext = selectedEventId ? `event-${selectedEventId}` : 'filtered-events';
+		link.setAttribute('download', `gdelt-mentions-${eventContext}-${timestamp}.csv`);
+		
+		link.style.visibility = 'hidden';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
 	function resetFilters() {
 		// Reset event types
 		activeEventTypes = new Set(['all']);
@@ -603,6 +728,69 @@
 			
 		} catch (err) {
 			console.error('Error fetching mentions:', err);
+			mentionsError = err instanceof Error ? err.message : 'Failed to load mentions';
+			mentions = [];
+		} finally {
+			loadingMentions = false;
+		}
+	}
+
+	async function fetchAllMentionsForVisible() {
+		try {
+			loadingMentions = true;
+			mentionsError = '';
+			mentionsLimitationNotice = '';
+			mentions = []; // Clear previous mentions
+			selectedEventId = null; // Set to null to indicate multiple events
+			showMentions = true; // Show the mentions section immediately
+			
+			console.log(`Starting bulk mentions fetch for ${visibleEvents.length} events...`);
+			
+			// Get all visible event IDs as array
+			let eventIds = visibleEvents.map(e => e.id);
+			let isLimited = false;
+			
+			// Handle large datasets by limiting to first 1000 events
+			if (eventIds.length > 1000) {
+				console.log(`Large dataset detected: ${eventIds.length} events. Limiting to first 1000 events.`);
+				eventIds = eventIds.slice(0, 1000);
+				isLimited = true;
+			}
+			
+			// Use POST to avoid URL length limits
+			const response = await fetch('/api/gdelt/mentions', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					eventIds: eventIds
+				})
+			});
+			
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+			}
+			
+			const data = await response.json();
+			
+			if (data.error) {
+				throw new Error(data.error);
+			}
+			
+			mentions = data.mentions || [];
+			
+			if (isLimited) {
+				console.log(`Successfully loaded ${mentions.length} mentions for first 1000 of ${visibleEvents.length} events`);
+				// Add a notice about the limitation using the separate variable
+				mentionsLimitationNotice = `Showing mentions from the first 1000 of ${visibleEvents.length} filtered events due to performance limits.`;
+			} else {
+				console.log(`Successfully loaded ${mentions.length} mentions for ${visibleEvents.length} events`);
+			}
+			
+		} catch (err) {
+			console.error('Error fetching all mentions:', err);
 			mentionsError = err instanceof Error ? err.message : 'Failed to load mentions';
 			mentions = [];
 		} finally {
@@ -743,9 +931,10 @@
 		// Create the map
 		map = leaflet.map(mapContainer).setView([20, 0], 2);
 		
-		// Add tile layer
-		leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-			attribution: '© OpenStreetMap contributors'
+		// Add tile layer with English labels
+		leaflet.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+			attribution: '© Esri, © OpenStreetMap contributors',
+			maxZoom: 19
 		}).addTo(map);
 		
 		// Add markers for each event
@@ -795,7 +984,7 @@
 						<p class="text-xs mb-1"><strong>Event Code:</strong> ${event.eventCode}</p>
 						<p class="text-xs mb-1"><strong>Goldstein Scale:</strong> ${event.goldstein?.toFixed(2) || 'N/A'}</p>
 						<p class="text-xs mb-1"><strong>Tone:</strong> ${event.tone?.toFixed(2) || 'N/A'}</p>
-						<p class="text-xs mb-2"><strong>Date:</strong> ${event.date}</p>
+						<p class="text-xs mb-2"><strong>Date:</strong> ${gdeltDateToInputDate(event.date)}</p>
 						<div class="flex gap-2">
 							<button onclick="window.filterByCountry('${event.country}')" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded transition-colors">
 								Filter by ${getCountryNameWithFallback(event.country, event.country)}
@@ -1464,6 +1653,29 @@
 									<h2 class="text-xl xl:text-2xl font-semibold text-gray-900">Global Events Map</h2>
 								</div>
 								<div class="flex items-center space-x-4 xl:space-x-6">
+									{#if visibleEvents.length > 0 && visibleEvents.length < events.length}
+										<button 
+											on:click={() => fetchAllMentionsForVisible()}
+											disabled={loadingMentions}
+											class="text-xs xl:text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2 min-w-max"
+										>
+											{#if loadingMentions}
+												<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
+												<span class="text-blue-100">Processing...</span>
+											{:else}
+												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+												</svg>
+												<span>
+												{#if visibleEvents.length > 1000}
+													Show Mentions (first 1000 of {visibleEvents.length})
+												{:else}
+													Show All Mentions ({visibleEvents.length})
+												{/if}
+											</span>
+											{/if}
+										</button>
+									{/if}
 									<div class="text-sm xl:text-base text-gray-600">
 										Displaying {visibleEvents.length} of {events.length} events
 									</div>
@@ -1489,6 +1701,14 @@
 									</div>
 								</div>
 							{/if}
+							
+							<!-- Bulk Mentions Processing Indicator -->
+							{#if loadingMentions && showMentions}
+								<div class="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 z-40">
+									<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
+									<span class="text-sm font-medium">Processing mentions...</span>
+								</div>
+							{/if}
 						</div>
 					</div>
 
@@ -1507,41 +1727,93 @@
 									</div>
 									<div class="flex items-center space-x-4 xl:space-x-6">
 										<div class="text-sm xl:text-base text-gray-600">
-											Event ID: {selectedEventId}
+											{#if selectedEventId}
+												Event ID: {selectedEventId}
+											{:else}
+												All Filtered Events ({mentions.length} mentions)
+											{/if}
 										</div>
-										<button 
-											on:click={() => showMentions = false}
-											class="text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition-colors"
-										>
-											Close
-										</button>
+										<div class="flex items-center space-x-2">
+											<button 
+												on:click={exportMentionsToCSV}
+												disabled={filteredMentions.length === 0}
+												class="text-sm text-green-600 hover:text-green-700 disabled:text-gray-400 bg-green-50 hover:bg-green-100 disabled:bg-gray-50 px-3 py-1 rounded transition-colors flex items-center gap-1"
+												title="Export filtered mentions to CSV"
+											>
+												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V11a2 2 0 01-2 2z"></path>
+												</svg>
+												Export CSV
+											</button>
+											<button 
+												on:click={() => showMentions = false}
+												class="text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition-colors"
+											>
+												Close
+											</button>
+										</div>
 									</div>
 								</div>
 							</div>
 							
 							<div class="p-4 xl:p-6">
 								{#if loadingMentions}
-									<div class="flex items-center justify-center py-12">
+									<div class="flex items-center justify-center py-16">
 										<div class="text-center">
-											<div class="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600 mx-auto mb-3"></div>
-											<div class="text-sm font-medium text-gray-700">Loading mentions...</div>
-											<div class="text-xs text-gray-500 mt-1">Please wait</div>
+											<div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+											<div class="text-lg font-semibold text-gray-900 mb-2">
+												{#if selectedEventId}
+													Loading mentions for event {selectedEventId}...
+												{:else}
+													Processing {visibleEvents.length} events for mentions...
+												{/if}
+											</div>
+											<div class="text-sm text-gray-600 mb-3">
+												{#if selectedEventId}
+													Fetching related mentions and media sources
+												{:else}
+													Analyzing mentions across all filtered events
+												{/if}
+											</div>
+											<div class="flex items-center justify-center space-x-2 text-xs text-gray-500">
+												<div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+												<span>Database query in progress</span>
+												<div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style="animation-delay: 0.5s"></div>
+											</div>
 										</div>
 									</div>
 								{:else if mentionsError}
-									<div class="bg-red-50 border border-red-200 rounded-lg p-4">
-										<div class="flex">
-											<div class="flex-shrink-0">
-												<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-													<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-												</svg>
-											</div>
-											<div class="ml-3">
-												<h3 class="text-sm font-medium text-red-800">Error Loading Mentions</h3>
-												<p class="text-sm text-red-700 mt-1">{mentionsError}</p>
+									{#if mentionsError.startsWith('Note:')}
+										<!-- Information notice for data limitations -->
+										<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+											<div class="flex">
+												<div class="flex-shrink-0">
+													<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+														<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+													</svg>
+												</div>
+												<div class="ml-3">
+													<h3 class="text-sm font-medium text-blue-800">Data Limitation</h3>
+													<p class="text-sm text-blue-700 mt-1">{mentionsError}</p>
+												</div>
 											</div>
 										</div>
-									</div>
+									{:else}
+										<!-- Regular error display -->
+										<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+											<div class="flex">
+												<div class="flex-shrink-0">
+													<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+														<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+													</svg>
+												</div>
+												<div class="ml-3">
+													<h3 class="text-sm font-medium text-red-800">Error Loading Mentions</h3>
+													<p class="text-sm text-red-700 mt-1">{mentionsError}</p>
+												</div>
+											</div>
+										</div>
+									{/if}
 								{:else if mentions.length === 0}
 									<div class="text-center py-12">
 										<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1551,21 +1823,117 @@
 										<p class="mt-2 text-sm text-gray-500">There are no mentions available for this event.</p>
 									</div>
 								{:else}
+									<!-- Data Limitation Notice -->
+									{#if mentionsLimitationNotice}
+										<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+											<div class="flex">
+												<div class="flex-shrink-0">
+													<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+														<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+													</svg>
+												</div>
+												<div class="ml-3">
+													<h3 class="text-sm font-medium text-blue-800">Data Limitation</h3>
+													<p class="text-sm text-blue-700 mt-1">{mentionsLimitationNotice}</p>
+												</div>
+											</div>
+										</div>
+									{/if}
+									
+									<!-- Search and Filter Controls -->
+									<div class="mb-4 flex flex-col sm:flex-row gap-4">
+										<div class="flex-1">
+											<label class="block text-sm font-medium text-gray-700 mb-2">Search Sources & Identifiers</label>
+											<input
+												type="text"
+												bind:value={mentionsSearchTerm}
+												placeholder="Search by source name or identifier..."
+												class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+											/>
+										</div>
+										<div class="sm:w-48">
+											<label class="block text-sm font-medium text-gray-700 mb-2">Filter by Type</label>
+											<select
+												bind:value={mentionsTypeFilter}
+												class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+											>
+												<option value="">All Types</option>
+												<option value="1">Web News</option>
+												<option value="2">Print News</option>
+												<option value="3">Broadcast News</option>
+											</select>
+										</div>
+									</div>
+
 									<div class="overflow-x-auto">
-										<table class="min-w-full divide-y divide-gray-200">
+										<table class="min-w-full divide-y divide-gray-200 table-auto">
 											<thead class="bg-gray-50">
 												<tr>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mention Date</th>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc Tone</th>
-													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc Length</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('mentionSourceName')}>
+														<div class="flex items-center">
+															Source
+															{#if mentionsSortField === 'mentionSourceName'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('mentionType')}>
+														<div class="flex items-center">
+															Type
+															{#if mentionsSortField === 'mentionType'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('mentionTimeDate')}>
+														<div class="flex items-center">
+															Mention Date
+															{#if mentionsSortField === 'mentionTimeDate'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('confidence')}>
+														<div class="flex items-center">
+															Confidence
+															{#if mentionsSortField === 'confidence'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('mentionDocTone')}>
+														<div class="flex items-center">
+															Doc Tone
+															{#if mentionsSortField === 'mentionDocTone'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
+													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" on:click={() => sortMentions('mentionDocLen')}>
+														<div class="flex items-center">
+															Doc Length
+															{#if mentionsSortField === 'mentionDocLen'}
+																<svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={mentionsSortDirection === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}></path>
+																</svg>
+															{/if}
+														</div>
+													</th>
 													<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identifier</th>
 												</tr>
 											</thead>
 											<tbody class="bg-white divide-y divide-gray-200">
-												{#each mentions as mention}
+												{#each filteredMentions as mention, index}
 													<tr class="hover:bg-gray-50">
 														<td class="px-4 py-3 text-sm text-gray-900 font-medium max-w-xs truncate" title="{mention.mentionSourceName || 'Unknown'}">
 															{mention.mentionSourceName || 'Unknown'}
@@ -1633,7 +2001,14 @@
 									</div>
 									
 									<div class="mt-4 text-sm text-gray-500 text-center">
-										Showing {mentions.length} mention{mentions.length !== 1 ? 's' : ''} for Event ID {selectedEventId}
+										Showing {filteredMentions.length} of {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
+										{#if selectedEventId}
+											for Event ID {selectedEventId}
+										{:else if visibleEvents.length > 1000}
+											for first 1000 of {visibleEvents.length} filtered events
+										{:else}
+											for {visibleEvents.length} filtered events
+										{/if}
 									</div>
 								{/if}
 							</div>
