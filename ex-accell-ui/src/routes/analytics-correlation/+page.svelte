@@ -693,13 +693,13 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
+  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
     
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+          <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
@@ -733,12 +733,12 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <!-- Selection Status -->
-    <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-6">
           <div class="flex items-center">
             <span class="text-sm font-medium text-gray-700 mr-2">Active Selections:</span>
-            <span class="text-2xl font-bold text-purple-600">{globalSelection.dataPoints.length}</span>
+            <span class="text-2xl font-bold text-blue-600">{globalSelection.dataPoints.length}</span>
             <span class="text-sm text-gray-500 ml-1">data points</span>
           </div>
           
@@ -750,13 +750,13 @@
           
           {#if globalSelection.platforms.length > 0}
             <div class="flex items-center space-x-2">
-              <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">{globalSelection.platforms.length} Platforms</span>
+              <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{globalSelection.platforms.length} Platforms</span>
             </div>
           {/if}
           
           {#if globalSelection.topics.length > 0}
             <div class="flex items-center space-x-2">
-              <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">{globalSelection.topics.length} Topics</span>
+              <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{globalSelection.topics.length} Topics</span>
             </div>
           {/if}
           
@@ -773,7 +773,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       
       <!-- Time Series Chart -->
-      <div class="xl:col-span-3 bg-white rounded-lg shadow-sm">
+      <div class="xl:col-span-3 bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Engagement Timeline</h3>
           <p class="text-sm text-gray-600">Brush to select time range • Connected to all other views</p>
@@ -784,7 +784,7 @@
       </div>
 
       <!-- Sentiment Distribution -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Sentiment Analysis</h3>
           <p class="text-sm text-gray-600">Click bars to filter by sentiment range</p>
@@ -795,7 +795,7 @@
       </div>
 
       <!-- Platform Comparison -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Platform Performance</h3>
           <p class="text-sm text-gray-600">Click platforms to toggle selection</p>
@@ -806,7 +806,7 @@
       </div>
 
       <!-- Topic Network -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Topic Relationships</h3>
           <p class="text-sm text-gray-600">Click topics to filter • Node size = engagement</p>
@@ -817,7 +817,7 @@
       </div>
 
       <!-- Geographic Distribution -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Geographic Reach</h3>
           <p class="text-sm text-gray-600">Click regions to toggle selection</p>
@@ -828,7 +828,7 @@
       </div>
 
       <!-- Correlation Matrix -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="bg-white rounded-xl shadow-sm">
         <div class="p-4 border-b border-gray-200">
           <h3 class="text-lg font-semibold text-gray-900">Metric Correlations</h3>
           <p class="text-sm text-gray-600">Real-time correlation analysis</p>
@@ -841,7 +841,7 @@
     </div>
 
     <!-- Interaction Guide -->
-    <div class="mt-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-6">
+    <div class="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">Interactive Features</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
         <div class="flex items-start space-x-2">
@@ -851,13 +851,13 @@
           </div>
         </div>
         <div class="flex items-start space-x-2">
-          <div class="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+          <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
           <div>
             <span class="font-medium">Platform Filter:</span> Click platform bars to include/exclude platforms
           </div>
         </div>
         <div class="flex items-start space-x-2">
-          <div class="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+          <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
           <div>
             <span class="font-medium">Topic Focus:</span> Click topic nodes to explore topic-specific data
           </div>
@@ -869,7 +869,7 @@
           </div>
         </div>
         <div class="flex items-start space-x-2">
-          <div class="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+          <div class="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
           <div>
             <span class="font-medium">Sentiment Range:</span> Click sentiment bars to filter by emotional tone
           </div>

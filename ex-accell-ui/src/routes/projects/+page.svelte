@@ -7,7 +7,7 @@
 
   function getStatusColor(status: string) {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
+      case 'active': return 'bg-blue-100 text-blue-800';
       case 'paused': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-blue-100 text-blue-800';
       case 'archived': return 'bg-gray-100 text-gray-800';
@@ -44,7 +44,7 @@
 <Navigation />
 
 <!-- Header -->
-<div class="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700">
+<div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex items-center justify-between">
       <div>
@@ -53,7 +53,7 @@
       </div>
       <button 
         on:click={() => window.location.href='/projects/new'}
-        class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-white border-opacity-30">
+        class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-white border-opacity-30">
         + New Project
       </button>
     </div>
@@ -82,7 +82,7 @@
     <!-- Projects Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       {#each projects as project}
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer" on:click={() => openProject(project.id)}>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer" on:click={() => openProject(project.id)}>
           <div class="p-6">
             <!-- Project Header -->
             <div class="flex items-start justify-between mb-4">

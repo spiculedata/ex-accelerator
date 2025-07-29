@@ -128,7 +128,7 @@
 		const colorMap: { [key: number]: string } = {
 			1: 'bg-blue-100 text-blue-800',      // Web News
 			2: 'bg-gray-100 text-gray-800',     // Print News
-			3: 'bg-purple-100 text-purple-800'  // Broadcast News
+			3: 'bg-blue-100 text-blue-800'  // Broadcast News
 		};
 		return colorMap[mentionType] || 'bg-gray-100 text-gray-800';
 	}
@@ -1069,10 +1069,10 @@
 						<p class="text-xs mb-1"><strong>Tone:</strong> ${event.tone?.toFixed(2) || 'N/A'}</p>
 						<p class="text-xs mb-2"><strong>Date:</strong> ${gdeltDateToInputDate(event.date)}</p>
 						<div class="flex gap-2">
-							<button onclick="window.filterByCountry('${event.country}')" class="text-xs bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded transition-colors">
+							<button onclick="window.filterByCountry('${event.country}')" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl transition-colors">
 								Filter by ${getCountryNameWithFallback(event.country, event.country)}
 							</button>
-							<button onclick="window.showEventMentions(${event.id})" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors">
+							<button onclick="window.showEventMentions(${event.id})" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl transition-colors">
 								Show Related Mentions
 							</button>
 						</div>
@@ -1136,14 +1136,14 @@
 
 <div class="min-h-screen bg-gray-50">
 	<!-- Page Header -->
-	<div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+	<div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
 		<!-- Background pattern -->
-		<div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
+		<div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
 		
 		<div class="relative max-w-7xl xl:max-w-full 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-12 xl:py-16">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center">
-					<div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+					<div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
 						<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 						</svg>
@@ -1163,15 +1163,15 @@
 	<div class="max-w-7xl xl:max-w-full 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-8 xl:py-12">
 
 		{#if loading}
-			<div class="flex items-center justify-center h-96 bg-white rounded-lg shadow-sm">
+			<div class="flex items-center justify-center h-96 bg-white rounded-xl shadow-sm">
 				<div class="text-center">
-					<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+					<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
 					<p class="text-gray-600 font-medium">Loading GDELT events...</p>
 					<p class="text-sm text-gray-500 mt-2">Fetching global event data from database</p>
 				</div>
 			</div>
 		{:else if error}
-			<div class="bg-white rounded-lg shadow-sm p-6 border-l-4 border-red-400">
+			<div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-400">
 				<div class="flex items-center">
 					<div class="flex-shrink-0">
 						<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1195,13 +1195,13 @@
 			<div class="grid grid-cols-1 xl:grid-cols-5 lg:grid-cols-4 gap-6 xl:gap-8">
 				<!-- Filters Panel -->
 				<div class="xl:col-span-1 lg:col-span-1">
-					<div class="bg-white rounded-lg shadow-sm p-6 sticky top-4 min-h-screen lg:min-h-[calc(100vh-8rem)] xl:min-h-[calc(100vh-6rem)] relative">
+					<div class="bg-white rounded-xl shadow-sm p-6 sticky top-4 min-h-screen lg:min-h-[calc(100vh-8rem)] xl:min-h-[calc(100vh-6rem)] relative">
 						
 						<!-- Loading Overlay for Filter Panel -->
 						{#if isUpdatingFilter}
-							<div class="absolute inset-0 bg-white bg-opacity-90 rounded-lg flex items-center justify-center z-40">
+							<div class="absolute inset-0 bg-white bg-opacity-90 rounded-xl flex items-center justify-center z-40">
 								<div class="text-center">
-									<div class="animate-spin rounded-full h-8 w-8 border-3 border-violet-200 border-t-violet-600 mx-auto mb-3"></div>
+									<div class="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600 mx-auto mb-3"></div>
 									<div class="text-sm font-medium text-gray-700">Updating filters...</div>
 									<div class="text-xs text-gray-500 mt-1">Please wait</div>
 								</div>
@@ -1210,7 +1210,7 @@
 						<!-- Reset Button -->
 						<div class="flex items-center justify-between mb-6 xl:mb-8">
 							<div class="flex items-center">
-								<div class="w-8 h-8 bg-gradient-to-br from-violet-400 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+								<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-3">
 									<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
 									</svg>
@@ -1220,7 +1220,7 @@
 							<button
 								on:click={resetFilters}
 								disabled={isUpdatingFilter}
-								class="text-xs xl:text-sm px-3 xl:px-4 py-1.5 xl:py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+								class="text-xs xl:text-sm px-3 xl:px-4 py-1.5 xl:py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								Reset All
 							</button>
@@ -1229,7 +1229,7 @@
 						<!-- Date Range Filter -->
 						<div class="mb-6 xl:mb-8 pb-4 xl:pb-6 border-b border-gray-200">
 							<div class="flex items-center mb-4 xl:mb-6">
-								<div class="w-8 h-8 bg-gradient-to-br from-violet-400 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+								<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-3">
 									<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 									</svg>
@@ -1254,7 +1254,7 @@
 												min={availableDateRange[0]}
 												max={availableDateRange[1]}
 												disabled={isUpdatingFilter}
-												class="w-full pl-10 pr-3 py-2.5 xl:py-3 text-sm xl:text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-colors bg-white hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+												class="w-full pl-10 pr-3 py-2.5 xl:py-3 text-sm xl:text-base border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
 											/>
 										</div>
 									</div>
@@ -1274,14 +1274,14 @@
 												min={availableDateRange[0]}
 												max={availableDateRange[1]}
 												disabled={isUpdatingFilter}
-												class="w-full pl-10 pr-3 py-2.5 xl:py-3 text-sm xl:text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-colors bg-white hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+												class="w-full pl-10 pr-3 py-2.5 xl:py-3 text-sm xl:text-base border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
 											/>
 										</div>
 									</div>
 								</div>
 								
 								{#if availableDateRange[0] && availableDateRange[1]}
-									<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+									<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-200">
 										<div class="flex items-center text-xs text-blue-700">
 											<svg class="w-3 h-3 mr-2" fill="currentColor" viewBox="0 0 20 20">
 												<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
@@ -1301,7 +1301,7 @@
 											dateRange[1] = today.toISOString().split('T')[0];
 										}}
 										disabled={isUpdatingFilter}
-										class="px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-md hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+										class="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 									>
 										Last 7 days
 									</button>
@@ -1327,7 +1327,7 @@
 							<button
 								on:click={() => toggleEventType('all')}
 								disabled={isToggling}
-								class="flex items-center w-full p-3 rounded-lg transition-all duration-200 {activeEventTypes.has('all') ? 'bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 shadow-sm' : 'bg-gray-50 hover:bg-gray-100 border-gray-200'} border {isToggling ? 'opacity-60 cursor-not-allowed' : ''}"
+								class="flex items-center w-full p-3 rounded-xl transition-all duration-200 {activeEventTypes.has('all') ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 shadow-sm' : 'bg-gray-50 hover:bg-gray-100 border-gray-200'} border {isToggling ? 'opacity-60 cursor-not-allowed' : ''}"
 							>
 							<div class="w-4 h-4 rounded-full bg-gray-400 mr-3"></div>
 							<div class="flex-1 text-left">
@@ -1349,7 +1349,7 @@
 									<button
 										on:click={() => toggleEventType(key)}
 										disabled={isToggling}
-										class="flex items-center w-full p-3 rounded-lg transition-all duration-200 {activeEventTypes.has(key) ? 'bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200 shadow-sm' : 'bg-gray-50 hover:bg-gray-100 border-gray-200'} border text-left group {isToggling ? 'opacity-60 cursor-not-allowed' : ''}"
+										class="flex items-center w-full p-3 rounded-xl transition-all duration-200 {activeEventTypes.has(key) ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 shadow-sm' : 'bg-gray-50 hover:bg-gray-100 border-gray-200'} border text-left group {isToggling ? 'opacity-60 cursor-not-allowed' : ''}"
 									>
 									<div 
 										class="w-4 h-4 rounded-full mr-3 flex-shrink-0" 
@@ -1376,7 +1376,7 @@
 						<div class="mb-6 xl:mb-8 pt-4 xl:pt-6 border-t border-gray-200">
 							<div class="flex items-center justify-between mb-3 xl:mb-4">
 								<div class="flex items-center">
-									<svg class="w-4 h-4 text-violet-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
 									</svg>
 									<span class="text-sm font-medium text-gray-900">Goldstein Scale</span>
@@ -1384,7 +1384,7 @@
 								<button
 									on:click={refreshData}
 									disabled={isUpdatingFilter}
-									class="text-xs text-violet-600 hover:text-violet-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+									class="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
 								>
 									{#if isUpdatingFilter}
 										<svg class="animate-spin w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24">
@@ -1405,7 +1405,7 @@
 								<!-- Range Display -->
 								<div class="flex justify-between text-xs">
 									<span class="text-red-600 font-medium">Conflict: {goldsteinRange[0]}</span>
-									<span class="text-green-600 font-medium">Cooperation: {goldsteinRange[1]}</span>
+									<span class="text-blue-600 font-medium">Cooperation: {goldsteinRange[1]}</span>
 								</div>
 								
 								<!-- Dual Range Slider -->
@@ -1417,7 +1417,7 @@
 										step="0.1"
 										bind:value={goldsteinRange[0]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer range-slider"
+										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1427,10 +1427,10 @@
 										step="0.1"
 										bind:value={goldsteinRange[1]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer range-slider"
+										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
 										style="z-index: 3; pointer-events: auto;"
 									/>
-									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-lg" style="z-index: 1;"></div>
+									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
 									<div class="flex justify-between text-xs text-gray-400 mt-6">
@@ -1451,7 +1451,7 @@
 											step="0.1"
 											bind:value={goldsteinMin}
 											on:change={handleManualEntry}
-											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
 									</div>
 									<div>
@@ -1463,7 +1463,7 @@
 											step="0.1"
 											bind:value={goldsteinMax}
 											on:change={handleManualEntry}
-											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
 									</div>
 								</div>
@@ -1475,7 +1475,7 @@
 										<span>Negative: Conflict, threats, violence</span>
 									</div>
 									<div class="flex items-center">
-										<div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+										<div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
 										<span>Positive: Cooperation, agreements, aid</span>
 									</div>
 								</div>
@@ -1485,7 +1485,7 @@
 						<!-- Average Tone Filter -->
 						<div class="mb-6 xl:mb-8 pt-4 xl:pt-6 border-t border-gray-200">
 							<div class="flex items-center mb-3 xl:mb-4">
-								<svg class="w-4 h-4 text-violet-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h4a1 1 0 011 1v2m-6 0h8m-8 0a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2m-8 0V4"></path>
 								</svg>
 								<span class="text-sm font-medium text-gray-900">Average Tone</span>
@@ -1507,7 +1507,7 @@
 										step="0.5"
 										bind:value={toneRange[0]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer range-slider"
+										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1517,10 +1517,10 @@
 										step="0.5"
 										bind:value={toneRange[1]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer range-slider"
+										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
 										style="z-index: 3; pointer-events: auto;"
 									/>
-									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-lg" style="z-index: 1;"></div>
+									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
 									<div class="flex justify-between text-xs text-gray-400 mt-6">
@@ -1541,7 +1541,7 @@
 											step="0.5"
 											bind:value={toneMin}
 											on:change={handleToneManualEntry}
-											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
 									</div>
 									<div>
@@ -1553,7 +1553,7 @@
 											step="0.5"
 											bind:value={toneMax}
 											on:change={handleToneManualEntry}
-											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+											class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
 										/>
 									</div>
 								</div>
@@ -1575,7 +1575,7 @@
 						<!-- Country Filter -->
 						<div class="pt-4 xl:pt-6 border-t border-gray-200">
 							<div class="flex items-center mb-3 xl:mb-4">
-								<svg class="w-4 h-4 text-violet-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 								</svg>
 								<span class="text-sm font-medium text-gray-900">Countries</span>
@@ -1589,7 +1589,7 @@
 											type="text"
 											placeholder="Search countries..."
 											bind:value={countrySearchTerm}
-											class="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+											class="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 										/>
 										<svg class="absolute left-2.5 top-2.5 w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -1600,9 +1600,9 @@
 								<!-- All Countries Toggle -->
 								<button
 									on:click={() => toggleCountry('all')}
-									class="flex items-center w-full p-2 rounded-lg transition-all duration-200 hover:bg-gray-100 border border-gray-200 text-left"
+									class="flex items-center w-full p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 border border-gray-200 text-left"
 								>
-									<div class="flex items-center justify-center w-4 h-4 mr-3 border border-gray-300 rounded {selectedCountries.has('all') ? 'bg-violet-600 border-violet-600' : 'bg-white'}">
+									<div class="flex items-center justify-center w-4 h-4 mr-3 border border-gray-300 rounded {selectedCountries.has('all') ? 'bg-blue-600 border-blue-600' : 'bg-white'}">
 										{#if selectedCountries.has('all')}
 											<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
 												<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -1622,9 +1622,9 @@
 										{#if totalEventCount > 0}
 											<button
 												on:click={() => toggleCountry(country)}
-												class="flex items-center w-full p-2 rounded-lg transition-all duration-200 hover:bg-gray-100 border border-gray-200 text-left"
+												class="flex items-center w-full p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 border border-gray-200 text-left"
 											>
-												<div class="flex items-center justify-center w-4 h-4 mr-3 border border-gray-300 rounded {selectedCountries.has(country) ? 'bg-violet-600 border-violet-600' : 'bg-white'}">
+												<div class="flex items-center justify-center w-4 h-4 mr-3 border border-gray-300 rounded {selectedCountries.has(country) ? 'bg-blue-600 border-blue-600' : 'bg-white'}">
 													{#if selectedCountries.has(country)}
 														<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
 															<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -1642,9 +1642,9 @@
 								<div class="mt-3 pt-3 border-t border-gray-100">
 									<button
 										on:click={toggleGlobalSouthCountries}
-										class="flex items-center w-full p-2 rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 border border-orange-200 text-left bg-gradient-to-r from-orange-25 to-amber-25"
+										class="flex items-center w-full p-2 rounded-xl transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-50 hover:to-amber-50 border border-blue-200 text-left bg-gradient-to-r from-blue-25 to-amber-25"
 									>
-										<div class="flex items-center justify-center w-4 h-4 mr-3 border border-orange-300 rounded {allGlobalSouthSelected ? 'bg-orange-500 border-orange-500' : 'bg-white'}">
+										<div class="flex items-center justify-center w-4 h-4 mr-3 border border-blue-300 rounded {allGlobalSouthSelected ? 'bg-blue-500 border-blue-500' : 'bg-white'}">
 											{#if allGlobalSouthSelected}
 												<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
 													<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -1652,12 +1652,12 @@
 											{/if}
 										</div>
 										<div class="flex-1">
-											<span class="text-xs font-medium text-orange-800">All Global South Countries</span>
-											<div class="text-xs text-orange-600 mt-0.5">
+											<span class="text-xs font-medium text-blue-800">All Global South Countries</span>
+											<div class="text-xs text-blue-600 mt-0.5">
 												{globalSouthCountryCodes.length} countries available
 											</div>
 										</div>
-										<div class="flex items-center text-xs text-orange-700">
+										<div class="flex items-center text-xs text-blue-700">
 											<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 											</svg>
@@ -1685,54 +1685,54 @@
 				<div class="xl:col-span-4 lg:col-span-3 space-y-6">
 					<!-- Stats Cards -->
 					<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 xl:gap-6">
-						<div class="bg-white rounded-lg shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
-							{#if isUpdatingFilter}
-								<div class="absolute top-2 right-2">
-									<div class="animate-spin rounded-full h-3 w-3 border border-violet-200 border-t-violet-600"></div>
-								</div>
-							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-violet-600 mb-1 xl:mb-2">{visibleEvents.length.toLocaleString()}</div>
-							<div class="text-sm xl:text-base text-gray-600">Visible Events</div>
-						</div>
-						<div class="bg-white rounded-lg shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
 								<div class="absolute top-2 right-2">
 									<div class="animate-spin rounded-full h-3 w-3 border border-blue-200 border-t-blue-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-blue-600 mb-1 xl:mb-2">{new Set(visibleEvents.map(e => e.country)).size}</div>
-							<div class="text-sm xl:text-base text-gray-600">Countries</div>
+							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-blue-600 mb-1 xl:mb-2">{visibleEvents.length.toLocaleString()}</div>
+							<div class="text-sm xl:text-base text-gray-600">Visible Events</div>
 						</div>
-						<div class="bg-white rounded-lg shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
 								<div class="absolute top-2 right-2">
-									<div class="animate-spin rounded-full h-3 w-3 border border-green-200 border-t-green-600"></div>
+									<div class="animate-spin rounded-full h-3 w-3 border border-emerald-200 border-t-emerald-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-green-600 mb-1 xl:mb-2">{Object.keys(eventTypes).filter(k => visibleEvents.some(e => getEventType(e.eventCode) === k)).length}</div>
-							<div class="text-sm xl:text-base text-gray-600">Event Types</div>
+							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-emerald-600 mb-1 xl:mb-2">{new Set(visibleEvents.map(e => e.country)).size}</div>
+							<div class="text-sm xl:text-base text-gray-600">Countries</div>
 						</div>
-						<div class="bg-white rounded-lg shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
 								<div class="absolute top-2 right-2">
-									<div class="animate-spin rounded-full h-3 w-3 border border-orange-200 border-t-orange-600"></div>
+									<div class="animate-spin rounded-full h-3 w-3 border border-amber-200 border-t-amber-600"></div>
+								</div>
+							{/if}
+							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-amber-600 mb-1 xl:mb-2">{Object.keys(eventTypes).filter(k => visibleEvents.some(e => getEventType(e.eventCode) === k)).length}</div>
+							<div class="text-sm xl:text-base text-gray-600">Event Types</div>
+						</div>
+						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+							{#if isUpdatingFilter}
+								<div class="absolute top-2 right-2">
+									<div class="animate-spin rounded-full h-3 w-3 border border-blue-200 border-t-blue-600"></div>
 								</div>
 							{/if}
 							{#if true}
 								{@const avgTone = visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc, e) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}
-								<div class="text-xl xl:text-2xl 2xl:text-3xl font-bold text-orange-600 mb-1">{getToneDescription(avgTone)}</div>
-								<div class="text-lg xl:text-xl 2xl:text-2xl font-semibold text-orange-500 mb-1">{avgTone}</div>
+								<div class="text-xl xl:text-2xl 2xl:text-3xl font-bold text-blue-600 mb-1">{getToneDescription(avgTone)}</div>
+								<div class="text-lg xl:text-xl 2xl:text-2xl font-semibold text-blue-500 mb-1">{avgTone}</div>
 								<div class="text-sm xl:text-base text-gray-600">Avg Tone</div>
 							{/if}
 						</div>
 					</div>
 
 					<!-- Map -->
-					<div class="bg-white rounded-lg shadow-sm overflow-hidden">
+					<div class="bg-white rounded-xl shadow-sm overflow-hidden">
 						<div class="p-4 xl:p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center">
-									<div class="w-8 h-8 bg-gradient-to-br from-violet-400 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+									<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-3">
 										<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 										</svg>
@@ -1744,7 +1744,7 @@
 										<button 
 											on:click={() => fetchAllMentionsForVisible()}
 											disabled={loadingMentions || isBatchLoading}
-											class="text-xs xl:text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2 min-w-max"
+											class="text-xs xl:text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-xl transition-all duration-200 flex items-center gap-2 min-w-max"
 										>
 											{#if loadingMentions || isBatchLoading}
 												<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
@@ -1769,7 +1769,7 @@
 										Displaying {visibleEvents.length} of {events.length} events
 									</div>
 									<div class="flex items-center text-xs xl:text-sm text-gray-500">
-										<div class="w-2 h-2 {isUpdatingFilter ? 'bg-orange-400' : 'bg-green-400'} rounded-full animate-pulse mr-1"></div>
+										<div class="w-2 h-2 {isUpdatingFilter ? 'bg-blue-400' : 'bg-blue-400'} rounded-full animate-pulse mr-1"></div>
 										{isUpdatingFilter ? 'Refreshing...' : 'Live Data'}
 									</div>
 								</div>
@@ -1781,8 +1781,8 @@
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}
 								<div class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
-									<div class="bg-white rounded-lg shadow-lg p-6 flex flex-col items-center">
-										<div class="animate-spin rounded-full h-12 w-12 border-4 border-violet-200 border-t-violet-600 mb-4"></div>
+									<div class="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
+										<div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
 										<div class="text-lg font-semibold text-gray-900 mb-2">Refreshing Data</div>
 										<div class="text-sm text-gray-600 text-center">
 											Fetching updated events from database...
@@ -1793,7 +1793,7 @@
 							
 							<!-- Bulk Mentions Processing Indicator -->
 							{#if (loadingMentions || isBatchLoading) && showMentions}
-								<div class="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 z-40">
+								<div class="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-xl shadow-lg flex items-center gap-2 z-40">
 									<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
 									<span class="text-sm font-medium">
 										{#if isBatchLoading}
@@ -1809,11 +1809,11 @@
 
 					<!-- Mentions Section -->
 					{#if showMentions}
-						<div class="bg-white rounded-lg shadow-sm overflow-hidden">
+						<div class="bg-white rounded-xl shadow-sm overflow-hidden">
 							<div class="p-4 xl:p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center">
-										<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+										<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-3">
 											<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
 											</svg>
@@ -1832,7 +1832,7 @@
 											<button 
 												on:click={exportMentionsToCSV}
 												disabled={filteredMentions.length === 0}
-												class="text-sm text-green-600 hover:text-green-700 disabled:text-gray-400 bg-green-50 hover:bg-green-100 disabled:bg-gray-50 px-3 py-1 rounded transition-colors flex items-center gap-1"
+												class="text-sm text-blue-600 hover:text-blue-700 disabled:text-gray-400 bg-blue-50 hover:bg-blue-100 disabled:bg-gray-50 px-3 py-1 rounded transition-colors flex items-center gap-1"
 												title="Export filtered mentions to CSV"
 											>
 												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1880,7 +1880,7 @@
 								{:else if mentionsError}
 									{#if mentionsError.startsWith('Note:')}
 										<!-- Information notice for data limitations -->
-										<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+										<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
 											<div class="flex">
 												<div class="flex-shrink-0">
 													<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1895,7 +1895,7 @@
 										</div>
 									{:else}
 										<!-- Regular error display -->
-										<div class="bg-red-50 border border-red-200 rounded-lg p-4">
+										<div class="bg-red-50 border border-red-200 rounded-xl p-4">
 											<div class="flex">
 												<div class="flex-shrink-0">
 													<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1920,7 +1920,7 @@
 								{:else}
 									<!-- Data Limitation Notice -->
 									{#if mentionsLimitationNotice}
-										<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+										<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
 											<div class="flex">
 												<div class="flex-shrink-0">
 													<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
@@ -1943,14 +1943,14 @@
 												type="text"
 												bind:value={mentionsSearchTerm}
 												placeholder="Search by source name or identifier..."
-												class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+												class="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 											/>
 										</div>
 										<div class="sm:w-48">
 											<label class="block text-sm font-medium text-gray-700 mb-2">Filter by Type</label>
 											<select
 												bind:value={mentionsTypeFilter}
-												class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+												class="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 											>
 												<option value="">All Types</option>
 												<option value="1">Web News</option>
@@ -1971,7 +1971,7 @@
 												<select
 													bind:value={itemsPerPage}
 													on:change={() => changeItemsPerPage(itemsPerPage)}
-													class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+													class="px-3 py-1 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 												>
 													{#each itemsPerPageOptions as option}
 														<option value={option}>{option} per page</option>
@@ -2124,7 +2124,7 @@
 															{#if mention.confidence}
 																<div class="flex items-center">
 																	<div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
-																		<div class="bg-green-600 h-2 rounded-full" style="width: {mention.confidence}%"></div>
+																		<div class="bg-blue-600 h-2 rounded-full" style="width: {mention.confidence}%"></div>
 																	</div>
 																	<span class="text-xs">{mention.confidence}%</span>
 																</div>
@@ -2134,7 +2134,7 @@
 														</td>
 														<td class="px-4 py-3 text-sm text-gray-600">
 															{#if mention.mentionDocTone}
-																<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {mention.mentionDocTone > 0 ? 'bg-green-100 text-green-800' : mention.mentionDocTone < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
+																<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {mention.mentionDocTone > 0 ? 'bg-blue-100 text-blue-800' : mention.mentionDocTone < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
 																	{mention.mentionDocTone.toFixed(2)}
 																</span>
 															{:else}
@@ -2170,7 +2170,7 @@
 												<select
 													bind:value={itemsPerPage}
 													on:change={() => changeItemsPerPage(itemsPerPage)}
-													class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+													class="px-3 py-1 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 												>
 													{#each itemsPerPageOptions as option}
 														<option value={option}>{option} per page</option>
@@ -2261,7 +2261,7 @@
 		<div class="flex flex-col sm:flex-row justify-between items-center">
 			<!-- Brand -->
 			<div class="flex items-center mb-4 sm:mb-0">
-				<div class="h-6 w-6 bg-gradient-to-br from-violet-400 to-purple-600 rounded-lg flex items-center justify-center mr-2">
+				<div class="h-6 w-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-2">
 					<span class="text-white font-bold text-xs">SE</span>
 				</div>
 				<span class="text-sm text-gray-600">Social Explorer - GDELT World Events</span>
@@ -2272,6 +2272,10 @@
 				<span>Data Source: GDELT Project</span>
 				<span class="text-gray-300">|</span>
 				<span>Last Updated: {new Date().toLocaleDateString()}</span>
+				<span class="text-gray-300">|</span>
+				<a href="https://concepttocloud.com/" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+					Concept to Cloud
+				</a>
 			</div>
 		</div>
 	</div>

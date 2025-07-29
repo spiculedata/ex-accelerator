@@ -794,29 +794,32 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-indigo-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
             on:click={() => window.location.href='/text-analytics'}
-            class="mr-4 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-4">
+          <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Topic Modeling</h1>
-            <p class="text-gray-600 mt-1">Discover themes and relationships in your social media data with advanced topic analysis</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Topic Modeling</h1>
+            <p class="text-slate-300 text-lg font-medium">Discover themes and relationships in your social media data with advanced topic analysis</p>
             {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-gray-500">Project:</span>
-                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <div class="flex items-center mt-3">
+                <span class="text-sm text-slate-400">Project:</span>
+                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                   {$currentProject.name}
                 </span>
               </div>
@@ -840,26 +843,26 @@
     
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{filteredTopics.length}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{filteredTopics.length}</div>
         <div class="text-sm text-gray-600">Active Topics</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{categories.length - 1}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{categories.length - 1}</div>
         <div class="text-sm text-gray-600">Categories</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{filteredTopics.reduce((sum, t) => sum + t.size, 0).toLocaleString()}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{filteredTopics.reduce((sum, t) => sum + t.size, 0).toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-orange-600 mb-1">{topicRelationships.length}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{topicRelationships.length}</div>
         <div class="text-sm text-gray-600">Topic Connections</div>
       </div>
     </div>
 
     <!-- Filters & Controls -->
-    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Analysis Filters</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -889,7 +892,7 @@
             min="500" 
             max="5000" 
             step="100"
-            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
         
         <div>
@@ -900,7 +903,7 @@
                 type="radio" 
                 bind:group={showNetworkDiagram}
                 value={true}
-                class="text-blue-600 focus:ring-blue-500">
+                class="text-indigo-600 focus:ring-indigo-500">
               <span class="ml-2 text-sm text-gray-700">Network</span>
             </label>
             <label class="flex items-center">
@@ -908,7 +911,7 @@
                 type="radio" 
                 bind:group={showNetworkDiagram}
                 value={false}
-                class="text-blue-600 focus:ring-blue-500">
+                class="text-indigo-600 focus:ring-indigo-500">
               <span class="ml-2 text-sm text-gray-700">Treemap</span>
             </label>
           </div>
@@ -917,7 +920,7 @@
     </div>
 
     <!-- Visualization Area -->
-    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">
           {showNetworkDiagram ? 'Topic Relationship Network' : 'Topic Size Distribution'}
@@ -934,7 +937,7 @@
     </div>
 
     <!-- Topics Table -->
-    <div class="bg-white rounded-lg shadow-sm p-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Topic Details</h2>
         <span class="text-sm text-gray-500">{filteredTopics.length} topics</span>
@@ -992,7 +995,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button 
                     on:click={() => selectTopic(topic)}
-                    class="text-blue-600 hover:text-blue-900">
+                    class="text-indigo-600 hover:text-indigo-900">
                     Analyze
                   </button>
                 </td>

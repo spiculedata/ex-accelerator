@@ -1,5 +1,5 @@
 <div class="min-h-screen bg-blue-500 flex items-center justify-center">
-  <div class="bg-white p-8 rounded-lg shadow-lg max-w-md">
+  <div class="bg-white p-8 rounded-xl shadow-lg max-w-md">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Tailwind v4 Test</h1>
     <p class="text-gray-600 mb-4">Testing grid layout:</p>
     

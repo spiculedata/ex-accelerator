@@ -118,10 +118,10 @@
 
   function getStatusColor(status: string) {
     const colors = {
-      'ready': 'bg-green-100 text-green-800',
+      'ready': 'bg-blue-100 text-blue-800',
       'processing': 'bg-yellow-100 text-yellow-800', 
       'completed': 'bg-blue-100 text-blue-800',
-      'running': 'bg-purple-100 text-purple-800',
+      'running': 'bg-blue-100 text-blue-800',
       'draft': 'bg-gray-100 text-gray-800',
       'error': 'bg-red-100 text-red-800'
     };
@@ -158,14 +158,14 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-orange-900 to-slate-900 overflow-hidden">
+  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
     <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-orange-900/10 to-slate-900/10 opacity-40"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
     
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+          <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-red-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
@@ -187,7 +187,7 @@
         <div class="flex items-center space-x-4">
           <button 
             on:click={createNewWorkflow}
-            class="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
+            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-red-600 hover:from-blue-600 hover:to-red-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
             Create Workflow
           </button>
         </div>
@@ -200,27 +200,27 @@
     
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-orange-600 mb-1">{processingStats.totalWorkflows}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{processingStats.totalWorkflows}</div>
         <div class="text-sm text-gray-600">Total Workflows</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{processingStats.runningWorkflows}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{processingStats.runningWorkflows}</div>
         <div class="text-sm text-gray-600">Running Now</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{processingStats.completedWorkflows}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{processingStats.completedWorkflows}</div>
         <div class="text-sm text-gray-600">Completed</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{processingStats.datasetsProcessed}</div>
         <div class="text-sm text-gray-600">Datasets Processed</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-indigo-600 mb-1">{processingStats.totalProcessingTime}</div>
         <div class="text-sm text-gray-600">Total Runtime</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-cyan-600 mb-1">{processingStats.averageProcessingTime}</div>
         <div class="text-sm text-gray-600">Avg Runtime</div>
       </div>
@@ -229,18 +229,18 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
       <!-- Dataset Selection Panel -->
       <div class="xl:col-span-1">
-        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-6">Select Input Dataset</h2>
           
           <div class="space-y-4">
             {#each availableDatasets as dataset}
               <div 
-                class="border border-gray-200 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors {selectedDataset?.id === dataset.id ? 'ring-2 ring-orange-500 bg-orange-50' : ''}"
+                class="border border-gray-200 rounded-xl p-4 cursor-pointer hover:bg-gray-50 transition-colors {selectedDataset?.id === dataset.id ? 'ring-2 ring-blue-500 bg-blue-50' : ''}"
                 on:click={() => selectDataset(dataset)}>
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex items-start space-x-3">
-                    <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                       </svg>
                     </div>
@@ -277,7 +277,7 @@
 
         {#if selectedDataset}
           <!-- Dataset Preview -->
-          <div class="bg-white rounded-lg shadow-sm p-6">
+          <div class="bg-white rounded-xl shadow-sm p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Dataset Preview</h3>
             <div class="space-y-3">
               <div class="flex justify-between">
@@ -302,7 +302,7 @@
               <h4 class="text-sm font-medium text-gray-900 mb-2">All Columns</h4>
               <div class="flex flex-wrap gap-1">
                 {#each selectedDataset.columns as column}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                     {column}
                   </span>
                 {/each}
@@ -314,7 +314,7 @@
 
       <!-- Workflows Panel -->
       <div class="xl:col-span-2">
-        <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="bg-white rounded-xl shadow-sm p-6">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold text-gray-900">Processing Workflows</h2>
             <span class="text-sm text-gray-500">{workflows.length} workflows</span>
@@ -322,7 +322,7 @@
           
           <div class="space-y-4">
             {#each workflows as workflow}
-              <div class="border border-gray-200 rounded-lg p-6">
+              <div class="border border-gray-200 rounded-xl p-6">
                 <div class="flex items-start justify-between mb-4">
                   <div>
                     <h3 class="font-medium text-gray-900">{workflow.name}</h3>
@@ -355,7 +355,7 @@
                       <span class="text-gray-900 font-medium">{workflow.progress}%</span>
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-2">
-                      <div class="bg-orange-600 h-2 rounded-full transition-all duration-300" style="width: {workflow.progress}%"></div>
+                      <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {workflow.progress}%"></div>
                     </div>
                   </div>
                 {/if}
@@ -365,14 +365,14 @@
                     {#if workflow.status === 'draft'}
                       <button 
                         on:click={() => window.location.href = '/data-processing/workflow-builder'}
-                        class="text-sm text-orange-600 hover:text-orange-800 font-medium">Edit</button>
-                      <button class="text-sm text-green-600 hover:text-green-800 font-medium">Run</button>
+                        class="text-sm text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                      <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Run</button>
                     {:else if workflow.status === 'running'}
                       <button class="text-sm text-red-600 hover:text-red-800 font-medium">Stop</button>
                       <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Logs</button>
                     {:else if workflow.status === 'completed'}
                       <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Results</button>
-                      <button class="text-sm text-green-600 hover:text-green-800 font-medium">Download</button>
+                      <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Download</button>
                     {/if}
                   </div>
                   <button class="text-sm text-gray-600 hover:text-gray-800">

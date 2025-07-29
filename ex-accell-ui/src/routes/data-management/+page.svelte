@@ -167,13 +167,13 @@
 
   function getStatusColor(status: string) {
     const colors = {
-      'connected': 'bg-green-100 text-green-800',
+      'connected': 'bg-blue-100 text-blue-800',
       'paused': 'bg-yellow-100 text-yellow-800',
       'disconnected': 'bg-gray-100 text-gray-800',
       'error': 'bg-red-100 text-red-800',
-      'ready': 'bg-green-100 text-green-800',
+      'ready': 'bg-blue-100 text-blue-800',
       'processing': 'bg-blue-100 text-blue-800',
-      'running': 'bg-purple-100 text-purple-800',
+      'running': 'bg-blue-100 text-blue-800',
       'completed': 'bg-blue-100 text-blue-800',
       'draft': 'bg-gray-100 text-gray-800'
     };
@@ -270,34 +270,34 @@
     
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-teal-600 mb-1">{dataStats.totalRecordsCapture.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Records Captured</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{dataStats.activeConnections}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.activeConnections}</div>
         <div class="text-sm text-gray-600">Active Sources</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.totalDatasets}</div>
         <div class="text-sm text-gray-600">Datasets</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{dataStats.activeWorkflows}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.activeWorkflows}</div>
         <div class="text-sm text-gray-600">Active Workflows</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-orange-600 mb-1">{dataStats.totalStorageUsed}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.totalStorageUsed}</div>
         <div class="text-sm text-gray-600">Storage Used</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-xs text-gray-500 mb-1">Last Update</div>
         <div class="text-sm font-medium text-gray-900">{formatTimestamp(dataStats.lastCaptureUpdate).split(',')[1]}</div>
       </div>
     </div>
 
     <!-- Tab Navigation -->
-    <div class="bg-white rounded-lg shadow-sm mb-8">
+    <div class="bg-white rounded-xl shadow-sm mb-8">
       <div class="border-b border-gray-200">
         <nav class="-mb-px flex space-x-8 px-6">
           <button
@@ -324,14 +324,14 @@
           <div class="space-y-6">
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-semibold text-gray-900">Data Sources</h2>
-              <button class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors">
+              <button class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-medium transition-colors">
                 Add Source
               </button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {#each dataSources as source}
-                <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
                   <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
                       <span class="text-2xl">{source.icon}</span>
@@ -361,10 +361,10 @@
                   <div class="flex space-x-2">
                     <button 
                       on:click={() => toggleDataSource(source.id)}
-                      class="flex-1 px-3 py-2 {source.status === 'connected' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} rounded-lg text-sm font-medium transition-colors">
+                      class="flex-1 px-3 py-2 {source.status === 'connected' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'} rounded-xl text-sm font-medium transition-colors">
                       {source.status === 'connected' ? 'Pause' : 'Start'}
                     </button>
-                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
+                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
                       Configure
                     </button>
                   </div>
@@ -378,14 +378,14 @@
           <div class="space-y-6">
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-semibold text-gray-900">Available Datasets</h2>
-              <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+              <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                 Import Dataset
               </button>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {#each availableDatasets as dataset}
-                <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
                   <div class="flex items-start justify-between mb-4">
                     <div>
                       <h3 class="font-medium text-gray-900 mb-1">{dataset.name}</h3>
@@ -421,10 +421,10 @@
                   <div class="flex space-x-2">
                     <button 
                       on:click={() => createWorkflowFromDataset(dataset)}
-                      class="flex-1 px-3 py-2 bg-teal-100 text-teal-800 hover:bg-teal-200 rounded-lg text-sm font-medium transition-colors">
+                      class="flex-1 px-3 py-2 bg-teal-100 text-teal-800 hover:bg-teal-200 rounded-xl text-sm font-medium transition-colors">
                       Process
                     </button>
-                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
+                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
                       Preview
                     </button>
                   </div>
@@ -440,14 +440,14 @@
               <h2 class="text-xl font-semibold text-gray-900">Processing Workflows</h2>
               <button 
                 on:click={() => window.location.href = '/data-management/workflow-builder'}
-                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                 New Workflow
               </button>
             </div>
 
             <div class="space-y-4">
               {#each workflows as workflow}
-                <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
                   <div class="flex items-start justify-between mb-4">
                     <div class="flex-1">
                       <h3 class="font-medium text-gray-900 mb-1">{workflow.name}</h3>
@@ -492,14 +492,14 @@
                       {#if workflow.status === 'draft'}
                         <button 
                           on:click={() => editWorkflow(workflow)}
-                          class="text-sm text-purple-600 hover:text-purple-800 font-medium">Edit</button>
-                        <button class="text-sm text-green-600 hover:text-green-800 font-medium">Run</button>
+                          class="text-sm text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Run</button>
                       {:else if workflow.status === 'running'}
                         <button class="text-sm text-red-600 hover:text-red-800 font-medium">Stop</button>
                         <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Logs</button>
                       {:else if workflow.status === 'completed'}
                         <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Results</button>
-                        <button class="text-sm text-green-600 hover:text-green-800 font-medium">Download</button>
+                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Download</button>
                       {/if}
                     </div>
                   </div>

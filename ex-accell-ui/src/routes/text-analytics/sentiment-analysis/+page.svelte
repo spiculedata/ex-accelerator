@@ -410,7 +410,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
           </button>
-          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-green-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -445,36 +445,36 @@
     
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{sentimentStats.positive.percentage}%</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-emerald-600 mb-1">{sentimentStats.positive.percentage}%</div>
         <div class="text-sm text-gray-600">Positive Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.positive.count.toLocaleString()} posts</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-red-600 mb-1">{sentimentStats.negative.percentage}%</div>
         <div class="text-sm text-gray-600">Negative Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.negative.count.toLocaleString()} posts</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-gray-600 mb-1">{sentimentStats.neutral.percentage}%</div>
         <div class="text-sm text-gray-600">Neutral Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.neutral.count.toLocaleString()} posts</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">89%</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-emerald-600 mb-1">89%</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
         <div class="text-xs text-gray-500 mt-1">AI Classification</div>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Analysis Filters</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment</label>
-          <select bind:value={selectedSentiment} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+          <select bind:value={selectedSentiment} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">All Sentiments</option>
             <option value="Very Positive">Very Positive</option>
             <option value="Positive">Positive</option>
@@ -486,7 +486,7 @@
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-          <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+          <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">All Platforms</option>
             <option value="twitter">Twitter</option>
             <option value="facebook">Facebook</option>
@@ -504,12 +504,12 @@
             min="0.5" 
             max="1" 
             step="0.05"
-            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="1d">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
@@ -522,23 +522,23 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
       <!-- Sentiment Distribution Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="sentiment-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Emotion Analysis Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="emotion-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Sentiment Trends Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="trend-chart" class="w-full h-80"></div>
       </div>
     </div>
 
     <!-- Sample Posts Analysis -->
-    <div class="bg-white rounded-lg shadow-sm p-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Post Analysis</h2>
         <span class="text-sm text-gray-500">{filteredPosts.length} posts shown</span>
@@ -546,7 +546,7 @@
       
       <div class="space-y-4">
         {#each filteredPosts as post}
-          <div class="border border-gray-200 rounded-lg p-4">
+          <div class="border border-gray-200 rounded-xl p-4">
             <div class="flex items-start justify-between mb-3">
               <div class="flex items-center space-x-3">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -556,7 +556,7 @@
                       style="background-color: {getSentimentColor(post.sentiment)}20; color: {getSentimentColor(post.sentiment)}">
                   {getSentimentIcon(post.sentiment)} {post.sentiment}
                 </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                   {(post.confidence * 100).toFixed(1)}% confidence
                 </span>
               </div>
@@ -569,7 +569,7 @@
               <div class="flex items-center space-x-2 mb-3">
                 <span class="text-sm text-gray-600">Emotions:</span>
                 {#each post.emotions as emotion}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
                     {emotion}
                   </span>
                 {/each}

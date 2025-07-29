@@ -77,12 +77,12 @@
 <Navigation />
 
 <!-- Header -->
-<div class="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700">
+<div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex items-center">
       <button 
         on:click={() => window.history.back()}
-        class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+        class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
@@ -97,7 +97,7 @@
 
 <!-- Form Content -->
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="p-8">
       <form on:submit|preventDefault={createProject} class="space-y-8">
         
@@ -143,7 +143,7 @@
                   type="radio" 
                   value={type.value}
                   class="sr-only">
-                <div class="border-2 rounded-lg p-4 transition-all {projectType === type.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
+                <div class="border-2 rounded-xl p-4 transition-all {projectType === type.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
                   <div class="flex items-center">
                     <div class="w-4 h-4 border-2 rounded-full mr-3 {projectType === type.value ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
                       {#if projectType === type.value}
@@ -173,7 +173,7 @@
                   type="checkbox"
                   on:change={() => toggleDataSource(source.id)}
                   class="sr-only">
-                <div class="border-2 rounded-lg p-4 transition-all {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
+                <div class="border-2 rounded-xl p-4 transition-all {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
                   <div class="flex items-center">
                     <div class="w-5 h-5 border-2 rounded mr-3 flex items-center justify-center {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
                       {#if dataSources.includes(source.id)}
@@ -184,7 +184,7 @@
                     </div>
                     <div>
                       <h3 class="font-medium text-gray-900">{source.name}</h3>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {source.type === 'social' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'} mt-1">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {source.type === 'social' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-800'} mt-1">
                         {source.type === 'social' ? 'Social Media' : 'File Upload'}
                       </span>
                     </div>

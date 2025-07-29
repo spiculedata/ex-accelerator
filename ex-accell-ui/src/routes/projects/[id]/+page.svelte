@@ -37,7 +37,7 @@
       name: 'Text Analytics',
       description: 'NLP processing and sentiment analysis',
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-      color: 'from-green-500 to-green-600',
+      color: 'from-blue-500 to-blue-600',
       available: true
     },
     {
@@ -45,7 +45,7 @@
       name: 'Image Processing',
       description: 'Computer vision and image analysis',
       icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
-      color: 'from-purple-500 to-purple-600',
+      color: 'from-blue-500 to-blue-600',
       available: project.totalPosts > 0
     }
   ];
@@ -57,7 +57,7 @@
 
   function getStatusColor(status: string) {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
+      case 'active': return 'bg-blue-100 text-blue-800';
       case 'paused': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-blue-100 text-blue-800';
       case 'archived': return 'bg-gray-100 text-gray-800';
@@ -79,13 +79,13 @@
 
 {#if project}
   <!-- Project Header -->
-  <div class="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700">
+  <div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
             on:click={() => window.location.href='/projects'}
-            class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+            class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
@@ -114,19 +114,19 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <!-- Quick Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+    <div class="bg-white rounded-xl shadow-sm p-6 text-center">
       <div class="text-2xl font-bold text-blue-600 mb-1">{project.totalPosts.toLocaleString()}</div>
       <div class="text-sm text-gray-600">Total Posts</div>
     </div>
-    <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-green-600 mb-1">{project.dataSources.length}</div>
+    <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+      <div class="text-2xl font-bold text-blue-600 mb-1">{project.dataSources.length}</div>
       <div class="text-sm text-gray-600">Data Sources</div>
     </div>
-    <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-purple-600 mb-1">{project.teamMembers.length}</div>
+    <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+      <div class="text-2xl font-bold text-blue-600 mb-1">{project.teamMembers.length}</div>
       <div class="text-sm text-gray-600">Team Members</div>
     </div>
-    <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+    <div class="bg-white rounded-xl shadow-sm p-6 text-center">
       <div class="text-2xl font-bold text-orange-600 mb-1">3</div>
       <div class="text-sm text-gray-600">Applications</div>
     </div>
@@ -141,13 +141,13 @@
           class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer {app.available ? '' : 'opacity-60'}"
           on:click={() => app.available && openApplication(app.id)}>
           <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gradient-to-br {app.color} rounded-lg flex items-center justify-center">
+            <div class="w-12 h-12 bg-gradient-to-br {app.color} rounded-xl flex items-center justify-center">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={app.icon}></path>
               </svg>
             </div>
             {#if app.available}
-              <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Available</span>
+              <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Available</span>
             {:else}
               <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Needs Data</span>
             {/if}
@@ -165,7 +165,7 @@
   <!-- Data Management -->
   <div class="mb-8">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Data Management</h2>
-    <div class="bg-white rounded-lg shadow-sm p-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900">Data Sources</h3>
         <button 
@@ -177,10 +177,10 @@
       
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {#each project.dataSources as source}
-          <div class="border border-gray-200 rounded-lg p-4">
+          <div class="border border-gray-200 rounded-xl p-4">
             <div class="flex items-center justify-between">
               <h4 class="font-medium text-gray-900 capitalize">{source}</h4>
-              <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Active</span>
+              <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Active</span>
             </div>
             <p class="text-sm text-gray-600 mt-2">
               {source === 'twitter' ? 'Social media posts and interactions' :
@@ -192,7 +192,7 @@
         {/each}
         
         <!-- Add Data Source -->
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center hover:border-gray-400 transition-colors cursor-pointer"
+        <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 flex items-center justify-center hover:border-gray-400 transition-colors cursor-pointer"
              on:click={() => window.location.href='/data-capture'}>
           <div class="text-center">
             <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +208,7 @@
   <!-- Team Members -->
   <div>
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Team Members</h2>
-    <div class="bg-white rounded-lg shadow-sm p-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="space-y-4">
         {#each project.teamMembers as member, i}
           <div class="flex items-center justify-between py-2">

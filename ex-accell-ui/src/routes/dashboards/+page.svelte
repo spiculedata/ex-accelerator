@@ -120,10 +120,10 @@
 
   function getStatusColor(status: string) {
     const colors = {
-      'active': 'bg-green-100 text-green-800',
+      'active': 'bg-blue-100 text-blue-800',
       'paused': 'bg-yellow-100 text-yellow-800',
       'error': 'bg-red-100 text-red-800',
-      'success': 'bg-green-100 text-green-800',
+      'success': 'bg-blue-100 text-blue-800',
       'warning': 'bg-yellow-100 text-yellow-800',
       'info': 'bg-blue-100 text-blue-800'
     };
@@ -152,7 +152,7 @@
   }
 
   function getHealthColor(health: number) {
-    if (health >= 95) return 'text-green-600';
+    if (health >= 95) return 'text-blue-600';
     if (health >= 90) return 'text-yellow-600';
     return 'text-red-600';
   }
@@ -410,14 +410,14 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
+  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
     <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
     
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+          <div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
@@ -441,7 +441,7 @@
             <span class="text-sm text-slate-300 font-medium">Auto-refresh:</span>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" bind:checked={autoRefresh} class="sr-only peer">
-              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-md peer-checked:bg-gradient-to-r peer-checked:from-violet-500 peer-checked:to-purple-600"></div>
+              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-md peer-checked:bg-gradient-to-r peer-checked:from-violet-500 peer-checked:to-blue-600"></div>
             </label>
           </div>
           <select bind:value={timeRange} class="px-4 py-3 bg-white/10 border border-white/20 backdrop-blur-sm rounded-xl text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:border-violet-400/50">
@@ -460,27 +460,27 @@
     
     <!-- Key Metrics Overview -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{dashboardStats.totalSources}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalSources}</div>
         <div class="text-sm text-gray-600">Data Sources</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{dashboardStats.activeCrawlers}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.activeCrawlers}</div>
         <div class="text-sm text-gray-600">Active Crawlers</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-orange-600 mb-1">{dashboardStats.processingRate.toLocaleString()}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.processingRate.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Posts/Hour</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-indigo-600 mb-1">{dashboardStats.dataQuality}%</div>
         <div class="text-sm text-gray-600">Data Quality</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-xs text-gray-500 mb-1">Last Updated</div>
         <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated).split(',')[1]}</div>
       </div>
@@ -489,22 +489,22 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
       <!-- Sentiment Overview Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="sentiment-overview-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Data Sources Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="source-breakdown-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Activity Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="activity-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Top Topics Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="topics-chart" class="w-full h-80"></div>
       </div>
     </div>
@@ -512,13 +512,13 @@
     <!-- Data Sources Status & Language Breakdown -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
       <!-- Data Sources Status -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-6">Data Sources Status</h2>
         <div class="space-y-4">
           {#each dataSources as source}
             <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
               <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div class="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
                   <span class="text-blue-600 font-medium text-sm">{source.name.charAt(0)}</span>
                 </div>
                 <div>
@@ -540,7 +540,7 @@
       </div>
 
       <!-- Language Breakdown -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-6">Language Distribution</h2>
         <div class="space-y-4">
           {#each textAnalytics.topLanguages as language}
@@ -567,7 +567,7 @@
     <!-- Recent Activity & Top Topics -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
       <!-- Recent Activity Feed -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-lg font-semibold text-gray-900">Recent Activity</h2>
           <button class="text-sm text-blue-600 hover:text-blue-800">View All</button>
@@ -590,7 +590,7 @@
       </div>
 
       <!-- Top Topics with Trends -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-lg font-semibold text-gray-900">Trending Topics</h2>
           <button class="text-sm text-blue-600 hover:text-blue-800">View Analysis</button>
@@ -607,7 +607,7 @@
               </div>
               <div class="text-right">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {
-                  topic.trend === 'up' ? 'bg-green-100 text-green-800' : 
+                  topic.trend === 'up' ? 'bg-blue-100 text-blue-800' : 
                   topic.trend === 'down' ? 'bg-red-100 text-red-800' : 
                   'bg-gray-100 text-gray-800'
                 }">

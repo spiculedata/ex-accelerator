@@ -177,7 +177,7 @@
 
   function getSentimentColor(sentiment: string) {
     const colors = {
-      'positive': 'bg-green-100 text-green-800',
+      'positive': 'bg-blue-100 text-blue-800',
       'negative': 'bg-red-100 text-red-800',
       'neutral': 'bg-gray-100 text-gray-800',
       'mixed': 'bg-yellow-100 text-yellow-800'
@@ -196,7 +196,7 @@
 
   function getTrendColor(trend: string) {
     const colors = {
-      'up': 'text-green-600',
+      'up': 'text-blue-600',
       'down': 'text-red-600',
       'stable': 'text-gray-600'
     };
@@ -481,7 +481,7 @@
           </button>
           <button 
             on:click={() => window.location.href='/text-analytics/research-investigation'}
-            class="px-6 py-3 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
+            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
             Research Investigation
           </button>
         </div>
@@ -494,26 +494,26 @@
     
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-pink-600 mb-1">{hashtagStats.totalHashtags.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Hashtags</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-green-600 mb-1">{hashtagStats.trendingHashtags}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{hashtagStats.trendingHashtags}</div>
         <div class="text-sm text-gray-600">Trending Now</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-purple-600 mb-1">{hashtagStats.totalReach.toLocaleString()}</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{hashtagStats.totalReach.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Reach</div>
       </div>
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-orange-600 mb-1">{hashtagStats.averageEngagement}%</div>
+      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
+        <div class="text-2xl font-bold text-blue-600 mb-1">{hashtagStats.averageEngagement}%</div>
         <div class="text-sm text-gray-600">Avg Engagement</div>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Analysis Filters</h2>
       
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -558,7 +558,7 @@
             min="0" 
             max="10" 
             step="0.5"
-            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
         
         <div>
@@ -576,23 +576,23 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
       <!-- Hashtag Trends Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="hashtag-trend-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Engagement Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="engagement-chart" class="w-full h-80"></div>
       </div>
       
       <!-- Reach Distribution Chart -->
-      <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="reach-chart" class="w-full h-80"></div>
       </div>
     </div>
 
     <!-- Trending Hashtags Table -->
-    <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Trending Hashtags</h2>
         <span class="text-sm text-gray-500">{filteredHashtags.length} hashtags</span>
@@ -665,7 +665,7 @@
     </div>
 
     <!-- Sample Posts -->
-    <div class="bg-white rounded-lg shadow-sm p-6">
+    <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Recent Posts with Hashtags</h2>
         <span class="text-sm text-gray-500">{samplePosts.length} posts shown</span>
@@ -673,7 +673,7 @@
       
       <div class="space-y-4">
         {#each samplePosts as post}
-          <div class="border border-gray-200 rounded-lg p-4">
+          <div class="border border-gray-200 rounded-xl p-4">
             <div class="flex items-start justify-between mb-3">
               <div class="flex items-center space-x-3">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

@@ -272,11 +272,11 @@
   function getStepColor(color) {
     const colors = {
       'blue': 'bg-blue-100 border-blue-300 text-blue-800',
-      'green': 'bg-green-100 border-green-300 text-green-800',
+      'green': 'bg-blue-100 border-blue-300 text-blue-800',
       'yellow': 'bg-yellow-100 border-yellow-300 text-yellow-800',
-      'purple': 'bg-purple-100 border-purple-300 text-purple-800',
+      'purple': 'bg-blue-100 border-blue-300 text-blue-800',
       'indigo': 'bg-indigo-100 border-indigo-300 text-indigo-800',
-      'orange': 'bg-orange-100 border-orange-300 text-orange-800',
+      'orange': 'bg-blue-100 border-blue-300 text-blue-800',
       'pink': 'bg-pink-100 border-pink-300 text-pink-800',
       'emerald': 'bg-emerald-100 border-emerald-300 text-emerald-800',
       'cyan': 'bg-cyan-100 border-cyan-300 text-cyan-800',
@@ -465,7 +465,7 @@
         <div class="flex items-center space-x-4">
           <button 
             on:click={() => window.location.href='/data-management'}
-            class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
@@ -479,12 +479,12 @@
         <div class="flex items-center space-x-3">
           <button 
             on:click={saveWorkflow}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
             Save Workflow
           </button>
           <button 
             on:click={runWorkflow}
-            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
             Run Workflow
           </button>
         </div>
@@ -504,7 +504,7 @@
             <div class="space-y-2">
               {#each category.steps as step}
                 <div 
-                  class="p-3 border border-gray-200 rounded-lg cursor-move hover:shadow-md transition-shadow {getStepColor(step.color)}"
+                  class="p-3 border border-gray-200 rounded-xl cursor-move hover:shadow-md transition-shadow {getStepColor(step.color)}"
                   draggable="true"
                   on:dragstart={(e) => handleDragStart(e, step)}>
                   <div class="flex items-center space-x-3">
@@ -610,7 +610,7 @@
         <!-- Workflow Steps -->
         {#each workflow.steps as step (step.id)}
           <div 
-            class="absolute bg-white rounded-lg shadow-md border-2 border-gray-300 p-4 min-w-[150px] cursor-move hover:shadow-lg transition-shadow"
+            class="absolute bg-white rounded-xl shadow-md border-2 border-gray-300 p-4 min-w-[150px] cursor-move hover:shadow-lg transition-shadow"
             style="left: {step.position.x}px; top: {step.position.y}px; z-index: 10;"
             on:mousedown={(e) => startStepDrag(e, step)}
             on:click={() => selectStep(step)}>
@@ -650,7 +650,7 @@
               <div class="flex flex-col space-y-1">
                 {#each step.outputs as output, index}
                   <div 
-                    class="port w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-green-600 transition-colors relative group"
+                    class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group"
                     on:click={(e) => handlePortClick(e, step, 'output', index)}
                     on:mouseenter={() => {}}
                   >
@@ -703,7 +703,7 @@
           </div>
 
           <div class="space-y-4">
-            <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl">
               <span class="text-xl">{selectedStep.icon}</span>
               <div>
                 <h4 class="font-medium text-gray-900">{selectedStep.name}</h4>
@@ -773,7 +773,7 @@
             {/if}
 
             <div class="pt-4 border-t border-gray-200">
-              <button class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+              <button class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                 Update Configuration
               </button>
             </div>

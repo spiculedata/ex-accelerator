@@ -5,15 +5,19 @@
   
   let mobileMenuOpen = false;
   let projectSwitcherOpen = false;
+  let openDropdowns = {}; // Track which dropdowns are open
 
   onMount(() => {
     loadCurrentProject();
     
-    // Click outside handler for project switcher
+    // Click outside handler for project switcher and dropdowns
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target.closest('.project-switcher')) {
         projectSwitcherOpen = false;
+      }
+      if (!target.closest('.nav-dropdown') && !target.closest('.mobile-menu')) {
+        openDropdowns = {};
       }
     };
     
@@ -23,14 +27,40 @@
   
   const navigationItems = [
     { name: 'Home', href: '/', current: false, requiresProject: false },
-    { name: 'Dashboards', href: '/dashboards', current: false, requiresProject: true },
-    { name: 'GDELT Events', href: '/gdelt', current: false, requiresProject: false },
+    { 
+      name: 'Dashboards', 
+      href: '/dashboards', 
+      current: false, 
+      requiresProject: true,
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Overview', href: '/dashboards', requiresProject: true },
+        { name: 'GDELT Events', href: '/gdelt', requiresProject: false },
+        { name: 'Android Analytics', href: '/android-analytics', requiresProject: false }
+      ]
+    },
     { name: 'Text Analytics', href: '/text-analytics', current: false, requiresProject: true },
-    { name: 'Research Investigation', href: '/text-analytics/research-investigation', current: false, requiresProject: true },
     { name: 'Image Processing', href: '/image-processing', current: false, requiresProject: true },
-    { name: 'Data Capture', href: '/data-capture', current: false, requiresProject: true },
-    { name: 'Data Management', href: '/data-management', current: false, requiresProject: true }
+    { name: 'Research Investigation', href: '/text-analytics/research-investigation', current: false, requiresProject: true },
+    { 
+      name: 'Data Management', 
+      href: '/data-capture', 
+      current: false, 
+      requiresProject: true,
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Data Capture', href: '/data-capture', requiresProject: true },
+        { name: 'Data Management', href: '/data-management', requiresProject: true }
+      ]
+    }
   ];
+
+  function toggleDropdown(itemName: string) {
+    openDropdowns = {
+      ...openDropdowns,
+      [itemName]: !openDropdowns[itemName]
+    };
+  }
 
   function navigateToApp(item: any, event: Event) {
     event.preventDefault();
@@ -57,7 +87,7 @@
       <!-- Logo and brand -->
       <div class="flex items-center">
         <div class="flex items-center">
-          <div class="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+          <div class="h-8 w-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
             <span class="text-white font-bold text-lg">SE</span>
           </div>
           <h1 class="ml-3 text-xl font-bold text-gray-900 whitespace-nowrap">
@@ -73,7 +103,7 @@
           <div class="mr-6 relative project-switcher">
             <button
               on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
-              class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
+              class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
               <div class="flex items-center">
                 <div class="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center mr-2">
                   <span class="text-white font-medium text-xs">{$currentProject.name.charAt(0)}</span>
@@ -87,7 +117,7 @@
 
             <!-- Project Dropdown -->
             {#if projectSwitcherOpen}
-              <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-[100]">
+              <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-[100]">
                 <div class="p-4 border-b border-gray-200">
                   <h3 class="text-sm font-medium text-gray-900">Switch Project</h3>
                 </div>
@@ -100,7 +130,7 @@
                       }}
                       class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {$currentProject?.id === project.id ? 'bg-blue-50' : ''}">
                       <div class="flex items-center">
-                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mr-3">
                           <span class="text-white font-medium text-sm">{project.name.charAt(0)}</span>
                         </div>
                         <div class="flex-1 min-w-0">
@@ -143,7 +173,7 @@
           <div class="mr-6">
             <button
               on:click={() => window.location.href = '/projects'}
-              class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors border border-gray-300 border-dashed">
+              class="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors border border-gray-300 border-dashed">
               <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
               </svg>
@@ -155,20 +185,62 @@
         <!-- Desktop navigation -->
         <div class="hidden lg:flex lg:items-center lg:space-x-4">
           {#each updatedNavItems as item}
-            <a
-              href={item.href}
-              on:click={(e) => navigateToApp(item, e)}
-              class="px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
-                ? 'bg-blue-100 text-blue-700' 
-                : item.requiresProject && !$currentProject 
-                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
-            >
-              {item.name}
-              {#if item.requiresProject && !$currentProject}
-                <span class="ml-1 text-xs text-gray-400">*</span>
-              {/if}
-            </a>
+            {#if item.hasDropdown}
+              <!-- Dropdown navigation item -->
+              <div class="relative nav-dropdown">
+                <button
+                  on:click={() => toggleDropdown(item.name)}
+                  class="flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : item.requiresProject && !$currentProject 
+                      ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+                >
+                  {item.name}
+                  <svg class="ml-1 w-4 h-4 transition-transform {openDropdowns[item.name] ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                  {#if item.requiresProject && !$currentProject}
+                    <span class="ml-1 text-xs text-gray-400">*</span>
+                  {/if}
+                </button>
+                
+                {#if openDropdowns[item.name]}
+                  <div class="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+                    {#each item.dropdownItems as dropdownItem}
+                      <a
+                        href={dropdownItem.href}
+                        on:click={(e) => navigateToApp(dropdownItem, e)}
+                        class="block px-4 py-2 text-sm transition-colors duration-200 {dropdownItem.requiresProject && !$currentProject 
+                          ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                          : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+                      >
+                        {dropdownItem.name}
+                        {#if dropdownItem.requiresProject && !$currentProject}
+                          <span class="ml-1 text-xs text-gray-400">*</span>
+                        {/if}
+                      </a>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {:else}
+              <!-- Regular navigation item -->
+              <a
+                href={item.href}
+                on:click={(e) => navigateToApp(item, e)}
+                class="px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : item.requiresProject && !$currentProject 
+                    ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+              >
+                {item.name}
+                {#if item.requiresProject && !$currentProject}
+                  <span class="ml-1 text-xs text-gray-400">*</span>
+                {/if}
+              </a>
+            {/if}
           {/each}
           
           <!-- Project requirement notice -->
@@ -184,12 +256,12 @@
       <div class="flex items-center justify-end">
         <!-- User Profile -->
         <div class="hidden lg:flex lg:items-center lg:space-x-2 mr-4">
-          <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+          <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors duration-200">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
           </button>
-          <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200 relative">
+          <button class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors duration-200 relative">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5-5-5h5v-13"></path>
             </svg>
@@ -226,26 +298,72 @@
 
   <!-- Mobile menu -->
   {#if mobileMenuOpen}
-    <div class="lg:hidden border-t border-gray-200 bg-white">
+    <div class="lg:hidden border-t border-gray-200 bg-white mobile-menu">
       <div class="px-2 pt-2 pb-3 space-y-1">
         {#each updatedNavItems as item}
-          <a
-            href={item.href}
-            on:click={(e) => {
-              navigateToApp(item, e);
-              mobileMenuOpen = false;
-            }}
-            class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current 
-              ? 'bg-blue-100 text-blue-700' 
-              : item.requiresProject && !$currentProject 
-                ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
-          >
-            {item.name}
-            {#if item.requiresProject && !$currentProject}
-              <span class="ml-1 text-xs text-gray-400">*</span>
-            {/if}
-          </a>
+          {#if item.hasDropdown}
+            <!-- Mobile dropdown navigation item -->
+            <div class="space-y-1">
+              <button
+                on:click={() => toggleDropdown(item.name)}
+                class="w-full flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.requiresProject && !$currentProject 
+                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+              >
+                <span>
+                  {item.name}
+                  {#if item.requiresProject && !$currentProject}
+                    <span class="ml-1 text-xs text-gray-400">*</span>
+                  {/if}
+                </span>
+                <svg class="w-4 h-4 transition-transform {openDropdowns[item.name] ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              
+              {#if openDropdowns[item.name]}
+                <div class="pl-6 space-y-1">
+                  {#each item.dropdownItems as dropdownItem}
+                    <a
+                      href={dropdownItem.href}
+                      on:click={(e) => {
+                        navigateToApp(dropdownItem, e);
+                        mobileMenuOpen = false;
+                        openDropdowns = {};
+                      }}
+                      class="block px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {dropdownItem.requiresProject && !$currentProject 
+                        ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+                    >
+                      {dropdownItem.name}
+                      {#if dropdownItem.requiresProject && !$currentProject}
+                        <span class="ml-1 text-xs text-gray-400">*</span>
+                      {/if}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <!-- Regular mobile navigation item -->
+            <a
+              href={item.href}
+              on:click={(e) => {
+                navigateToApp(item, e);
+                mobileMenuOpen = false;
+              }}
+              class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current 
+                ? 'bg-blue-100 text-blue-700' 
+                : item.requiresProject && !$currentProject 
+                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+            >
+              {item.name}
+              {#if item.requiresProject && !$currentProject}
+                <span class="ml-1 text-xs text-gray-400">*</span>
+              {/if}
+            </a>
+          {/if}
         {/each}
         
         <!-- Project requirement notice (mobile) -->
