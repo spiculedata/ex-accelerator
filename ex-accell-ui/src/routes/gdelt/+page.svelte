@@ -36,12 +36,22 @@
 	let mentionsLimitationNotice = '';
 	let showMentions = false;
 	
+	// Batch loading state
+	let isBatchLoading = false;
+	let batchProgress = { current: 0, total: 0, loadedMentions: 0 };
+	
 	// Mentions table state
 	let mentionsSortField = 'mentionTimeDate';
 	let mentionsSortDirection: 'asc' | 'desc' = 'desc';
 	let mentionsSearchTerm = '';
 	let mentionsTypeFilter = '';
 	let filteredMentions: any[] = [];
+	
+	// Pagination state
+	let currentPage = 1;
+	let itemsPerPage = 100;
+	let displayedMentions: any[] = [];
+	const itemsPerPageOptions = [25, 50, 100, 200, 500, 1000];
 	
 	// Global South countries list from BISA
 	const globalSouthCountries = [
@@ -101,6 +111,17 @@
 			3: 'Broadcast News'
 		};
 		return typeMap[mentionType] || `Type ${mentionType}`;
+	}
+
+	// Function to convert tone score to human-readable description
+	function getToneDescription(toneScore: number): string {
+		if (toneScore >= 5) return 'Very Positive';
+		if (toneScore >= 2) return 'Positive';
+		if (toneScore >= 0.5) return 'Slightly Positive';
+		if (toneScore > -0.5) return 'Neutral';
+		if (toneScore > -2) return 'Slightly Negative';
+		if (toneScore > -5) return 'Negative';
+		return 'Very Negative';
 	}
 
 	function getMentionTypeColor(mentionType: number): string {
@@ -528,7 +549,7 @@
 	}
 
 
-	// Reactive mentions filtering and sorting
+	// Reactive mentions filtering, sorting, and pagination
 	$: {
 		let filtered = [...mentions];
 		
@@ -567,6 +588,11 @@
 		});
 		
 		filteredMentions = filtered;
+		
+		// Calculate pagination
+		const startIndex = (currentPage - 1) * itemsPerPage;
+		const endIndex = startIndex + itemsPerPage;
+		displayedMentions = filteredMentions.slice(startIndex, endIndex);
 	}
 
 	function sortMentions(field: string) {
@@ -576,6 +602,21 @@
 			mentionsSortField = field;
 			mentionsSortDirection = 'desc';
 		}
+		currentPage = 1; // Reset to first page when sorting
+	}
+	
+	function goToPage(page: number) {
+		currentPage = page;
+	}
+	
+	function changeItemsPerPage(newItemsPerPage: number) {
+		itemsPerPage = newItemsPerPage;
+		currentPage = 1; // Reset to first page when changing page size
+	}
+	
+	// Reset pagination when search or filter changes
+	$: if (mentionsSearchTerm || mentionsTypeFilter) {
+		currentPage = 1;
 	}
 
 	function exportMentionsToCSV() {
@@ -709,6 +750,10 @@
 			loadingMentions = true;
 			mentionsError = '';
 			
+			// Reset pagination
+			currentPage = 1;
+			itemsPerPage = 100;
+			
 			const response = await fetch(`/api/gdelt/mentions?eventId=${eventId}`);
 			
 			if (!response.ok) {
@@ -735,64 +780,102 @@
 		}
 	}
 
+	async function fetchMentionsBatch(eventIds) {
+		const response = await fetch('/api/gdelt/mentions', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				eventIds: eventIds
+			})
+		});
+		
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+		}
+		
+		const data = await response.json();
+		
+		if (data.error) {
+			throw new Error(data.error);
+		}
+		
+		return data.mentions || [];
+	}
+
 	async function fetchAllMentionsForVisible() {
 		try {
 			loadingMentions = true;
+			isBatchLoading = false;
 			mentionsError = '';
 			mentionsLimitationNotice = '';
 			mentions = []; // Clear previous mentions
 			selectedEventId = null; // Set to null to indicate multiple events
 			showMentions = true; // Show the mentions section immediately
 			
-			console.log(`Starting bulk mentions fetch for ${visibleEvents.length} events...`);
+			// Reset pagination
+			currentPage = 1;
+			itemsPerPage = 100;
 			
-			// Get all visible event IDs as array
-			let eventIds = visibleEvents.map(e => e.id);
-			let isLimited = false;
+			const allEventIds = visibleEvents.map(e => e.id);
+			console.log(`Starting batch mentions fetch for ${allEventIds.length} events...`);
 			
-			// Handle large datasets by limiting to first 1000 events
-			if (eventIds.length > 1000) {
-				console.log(`Large dataset detected: ${eventIds.length} events. Limiting to first 1000 events.`);
-				eventIds = eventIds.slice(0, 1000);
-				isLimited = true;
-			}
-			
-			// Use POST to avoid URL length limits
-			const response = await fetch('/api/gdelt/mentions', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					eventIds: eventIds
-				})
-			});
-			
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-			}
-			
-			const data = await response.json();
-			
-			if (data.error) {
-				throw new Error(data.error);
-			}
-			
-			mentions = data.mentions || [];
-			
-			if (isLimited) {
-				console.log(`Successfully loaded ${mentions.length} mentions for first 1000 of ${visibleEvents.length} events`);
-				// Add a notice about the limitation using the separate variable
-				mentionsLimitationNotice = `Showing mentions from the first 1000 of ${visibleEvents.length} filtered events due to performance limits.`;
+			if (allEventIds.length <= 1000) {
+				// Single batch - use existing logic
+				const batchMentions = await fetchMentionsBatch(allEventIds);
+				mentions = batchMentions;
+				console.log(`Successfully loaded ${mentions.length} mentions for ${allEventIds.length} events`);
 			} else {
-				console.log(`Successfully loaded ${mentions.length} mentions for ${visibleEvents.length} events`);
+				// Multiple batches required
+				isBatchLoading = true;
+				const batchSize = 1000;
+				const totalBatches = Math.ceil(allEventIds.length / batchSize);
+				
+				batchProgress = {
+					current: 0,
+					total: totalBatches,
+					loadedMentions: 0
+				};
+				
+				console.log(`Large dataset: processing ${allEventIds.length} events in ${totalBatches} batches of ${batchSize}`);
+				
+				let allMentions = [];
+				
+				for (let i = 0; i < totalBatches; i++) {
+					const start = i * batchSize;
+					const end = Math.min(start + batchSize, allEventIds.length);
+					const batchEventIds = allEventIds.slice(start, end);
+					
+					console.log(`Processing batch ${i + 1}/${totalBatches}: events ${start + 1}-${end}`);
+					
+					batchProgress.current = i + 1;
+					
+					const batchMentions = await fetchMentionsBatch(batchEventIds);
+					allMentions = [...allMentions, ...batchMentions];
+					
+					// Update mentions progressively so user sees results building up
+					mentions = [...allMentions];
+					batchProgress.loadedMentions = allMentions.length;
+					
+					console.log(`Batch ${i + 1} complete: ${batchMentions.length} mentions (total: ${allMentions.length})`);
+					
+					// Small delay to prevent overwhelming the server and allow UI updates
+					if (i < totalBatches - 1) {
+						await new Promise(resolve => setTimeout(resolve, 100));
+					}
+				}
+				
+				console.log(`Batch loading complete: ${allMentions.length} mentions from ${allEventIds.length} events`);
+				isBatchLoading = false;
 			}
 			
 		} catch (err) {
 			console.error('Error fetching all mentions:', err);
 			mentionsError = err instanceof Error ? err.message : 'Failed to load mentions';
 			mentions = [];
+			isBatchLoading = false;
 		} finally {
 			loadingMentions = false;
 		}
@@ -1635,8 +1718,12 @@
 									<div class="animate-spin rounded-full h-3 w-3 border border-orange-200 border-t-orange-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-orange-600 mb-1 xl:mb-2">{visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc, e) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}</div>
-							<div class="text-sm xl:text-base text-gray-600">Avg Tone</div>
+							{#if true}
+								{@const avgTone = visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc, e) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}
+								<div class="text-xl xl:text-2xl 2xl:text-3xl font-bold text-orange-600 mb-1">{getToneDescription(avgTone)}</div>
+								<div class="text-lg xl:text-xl 2xl:text-2xl font-semibold text-orange-500 mb-1">{avgTone}</div>
+								<div class="text-sm xl:text-base text-gray-600">Avg Tone</div>
+							{/if}
 						</div>
 					</div>
 
@@ -1656,23 +1743,25 @@
 									{#if visibleEvents.length > 0 && visibleEvents.length < events.length}
 										<button 
 											on:click={() => fetchAllMentionsForVisible()}
-											disabled={loadingMentions}
+											disabled={loadingMentions || isBatchLoading}
 											class="text-xs xl:text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2 min-w-max"
 										>
-											{#if loadingMentions}
+											{#if loadingMentions || isBatchLoading}
 												<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
-												<span class="text-blue-100">Processing...</span>
+												<span class="text-blue-100">
+													{#if isBatchLoading}
+														Batch {batchProgress.current}/{batchProgress.total} ({batchProgress.loadedMentions} mentions)
+													{:else}
+														Processing...
+													{/if}
+												</span>
 											{:else}
 												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
 												</svg>
 												<span>
-												{#if visibleEvents.length > 1000}
-													Show Mentions (first 1000 of {visibleEvents.length})
-												{:else}
 													Show All Mentions ({visibleEvents.length})
-												{/if}
-											</span>
+												</span>
 											{/if}
 										</button>
 									{/if}
@@ -1703,10 +1792,16 @@
 							{/if}
 							
 							<!-- Bulk Mentions Processing Indicator -->
-							{#if loadingMentions && showMentions}
+							{#if (loadingMentions || isBatchLoading) && showMentions}
 								<div class="absolute top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 z-40">
 									<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
-									<span class="text-sm font-medium">Processing mentions...</span>
+									<span class="text-sm font-medium">
+										{#if isBatchLoading}
+											Loading batch {batchProgress.current}/{batchProgress.total}...
+										{:else}
+											Processing mentions...
+										{/if}
+									</span>
 								</div>
 							{/if}
 						</div>
@@ -1865,6 +1960,70 @@
 										</div>
 									</div>
 
+									<!-- Pagination Controls (Top) -->
+									{#if filteredMentions.length > itemsPerPageOptions[0]}
+										{@const totalPages = Math.ceil(filteredMentions.length / itemsPerPage)}
+										
+										<div class="mb-6 flex flex-col lg:flex-row items-center justify-between gap-4 border-b pb-4">
+											<!-- Results per page selector -->
+											<div class="flex items-center gap-3">
+												<label class="text-sm text-gray-700 font-medium">Show:</label>
+												<select
+													bind:value={itemsPerPage}
+													on:change={() => changeItemsPerPage(itemsPerPage)}
+													class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+												>
+													{#each itemsPerPageOptions as option}
+														<option value={option}>{option} per page</option>
+													{/each}
+												</select>
+											</div>
+
+											<!-- Page Navigation -->
+											{#if totalPages > 1}
+												{@const startPage = Math.max(1, currentPage - 2)}
+												{@const endPage = Math.min(totalPages, currentPage + 2)}
+												
+												<div class="flex items-center space-x-2">
+													<button
+														on:click={() => goToPage(currentPage - 1)}
+														disabled={currentPage === 1}
+														class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+													>
+														Previous
+													</button>
+													
+													{#if startPage > 1}
+														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
+														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+													{/if}
+													
+													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
+														<button
+															on:click={() => goToPage(page)}
+															class="px-3 py-1 text-sm rounded transition-colors {page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+														>
+															{page}
+														</button>
+													{/each}
+													
+													{#if endPage < totalPages}
+														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
+													{/if}
+													
+													<button
+														on:click={() => goToPage(currentPage + 1)}
+														disabled={currentPage === totalPages}
+														class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+													>
+														Next
+													</button>
+												</div>
+											{/if}
+										</div>
+									{/if}
+
 									<div class="overflow-x-auto">
 										<table class="min-w-full divide-y divide-gray-200 table-auto">
 											<thead class="bg-gray-50">
@@ -1933,7 +2092,7 @@
 												</tr>
 											</thead>
 											<tbody class="bg-white divide-y divide-gray-200">
-												{#each filteredMentions as mention, index}
+												{#each displayedMentions as mention, index}
 													<tr class="hover:bg-gray-50">
 														<td class="px-4 py-3 text-sm text-gray-900 font-medium max-w-xs truncate" title="{mention.mentionSourceName || 'Unknown'}">
 															{mention.mentionSourceName || 'Unknown'}
@@ -2000,14 +2159,89 @@
 										</table>
 									</div>
 									
+									<!-- Pagination Controls (Bottom) -->
+									{#if filteredMentions.length > itemsPerPageOptions[0]}
+										{@const totalPages = Math.ceil(filteredMentions.length / itemsPerPage)}
+										
+										<div class="mt-6 flex flex-col lg:flex-row items-center justify-between gap-4 border-t pt-4">
+											<!-- Results per page selector -->
+											<div class="flex items-center gap-3">
+												<label class="text-sm text-gray-700 font-medium">Show:</label>
+												<select
+													bind:value={itemsPerPage}
+													on:change={() => changeItemsPerPage(itemsPerPage)}
+													class="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+												>
+													{#each itemsPerPageOptions as option}
+														<option value={option}>{option} per page</option>
+													{/each}
+												</select>
+											</div>
+
+											<!-- Page Navigation -->
+											{#if totalPages > 1}
+												{@const startPage = Math.max(1, currentPage - 2)}
+												{@const endPage = Math.min(totalPages, currentPage + 2)}
+												
+												<div class="flex items-center space-x-2">
+													<button
+														on:click={() => goToPage(currentPage - 1)}
+														disabled={currentPage === 1}
+														class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+													>
+														Previous
+													</button>
+													
+													{#if startPage > 1}
+														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
+														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+													{/if}
+													
+													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
+														<button
+															on:click={() => goToPage(page)}
+															class="px-3 py-1 text-sm rounded transition-colors {page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+														>
+															{page}
+														</button>
+													{/each}
+													
+													{#if endPage < totalPages}
+														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
+													{/if}
+													
+													<button
+														on:click={() => goToPage(currentPage + 1)}
+														disabled={currentPage === totalPages}
+														class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded transition-colors"
+													>
+														Next
+													</button>
+												</div>
+											{/if}
+										</div>
+									{/if}
+									
 									<div class="mt-4 text-sm text-gray-500 text-center">
-										Showing {filteredMentions.length} of {mentions.length} mention{mentions.length !== 1 ? 's' : ''}
-										{#if selectedEventId}
-											for Event ID {selectedEventId}
-										{:else if visibleEvents.length > 1000}
-											for first 1000 of {visibleEvents.length} filtered events
+										{#if filteredMentions.length > 0}
+											{@const startIndex = (currentPage - 1) * itemsPerPage + 1}
+											{@const endIndex = Math.min(currentPage * itemsPerPage, filteredMentions.length)}
+											
+											Showing {startIndex}-{endIndex} of {filteredMentions.length} filtered mention{filteredMentions.length !== 1 ? 's' : ''}
+											({mentions.length} total)
+											{#if selectedEventId}
+												for Event ID {selectedEventId}
+											{:else}
+												for {visibleEvents.length} filtered events
+												{#if isBatchLoading}
+													<span class="text-blue-600 font-medium">
+														(batch {batchProgress.current}/{batchProgress.total} loading...)
+													</span>
+												{/if}
+											{/if}
 										{:else}
-											for {visibleEvents.length} filtered events
+											No mentions to display
 										{/if}
 									</div>
 								{/if}

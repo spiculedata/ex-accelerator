@@ -26,6 +26,7 @@
     { name: 'Dashboards', href: '/dashboards', current: false, requiresProject: true },
     { name: 'GDELT Events', href: '/gdelt', current: false, requiresProject: false },
     { name: 'Text Analytics', href: '/text-analytics', current: false, requiresProject: true },
+    { name: 'Research Investigation', href: '/text-analytics/research-investigation', current: false, requiresProject: true },
     { name: 'Image Processing', href: '/image-processing', current: false, requiresProject: true },
     { name: 'Data Capture', href: '/data-capture', current: false, requiresProject: true },
     { name: 'Data Management', href: '/data-management', current: false, requiresProject: true }

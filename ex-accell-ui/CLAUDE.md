@@ -86,9 +86,12 @@ npm run prepare
 ### Project Structure
 - Standard SvelteKit project structure with `src/` containing app logic
 - `src/routes/+page.svelte` - Main page component
-- `src/lib/` - Shared library components (currently empty)
+- `src/routes/text-analytics/research-investigation/+page.svelte` - Research Investigation interface
+- `src/lib/components/Navigation.svelte` - Main navigation component
+- `src/lib/` - Shared library components
 - `src/app.html` - HTML template
 - `static/` - Static assets
+- `notebooks/` - Jupyter notebook templates
 
 ### Configuration
 - **Vite**: Basic SvelteKit plugin configuration in `vite.config.ts`
@@ -125,20 +128,80 @@ Located in `notebooks/` directory:
 - `topic_modeling.ipynb` - Topic discovery with LDA
 - `text_classification.ipynb` - Custom text classifiers
 - `language_detection.ipynb` - Multi-language text analysis
+- `deepseek_openllm_demo.ipynb` - Comprehensive demo of DeepSeek R1 model capabilities
+- `deepseek_gdelt_integration.ipynb` - AI-powered analysis of GDELT events using DeepSeek R1
 - `custom_research.ipynb` - Blank template for custom research
 
 ### Getting Started
 1. **Bootstrap Environment**: `npm run jupyter:bootstrap` (run once)
 2. **Start Development**: `npm run dev:jupyter` (starts both SvelteKit and Jupyter Lab)
-3. **Access Interface**: Navigate to `/text-analytics/research-investigation`
+3. **Access Interface**: Navigate to `/text-analytics/research-investigation` or use the "Research Investigation" menu item
 4. **Select Template**: Choose a notebook template and click "Start JupyterLab"
 5. **Analyze**: Use the embedded viewer or open directly in Jupyter Lab
+
+### Adding New Notebook Templates
+
+To add a new Jupyter notebook template to the Research Investigation interface:
+
+1. **Create the Notebook**: Place your `.ipynb` file in the `notebooks/` directory
+2. **Update Template List**: Edit `/src/routes/text-analytics/research-investigation/+page.svelte`
+3. **Add to `notebookTemplates` array**:
+   ```javascript
+   {
+     id: 'your_notebook_id',
+     name: 'Display Name',
+     description: 'Brief description of what this notebook does',
+     file: 'your_notebook_file.ipynb'
+   }
+   ```
+4. **Special Considerations**:
+   - For AI-powered notebooks (like DeepSeek), use an `id` containing 'deepseek' to auto-display setup instructions
+   - The `file` name should match exactly what's in the `notebooks/` directory
+   - Use descriptive names and clear descriptions for better user experience
+
+**Template Structure Example**:
+```javascript
+{
+  id: 'my_analysis_notebook',
+  name: 'My Data Analysis',
+  description: 'Custom analysis for specific dataset with visualization',
+  file: 'my_analysis_notebook.ipynb'
+}
+```
+
+The notebook will automatically appear in the Research Investigation interface with proper styling and functionality.
 
 ### Configuration
 - **Jupyter Lab**: Configured for iframe embedding with CORS support
 - **Python Environment**: Managed with Poetry (Python 3.12+)
 - **NLTK Data**: Automatically downloaded during bootstrap
 - **Server**: Runs on `http://localhost:8888` by default
+
+## DeepSeek R1 Integration
+
+The project includes full integration with DeepSeek R1, a state-of-the-art reasoning model, through OpenLLM.
+
+### Features
+- **Advanced AI Analysis**: Use DeepSeek R1 for complex reasoning and analysis tasks
+- **GDELT Integration**: AI-powered analysis of global events and geopolitical patterns
+- **Interactive Q&A**: Ask natural language questions about your data
+- **Code Generation**: AI-assisted code generation for data analysis
+- **OpenAI-Compatible API**: Standard API interface through OpenLLM
+
+### Setup
+1. **Install Dependencies**: Already included in Poetry configuration
+2. **Download Model**: `poetry run openllm model get deepseek:r1-llama3.1-8b`
+3. **Start Server**: `poetry run openllm serve deepseek:r1-llama3.1-8b --port 3000`
+
+### Usage
+- **Demo Notebook**: `deepseek_openllm_demo.ipynb` - Comprehensive capabilities demo
+- **GDELT Analysis**: `deepseek_gdelt_integration.ipynb` - Real-world geopolitical analysis
+- **API Endpoint**: `http://localhost:3000/v1/chat/completions`
+
+### Requirements
+- **GPU**: 24GB VRAM recommended (DeepSeek R1 8B model)
+- **CPU Fallback**: Works on CPU but significantly slower
+- **Memory**: 32GB+ RAM for optimal performance
 
 ## Dapr Integration
 

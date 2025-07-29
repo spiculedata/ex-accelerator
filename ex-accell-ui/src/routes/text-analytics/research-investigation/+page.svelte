@@ -42,6 +42,24 @@
       file: 'language_detection.ipynb'
     },
     { 
+      id: 'deepseek_openllm_demo', 
+      name: 'DeepSeek R1 OpenLLM Demo',
+      description: 'Comprehensive demo of DeepSeek R1 model capabilities via OpenLLM',
+      file: 'deepseek_openllm_demo.ipynb'
+    },
+    { 
+      id: 'deepseek_gdelt_integration', 
+      name: 'DeepSeek + GDELT Integration',
+      description: 'AI-powered analysis of global events using DeepSeek R1 and GDELT data',
+      file: 'deepseek_gdelt_integration.ipynb'
+    },
+    { 
+      id: 'ollama_gdelt_integration', 
+      name: 'Ollama + GDELT Integration',
+      description: 'Local AI model deployment with Ollama for GDELT analysis - easier setup alternative to OpenLLM',
+      file: 'ollama_gdelt_integration.ipynb'
+    },
+    { 
       id: 'custom_research', 
       name: 'Custom Research',
       description: 'Blank notebook for custom text analytics research',
@@ -244,7 +262,14 @@
                 class="p-4 border rounded-lg cursor-pointer transition-colors {selectedTemplate.id === template.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}"
                 on:click={() => selectedTemplate = template}>
                 <div class="flex items-center justify-between mb-2">
-                  <h4 class="font-medium text-gray-900">{template.name}</h4>
+                  <div class="flex items-center">
+                    <h4 class="font-medium text-gray-900">{template.name}</h4>
+                    {#if template.id.includes('deepseek') || template.id.includes('ollama')}
+                      <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        AI-Powered
+                      </span>
+                    {/if}
+                  </div>
                   <input 
                     type="radio" 
                     bind:group={selectedTemplate} 
@@ -252,6 +277,15 @@
                     class="text-purple-600">
                 </div>
                 <p class="text-sm text-gray-600">{template.description}</p>
+                {#if template.id.includes('deepseek')}
+                  <div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                    <strong>⚠️ Setup Required:</strong> Run <code class="bg-amber-100 px-1 rounded">poetry run openllm serve deepseek:r1-llama3.1-8b --port 3000</code> first
+                  </div>
+                {:else if template.id.includes('ollama')}
+                  <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+                    <strong>✅ Setup Required:</strong> Install <a href="https://ollama.ai/" target="_blank" class="underline">Ollama</a> then run <code class="bg-green-100 px-1 rounded">ollama pull llama3.3:8b</code>
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
