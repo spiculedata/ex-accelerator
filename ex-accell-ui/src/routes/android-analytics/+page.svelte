@@ -1,6 +1,7 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { onMount } from 'svelte';
+  import { androidAnalyticsDb } from '$lib/services/androidAnalyticsDb';
 
   // Data from the Princeton SMART / Screenlake research kit
   let appAccessibilityData = [];
@@ -18,13 +19,46 @@
   let userBehaviorPatterns = [];
 
   onMount(async () => {
-    // In a real implementation, you would fetch this data from an API
-    // For now, we'll simulate the data structure based on what we observed
-    loadSampleData();
+    // Load data from database service
+    await loadAndroidAnalyticsData();
   });
 
-  function loadSampleData() {
-    // Sample data based on the CSV structure we examined
+  // Load all Android analytics data from database
+  async function loadAndroidAnalyticsData() {
+    try {
+      // Load analytics summary and raw data from database service
+      const [summary, accessibility, segments, screenshots] = await Promise.all([
+        androidAnalyticsDb.getAnalyticsSummary(),
+        androidAnalyticsDb.getAccessibilityEvents(),
+        androidAnalyticsDb.getAppSegments(),
+        androidAnalyticsDb.getScreenshots()
+      ]);
+
+      // Set raw data for detailed analysis
+      appAccessibilityData = accessibility;
+      appSegmentData = segments;
+      screenshotData = screenshots;
+
+      // Use database summary for key metrics
+      totalSessions = summary.totalSessions;
+      totalScreenshots = summary.totalScreenshots;
+      uniqueApps = new Set(segments.map(s => s.apk));
+      sessionDuration = summary.sessionDuration;
+
+      console.log('Android analytics data loaded successfully from database');
+      
+      // Calculate additional analytics from the loaded data  
+      calculateAnalytics();
+      loading = false;
+    } catch (error) {
+      console.error('Error loading Android analytics data:', error);
+      // Fallback to sample data if database fails
+      loadFallbackData();
+    }
+  }
+
+  // Fallback sample data if database connection fails
+  function loadFallbackData() {
     appAccessibilityData = [
       {
         id_user: "7324",
@@ -320,7 +354,7 @@
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-        <span class="ml-4 text-lg text-gray-600">Loading Android analytics data...</span>
+        <span class="ml-4 text-lg text-gray-600">Loading Android analytics from database...</span>
       </div>
     {:else}
       

@@ -1,168 +1,114 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
+  import { engagementAnalysisDb } from '$lib/services/engagementAnalysisDb';
   import { onMount } from 'svelte';
   
+  // Loading state
+  let loading = true;
+  
   // Redirect to projects if no current project
-  onMount(() => {
+  onMount(async () => {
     if (!$currentProject) {
       window.location.href = '/projects';
+      return;
     }
+    
+    // Load engagement analysis data from database
+    await loadEngagementAnalysisData();
   });
 
-  // Engagement analysis data
-  let engagementStats = {
-    totalEngagements: 487293,
-    averageRate: 4.2,
-    totalReach: 12456789,
-    bestPerformingPost: 24567
-  };
-
-  // Platform engagement breakdown
-  let platformEngagement = [
-    { 
-      platform: 'Instagram', 
-      engagementRate: 6.8, 
-      totalEngagements: 156789, 
-      posts: 2341, 
-      avgLikes: 245, 
-      avgComments: 67, 
-      avgShares: 23,
-      color: '#ff6b9d'
-    },
-    { 
-      platform: 'TikTok', 
-      engagementRate: 5.9, 
-      totalEngagements: 134567, 
-      posts: 1876, 
-      avgLikes: 387, 
-      avgComments: 89, 
-      avgShares: 45,
-      color: '#667eea'
-    },
-    { 
-      platform: 'Twitter', 
-      engagementRate: 3.7, 
-      totalEngagements: 98765, 
-      posts: 4523, 
-      avgLikes: 89, 
-      avgComments: 23, 
-      avgShares: 156,
-      color: '#26d0ce'
-    },
-    { 
-      platform: 'LinkedIn', 
-      engagementRate: 3.1, 
-      totalEngagements: 56789, 
-      posts: 1234, 
-      avgLikes: 167, 
-      avgComments: 34, 
-      avgShares: 78,
-      color: '#6366f1'
-    },
-    { 
-      platform: 'Facebook', 
-      engagementRate: 2.8, 
-      totalEngagements: 34567, 
-      posts: 2987, 
-      avgLikes: 45, 
-      avgComments: 12, 
-      avgShares: 89,
-      color: '#8b5cf6'
-    },
-    { 
-      platform: 'YouTube', 
-      engagementRate: 4.5, 
-      totalEngagements: 23456, 
-      posts: 234, 
-      avgLikes: 456, 
-      avgComments: 123, 
-      avgShares: 67,
-      color: '#f72585'
+  // Engagement analysis data - loaded from database
+  let engagementStats = {};
+  let platformEngagement = [];
+  let contentTypes = [];
+  let engagementTrends = [];
+  let topPosts = [];
+  
+  // Load engagement analysis data from database service
+  async function loadEngagementAnalysisData() {
+    try {
+      // Load all engagement data from database service
+      engagementStats = await engagementAnalysisDb.getEngagementStats();
+      
+      // Load data with current filters
+      await loadFilteredData();
+      
+      console.log('Engagement analysis data loaded successfully from database');
+      loading = false;
+    } catch (error) {
+      console.error('Error loading engagement analysis data:', error);
+      // Fallback to sample data if database fails
+      loadFallbackData();
     }
-  ];
-
-  // Content type performance
-  let contentTypes = [
-    { type: 'Video', engagementRate: 7.2, posts: 2341, reach: 1234567, sentiment: 'positive' },
-    { type: 'Image', engagementRate: 5.1, posts: 4567, reach: 987654, sentiment: 'positive' },
-    { type: 'Carousel', engagementRate: 6.8, posts: 1234, reach: 765432, sentiment: 'positive' },
-    { type: 'Story', engagementRate: 4.9, posts: 3456, reach: 654321, sentiment: 'mixed' },
-    { type: 'Text Only', engagementRate: 2.1, posts: 5678, reach: 432109, sentiment: 'neutral' },
-    { type: 'Link', engagementRate: 1.8, posts: 2987, reach: 321098, sentiment: 'neutral' }
-  ];
-
-  // Engagement over time
-  let engagementTrends = [
-    { date: '2025-01-20', likes: 12456, comments: 3456, shares: 1234 },
-    { date: '2025-01-21', likes: 13567, comments: 3789, shares: 1456 },
-    { date: '2025-01-22', likes: 11234, comments: 3234, shares: 1123 },
-    { date: '2025-01-23', likes: 14789, comments: 4123, shares: 1567 },
-    { date: '2025-01-24', likes: 13890, comments: 3890, shares: 1390 },
-    { date: '2025-01-25', likes: 15234, comments: 4234, shares: 1678 },
-    { date: '2025-01-26', likes: 14567, comments: 4067, shares: 1545 },
-    { date: '2025-01-27', likes: 16123, comments: 4456, shares: 1789 }
-  ];
-
-  // Top performing posts
-  let topPosts = [
-    {
-      id: 1,
-      text: "Just launched our new AI-powered feature! 🚀 What do you think?",
-      platform: 'Instagram',
-      contentType: 'Video',
-      engagement: {
-        likes: 2456,
-        comments: 345,
-        shares: 123,
-        rate: 8.4
-      },
-      reach: 45678,
-      timestamp: '2025-01-27T14:32:00Z'
-    },
-    {
-      id: 2,
-      text: "Behind the scenes of our latest product development 💡",
-      platform: 'TikTok',
-      contentType: 'Video',
-      engagement: {
-        likes: 1987,
-        comments: 287,
-        shares: 98,
-        rate: 7.2
-      },
-      reach: 34567,
-      timestamp: '2025-01-27T13:15:00Z'
-    },
-    {
-      id: 3,
-      text: "5 tips for improving your workflow efficiency 📈",
-      platform: 'LinkedIn',
-      contentType: 'Carousel',
-      engagement: {
-        likes: 1234,
-        comments: 156,
-        shares: 234,
-        rate: 6.8
-      },
-      reach: 23456,
-      timestamp: '2025-01-27T12:45:00Z'
-    },
-    {
-      id: 4,
-      text: "Customer success story: How we helped increase ROI by 150%",
-      platform: 'Twitter',
-      contentType: 'Image',
-      engagement: {
-        likes: 987,
-        comments: 67,
-        shares: 189,
-        rate: 5.9
-      },
-      reach: 18765,
-      timestamp: '2025-01-27T11:20:00Z'
+  }
+  
+  // Load filtered data from database
+  async function loadFilteredData() {
+    try {
+      const filters = {
+        platform: selectedPlatform,
+        contentType: selectedContentType,
+        minEngagementRate: minEngagementRate,
+        timeRange: timeRange
+      };
+      
+      platformEngagement = await engagementAnalysisDb.getPlatformEngagement(filters);
+      contentTypes = await engagementAnalysisDb.getContentTypePerformance(filters);
+      engagementTrends = await engagementAnalysisDb.getEngagementTrends(filters.timeRange);
+      topPosts = await engagementAnalysisDb.getTopPerformingPosts(filters, 10);
+    } catch (error) {
+      console.error('Error loading filtered data:', error);
     }
-  ];
+  }
+  
+  // Fallback sample data if database connection fails
+  function loadFallbackData() {
+    engagementStats = {
+      totalEngagements: 487293,
+      averageRate: 4.2,
+      totalReach: 12456789,
+      bestPerformingPost: 24567
+    };
+
+    platformEngagement = [
+      { platform: 'Instagram', engagementRate: 6.8, totalEngagements: 156789, posts: 2341, avgLikes: 245, avgComments: 67, avgShares: 23, color: '#ff6b9d' },
+      { platform: 'TikTok', engagementRate: 5.9, totalEngagements: 134567, posts: 1876, avgLikes: 387, avgComments: 89, avgShares: 45, color: '#667eea' },
+      { platform: 'Twitter', engagementRate: 3.7, totalEngagements: 98765, posts: 4523, avgLikes: 89, avgComments: 23, avgShares: 156, color: '#26d0ce' },
+      { platform: 'LinkedIn', engagementRate: 3.1, totalEngagements: 56789, posts: 1234, avgLikes: 167, avgComments: 34, avgShares: 78, color: '#6366f1' },
+      { platform: 'Facebook', engagementRate: 2.8, totalEngagements: 34567, posts: 2987, avgLikes: 45, avgComments: 12, avgShares: 89, color: '#8b5cf6' },
+      { platform: 'YouTube', engagementRate: 4.5, totalEngagements: 23456, posts: 234, avgLikes: 456, avgComments: 123, avgShares: 67, color: '#f72585' }
+    ];
+
+    contentTypes = [
+      { type: 'Video', engagementRate: 7.2, posts: 2341, reach: 1234567, sentiment: 'positive' },
+      { type: 'Image', engagementRate: 5.1, posts: 4567, reach: 987654, sentiment: 'positive' },
+      { type: 'Carousel', engagementRate: 6.8, posts: 1234, reach: 765432, sentiment: 'positive' },
+      { type: 'Story', engagementRate: 4.9, posts: 3456, reach: 654321, sentiment: 'mixed' },
+      { type: 'Text Only', engagementRate: 2.1, posts: 5678, reach: 432109, sentiment: 'neutral' },
+      { type: 'Link', engagementRate: 1.8, posts: 2987, reach: 321098, sentiment: 'neutral' }
+    ];
+
+    engagementTrends = [
+      { date: '2025-01-20', likes: 12456, comments: 3456, shares: 1234 },
+      { date: '2025-01-21', likes: 13567, comments: 3789, shares: 1456 },
+      { date: '2025-01-22', likes: 11234, comments: 3234, shares: 1123 },
+      { date: '2025-01-23', likes: 14789, comments: 4123, shares: 1567 },
+      { date: '2025-01-24', likes: 13890, comments: 3890, shares: 1390 },
+      { date: '2025-01-25', likes: 15234, comments: 4234, shares: 1678 },
+      { date: '2025-01-26', likes: 14567, comments: 4067, shares: 1545 },
+      { date: '2025-01-27', likes: 16123, comments: 4456, shares: 1789 }
+    ];
+
+    topPosts = [
+      { id: 1, text: "Just launched our new AI-powered feature! 🚀 What do you think?", platform: 'Instagram', contentType: 'Video', engagement: { likes: 2456, comments: 345, shares: 123, rate: 8.4 }, reach: 45678, timestamp: '2025-01-27T14:32:00Z' },
+      { id: 2, text: "Behind the scenes of our latest product development 💡", platform: 'TikTok', contentType: 'Video', engagement: { likes: 1987, comments: 287, shares: 98, rate: 7.2 }, reach: 34567, timestamp: '2025-01-27T13:15:00Z' },
+      { id: 3, text: "5 tips for improving your workflow efficiency 📈", platform: 'LinkedIn', contentType: 'Carousel', engagement: { likes: 1234, comments: 156, shares: 234, rate: 6.8 }, reach: 23456, timestamp: '2025-01-27T12:45:00Z' },
+      { id: 4, text: "Customer success story: How we helped increase ROI by 150%", platform: 'Twitter', contentType: 'Image', engagement: { likes: 987, comments: 67, shares: 189, rate: 5.9 }, reach: 18765, timestamp: '2025-01-27T11:20:00Z' }
+    ];
+    
+    loading = false;
+  }
 
   // Filters
   let selectedPlatform = 'all';
@@ -231,20 +177,24 @@
     window.URL.revokeObjectURL(url);
   }
 
-  // Chart initialization
-  onMount(async () => {
-    // Load ECharts from CDN
-    if (typeof window !== 'undefined' && !(window as any).echarts) {
+  // Initialize charts after data is loaded
+  $: if (!loading && platformEngagement.length > 0 && typeof window !== 'undefined') {
+    initializeChartsWhenReady();
+  }
+  
+  function initializeChartsWhenReady() {
+    // Load ECharts from CDN if not already loaded
+    if (!(window as any).echarts) {
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
       script.onload = () => {
-        initializeCharts();
+        setTimeout(initializeCharts, 100); // Small delay to ensure DOM is ready
       };
       document.head.appendChild(script);
-    } else if ((window as any).echarts) {
-      initializeCharts();
+    } else {
+      setTimeout(initializeCharts, 100); // Small delay to ensure DOM is ready
     }
-  });
+  }
 
   function initializeCharts() {
     if (typeof window !== 'undefined' && (window as any).echarts) {
@@ -279,7 +229,7 @@
   }
 
   function updatePlatformChart() {
-    if (!platformChart) return;
+    if (!platformChart || !filteredPlatforms || filteredPlatforms.length === 0) return;
 
     const option = {
       title: {
@@ -319,7 +269,7 @@
   }
 
   function updateContentChart() {
-    if (!contentChart) return;
+    if (!contentChart || !filteredContent || filteredContent.length === 0) return;
 
     const option = {
       title: {
@@ -360,7 +310,7 @@
   }
 
   function updateTrendsChart() {
-    if (!trendsChart) return;
+    if (!trendsChart || !engagementTrends || engagementTrends.length === 0) return;
 
     const dates = engagementTrends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     
@@ -414,10 +364,15 @@
   }
 
   // Update charts when data changes
-  $: if (platformChart && contentChart && trendsChart) {
+  $: if (platformChart && contentChart && trendsChart && !loading && platformEngagement.length > 0) {
     updatePlatformChart();
     updateContentChart();
     updateTrendsChart();
+  }
+
+  // Watch for filter changes and reload data
+  $: if (!loading && (selectedPlatform || selectedContentType || minEngagementRate || timeRange)) {
+    loadFilteredData();
   }
 </script>
 
@@ -482,22 +437,29 @@
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    {#if loading}
+      <div class="flex items-center justify-center py-16">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+        <span class="ml-4 text-lg text-gray-600">Loading engagement analysis data from database...</span>
+      </div>
+    {:else}
+    
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-cyan-600 mb-1">{engagementStats.totalEngagements.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-cyan-600 mb-1">{engagementStats.totalEngagements ? engagementStats.totalEngagements.toLocaleString() : '0'}</div>
         <div class="text-sm text-gray-600">Total Engagements</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.averageRate}%</div>
+        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.averageRate || 0}%</div>
         <div class="text-sm text-gray-600">Average Rate</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.totalReach.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.totalReach ? engagementStats.totalReach.toLocaleString() : '0'}</div>
         <div class="text-sm text-gray-600">Total Reach</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.bestPerformingPost.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-blue-600 mb-1">{engagementStats.bestPerformingPost ? engagementStats.bestPerformingPost.toLocaleString() : '0'}</div>
         <div class="text-sm text-gray-600">Best Post Engagements</div>
       </div>
     </div>
@@ -613,7 +575,7 @@
                   <div class="text-xs text-gray-500">Reach: {content.reach.toLocaleString()}</div>
                 </div>
                 <div class="w-24 bg-gray-200 rounded-full h-2">
-                  <div class="bg-cyan-600 h-2 rounded-full transition-all duration-300" style="width: {content.engagementRate * 10}%"></div>
+                  <div class="bg-cyan-600 h-2 rounded-full transition-all duration-300" style="width: {Math.min(100, content.engagementRate * 10)}%"></div>
                 </div>
               </div>
             </div>
@@ -664,5 +626,7 @@
         {/each}
       </div>
     </div>
+    
+    {/if}
   </div>
 </div>

@@ -1,119 +1,157 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
+  import { sentimentAnalysisDb } from '$lib/services/sentimentAnalysisDb';
   import { onMount } from 'svelte';
   
+  // Loading state
+  let loading = true;
+  
   // Redirect to projects if no current project
-  onMount(() => {
+  onMount(async () => {
     if (!$currentProject) {
       window.location.href = '/projects';
+      return;
     }
+    
+    // Load sentiment analysis data from database
+    await loadSentimentData();
   });
 
-  // Comprehensive sentiment analysis data
+  // Comprehensive sentiment analysis data - loaded from database
   let sentimentStats = {
-    positive: { count: 15847, percentage: 52.8, confidence: 0.89 },
-    negative: { count: 8234, percentage: 27.4, confidence: 0.91 },
-    neutral: { count: 5947, percentage: 19.8, confidence: 0.85 }
+    positive: { count: 0, percentage: 0, confidence: 0 },
+    negative: { count: 0, percentage: 0, confidence: 0 },
+    neutral: { count: 0, percentage: 0, confidence: 0 }
   };
 
-  let totalPosts = sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count;
+  let totalPosts = 0;
 
   // Detailed sentiment categories
-  let detailedSentiments = [
-    { label: 'Very Positive', count: 6234, color: '#06d6a0', percentage: 20.8 },
-    { label: 'Positive', count: 9613, color: '#26d0ce', percentage: 32.0 },
-    { label: 'Neutral', count: 5947, color: '#8b5cf6', percentage: 19.8 },
-    { label: 'Negative', count: 5890, color: '#ff6b9d', percentage: 19.6 },
-    { label: 'Very Negative', count: 2344, color: '#f72585', percentage: 7.8 }
-  ];
+  let detailedSentiments = [];
 
   // Emotion analysis data
-  let emotionStats = [
-    { emotion: 'Joy', count: 8234, percentage: 27.4, color: '#ffd23f' },
-    { emotion: 'Trust', count: 6789, percentage: 22.6, color: '#06d6a0' },
-    { emotion: 'Fear', count: 4567, percentage: 15.2, color: '#8b5cf6' },
-    { emotion: 'Surprise', count: 3456, percentage: 11.5, color: '#26d0ce' },
-    { emotion: 'Sadness', count: 3234, percentage: 10.8, color: '#667eea' },
-    { emotion: 'Disgust', count: 2456, percentage: 8.2, color: '#f72585' },
-    { emotion: 'Anger', count: 1292, percentage: 4.3, color: '#ff6b9d' }
-  ];
+  let emotionStats = [];
 
   // Sentiment over time data
-  let sentimentTrends = [
-    { date: '2025-01-20', positive: 58, negative: 23, neutral: 19 },
-    { date: '2025-01-21', positive: 62, negative: 20, neutral: 18 },
-    { date: '2025-01-22', positive: 55, negative: 28, neutral: 17 },
-    { date: '2025-01-23', positive: 49, negative: 35, neutral: 16 },
-    { date: '2025-01-24', positive: 53, negative: 29, neutral: 18 },
-    { date: '2025-01-25', positive: 61, negative: 22, neutral: 17 },
-    { date: '2025-01-26', positive: 56, negative: 26, neutral: 18 },
-    { date: '2025-01-27', positive: 53, negative: 27, neutral: 20 }
-  ];
+  let sentimentTrends = [];
 
   // Sample posts with sentiment analysis
-  let samplePosts = [
-    {
-      id: 1,
-      text: "This new product launch is absolutely incredible! Best decision I've ever made 🎉",
-      sentiment: 'Very Positive',
-      confidence: 0.94,
-      emotions: ['Joy', 'Trust'],
-      platform: 'twitter',
-      timestamp: '2025-01-27T14:32:00Z',
-      engagement: { likes: 24, shares: 8, comments: 12 }
-    },
-    {
-      id: 2,
-      text: "The customer service was helpful and resolved my issue quickly. Thank you!",
-      sentiment: 'Positive',
-      confidence: 0.87,
-      emotions: ['Trust', 'Joy'],
-      platform: 'facebook',
-      timestamp: '2025-01-27T13:15:00Z',
-      engagement: { likes: 15, shares: 3, comments: 5 }
-    },
-    {
-      id: 3,
-      text: "Not sure what to think about the recent updates. Some good, some bad I guess.",
-      sentiment: 'Neutral',
-      confidence: 0.82,
-      emotions: ['Surprise'],
-      platform: 'reddit',
-      timestamp: '2025-01-27T12:45:00Z',
-      engagement: { likes: 7, shares: 1, comments: 18 }
-    },
-    {
-      id: 4,
-      text: "Really disappointed with the quality. Expected much better for the price.",
-      sentiment: 'Negative',
-      confidence: 0.91,
-      emotions: ['Sadness', 'Disgust'],
-      platform: 'instagram',
-      timestamp: '2025-01-27T11:20:00Z',
-      engagement: { likes: 3, shares: 0, comments: 22 }
-    },
-    {
-      id: 5,
-      text: "This is absolutely terrible! Waste of money and time. Completely frustrated!",
-      sentiment: 'Very Negative',
-      confidence: 0.96,
-      emotions: ['Anger', 'Disgust'],
-      platform: 'twitter',
-      timestamp: '2025-01-27T10:58:00Z',
-      engagement: { likes: 1, shares: 0, comments: 34 }
-    },
-    {
-      id: 6,
-      text: "Great experience overall! The team was professional and efficient.",
-      sentiment: 'Positive',
-      confidence: 0.89,
-      emotions: ['Trust', 'Joy'],
-      platform: 'linkedin',
-      timestamp: '2025-01-27T09:33:00Z',
-      engagement: { likes: 45, shares: 12, comments: 8 }
+  let samplePosts = [];
+
+  // Load sentiment analysis data from database service
+  async function loadSentimentData() {
+    try {
+      // Load all sentiment data from database service
+      const stats = await sentimentAnalysisDb.getSentimentStats();
+      sentimentStats = stats;
+      totalPosts = stats.total;
+      
+      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments();
+      emotionStats = await sentimentAnalysisDb.getEmotionStats();
+      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange);
+      
+      // Load posts with current filters
+      await loadFilteredPosts();
+      
+      console.log('Sentiment analysis data loaded successfully from database');
+      loading = false;
+      
+      // Initialize charts after data is loaded
+      if (typeof window !== 'undefined' && (window as any).echarts) {
+        setTimeout(() => {
+          initializeCharts();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading sentiment data:', error);
+      // Fallback to sample data if database fails
+      loadFallbackData();
     }
-  ];
+  }
+
+  // Load filtered posts from database
+  async function loadFilteredPosts() {
+    try {
+      const filters = {
+        sentiment: selectedSentiment,
+        platform: selectedPlatform,
+        confidenceThreshold: confidenceThreshold,
+        timeRange: timeRange
+      };
+      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters);
+    } catch (error) {
+      console.error('Error loading filtered posts:', error);
+    }
+  }
+
+  // Fallback sample data if database connection fails
+  function loadFallbackData() {
+    sentimentStats = {
+      positive: { count: 15847, percentage: 52.8, confidence: 0.89 },
+      negative: { count: 8234, percentage: 27.4, confidence: 0.91 },
+      neutral: { count: 5947, percentage: 19.8, confidence: 0.85 }
+    };
+
+    totalPosts = sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count;
+
+    detailedSentiments = [
+      { label: 'Very Positive', count: 6234, color: '#06d6a0', percentage: 20.8 },
+      { label: 'Positive', count: 9613, color: '#26d0ce', percentage: 32.0 },
+      { label: 'Neutral', count: 5947, color: '#8b5cf6', percentage: 19.8 },
+      { label: 'Negative', count: 5890, color: '#ff6b9d', percentage: 19.6 },
+      { label: 'Very Negative', count: 2344, color: '#f72585', percentage: 7.8 }
+    ];
+
+    emotionStats = [
+      { emotion: 'Joy', count: 8234, percentage: 27.4, color: '#ffd23f' },
+      { emotion: 'Trust', count: 6789, percentage: 22.6, color: '#06d6a0' },
+      { emotion: 'Fear', count: 4567, percentage: 15.2, color: '#8b5cf6' },
+      { emotion: 'Surprise', count: 3456, percentage: 11.5, color: '#26d0ce' },
+      { emotion: 'Sadness', count: 3234, percentage: 10.8, color: '#667eea' },
+      { emotion: 'Disgust', count: 2456, percentage: 8.2, color: '#f72585' },
+      { emotion: 'Anger', count: 1292, percentage: 4.3, color: '#ff6b9d' }
+    ];
+
+    sentimentTrends = [
+      { date: '2025-01-20', positive: 58, negative: 23, neutral: 19 },
+      { date: '2025-01-21', positive: 62, negative: 20, neutral: 18 },
+      { date: '2025-01-22', positive: 55, negative: 28, neutral: 17 },
+      { date: '2025-01-23', positive: 49, negative: 35, neutral: 16 },
+      { date: '2025-01-24', positive: 53, negative: 29, neutral: 18 },
+      { date: '2025-01-25', positive: 61, negative: 22, neutral: 17 },
+      { date: '2025-01-26', positive: 56, negative: 26, neutral: 18 },
+      { date: '2025-01-27', positive: 53, negative: 27, neutral: 20 }
+    ];
+
+    samplePosts = [
+      {
+        id: 1,
+        text: "This new product launch is absolutely incredible! Best decision I've ever made 🎉",
+        sentiment: 'Very Positive',
+        confidence: 0.94,
+        emotions: ['Joy', 'Trust'],
+        platform: 'twitter',
+        timestamp: '2025-01-27T14:32:00Z',
+        engagement: { likes: 24, shares: 8, comments: 12 }
+      },
+      {
+        id: 2,
+        text: "The customer service was helpful and resolved my issue quickly. Thank you!",
+        sentiment: 'Positive',
+        confidence: 0.87,
+        emotions: ['Trust', 'Joy'],
+        platform: 'facebook',
+        timestamp: '2025-01-27T13:15:00Z',
+        engagement: { likes: 15, shares: 3, comments: 5 }
+      }
+    ];
+
+    loading = false;
+    setTimeout(() => {
+      initializeCharts();
+    }, 100);
+  }
 
   // Filters
   let selectedSentiment = 'all';
@@ -122,13 +160,22 @@
   let timeRange = '7d';
   let showEmotions = true;
 
-  // Filtered posts
-  $: filteredPosts = samplePosts.filter(post => {
-    const matchesSentiment = selectedSentiment === 'all' || post.sentiment === selectedSentiment;
-    const matchesPlatform = selectedPlatform === 'all' || post.platform === selectedPlatform;
-    const matchesConfidence = post.confidence >= confidenceThreshold;
-    return matchesSentiment && matchesPlatform && matchesConfidence;
-  });
+  // Reactive statements for filter changes
+  $: if (selectedSentiment || selectedPlatform || confidenceThreshold || timeRange) {
+    if (!loading) {
+      loadFilteredPosts();
+      // Also reload trends if time range changed
+      if (timeRange) {
+        sentimentAnalysisDb.getSentimentTrends(timeRange).then(trends => {
+          sentimentTrends = trends;
+          updateTrendChart();
+        });
+      }
+    }
+  }
+
+  // Filtered posts (for display purposes, actual filtering happens in database)
+  $: filteredPosts = samplePosts;
 
   function getSentimentColor(sentiment: string) {
     const colors = {
@@ -156,21 +203,50 @@
     return new Date(timestamp).toLocaleString();
   }
 
-  function exportSentimentData() {
-    const csvData = filteredPosts.map(post => 
-      `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
-    ).join('\n');
-    
-    const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
-    const csv = header + csvData;
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sentiment_analysis_report.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  async function exportSentimentData() {
+    try {
+      const filters = {
+        sentiment: selectedSentiment,
+        platform: selectedPlatform,
+        confidenceThreshold: confidenceThreshold,
+        timeRange: timeRange
+      };
+      
+      const exportData = await sentimentAnalysisDb.exportSentimentData(filters);
+      
+      // Create CSV from the exported data
+      const csvData = exportData.posts.map(post => 
+        `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
+      ).join('\n');
+      
+      const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sentiment_analysis_report.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting sentiment data:', error);
+      // Fallback to current data
+      const csvData = filteredPosts.map(post => 
+        `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
+      ).join('\n');
+      
+      const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sentiment_analysis_report.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
   }
 
   // Chart initialization
@@ -178,19 +254,17 @@
   let emotionChart = null;
   let trendChart = null;
 
-  onMount(async () => {
-    // Load ECharts from CDN
+  // Load ECharts from CDN if not already loaded
+  async function loadECharts() {
     if (typeof window !== 'undefined' && !(window as any).echarts) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
-      script.onload = () => {
-        initializeCharts();
-      };
-      document.head.appendChild(script);
-    } else if ((window as any).echarts) {
-      initializeCharts();
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
+        script.onload = () => resolve(true);
+        document.head.appendChild(script);
+      });
     }
-  });
+  }
 
   function initializeCharts() {
     if (typeof window !== 'undefined' && (window as any).echarts) {
@@ -443,6 +517,13 @@
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    {#if loading}
+      <div class="flex items-center justify-center py-16">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        <span class="ml-4 text-lg text-gray-600">Loading sentiment analysis from database...</span>
+      </div>
+    {:else}
+    
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -461,7 +542,7 @@
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.neutral.count.toLocaleString()} posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-emerald-600 mb-1">89%</div>
+        <div class="text-2xl font-bold text-emerald-600 mb-1">{Math.round((sentimentStats.avgConfidence || 0.89) * 100)}%</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
         <div class="text-xs text-gray-500 mt-1">AI Classification</div>
       </div>
@@ -594,5 +675,7 @@
         </div>
       {/if}
     </div>
+    
+    {/if}
   </div>
 </div>

@@ -756,22 +756,52 @@
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="relative bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 overflow-hidden">
+    <!-- Background pattern -->
+    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
+    
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">Data Capture</h1>
-            <p class="text-gray-600 mt-1">Configure and manage your data collection sources</p>
+            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Data Capture & Collection</h1>
+            <p class="text-slate-300 text-lg font-medium">Web Crawling • File Upload • Smart Data Integration</p>
+            <div class="flex items-center mt-3 space-x-4">
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
+                🌐 Multi-Platform
+              </span>
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
+                📊 Real-time Monitoring
+              </span>
+              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
+                ⚡ High Performance
+              </span>
+            </div>
           </div>
         </div>
-        <div class="text-sm text-gray-600 font-medium">
-          {crawlJobs.filter(job => job.status === 'running').length} jobs running
+        
+        <div class="flex items-center space-x-3">
+          <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
+            <div class="text-white text-sm font-medium">
+              {crawlJobs.filter(job => job.status === 'running').length} jobs running
+            </div>
+          </div>
+          <button 
+            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center border border-white/20">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            View Analytics
+          </button>
+          <button 
+            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+            New Collection
+          </button>
         </div>
       </div>
     </div>

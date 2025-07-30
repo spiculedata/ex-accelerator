@@ -1,11 +1,54 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
+  import { overviewDb } from '$lib/services/overviewDb';
   import { onMount } from 'svelte';
   
-  onMount(() => {
+  // Overview dashboard data
+  let loading = true;
+  let overviewStats = {
+    activeProjects: 0,
+    postsAnalyzed: 0,
+    reportsReady: 0,
+    todaysActivities: 0
+  };
+  let appModules = [];
+  let recentActivities = [];
+  let systemStatus = [];
+  let currentWorkspace = null;
+  
+  onMount(async () => {
     loadCurrentProject();
+    await loadOverviewData();
   });
+
+  async function loadOverviewData() {
+    try {
+      loading = true;
+      
+      // Load all overview data from database
+      const [stats, modules, activities, status, workspace] = await Promise.all([
+        overviewDb.getOverviewStats(),
+        overviewDb.getAppModulesStatus(),
+        overviewDb.getRecentActivities(5),
+        overviewDb.getSystemStatus(),
+        overviewDb.getCurrentWorkspace()
+      ]);
+      
+      overviewStats = stats;
+      appModules = modules;
+      recentActivities = activities;
+      systemStatus = status;
+      currentWorkspace = workspace;
+      
+      console.log('Overview dashboard data loaded successfully from database');
+    } catch (error) {
+      console.error('Error loading overview data:', error);
+      // Keep default empty values on error
+    } finally {
+      loading = false;
+    }
+  }
 
   function navigateToApp(appPath: string) {
     if ($currentProject) {
@@ -15,6 +58,85 @@
       // If no project selected, go to project selection first
       window.location.href = '/projects';
     }
+  }
+
+  function formatNumber(num: number): string {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  }
+
+  function getActivityIcon(activityType: string) {
+    const icons = {
+      'analysis_completed': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+      'data_imported': 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10',
+      'dashboard_updated': 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 712 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 712-2h2a2 2 0 712 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+      'job_started': 'M12 6v6m0 0v6m0-6h6m-6 0H6'
+    };
+    return icons[activityType] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+  }
+
+  function getModuleIcon(moduleName: string) {
+    const icons = {
+      'dashboards': 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 712-2h2a2 2 0 712 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 712-2h2a2 2 0 712 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+      'text_analytics': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 712-2h5.586a1 1 0 71.707.293l5.414 5.414a1 1 0 71.293.707V19a2 2 0 01-2 2z',
+      'image_processing': 'M4 16l4.586-4.586a2 2 0 712.828 0L16 16m-2-2l1.586-1.586a2 2 0 712.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+      'data_capture': 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 711 9.9M9 19l3 3m0 0l3-3m-3 3V10',
+      'android_analytics': 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
+      'android_research': 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z'
+    };
+    return icons[moduleName] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+  }
+
+  function getModuleRoute(moduleName: string) {
+    const routes = {
+      'dashboards': '/dashboards',
+      'text_analytics': '/text-analytics',
+      'image_processing': '/image-processing',
+      'data_capture': '/data-capture',
+      'android_analytics': '/android-analytics',
+      'android_research': '/android-research'
+    };
+    return routes[moduleName] || '/';
+  }
+
+  function getModuleDescription(moduleName: string) {
+    const descriptions = {
+      'dashboards': 'Real-time analytics and custom visualizations',
+      'text_analytics': 'NLP processing and sentiment analysis',
+      'image_processing': 'Computer vision and image analysis',
+      'data_capture': 'Social media data collection',
+      'android_analytics': 'Mobile device interaction analysis',
+      'android_research': 'Deep behavioral analysis & phenotyping'
+    };
+    return descriptions[moduleName] || 'Analytics module';
+  }
+
+  function getStatusBadgeClass(iconColor: string) {
+    const colorMap = {
+      'blue': 'bg-blue-100 text-blue-800',
+      'emerald': 'bg-emerald-100 text-emerald-800',
+      'indigo': 'bg-indigo-100 text-indigo-800',
+      'amber': 'bg-amber-100 text-amber-800',
+      'purple': 'bg-purple-100 text-purple-800',
+      'pink': 'bg-pink-100 text-pink-800'
+    };
+    return colorMap[iconColor] || 'bg-gray-100 text-gray-800';
+  }
+
+  function getGradientClass(iconColor: string) {
+    const colorMap = {
+      'blue': 'from-blue-500 to-blue-600',
+      'emerald': 'from-emerald-500 to-emerald-600',
+      'indigo': 'from-indigo-500 to-indigo-600',
+      'amber': 'from-amber-500 to-amber-600',
+      'purple': 'from-purple-500 to-purple-600',
+      'pink': 'from-pink-500 to-purple-600'
+    };
+    return colorMap[iconColor] || 'from-gray-500 to-gray-600';
   }
 </script>
 
@@ -42,18 +164,39 @@
 
       <!-- Quick Stats -->
       <div class="grid grid-cols-3 gap-4 lg:gap-6">
-        <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-          <div class="text-2xl font-bold text-white">15</div>
-          <div class="text-gray-200 text-sm font-medium">Active Projects</div>
-        </div>
-        <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-          <div class="text-2xl font-bold text-white">2.3M</div>
-          <div class="text-gray-200 text-sm font-medium">Posts Analyzed</div>
-        </div>
-        <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-          <div class="text-2xl font-bold text-white">12</div>
-          <div class="text-gray-200 text-sm font-medium">Reports Ready</div>
-        </div>
+        {#if loading}
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-700 rounded mb-2"></div>
+              <div class="h-4 bg-gray-700 rounded"></div>
+            </div>
+          </div>
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-700 rounded mb-2"></div>
+              <div class="h-4 bg-gray-700 rounded"></div>
+            </div>
+          </div>
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-700 rounded mb-2"></div>
+              <div class="h-4 bg-gray-700 rounded"></div>
+            </div>
+          </div>
+        {:else}
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="text-2xl font-bold text-white">{overviewStats.activeProjects}</div>
+            <div class="text-gray-200 text-sm font-medium">Active Projects</div>
+          </div>
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="text-2xl font-bold text-white">{formatNumber(overviewStats.postsAnalyzed)}</div>
+            <div class="text-gray-200 text-sm font-medium">Posts Analyzed</div>
+          </div>
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="text-2xl font-bold text-white">{overviewStats.reportsReady}</div>
+            <div class="text-gray-200 text-sm font-medium">Reports Ready</div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -76,137 +219,49 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-      <!-- Dashboards -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => navigateToApp('/dashboards')}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
+      {#if loading}
+        <!-- Loading placeholders -->
+        {#each Array(6) as _, i}
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="animate-pulse">
+              <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 bg-gray-300 rounded-xl"></div>
+                <div class="h-6 bg-gray-300 rounded-full w-16"></div>
+              </div>
+              <div class="h-5 bg-gray-300 rounded mb-2"></div>
+              <div class="h-4 bg-gray-300 rounded mb-3"></div>
+              <div class="h-4 bg-gray-300 rounded w-3/4"></div>
+            </div>
+          </div>  
+        {/each}
+      {:else}
+        <!-- Dynamic app modules -->  
+        {#each appModules as module}
+          <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" 
+               on:click={() => navigateToApp(getModuleRoute(module.name))}>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 bg-gradient-to-br {getGradientClass(module.iconColor)} rounded-xl flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{getModuleIcon(module.name)}"></path>
+                </svg>
+              </div>
+              <span class="text-xs px-2 py-1 rounded-full {getStatusBadgeClass(module.iconColor)}">
+                {module.statusDisplay}
+              </span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">{module.displayName}</h3>
+            <p class="text-gray-600 text-sm mb-3">
+              {getModuleDescription(module.name)}
+            </p>
+            <div class="flex items-center text-sm text-gray-500">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              {module.activityDisplay}
+            </div>
           </div>
-          <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">3 Active</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Dashboards</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          Real-time analytics and custom visualizations
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          Updated 2 hours ago
-        </div>
-      </div>
-
-      <!-- Text Analytics -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => navigateToApp('/text-analytics')}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-          <span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">Running</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Text Analytics</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          NLP processing and sentiment analysis
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-          Processing 1.2K posts
-        </div>
-      </div>
-
-      <!-- Image Processing -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => navigateToApp('/image-processing')}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full">2 Queued</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Image Processing</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          Computer vision and image analysis
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-          Last run: 1 day ago
-        </div>
-      </div>
-
-      <!-- Data Capture -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => window.location.href='/data-capture'}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-            </svg>
-          </div>
-          <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">Live</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Data Capture</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          Social media data collection
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-          </svg>
-          5.2K posts today
-        </div>
-      </div>
-
-      <!-- Android Analytics -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => window.location.href='/android-analytics'}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">Research</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Android Analytics</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          Mobile device interaction analysis
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-          </svg>
-          Princeton SMART data
-        </div>
-      </div>
-
-      <!-- Android Research -->
-      <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" on:click={() => window.location.href='/android-research'}>
-        <div class="flex items-center justify-between mb-4">
-          <div class="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-            </svg>
-          </div>
-          <span class="bg-pink-100 text-pink-800 text-xs px-2 py-1 rounded-full">Advanced</span>
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-1">Android Research</h3>
-        <p class="text-gray-600 text-sm mb-3">
-          Deep behavioral analysis & phenotyping
-        </p>
-        <div class="flex items-center text-sm text-gray-500">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-          </svg>
-          ECharts visualizations
-        </div>
-      </div>
+        {/each}
+      {/if}
     </div>
   </div>
 </section>
@@ -225,62 +280,37 @@
         
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="divide-y divide-gray-200">
-            <!-- Activity items -->
-            <div class="p-4 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
+            {#if loading}
+              <!-- Loading activities -->
+              {#each Array(4) as _, i}
+                <div class="p-4">
+                  <div class="animate-pulse flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
+                    <div class="flex-1">
+                      <div class="h-4 bg-gray-300 rounded mb-2"></div>
+                      <div class="h-3 bg-gray-300 rounded w-1/3"></div>
+                    </div>
+                  </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-gray-900">Text analysis completed for <span class="font-medium">Twitter Campaign Q4</span></p>
-                  <p class="text-xs text-gray-500">2 hours ago</p>
+              {/each}
+            {:else}
+              <!-- Dynamic activities -->
+              {#each recentActivities as activity}
+                <div class="p-4 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-{activity.iconColor}-100 rounded-full flex items-center justify-center">
+                      <svg class="w-4 h-4 text-{activity.iconColor}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{getActivityIcon(activity.activityType)}"></path>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-gray-900">{activity.title}</p>
+                      <p class="text-xs text-gray-500">{activity.timeAgo}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <div class="p-4 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                  <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                  </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-gray-900">New data batch imported: <span class="font-medium">5,230 posts</span></p>
-                  <p class="text-xs text-gray-500">4 hours ago</p>
-                </div>
-              </div>
-            </div>
-            
-            <div class="p-4 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                  </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-gray-900">Dashboard <span class="font-medium">Brand Sentiment</span> updated</p>
-                  <p class="text-xs text-gray-500">6 hours ago</p>
-                </div>
-              </div>
-            </div>
-            
-            <div class="p-4 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center">
-                  <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm text-gray-900">Image processing job started for <span class="font-medium">Instagram Posts</span></p>
-                  <p class="text-xs text-gray-500">8 hours ago</p>
-                </div>
-              </div>
-            </div>
+              {/each}
+            {/if}
           </div>
         </div>
       </div>
@@ -290,19 +320,31 @@
         <!-- Current Workspace -->
         <div>
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Current Workspace</h3>
-          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-              <h4 class="font-medium text-gray-900">Brand Analysis Q4 2024</h4>
-              <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Active</span>
+          {#if loading}
+            <div class="animate-pulse bg-gray-200 rounded-xl p-4">
+              <div class="h-4 bg-gray-300 rounded mb-3"></div>
+              <div class="h-3 bg-gray-300 rounded mb-3"></div>
+              <div class="h-3 bg-gray-300 rounded w-2/3"></div>
             </div>
-            <p class="text-sm text-gray-600 mb-3">Social media sentiment tracking for major brands</p>
-            <div class="flex items-center text-sm text-gray-500">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-              3 collaborators
+          {:else if currentWorkspace}
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-medium text-gray-900">{currentWorkspace.name}</h4>
+                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Active</span>
+              </div>
+              <p class="text-sm text-gray-600 mb-3">{currentWorkspace.description}</p>
+              <div class="flex items-center text-sm text-gray-500">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                {currentWorkspace.activityCount} recent activities
+              </div>
             </div>
-          </div>
+          {:else}
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <p class="text-sm text-gray-500">No active workspace</p>
+            </div>
+          {/if}
         </div>
         
         <!-- Quick Actions -->
@@ -325,7 +367,7 @@
               class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 711 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
                 </svg>
                 <span class="text-sm font-medium text-gray-900">Import Data</span>
               </div>
@@ -334,7 +376,7 @@
             <button class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 712-2h2a2 2 0 712 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 712-2h2a2 2 0 712 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                 </svg>
                 <span class="text-sm font-medium text-gray-900">View Reports</span>
               </div>
@@ -346,27 +388,27 @@
         <div>
           <h3 class="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
           <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">Data Pipeline</span>
-              <div class="flex items-center">
-                <div class="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                <span class="text-sm text-blue-600">Healthy</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">Analytics Engine</span>
-              <div class="flex items-center">
-                <div class="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                <span class="text-sm text-blue-600">Running</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600">Storage</span>
-              <div class="flex items-center">
-                <div class="w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
-                <span class="text-sm text-yellow-600">85% Used</span>
-              </div>
-            </div>
+            {#if loading}
+              {#each Array(3) as _, i}
+                <div class="animate-pulse flex items-center justify-between">
+                  <div class="h-4 bg-gray-300 rounded w-1/3"></div>
+                  <div class="flex items-center">
+                    <div class="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
+                    <div class="h-4 bg-gray-300 rounded w-16"></div>
+                  </div>
+                </div>
+              {/each}
+            {:else}
+              {#each systemStatus as status}
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600">{status.displayName}</span>
+                  <div class="flex items-center">
+                    <div class="w-2 h-2 {status.statusColor} rounded-full mr-2"></div>
+                    <span class="text-sm text-{status.status === 'healthy' ? 'blue' : status.status === 'warning' ? 'yellow' : 'red'}-600">{status.statusDisplay}</span>
+                  </div>
+                </div>
+              {/each}
+            {/if}
           </div>
         </div>
       </div>
@@ -397,7 +439,7 @@
         </a>
         <button class="hover:text-gray-900 transition-colors">
           <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 713-3h4a3 3 0 713 3v1"></path>
           </svg>
           Sign Out
         </button>
@@ -405,4 +447,3 @@
     </div>
   </div>
 </footer>
-

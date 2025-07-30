@@ -1,67 +1,106 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
+  import { languageDetectionDb } from '$lib/services/languageDetectionDb';
   import { onMount } from 'svelte';
   
+  // Loading state
+  let loading = true;
+  
   // Redirect to projects if no current project
-  onMount(() => {
+  onMount(async () => {
     if (!$currentProject) {
       window.location.href = '/projects';
+      return;
     }
+    
+    // Load language detection data from database
+    await loadLanguageDetectionData();
   });
 
-  // Mock language detection data
-  let languageStats = [
-    { code: 'en', name: 'English', count: 45230, percentage: 67.2, confidence: 0.95 },
-    { code: 'es', name: 'Spanish', count: 8945, percentage: 13.3, confidence: 0.92 },
-    { code: 'fr', name: 'French', count: 4521, percentage: 6.7, confidence: 0.89 },
-    { code: 'de', name: 'German', count: 3210, percentage: 4.8, confidence: 0.91 },
-    { code: 'pt', name: 'Portuguese', count: 2134, percentage: 3.2, confidence: 0.88 },
-    { code: 'it', name: 'Italian', count: 1567, percentage: 2.3, confidence: 0.90 },
-    { code: 'ja', name: 'Japanese', count: 987, percentage: 1.5, confidence: 0.87 },
-    { code: 'ko', name: 'Korean', count: 678, percentage: 1.0, confidence: 0.85 }
-  ];
+  // Language detection data - loaded from database
+  let languageStats = [];
+  let languageAnalysis = [];
+  let detectionStats = {};
+  let samplePosts = [];
+  let mixingData = [];
+  let geographicData = [];
+  
+  // Load language detection data from database service
+  async function loadLanguageDetectionData() {
+    try {
+      // Load all language data from database service
+      languageStats = await languageDetectionDb.getLanguageStats();
+      languageAnalysis = await languageDetectionDb.getLanguageAnalysis();
+      detectionStats = await languageDetectionDb.getLanguageDetectionStats();
+      
+      // Load posts with current filters
+      await loadFilteredPosts();
+      
+      // Load additional data
+      mixingData = await languageDetectionDb.getLanguageMixing();
+      geographicData = await languageDetectionDb.getGeographicDistribution();
+      
+      console.log('Language detection data loaded successfully from database');
+      loading = false;
+    } catch (error) {
+      console.error('Error loading language detection data:', error);
+      // Fallback to sample data if database fails
+      loadFallbackData();
+    }
+  }
+  
+  // Load filtered posts from database
+  async function loadFilteredPosts() {
+    try {
+      const filters = {
+        language: selectedLanguage,
+        platform: selectedPlatform,
+        confidenceThreshold: confidenceThreshold,
+        timeRange: timeRange
+      };
+      samplePosts = await languageDetectionDb.getSamplePosts(filters);
+    } catch (error) {
+      console.error('Error loading filtered posts:', error);
+    }
+  }
+  
+  // Fallback sample data if database connection fails
+  function loadFallbackData() {
+    languageStats = [
+      { code: 'en', name: 'English', count: 45230, percentage: 67.2, confidence: 0.95 },
+      { code: 'es', name: 'Spanish', count: 8945, percentage: 13.3, confidence: 0.92 },
+      { code: 'fr', name: 'French', count: 4521, percentage: 6.7, confidence: 0.89 },
+      { code: 'de', name: 'German', count: 3210, percentage: 4.8, confidence: 0.91 },
+      { code: 'pt', name: 'Portuguese', count: 2134, percentage: 3.2, confidence: 0.88 },
+      { code: 'it', name: 'Italian', count: 1567, percentage: 2.3, confidence: 0.90 },
+      { code: 'ja', name: 'Japanese', count: 987, percentage: 1.5, confidence: 0.87 },
+      { code: 'ko', name: 'Korean', count: 678, percentage: 1.0, confidence: 0.85 }
+    ];
+    
+    detectionStats = {
+      totalPosts: languageStats.reduce((sum, lang) => sum + lang.count, 0),
+      totalLanguages: languageStats.length,
+      avgConfidence: 0.90,
+      topLanguage: languageStats[0]
+    };
+    
+    loading = false;
+  }
 
-  let totalPosts = languageStats.reduce((sum, lang) => sum + lang.count, 0);
   let selectedLanguage = 'all';
-  let confidenceThreshold = 0.8;
+  let selectedPlatform = 'all';
+  let confidenceThreshold = 0.5;
   let timeRange = '7d';
 
-  // Sample posts for demonstration
-  let samplePosts = [
-    {
-      id: 1,
-      text: "This is an amazing product! I highly recommend it to everyone.",
-      language: 'en',
-      confidence: 0.98,
-      timestamp: '2025-01-27T10:30:00Z',
-      platform: 'twitter'
-    },
-    {
-      id: 2,
-      text: "¡Excelente servicio al cliente! Muy satisfecho con la compra.",
-      language: 'es',
-      confidence: 0.95,
-      timestamp: '2025-01-27T09:15:00Z',
-      platform: 'instagram'
-    },
-    {
-      id: 3,
-      text: "Le produit est fantastique, je le recommande vivement!",
-      language: 'fr',
-      confidence: 0.92,
-      timestamp: '2025-01-27T08:45:00Z',
-      platform: 'reddit'
-    },
-    {
-      id: 4,
-      text: "Das ist wirklich ein ausgezeichnetes Produkt. Sehr zu empfehlen!",
-      language: 'de',
-      confidence: 0.94,
-      timestamp: '2025-01-27T07:20:00Z',
-      platform: 'telegram'
-    }
-  ];
+  // Reactive statements for filter changes
+  $: if ((selectedLanguage !== 'all' || selectedPlatform !== 'all' || confidenceThreshold !== 0.5 || timeRange !== '7d') && !loading) {
+    loadFilteredPosts();
+  }
+
+  // Filtered posts and stats (for display purposes, actual filtering happens in database)
+  $: filteredPosts = samplePosts;
+  $: totalPosts = detectionStats.totalPosts || languageStats.reduce((sum, lang) => sum + lang.count, 0);
 
   function getLanguageName(code: string) {
     const lang = languageStats.find(l => l.code === code);
@@ -78,30 +117,53 @@
     return new Date(timestamp).toLocaleString();
   }
 
-  function exportLanguageData() {
-    const csvData = languageStats.map(lang => 
-      `${lang.name},${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
-    ).join('\n');
-    
-    const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
-    const csv = header + csvData;
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'language_detection_report.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  async function exportLanguageData() {
+    try {
+      const filters = {
+        language: selectedLanguage,
+        platform: selectedPlatform,
+        confidenceThreshold: confidenceThreshold,
+        timeRange: timeRange
+      };
+      
+      const exportData = await languageDetectionDb.exportLanguageData(filters);
+      
+      // Create CSV from the exported data
+      const csvData = exportData.languages.map(lang => 
+        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
+      ).join('\n');
+      
+      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'language_detection_report.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting language data:', error);
+      // Fallback to current data
+      const csvData = languageStats.map(lang => 
+        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
+      ).join('\n');
+      
+      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'language_detection_report.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
   }
 
-  // Filter posts based on selected language and confidence
-  $: filteredPosts = samplePosts.filter(post => {
-    const matchesLanguage = selectedLanguage === 'all' || post.language === selectedLanguage;
-    const matchesConfidence = post.confidence >= confidenceThreshold;
-    return matchesLanguage && matchesConfidence;
-  });
-
+  // Filtered stats for display
   $: filteredStats = selectedLanguage === 'all' 
     ? languageStats 
     : languageStats.filter(lang => lang.code === selectedLanguage);
@@ -163,22 +225,29 @@
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    {#if loading}
+      <div class="flex items-center justify-center py-16">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+        <span class="ml-4 text-lg text-gray-600">Loading language detection data from database...</span>
+      </div>
+    {:else}
+    
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{totalPosts.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalPosts ? detectionStats.totalPosts.toLocaleString() : totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts Analyzed</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{languageStats.length}</div>
+        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalLanguages || languageStats.length}</div>
         <div class="text-sm text-gray-600">Languages Detected</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">92%</div>
+        <div class="text-2xl font-bold text-amber-600 mb-1">{Math.round((detectionStats.avgConfidence || 0.90) * 100)}%</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{languageStats[0]?.name || 'N/A'}</div>
+        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.topLanguage?.name || languageStats[0]?.name || 'English'}</div>
         <div class="text-sm text-gray-600">Top Language</div>
       </div>
     </div>
@@ -186,7 +255,7 @@
     <!-- Filters -->
     <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Filters & Analysis Options</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Language</label>
           <select bind:value={selectedLanguage} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -194,6 +263,20 @@
             {#each languageStats as lang}
               <option value={lang.code}>{lang.name} ({lang.count.toLocaleString()})</option>
             {/each}
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+          <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="all">All Platforms</option>
+            <option value="twitter">Twitter</option>
+            <option value="facebook">Facebook</option>
+            <option value="instagram">Instagram</option>
+            <option value="reddit">Reddit</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="telegram">Telegram</option>
+            <option value="whatsapp">WhatsApp</option>
           </select>
         </div>
         
@@ -365,5 +448,7 @@
         {/each}
       </div>
     </div>
+    
+    {/if}
   </div>
 </div>

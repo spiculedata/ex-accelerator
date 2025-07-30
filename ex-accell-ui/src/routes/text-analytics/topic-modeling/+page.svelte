@@ -1,6 +1,7 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
+  import { topicModelingDb } from '$lib/services/topicModelingDb';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
@@ -9,6 +10,7 @@
     id: string;
     name: string;
     category: string;
+    categoryColor?: string;
     size: number;
     weight: number;
     keywords: string[];
@@ -18,15 +20,60 @@
     [key: string]: any;
   }
   
+  // Loading state
+  let loading = true;
+  
   // Redirect to projects if no current project
-  onMount(() => {
+  onMount(async () => {
     if (!$currentProject) {
       window.location.href = '/projects';
+      return;
     }
+    
+    // Load topic modeling data from database
+    await loadTopicModelingData();
   });
 
-  // Generate comprehensive topics data with 300+ topics
-  let topicsData: Topic[] = [
+  // Topic modeling data - loaded from database
+  let topicsData: Topic[] = [];
+  let topicCategories: any[] = [];
+  let topicRelationships: any[] = [];
+  let topicStats: any = {};
+  
+  // Load topic modeling data from database service
+  async function loadTopicModelingData() {
+    try {
+      // Load all topic data from database service
+      const filters = {
+        category: selectedCategory,
+        search: searchQuery,
+        minSize: minTopicSize
+      };
+      
+      topicsData = await topicModelingDb.getTopics(filters);
+      topicCategories = await topicModelingDb.getTopicCategories();
+      topicRelationships = await topicModelingDb.getTopicRelationships(0.5);
+      topicStats = await topicModelingDb.getTopicStats();
+      
+      console.log('Topic modeling data loaded successfully from database');
+      loading = false;
+      
+      // Initialize charts after data is loaded
+      if (typeof window !== 'undefined' && (window as any).echarts) {
+        setTimeout(() => {
+          initializeCharts();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading topic modeling data:', error);
+      // Fallback to sample data if database fails
+      loadFallbackData();
+    }
+  }
+  
+  // Fallback sample data if database connection fails
+  function loadFallbackData() {
+    topicsData = [
     // Technology & Computing
     { id: 'tech-ai', name: 'Artificial Intelligence', category: 'Technology', size: 4520, weight: 0.95, keywords: ['AI', 'machine learning', 'neural networks'] },
     { id: 'tech-blockchain', name: 'Blockchain & Cryptocurrency', category: 'Technology', size: 3890, weight: 0.89, keywords: ['Bitcoin', 'Ethereum', 'crypto'] },
@@ -175,11 +222,11 @@
     { id: 'misc-veterans', name: 'Veterans Affairs', category: 'Social', size: 1789, weight: 0.77, keywords: ['veterans', 'military', 'service'] },
     { id: 'misc-volunteer', name: 'Volunteering & Charity', category: 'Social', size: 1567, weight: 0.75, keywords: ['volunteering', 'charity', 'nonprofit'] },
     { id: 'misc-community', name: 'Community Development', category: 'Social', size: 1890, weight: 0.78, keywords: ['community', 'development', 'local'] },
-    { id: 'misc-youth', name: 'Youth & Teen Issues', category: 'Social', size: 2123, weight: 0.80, keywords: ['youth', 'teenagers', 'adolescence'] }
-  ];
-
-  // Generate comprehensive relationships between topics
-  let topicRelationships = [
+      { id: 'misc-youth', name: 'Youth & Teen Issues', category: 'Social', size: 2123, weight: 0.80, keywords: ['youth', 'teenagers', 'adolescence'] }
+    ];
+    
+    // Sample relationships
+    topicRelationships = [
     // Technology cluster connections
     { source: 'tech-ai', target: 'tech-data', strength: 0.9 },
     { source: 'tech-ai', target: 'tech-cloud', strength: 0.8 },
@@ -329,29 +376,55 @@
     { source: 'misc-disability', target: 'law-civil', strength: 0.8 },
     { source: 'misc-veterans', target: 'pol-policy', strength: 0.75 },
     { source: 'misc-volunteer', target: 'misc-community', strength: 0.9 },
-    { source: 'misc-youth', target: 'edu-k12', strength: 0.8 }
-  ];
+      { source: 'misc-youth', target: 'edu-k12', strength: 0.8 }
+    ];
+    
+    loading = false;
+    setTimeout(() => {
+      initializeCharts();
+    }, 100);
+  }
 
   let selectedCategory = 'all';
   let selectedTopic: Topic | null = null;
   let searchQuery = '';
-  let minTopicSize = 1000;
+  let minTopicSize = 100;
   let showNetworkDiagram = true;
   let networkChart: any = null;
   let treemapChart: any = null;
 
-  // Filter topics based on current filters
-  $: filteredTopics = topicsData.filter(topic => {
-    const matchesCategory = selectedCategory === 'all' || topic.category === selectedCategory;
-    const matchesSearch = searchQuery === '' || 
-      topic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      topic.keywords.some(keyword => keyword.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesSize = topic.size >= minTopicSize;
-    return matchesCategory && matchesSearch && matchesSize;
-  });
+  // Reactive statements for filter changes - only reload after initial load
+  $: if ((selectedCategory !== 'all' || searchQuery !== '' || minTopicSize !== 100) && !loading && topicsData.length > 0) {
+    loadFilteredTopics();
+  }
 
-  // Get unique categories for filter dropdown
-  $: categories = ['all', ...new Set(topicsData.map(topic => topic.category))];
+  // Load filtered topics from database
+  async function loadFilteredTopics() {
+    try {
+      const filters = {
+        category: selectedCategory,
+        search: searchQuery,
+        minSize: minTopicSize
+      };
+      topicsData = await topicModelingDb.getTopics(filters);
+      
+      // Update charts with new data
+      if (typeof window !== 'undefined' && (window as any).echarts) {
+        setTimeout(async () => {
+          updateNetworkChart();
+          await updateTreemapChart();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading filtered topics:', error);
+    }
+  }
+
+  // Filtered topics (for display purposes, actual filtering happens in database)
+  $: filteredTopics = topicsData;
+
+  // Get categories from database data
+  $: categories = ['all', ...topicCategories.map(cat => cat.name)];
 
   // Initialize charts after component mounts
   onMount(async () => {
@@ -382,7 +455,7 @@
     updateNetworkChart();
   }
 
-  function initTreemapChart() {
+  async function initTreemapChart() {
     if (!browser) return;
     const treemapContainer = document.getElementById('treemap-chart');
     if (!treemapContainer) {
@@ -390,10 +463,20 @@
       return;
     }
 
+    // Make sure container is visible before initializing
+    if (treemapContainer.classList.contains('hidden')) {
+      treemapContainer.classList.remove('hidden');
+    }
+
     console.log('Initializing treemap chart...');
     treemapChart = (window as any).echarts.init(treemapContainer);
     console.log('Treemap chart initialized:', treemapChart);
-    updateTreemapChart();
+    await updateTreemapChart();
+    
+    // Restore visibility state
+    if (showNetworkDiagram) {
+      treemapContainer.classList.add('hidden');
+    }
   }
 
   function updateNetworkChart() {
@@ -481,7 +564,7 @@
     networkChart.setOption(option);
   }
 
-  function updateTreemapChart() {
+  async function updateTreemapChart() {
     if (!browser || !treemapChart) {
       console.error('Treemap chart not initialized');
       return;
@@ -505,36 +588,14 @@
     }
 
     try {
-      // Group topics by category for treemap
-      const categoryGroups = {};
-      filteredTopics.forEach(topic => {
-        if (!categoryGroups[topic.category]) {
-          categoryGroups[topic.category] = [];
-        }
-        categoryGroups[topic.category].push({
-          name: topic.name,
-          value: topic.size,
-          itemStyle: {
-            color: getCategoryColor(topic.category)
-          }
-        });
-      });
-
-      // Convert to treemap format with proper value calculation and colors
-      const treemapData = Object.keys(categoryGroups).map(category => {
-        const children = categoryGroups[category];
-        const totalValue = children.reduce((sum: number, child: any) => sum + child.value, 0);
-        const categoryColor = getCategoryColor(category);
-        
-        return {
-          name: category,
-          value: totalValue,
-          itemStyle: {
-            color: categoryColor
-          },
-          children: children
-        };
-      });
+      // Get treemap data from database service
+      const filters = {
+        category: selectedCategory,
+        search: searchQuery,
+        minSize: minTopicSize
+      };
+      
+      const treemapData = await topicModelingDb.getTreemapData(filters);
 
       console.log('Treemap data:', treemapData);
 
@@ -738,13 +799,13 @@
       updateNetworkChart();
     }
     if (treemapChart) {
-      setTimeout(() => updateTreemapChart(), 50);
+      setTimeout(async () => await updateTreemapChart(), 50);
     }
   }
 
   // Watch for visualization toggle changes
   $: if (browser && showNetworkDiagram !== undefined) {
-    setTimeout(() => {
+    setTimeout(async () => {
       if (showNetworkDiagram) {
         if (!networkChart) {
           initNetworkChart();
@@ -754,30 +815,58 @@
         }
       } else {
         if (!treemapChart) {
-          initTreemapChart();
+          await initTreemapChart();
         } else {
           treemapChart.resize();
-          updateTreemapChart();
+          await updateTreemapChart();
         }
       }
     }, 100);
   }
 
-  function exportTopicData() {
-    const csvData = filteredTopics.map(topic => 
-      `${topic.name},${topic.category},${topic.size},${topic.weight},${topic.keywords.join(';')}`
-    ).join('\n');
-    
-    const header = 'Topic Name,Category,Post Count,Weight,Keywords\n';
-    const csv = header + csvData;
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'topic_modeling_analysis.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  async function exportTopicData() {
+    try {
+      const filters = {
+        category: selectedCategory,
+        search: searchQuery,
+        minSize: minTopicSize
+      };
+      
+      const exportData = await topicModelingDb.exportTopicData(filters);
+      
+      // Create CSV from the exported data
+      const csvData = exportData.topics.map(topic => 
+        `"${topic.name}",${topic.category},${topic.size},${topic.weight},"${topic.keywords.join(';')}"`
+      ).join('\n');
+      
+      const header = 'Topic Name,Category,Post Count,Weight,Keywords\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'topic_modeling_analysis.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting topic data:', error);
+      // Fallback to current data
+      const csvData = filteredTopics.map(topic => 
+        `"${topic.name}",${topic.category},${topic.size},${topic.weight},"${topic.keywords.join(';')}"`
+      ).join('\n');
+      
+      const header = 'Topic Name,Category,Post Count,Weight,Keywords\n';
+      const csv = header + csvData;
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'topic_modeling_analysis.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
   }
 
   function selectTopic(topic: Topic) {
@@ -841,18 +930,25 @@
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    {#if loading}
+      <div class="flex items-center justify-center py-16">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <span class="ml-4 text-lg text-gray-600">Loading topic modeling data from database...</span>
+      </div>
+    {:else}
+    
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-indigo-600 mb-1">{filteredTopics.length}</div>
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{topicStats.totalTopics || filteredTopics.length}</div>
         <div class="text-sm text-gray-600">Active Topics</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-indigo-600 mb-1">{categories.length - 1}</div>
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{topicStats.totalCategories || (categories.length - 1)}</div>
         <div class="text-sm text-gray-600">Categories</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-indigo-600 mb-1">{filteredTopics.reduce((sum, t) => sum + t.size, 0).toLocaleString()}</div>
+        <div class="text-2xl font-bold text-indigo-600 mb-1">{topicStats.totalDocuments || filteredTopics.reduce((sum, t) => sum + t.size, 0).toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -1011,5 +1107,7 @@
         </div>
       {/if}
     </div>
+    
+    {/if}
   </div>
 </div>

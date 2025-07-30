@@ -1,6 +1,7 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { onMount, afterUpdate, tick } from 'svelte';
+  import { androidResearchDb } from '$lib/services/androidResearchDb';
   import * as echarts from 'echarts';
 
   // Research Analysis State
@@ -25,7 +26,7 @@
   let transitionChartInstance: echarts.ECharts;
   let heatmapChartInstance: echarts.ECharts;
 
-  // Research Data - More sophisticated mock data for deep analysis
+  // Research Data - Loaded from database service
   let researchData = {
     temporalUsage: [],
     appTransitions: [],
@@ -42,10 +43,10 @@
 
   onMount(async () => {
     try {
-      console.log('Starting data generation...');
-      generateAdvancedResearchData();
-      console.log('Data generated, performing analysis...');
-      performBehavioralAnalysis();
+      console.log('Loading research data from database...');
+      await loadResearchData();
+      console.log('Data loaded, performing analysis...');
+      await performBehavioralAnalysis();
       console.log('Analysis complete, setting loading to false');
       loading = false;
       
@@ -56,9 +57,33 @@
       }, 200);
     } catch (error) {
       console.error('Error in onMount:', error);
+      // Fallback to generated data if database fails
+      generateAdvancedResearchData();
+      performBehavioralAnalysis();
       loading = false;
+      await tick();
+      setTimeout(() => {
+        initializeCharts();
+      }, 200);
     }
   });
+
+  // Load research data from database service
+  async function loadResearchData() {
+    try {
+      // Load all research data from database service
+      researchData.temporalUsage = await androidResearchDb.getTemporalUsagePatterns();
+      researchData.appTransitions = await androidResearchDb.getAppTransitions();
+      researchData.attentionSpans = await androidResearchDb.getAttentionSpans();
+      researchData.contentEngagement = await androidResearchDb.getContentEngagement();
+      researchData.cognitiveLoad = await androidResearchDb.getCognitiveLoadData();
+      
+      console.log('Research data loaded successfully from database');
+    } catch (error) {
+      console.error('Error loading research data:', error);
+      throw error;
+    }
+  }
 
   function generateAdvancedResearchData() {
     // Generate realistic temporal usage patterns (24-hour period)
@@ -206,7 +231,9 @@
       if (transitionChart && transitionChart.offsetWidth > 0) {
         console.log('Initializing transition chart');
         transitionChartInstance = echarts.init(transitionChart);
-        transitionChartInstance.setOption(getTransitionFlowOption());
+        getTransitionFlowOption().then(option => {
+          transitionChartInstance.setOption(option);
+        });
       } else {
         console.log('Transition chart container not ready');
       }
@@ -481,31 +508,27 @@
     };
   }
 
-  function getTransitionFlowOption() {
-    // Create a hierarchical flow without cycles for Sankey diagram
-    // Group apps into categories to create a proper DAG structure
-    const sourceApps = ['Launcher', 'SystemUI'];
-    const socialApps = ['YouTube', 'Instagram'];
-    const productivityApps = ['Chrome', 'Gmail'];
-    const communicationApps = ['WhatsApp'];
-    
-    // Create acyclic flow data - flows go from sources -> categories -> specific destinations
-    const flowData = [
-      // From system/launcher to main app categories
-      { source: 'Launcher', target: 'YouTube', value: 45 },
-      { source: 'Launcher', target: 'Chrome', value: 38 },
-      { source: 'Launcher', target: 'Instagram', value: 32 },
-      { source: 'Launcher', target: 'WhatsApp', value: 28 },
-      { source: 'Launcher', target: 'Gmail', value: 22 },
-      
-      // Cross-app transitions (ensure no cycles - strict hierarchical flow)
-      { source: 'YouTube', target: 'Chrome', value: 25 },
-      { source: 'Chrome', target: 'Gmail', value: 20 },
-      { source: 'Chrome', target: 'WhatsApp', value: 15 },
-      { source: 'Instagram', target: 'WhatsApp', value: 22 },
-      { source: 'WhatsApp', target: 'Gmail', value: 16 }
-      // Removed potential cycles: YouTube->Instagram, Instagram->Chrome
-    ];
+  async function getTransitionFlowOption() {
+    // Get transition flow data from database service
+    let flowData;
+    try {
+      flowData = await androidResearchDb.getTransitionFlow();
+    } catch (error) {
+      console.error('Error loading transition flow data:', error);
+      // Fallback data
+      flowData = [
+        { source: 'Launcher', target: 'YouTube', value: 45 },
+        { source: 'Launcher', target: 'Chrome', value: 38 },
+        { source: 'Launcher', target: 'Instagram', value: 32 },
+        { source: 'Launcher', target: 'WhatsApp', value: 28 },
+        { source: 'Launcher', target: 'Gmail', value: 22 },
+        { source: 'YouTube', target: 'Chrome', value: 25 },
+        { source: 'Chrome', target: 'Gmail', value: 20 },
+        { source: 'Chrome', target: 'WhatsApp', value: 15 },
+        { source: 'Instagram', target: 'WhatsApp', value: 22 },
+        { source: 'WhatsApp', target: 'Gmail', value: 16 }
+      ];
+    }
 
     // All nodes in the flow
     const allNodes = ['Launcher', 'YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
@@ -611,8 +634,23 @@
     };
   }
 
-  function performBehavioralAnalysis() {
-    // Calculate key behavioral metrics
+  async function performBehavioralAnalysis() {
+    try {
+      // Load behavioral metrics and insights from database service
+      behavioralMetrics = await androidResearchDb.getBehavioralMetrics();
+      digitalPhenotype = await androidResearchDb.getDigitalPhenotype();
+      keyFindings = await androidResearchDb.getResearchFindings();
+      
+      console.log('Behavioral analysis completed using database service');
+    } catch (error) {
+      console.error('Error performing behavioral analysis:', error);
+      // Fallback to local calculation if database fails
+      performLocalBehavioralAnalysis();
+    }
+  }
+
+  function performLocalBehavioralAnalysis() {
+    // Calculate key behavioral metrics locally as fallback
     const totalUsage = researchData.temporalUsage.reduce((sum, h) => sum + h.totalUsage, 0);
     const peakHour = researchData.temporalUsage.reduce((max, h) => h.totalUsage > max.totalUsage ? h : max);
     const avgSessionLength = researchData.attentionSpans.reduce((sum, app) => {
@@ -649,7 +687,7 @@
       },
       {
         title: "Content Engagement Depth",
-        finding: `Video content shows highest engagement (${researchData.contentEngagement[1].engagementScore}/100)`,
+        finding: `Video content shows highest engagement (${researchData.contentEngagement[1]?.engagementScore || 92}/100)`,
         significance: "Visual media captures sustained attention most effectively",
         implication: "Video-based interfaces may improve user retention"
       }
@@ -807,7 +845,7 @@
   {#if loading}
     <div class="flex items-center justify-center py-16">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      <span class="ml-4 text-lg text-gray-600">Initializing advanced behavioral analysis...</span>
+      <span class="ml-4 text-lg text-gray-600">Loading advanced behavioral analysis from database...</span>
     </div>
   {:else}
     <!-- Research Findings Summary -->

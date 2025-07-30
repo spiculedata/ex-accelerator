@@ -15,6 +15,7 @@ This is the frontend UI component of the ex-accelerator project, built with Svel
 - **Package Manager**: npm (with engine-strict=true for version enforcement)
 - **Adapter**: @sveltejs/adapter-auto for automatic deployment detection
 - **Runtime**: Dapr-enabled for microservices architecture
+- **Database**: DuckDB with SQL queries (MANDATORY for data persistence and analytics)
 
 ## Common Commands
 
@@ -80,6 +81,12 @@ npm run check:watch
 # Prepare/sync SvelteKit
 npm run prepare
 ```
+
+**IMPORTANT**: After implementing database integration, always run `npm run build` to ensure:
+- TypeScript compilation succeeds
+- Database service imports are resolved correctly
+- Charts and data loading work properly
+- No runtime errors in the dashboard
 
 ## Key Technical Details
 
@@ -235,6 +242,147 @@ When running with Dapr, the following APIs are available:
 - State API: `http://localhost:3500/v1.0/state/statestore`
 - Pub/Sub API: `http://localhost:3500/v1.0/publish/pubsub/<topic>`
 - Secrets API: `http://localhost:3500/v1.0/secrets/secretstore/<key>`
+
+## Database Integration Guidelines
+
+**CRITICAL: This project uses DuckDB with SQL queries for all data operations. Never use in-memory data models or hardcoded sample data for production features.**
+
+### Mandatory Database Architecture
+
+When asked to implement database integration or data-driven features, you MUST follow this pattern:
+
+1. **Create DuckDB Schema** (`<feature>_schema.sql`):
+   - Design comprehensive table structures with foreign key relationships
+   - Include realistic sample data generation using SQL functions
+   - Create analytical views for performance optimization
+   - Use proper data types and constraints
+
+2. **Build Database Service Layer** (`src/lib/services/<feature>Db.ts`):
+   - Create TypeScript service class with async methods
+   - Implement browser-compatible simulation layer for development
+   - Include comprehensive error handling and fallback mechanisms
+   - Follow consistent naming patterns: `get<EntityName>()`, `export<Feature>Data()`
+
+3. **Dashboard Integration**:
+   - Replace hardcoded data with database service calls
+   - Add loading states and error handling
+   - Implement reactive filtering with database queries
+   - Maintain graceful fallback to sample data if database fails
+
+### Database Service Pattern
+
+```typescript
+class FeatureDatabase {
+  private initialized = false;
+
+  async connect() {
+    if (this.initialized) return;
+    // Database connection logic
+    this.initialized = true;
+  }
+
+  async getFeatureData(filters: any = {}) {
+    if (!this.initialized) await this.connect();
+    
+    // In production: actual DuckDB queries
+    // In browser: simulate SQL query results
+    return Promise.resolve(simulatedData);
+  }
+
+  async exportFeatureData(filters: any = {}) {
+    // Comprehensive data export with filters
+    return Promise.resolve({
+      exportDate: new Date().toISOString(),
+      data: await this.getFeatureData(filters),
+      filters
+    });
+  }
+}
+
+export const featureDb = new FeatureDatabase();
+```
+
+### Dashboard Integration Pattern
+
+```svelte
+<script lang="ts">
+  import { featureDb } from '$lib/services/featureDb';
+  
+  let loading = true;
+  let featureData = [];
+  
+  async function loadFeatureData() {
+    try {
+      featureData = await featureDb.getFeatureData(filters);
+      loading = false;
+    } catch (error) {
+      console.error('Database error:', error);
+      loadFallbackData(); // Graceful degradation
+    }
+  }
+  
+  onMount(loadFeatureData);
+  
+  // Reactive filtering with database queries
+  $: if (filtersChanged && !loading) {
+    loadFeatureData();
+  }
+</script>
+
+{#if loading}
+  <div>Loading data from database...</div>
+{:else}
+  <!-- Render data-driven content -->
+{/if}
+```
+
+### When to Use Database Integration
+
+**ALWAYS use DuckDB SQL approach when:**
+- Implementing analytics dashboards or data visualizations
+- Asked to "use SQL tables and queries" or "database-driven"
+- Creating features that process, filter, or analyze data
+- Building any data-heavy component requiring persistence
+- Implementing search, filtering, or reporting functionality
+
+**Browser simulation layer is acceptable for:**
+- Development and testing environments
+- When actual DuckDB connection is not available
+- Prototyping new features before database deployment
+
+### Existing Database Implementations
+
+Reference these existing implementations as patterns:
+
+- **Topic Modeling**: `topic_modeling_schema.sql` + `topicModelingDb.ts`
+- **Language Detection**: `language_detection_schema.sql` + `languageDetectionDb.ts`  
+- **Engagement Analysis**: `engagement_analysis_schema.sql` + `engagementAnalysisDb.ts`
+
+### Forbidden Data Approaches
+
+❌ **NEVER do this:**
+```typescript
+// Hardcoded in-memory data
+let topics = [
+  { id: 1, name: 'Tech', posts: 100 },
+  { id: 2, name: 'Health', posts: 50 }
+];
+
+// Direct array manipulation
+const filteredTopics = topics.filter(t => t.posts > 75);
+```
+
+✅ **ALWAYS do this instead:**
+```typescript
+// Database-driven approach
+let topics = [];
+let loading = true;
+
+async function loadTopics() {
+  topics = await topicDb.getTopics(filters);
+  loading = false;
+}
+```
 
 ## CSS and Styling Guidelines
 
