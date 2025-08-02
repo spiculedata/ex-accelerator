@@ -2,6 +2,8 @@
   import Navigation from '$lib/components/Navigation.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { jobSchedulerService } from '$lib/services/jobSchedulerService';
+  import type { JobScheduleRequest } from '$lib/services/jobSchedulerService';
   
   let activeTab = 'schedule';
   
@@ -74,8 +76,15 @@
     frequency: 'daily',
     time: '09:00',
     timezone: 'UTC',
-    enabled: false
+    enabled: false,
+    dueTime: 'now',
+    schedulingMode: 'immediate' // immediate, delayed, scheduled
   };
+
+  // Job scheduling state
+  let isSchedulingJob = false;
+  let schedulingError = '';
+  let scheduledJobs: any[] = [];
   
   // Mock data for crawl jobs
   let crawlJobs = [
@@ -614,24 +623,113 @@
     crawlerConfigStep = step;
   }
   
-  function saveCrawlerJob() {
-    const newJob = {
-      id: Date.now().toString(),
-      name: crawlerConfig.name || `${crawlerConfig.platform} crawl`,
-      status: scheduleConfig.enabled ? 'scheduled' : 'pending',
-      progress: 0,
-      schedule: scheduleConfig.enabled ? `${scheduleConfig.frequency} at ${scheduleConfig.time} ${scheduleConfig.timezone}` : 'On-demand',
-      itemsCollected: 0,
-      totalEstimated: 0,
-      nextRun: scheduleConfig.enabled ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : undefined,
-      platform: crawlerConfig.platform,
-      crawlId: crawlerConfig.crawlId,
-      crawlLabel: crawlerConfig.name
-    };
-    
-    crawlJobs = [newJob, ...crawlJobs];
-    
-    // Reset form
+  async function saveCrawlerJob() {
+    if (!validateForm()) {
+      return;
+    }
+
+    isSchedulingJob = true;
+    schedulingError = '';
+
+    try {
+      // Calculate due time based on scheduling mode
+      let dueTime = '10s'; // Default to 10 seconds for immediate execution
+      if (scheduleConfig.schedulingMode === 'delayed') {
+        // Convert time formats to seconds that Dapr accepts
+        const timeValue = scheduleConfig.dueTime;
+        if (timeValue.endsWith('s')) {
+          dueTime = timeValue; // Already in seconds
+        } else if (timeValue.endsWith('m')) {
+          const minutes = parseInt(timeValue.slice(0, -1));
+          dueTime = `${minutes * 60}s`; // Convert to seconds
+        } else if (timeValue.endsWith('h')) {
+          const hours = parseInt(timeValue.slice(0, -1));
+          dueTime = `${hours * 3600}s`; // Convert to seconds
+        } else {
+          dueTime = '10s'; // Fallback
+        }
+      } else if (scheduleConfig.schedulingMode === 'scheduled') {
+        const scheduledDate = new Date();
+        const [hours, minutes] = scheduleConfig.time.split(':');
+        scheduledDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        // If the time has passed today, schedule for tomorrow
+        if (scheduledDate.getTime() <= Date.now()) {
+          scheduledDate.setDate(scheduledDate.getDate() + 1);
+        }
+        
+        // Convert to seconds from now
+        const secondsFromNow = Math.floor((scheduledDate.getTime() - Date.now()) / 1000);
+        dueTime = `${Math.max(10, secondsFromNow)}s`; // Minimum 10 seconds
+      }
+
+      // Use registered job handler name from telegram-scraper
+      const jobName = 'my-scheduled-job'; // Must match registered handler
+
+      // Build job request
+      const jobRequest: JobScheduleRequest = {
+        name: jobName,
+        dueTime: dueTime,
+        data: {
+          droid: jobName,
+          task: `crawl ${crawlerConfig.platform} channels`,
+          urls: crawlerConfig.urls.filter(url => url.trim()),
+          platform: crawlerConfig.platform as 'telegram' | 'youtube',
+          crawlId: crawlerConfig.crawlId || undefined,
+          maxDepth: crawlerConfig.maxDepth > 0 ? crawlerConfig.maxDepth : undefined,
+          concurrency: crawlerConfig.concurrency,
+          maxPosts: crawlerConfig.maxPosts > 0 ? crawlerConfig.maxPosts : undefined,
+          skipMedia: crawlerConfig.skipMediaDownload,
+          timeAgo: crawlerConfig.timeAgo || undefined,
+          minPostDate: crawlerConfig.minPostDate || undefined
+        }
+      };
+
+      // Add platform-specific configuration
+      if (crawlerConfig.platform === 'youtube' && crawlerConfig.youtubeApiKey) {
+        jobRequest.data.youtubeApiKey = crawlerConfig.youtubeApiKey;
+        jobRequest.data.samplingMethod = crawlerConfig.samplingMethod;
+        jobRequest.data.minChannelVideos = crawlerConfig.minChannelVideos;
+      }
+
+      // Schedule the job
+      const result = await jobSchedulerService.scheduleJob(jobRequest);
+
+      // Add to local job list for UI display
+      const newJob = {
+        id: jobName,
+        name: crawlerConfig.name || `${crawlerConfig.platform} crawl`,
+        status: scheduleConfig.schedulingMode === 'immediate' ? 'running' : 'scheduled',
+        progress: 0,
+        schedule: scheduleConfig.schedulingMode === 'immediate' ? 'Running now' : 
+                 scheduleConfig.schedulingMode === 'delayed' ? `Delayed: ${dueTime}` :
+                 `${scheduleConfig.frequency} at ${scheduleConfig.time} ${scheduleConfig.timezone}`,
+        itemsCollected: 0,
+        totalEstimated: 0,
+        nextRun: scheduleConfig.schedulingMode !== 'immediate' ? dueTime : undefined,
+        platform: crawlerConfig.platform,
+        crawlId: crawlerConfig.crawlId,
+        crawlLabel: crawlerConfig.name,
+        daprJobName: jobName
+      };
+      
+      crawlJobs = [newJob, ...crawlJobs];
+      
+      // Reset form
+      resetCrawlerForm();
+      
+      // Go back to schedule tab to see the created job
+      activeTab = 'schedule';
+      
+    } catch (error) {
+      console.error('Failed to schedule crawler job:', error);
+      schedulingError = error instanceof Error ? error.message : 'Failed to schedule job';
+    } finally {
+      isSchedulingJob = false;
+    }
+  }
+
+  function resetCrawlerForm() {
     crawlerConfig = {
       name: '',
       crawlId: '',
@@ -1569,32 +1667,74 @@
                 </div>
               </div>
 
-              <!-- Schedule Configuration -->
+              <!-- Job Scheduling Configuration -->
               <div class="border border-gray-200 rounded-xl p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h3 class="text-lg font-medium text-gray-900">Schedule Configuration</h3>
-                  <label class="flex items-center">
-                    <input 
-                      bind:checked={scheduleConfig.enabled}
-                      type="checkbox" 
-                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span class="ml-2 text-sm text-gray-700">Enable scheduling</span>
-                  </label>
+                <div class="mb-4">
+                  <h3 class="text-lg font-medium text-gray-900 mb-2">Job Scheduling</h3>
+                  <p class="text-sm text-gray-600">Configure when and how your crawler job should be executed using Dapr Jobs.</p>
+                </div>
+                
+                <!-- Scheduling Mode -->
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Execution Mode</label>
+                  <div class="space-y-2">
+                    <label class="flex items-center">
+                      <input 
+                        bind:group={scheduleConfig.schedulingMode}
+                        type="radio" 
+                        value="immediate"
+                        class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-2 text-sm text-gray-700">Run immediately</span>
+                      <span class="ml-2 text-xs text-gray-500">(Execute as soon as job is created)</span>
+                    </label>
+                    <label class="flex items-center">
+                      <input 
+                        bind:group={scheduleConfig.schedulingMode}
+                        type="radio" 
+                        value="delayed"
+                        class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-2 text-sm text-gray-700">Run with delay</span>
+                      <span class="ml-2 text-xs text-gray-500">(Execute after a specified delay)</span>
+                    </label>
+                    <label class="flex items-center">
+                      <input 
+                        bind:group={scheduleConfig.schedulingMode}
+                        type="radio" 
+                        value="scheduled"
+                        class="text-blue-600 focus:ring-blue-500">
+                      <span class="ml-2 text-sm text-gray-700">Run at specific time</span>
+                      <span class="ml-2 text-xs text-gray-500">(Execute at a specific date and time)</span>
+                    </label>
+                  </div>
                 </div>
 
-                {#if scheduleConfig.enabled}
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
+                <!-- Delayed Execution Configuration -->
+                {#if scheduleConfig.schedulingMode === 'delayed'}
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Delay Time</label>
+                    <div class="flex space-x-2">
                       <select 
-                        bind:value={scheduleConfig.frequency}
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="hourly">Hourly</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
+                        bind:value={scheduleConfig.dueTime}
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="30s">30 seconds</option>
+                        <option value="1m">1 minute</option>
+                        <option value="5m">5 minutes</option>
+                        <option value="15m">15 minutes</option>
+                        <option value="30m">30 minutes</option>
+                        <option value="1h">1 hour</option>
+                        <option value="2h">2 hours</option>
+                        <option value="6h">6 hours</option>
+                        <option value="12h">12 hours</option>
+                        <option value="1d">1 day</option>
                       </select>
                     </div>
+                    <p class="text-xs text-gray-500 mt-1">Job will be executed after the specified delay from creation time.</p>
+                  </div>
+                {/if}
+
+                <!-- Scheduled Execution Configuration -->
+                {#if scheduleConfig.schedulingMode === 'scheduled'}
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-2">Time</label>
                       <input 
@@ -1612,6 +1752,22 @@
                         <option value="America/Los_Angeles">PST</option>
                         <option value="Europe/London">GMT</option>
                       </select>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500">Job will be executed at the specified time today (or tomorrow if time has passed).</p>
+                {/if}
+
+                <!-- Error Display -->
+                {#if schedulingError}
+                  <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <div class="flex">
+                      <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <div>
+                        <h4 class="text-sm font-medium text-red-800">Scheduling Error</h4>
+                        <p class="text-sm text-red-700 mt-1">{schedulingError}</p>
+                      </div>
                     </div>
                   </div>
                 {/if}
@@ -1636,9 +1792,16 @@
               {#if crawlerConfigStep === 'review'}
                 <button 
                   on:click={saveCrawlerJob}
-                  disabled={!validateForm()}
-                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
-                  Create Crawler Job
+                  disabled={!validateForm() || isSchedulingJob}
+                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors flex items-center">
+                  {#if isSchedulingJob}
+                    <svg class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Scheduling Job...
+                  {:else}
+                    Schedule Crawler Job
+                  {/if}
                 </button>
               {:else}
                 <button 

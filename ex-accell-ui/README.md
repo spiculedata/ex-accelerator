@@ -1,28 +1,28 @@
 # Ex-Accell UI
 
-A modern, Dapr-enabled frontend application built with SvelteKit for the Ex-Accelerator platform.
+A modern, unified Dapr deployment combining SvelteKit frontend with telegram-scraper job scheduling for the Ex-Accelerator platform.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
+- Go 1.21+ (for telegram-scraper)
 - Docker (for Redis)
 - Dapr CLI
 
-### Get Started in 3 Steps
+### Get Started in 2 Steps
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies and setup deployment
 npm install
+npm run dapr:setup
 
-# 2. Start Redis (required for Dapr)
-docker run -d --name redis-dapr -p 6379:6379 redis:alpine
-
-# 3. Run with Dapr
+# 2. Start unified deployment (UI + telegram-scraper)
 npm run dev:dapr
 ```
 
-Visit [http://localhost:5173](http://localhost:5173) to see your app! 🎉
+Visit [http://localhost:5173](http://localhost:5173) to see your app! 🎉  
+Access job scheduling at [http://localhost:5173/data-capture](http://localhost:5173/data-capture) 📋
 
 ## 📋 What You Need
 
@@ -39,32 +39,34 @@ dapr init
 
 ### Development
 ```bash
-npm run dev          # Standard development server
-npm run dev:dapr     # Development with Dapr sidecar (recommended)
+npm run dev             # Standard development server
+npm run dev:dapr        # Unified deployment (UI + telegram-scraper)
+```
+
+### Deployment Management
+```bash
+npm run dapr:setup      # Setup dependencies (Redis, telegram-scraper)
+npm run dapr:stop       # Stop all Dapr services
+npm run dapr:logs       # View deployment logs
 ```
 
 ### Building & Testing
 ```bash
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run check        # Type checking
-```
-
-### Dapr Operations
-```bash
-npm run dapr:init    # Initialize Dapr
-npm run dapr:stop    # Stop Dapr application
+npm run build           # Build for production
+npm run preview         # Preview production build
+npm run check           # Type checking
+npm run test:integration # Test job scheduling integration
 ```
 
 ## 🏗 What's Inside
 
-This is a **SvelteKit 2.x** application enhanced with **Dapr** for microservices capabilities:
+This is a **unified Dapr deployment** combining multiple services:
 
-- ⚡ **SvelteKit 2.x** - Modern web framework
-- 🔷 **TypeScript** - Type safety
-- 🚀 **Vite** - Lightning fast builds  
-- 🔧 **Dapr** - Microservices runtime
-- 🐳 **Docker** - Containerization ready
+- ⚡ **SvelteKit 2.x** - Modern web framework with TypeScript
+- 🔧 **Dapr Multi-App** - Unified microservices deployment
+- 📋 **Telegram Scraper** - Go-based job scheduling integration
+- 🚀 **Job Scheduling** - Web-based crawler job management
+- 🐳 **Docker** - Redis and containerization support
 
 ## 🌟 Key Features
 
@@ -74,10 +76,16 @@ This is a **SvelteKit 2.x** application enhanced with **Dapr** for microservices
 - **Advanced Correlations** - Language-sentiment relationships and topic performance analysis
 - **Real-Time Dashboards** - Comprehensive analytics from unified data source
 
+### Telegram Scraper Integration
+- **Job Scheduling** - Web-based crawler job creation and management
+- **Multi-App Deployment** - Single command starts UI and scraper services
+- **Real-time Monitoring** - Live job execution logs and status
+- **Platform Support** - Telegram and YouTube content crawling
+
 ### Dapr Integration
+- **Unified Deployment** - Multi-app configuration in single dapr.yaml
 - **State Management** - Redis-backed persistent state
-- **Pub/Sub Messaging** - Event-driven communication
-- **Secrets Management** - Secure configuration
+- **Job Store** - Etcd-based job scheduling and execution
 - **Service Discovery** - Microservices connectivity
 
 ### Modern Development
@@ -102,6 +110,8 @@ The application uses a **unified DuckDB database** for all analytics:
 - **State Store**: Redis (`components/statestore.yaml`)
 - **Pub/Sub**: Redis messaging (`components/pubsub.yaml`) 
 - **Secrets**: File-based secrets (`components/secretstore.yaml`)
+- **Job Store**: Etcd-based job scheduling (`components/jobstore.yaml`)
+- **Telegram Scraper**: Service binding (`components/telegram-scraper-app.yaml`)
 
 ## 📚 Documentation
 
@@ -114,10 +124,16 @@ This UI is part of the larger Ex-Accelerator ecosystem:
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Ex-Accell │    │     ETL     │    │  Superset   │
-│      UI     │◄──►│   Pipeline  │◄──►│ Analytics   │
-│  (This App) │    │             │    │             │
+│   Ex-Accell │    │ Telegram    │    │     ETL     │
+│      UI     │◄──►│  Scraper    │◄──►│   Pipeline  │
+│  (Frontend) │    │ (Job Mode)  │    │             │
 └─────────────┘    └─────────────┘    └─────────────┘
+       │                                      │
+       ▼                                      ▼
+┌─────────────┐                      ┌─────────────┐
+│  Job Queue  │                      │  Superset   │
+│ (Dapr Jobs) │                      │ Analytics   │
+└─────────────┘                      └─────────────┘
 ```
 
 ## 🚨 Troubleshooting
@@ -138,8 +154,15 @@ docker start redis-dapr  # Start Redis if stopped
 
 **Dapr not working?**
 ```bash
-dapr --version  # Check Dapr installation
-dapr list       # See running Dapr apps
+dapr --version       # Check Dapr installation
+dapr list            # See running Dapr apps
+npm run dapr:logs    # View deployment logs
+```
+
+**Telegram scraper issues?**
+```bash
+npm run dapr:setup   # Re-run setup to check dependencies
+ls -la /Users/tombarber/Projects/telegram-scraper/telegram-scraper  # Check binary exists
 ```
 
 ## 🤝 Contributing

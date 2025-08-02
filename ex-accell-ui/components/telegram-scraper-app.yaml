@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: telegram-scraper-app
+spec:
+  type: bindings.http
+  version: v1
+  metadata:
+  - name: url
+    value: "http://localhost:3001"
+  - name: method
+    value: "POST"
+  scopes:
+  - ex-accell-ui

@@ -37,19 +37,28 @@ npm run dev -- --open
 npm install
 ```
 
-### Dapr Commands
+### Dapr Commands (Unified Deployment)
 ```bash
 # Initialize Dapr (first time setup)
 npm run dapr:init
 
-# Stop Dapr application
+# One-time setup: check dependencies, build telegram-scraper, start Redis
+npm run dapr:setup
+
+# Start unified deployment (UI + telegram-scraper + Dapr)
+npm run dev:dapr
+
+# Stop all Dapr services
 npm run dapr:stop
 
-# Start with Dapr sidecar (development)
-npm run dev:dapr
+# View deployment logs in real-time
+npm run dapr:logs
 
 # Preview with Dapr sidecar
 npm run preview:dapr
+
+# Test job scheduling integration
+npm run test:integration
 ```
 
 ### Jupyter Lab Integration
@@ -220,18 +229,38 @@ The project includes full integration with DeepSeek R1, a state-of-the-art reaso
 
 ## Dapr Integration
 
-This project is configured to run with Dapr for microservices capabilities:
+This project is configured as a unified Dapr deployment with microservices capabilities and full telegram-scraper integration for job scheduling:
+
+### Unified Deployment Architecture
+The project uses a single `dapr.yaml` configuration file that manages both applications:
+- **ex-accell-ui**: SvelteKit frontend with job scheduling API endpoints
+- **telegram-scraper**: Go-based crawler service running in Dapr job mode
 
 ### Dapr Components
 - **State Store**: Redis-based state management (`components/statestore.yaml`)  
 - **Pub/Sub**: Redis-based messaging (`components/pubsub.yaml`)
 - **Secret Store**: File-based secrets management (`components/secretstore.yaml`)
+- **Job Store**: Etcd-based job scheduling (`components/jobstore.yaml`)
+- **Telegram Scraper**: HTTP binding to telegram-scraper service (`components/telegram-scraper-app.yaml`)
 
-### Dapr Configuration
-- **App ID**: `ex-accell-ui`
-- **HTTP Port**: 3500 (Dapr sidecar)
-- **gRPC Port**: 50001 (Dapr sidecar)
-- **App Port**: 5173 (dev) / 4173 (preview) / 3000 (production)
+### Dapr Configuration (Multi-App Deployment)
+- **UI App**: 
+  - App ID: `ex-accell-ui`
+  - HTTP Port: 3500 (Dapr sidecar)
+  - gRPC Port: 50001 (Dapr sidecar)
+  - App Port: 5173 (dev) / 4173 (preview)
+- **Telegram Scraper**:
+  - App ID: `telegram-scraper`
+  - HTTP Port: 3501 (Dapr sidecar)
+  - gRPC Port: 50002 (Dapr sidecar)
+  - App Port: 3001 (scraper service)
+  - Scheduler Host: localhost (for job scheduling)
+
+### Job Scheduling Integration
+- **Job Handlers**: R2-D2, C-3PO, BB-8, my-scheduled-job
+- **API Endpoints**: `/api/jobs` (POST, GET, DELETE)
+- **Job Store**: Uses Dapr's built-in job scheduling capabilities
+- **Storage**: Local directory `./telegram-data` for scraped content
 
 ### Prerequisites for Dapr
 ```bash
@@ -239,17 +268,152 @@ This project is configured to run with Dapr for microservices capabilities:
 wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - | /bin/bash
 
 # Initialize Dapr
-dapr init
+npm run dapr:init
+
+# Setup deployment dependencies (Redis, telegram-scraper binary)
+npm run dapr:setup
 
 # Start Redis (required for state store and pub/sub)
 docker run -d --name redis-dapr -p 6379:6379 redis:alpine
 ```
 
 ### Dapr API Access
-When running with Dapr, the following APIs are available:
+When running with unified Dapr deployment, the following APIs are available:
+
+**UI Application (port 3500):**
 - State API: `http://localhost:3500/v1.0/state/statestore`
 - Pub/Sub API: `http://localhost:3500/v1.0/publish/pubsub/<topic>`
 - Secrets API: `http://localhost:3500/v1.0/secrets/secretstore/<key>`
+
+**Telegram Scraper (port 3501):**
+- Jobs API: `http://localhost:3501/v1.0-alpha1/jobs/{job-name}`
+- Health Check: `http://localhost:3501/v1.0/healthz`
+
+**Job Scheduling Workflow:**
+1. **Web Interface**: Access `/data-capture` page to create jobs
+2. **API Endpoint**: POST to `/api/jobs` (internal routing to port 3501)
+3. **Job Execution**: Monitor logs via `npm run dapr:logs`
+
+## Telegram Scraper Job Scheduling
+
+The UI provides full integration with the telegram-scraper using Dapr's unified deployment and job scheduling capabilities. This allows users to schedule, monitor, and manage crawler jobs through a web interface.
+
+### Quick Start
+```bash
+# 1. Setup dependencies (one-time)
+npm run dapr:setup
+
+# 2. Start unified deployment
+npm run dev:dapr
+
+# 3. Access web interface
+# Navigate to: http://localhost:5173/data-capture?tab=crawler
+
+# 4. Monitor job execution
+npm run dapr:logs
+```
+
+### Features
+
+- **Unified Deployment**: Single command starts both UI and telegram-scraper
+- **Web-based Job Scheduling**: Create crawler jobs through the Data Capture interface
+- **Multiple Execution Modes**: 
+  - Immediate execution (run now)
+  - Delayed execution (run after specified delay)
+  - Scheduled execution (run at specific time)
+- **Platform Support**: Both Telegram and YouTube crawling
+- **Job Management**: View, monitor, and delete scheduled jobs
+- **Real-time Status**: Live job status updates and progress tracking
+- **Error Handling**: Comprehensive error reporting and validation
+
+### Job Scheduling Workflow
+
+1. **Configure Crawler Job**:
+   - Navigate to Data Capture → Web Crawler
+   - Complete the 4-step configuration process:
+     - Basic Settings (job name, concurrency, etc.)
+     - Platform & URLs (Telegram/YouTube channels)
+     - Filters & Limits (date ranges, post limits)
+     - Review & Schedule (execution timing)
+
+2. **Schedule Job Execution**:
+   - Choose execution mode (immediate, delayed, or scheduled)
+   - Configure timing parameters
+   - Submit job to Dapr Jobs API
+
+3. **Monitor Job Status**:
+   - View all jobs on the Schedule tab
+   - Track job progress and status
+   - Access job logs and results
+
+### API Integration
+
+The system provides the following endpoints for job management:
+
+- **POST** `/api/jobs` - Schedule a new crawler job
+- **GET** `/api/jobs` - List all scheduled jobs
+- **GET** `/api/jobs?name={jobName}` - Get specific job details
+- **DELETE** `/api/jobs?name={jobName}` - Delete a scheduled job
+
+### Job Configuration Example
+
+Following the [Dapr Jobs quickstart](https://github.com/dapr/quickstarts/tree/master/jobs/javascript/http) format:
+
+```typescript
+{
+  name: "telegram-crawl-2024-01-01T12-00-00-000Z",
+  dueTime: "30s", // or ISO date for scheduled execution
+  data: {
+    value: "telegram:{\"urls\":[\"@channel1\",\"@channel2\"],\"platform\":\"telegram\",\"crawlId\":\"my-crawl-001\",\"maxPosts\":1000,\"skipMedia\":true,\"timeAgo\":\"30d\"}"
+  }
+}
+```
+
+The `value` field contains a colon-separated format: `platform:jsonConfig` similar to the quickstart's `droid:task` format.
+
+### Development Setup
+
+To test the complete job scheduling workflow, following the [Dapr Jobs quickstart](https://github.com/dapr/quickstarts/tree/master/jobs/javascript/http) approach:
+
+#### Option 1: Multi-App Dapr Run (Recommended)
+```bash
+# 1. Initialize Dapr (first time only)
+npm run dapr:init
+
+# 2. Start both applications with multi-app configuration
+npm run start:dapr-multi
+```
+
+#### Option 2: Individual App Start
+```bash
+# 1. Initialize Dapr (first time only)
+npm run dapr:init
+
+# 2. Start telegram-scraper in job mode
+npm run telegram-scraper:start
+
+# 3. Start UI with Dapr sidecar  
+npm run dev:dapr
+```
+
+#### Access Points:
+- **UI**: `http://localhost:5173`
+- **Dapr Jobs API**: `http://localhost:3500/v1.0-alpha1/jobs/telegram-scraper`
+- **Telegram Scraper**: `http://localhost:3501` (Dapr sidecar)
+
+### Testing
+
+The implementation includes comprehensive test coverage:
+
+- **E2E Tests**: Full user workflow testing (`cypress/e2e/job-scheduler.cy.ts`)
+- **Component Tests**: Individual component validation (`cypress/component/JobScheduler.cy.ts`)
+- **API Tests**: Backend job scheduling validation
+- **Error Handling**: Edge cases and failure scenarios
+
+Run tests with:
+```bash
+npm run cypress:run
+```
 
 ## Database Integration Guidelines
 
