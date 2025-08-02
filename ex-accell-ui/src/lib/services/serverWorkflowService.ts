@@ -1,0 +1,360 @@
+// Server-side Workflow Service
+// Handles workflow operations on the server without fetch dependencies
+
+import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
+
+export interface PublishedWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  status: 'draft' | 'published' | 'archived';
+  pattern: string;
+  definition: any;
+  generatedCode: GeneratedWorkflow;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  tags: string[];
+  metadata: {
+    stepCount: number;
+    estimatedDuration: number;
+    datasetRequirements: string[];
+  };
+}
+
+export interface WorkflowExecution {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: number;
+  currentStep: string;
+  startedAt: string;
+  completedAt?: string;
+  duration?: number;
+  input: any;
+  output?: any;
+  error?: string;
+  logs: Array<{
+    timestamp: string;
+    level: 'info' | 'warn' | 'error' | 'debug';
+    message: string;
+    stepId?: string;
+    stepName?: string;
+    data?: any;
+  }>;
+  metadata: {
+    triggeredBy: 'manual' | 'scheduled' | 'api';
+    priority: 'low' | 'medium' | 'high';
+    retryCount: number;
+    maxRetries: number;
+  };
+}
+
+class ServerWorkflowService {
+  // In-memory storage for demo purposes
+  // In production, this would use a proper database
+  private workflows = new Map<string, PublishedWorkflow>();
+  private executions = new Map<string, WorkflowExecution>();
+
+  /**
+   * Publish a workflow
+   */
+  async publishWorkflow(
+    workflowDefinition: any,
+    metadata: {
+      name: string;
+      description: string;
+      version?: string;
+      tags?: string[];
+      createdBy: string;
+    }
+  ): Promise<PublishedWorkflow> {
+    try {
+      // Generate Dapr workflow code
+      const generatedCode = daprWorkflowGenerator.generateWorkflowCode(workflowDefinition);
+      
+      // Create published workflow record
+      const publishedWorkflow: PublishedWorkflow = {
+        id: `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: metadata.name,
+        description: metadata.description,
+        version: metadata.version || '1.0.0',
+        status: 'published',
+        pattern: generatedCode.workflowPattern,
+        definition: workflowDefinition,
+        generatedCode,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: metadata.createdBy,
+        tags: metadata.tags || [],
+        metadata: {
+          stepCount: workflowDefinition.steps.length,
+          estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
+          datasetRequirements: this.extractDatasetRequirements(workflowDefinition)
+        }
+      };
+
+      // Store in memory
+      this.workflows.set(publishedWorkflow.id, publishedWorkflow);
+
+      console.log(`Workflow "${publishedWorkflow.name}" published with ID: ${publishedWorkflow.id}`);
+      return publishedWorkflow;
+    } catch (error) {
+      console.error('Error publishing workflow:', error);
+      throw new Error(`Failed to publish workflow: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all published workflows
+   */
+  async getPublishedWorkflows(filters: {
+    status?: string;
+    pattern?: string;
+    search?: string;
+  } = {}): Promise<PublishedWorkflow[]> {
+    let workflows = Array.from(this.workflows.values());
+
+    if (filters.status) {
+      workflows = workflows.filter(w => w.status === filters.status);
+    }
+
+    if (filters.pattern) {
+      workflows = workflows.filter(w => w.pattern === filters.pattern);
+    }
+
+    if (filters.search) {
+      const search = filters.search.toLowerCase();
+      workflows = workflows.filter(w => 
+        w.name.toLowerCase().includes(search) || 
+        w.description.toLowerCase().includes(search)
+      );
+    }
+
+    return workflows.sort((a, b) => 
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+  }
+
+  /**
+   * Get a specific workflow
+   */
+  async getPublishedWorkflow(workflowId: string): Promise<PublishedWorkflow | null> {
+    return this.workflows.get(workflowId) || null;
+  }
+
+  /**
+   * Execute a workflow
+   */
+  async executeWorkflow(
+    workflowId: string,
+    input: any,
+    options: {
+      priority?: 'low' | 'medium' | 'high';
+      triggeredBy?: 'manual' | 'scheduled' | 'api';
+      maxRetries?: number;
+    } = {}
+  ): Promise<WorkflowExecution> {
+    const workflow = this.workflows.get(workflowId);
+    if (!workflow) {
+      throw new Error(`Workflow ${workflowId} not found`);
+    }
+
+    // Create execution record
+    const execution: WorkflowExecution = {
+      id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      status: 'queued',
+      progress: 0,
+      currentStep: '',
+      startedAt: new Date().toISOString(),
+      input,
+      logs: [],
+      metadata: {
+        triggeredBy: options.triggeredBy || 'manual',
+        priority: options.priority || 'medium',
+        retryCount: 0,
+        maxRetries: options.maxRetries || 3
+      }
+    };
+
+    // Store execution
+    this.executions.set(execution.id, execution);
+
+    // Start workflow execution (simulate asynchronously)
+    this.simulateWorkflowExecution(execution, workflow);
+
+    return execution;
+  }
+
+  /**
+   * Get workflow executions
+   */
+  async getWorkflowExecutions(filters: {
+    workflowId?: string;
+    status?: string;
+    limit?: number;
+  } = {}): Promise<WorkflowExecution[]> {
+    let executions = Array.from(this.executions.values());
+
+    if (filters.workflowId) {
+      executions = executions.filter(e => e.workflowId === filters.workflowId);
+    }
+
+    if (filters.status) {
+      executions = executions.filter(e => e.status === filters.status);
+    }
+
+    executions = executions.sort((a, b) => 
+      new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    );
+
+    if (filters.limit) {
+      executions = executions.slice(0, filters.limit);
+    }
+
+    return executions;
+  }
+
+  /**
+   * Get specific execution
+   */
+  async getWorkflowExecution(executionId: string): Promise<WorkflowExecution | null> {
+    return this.executions.get(executionId) || null;
+  }
+
+  /**
+   * Cancel workflow execution
+   */
+  async cancelWorkflowExecution(executionId: string): Promise<void> {
+    const execution = this.executions.get(executionId);
+    if (execution && (execution.status === 'queued' || execution.status === 'running')) {
+      execution.status = 'cancelled';
+      execution.completedAt = new Date().toISOString();
+      execution.logs.push({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: 'Workflow execution cancelled by user'
+      });
+      this.executions.set(executionId, execution);
+    }
+  }
+
+  /**
+   * Simulate workflow execution
+   */
+  private async simulateWorkflowExecution(execution: WorkflowExecution, workflow: PublishedWorkflow): Promise<void> {
+    // Simulate async execution
+    setTimeout(async () => {
+      try {
+        execution.status = 'running';
+        execution.currentStep = 'Starting workflow';
+        execution.logs.push({
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: `Starting workflow: ${workflow.name}`
+        });
+
+        const steps = workflow.definition.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_output');
+        const totalSteps = steps.length;
+
+        for (let i = 0; i < totalSteps; i++) {
+          const step = steps[i];
+          
+          execution.currentStep = step.name;
+          execution.progress = Math.round(((i + 1) / totalSteps) * 100);
+          
+          execution.logs.push({
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            message: `Executing step: ${step.name}`,
+            stepId: step.id,
+            stepName: step.name
+          });
+
+          // Simulate step processing time
+          await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        }
+
+        // Complete execution
+        execution.status = 'completed';
+        execution.progress = 100;
+        execution.currentStep = 'Completed';
+        execution.completedAt = new Date().toISOString();
+        execution.duration = new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime();
+        execution.output = {
+          processedRecords: Math.floor(Math.random() * 10000) + 1000,
+          resultDataset: `result_${execution.id}`,
+          summary: `Workflow ${workflow.name} completed successfully`
+        };
+
+        execution.logs.push({
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: 'Workflow completed successfully',
+          data: execution.output
+        });
+
+        this.executions.set(execution.id, execution);
+        console.log(`Workflow execution ${execution.id} completed`);
+
+      } catch (error) {
+        execution.status = 'failed';
+        execution.error = error.message;
+        execution.completedAt = new Date().toISOString();
+        execution.logs.push({
+          timestamp: new Date().toISOString(),
+          level: 'error',
+          message: `Workflow failed: ${error.message}`
+        });
+        this.executions.set(execution.id, execution);
+        console.error(`Workflow execution ${execution.id} failed:`, error);
+      }
+    }, 500); // Start after 500ms
+  }
+
+  private estimateWorkflowDuration(workflowDefinition: any): number {
+    const steps = workflowDefinition.steps;
+    let estimatedSeconds = 0;
+    
+    steps.forEach(step => {
+      switch (step.type) {
+        case 'dataset_input':
+        case 'dataset_output':
+          estimatedSeconds += 5;
+          break;
+        case 'text_preprocessing':
+        case 'sentiment_analysis':
+        case 'topic_modeling':
+          estimatedSeconds += 30;
+          break;
+        case 'clustering':
+        case 'feature_extraction':
+          estimatedSeconds += 45;
+          break;
+        default:
+          estimatedSeconds += 15;
+      }
+    });
+    
+    return estimatedSeconds;
+  }
+
+  private extractDatasetRequirements(workflowDefinition: any): string[] {
+    const requirements = [];
+    
+    workflowDefinition.steps.forEach(step => {
+      if (step.type === 'dataset_input' && step.config.dataset_id) {
+        requirements.push(step.config.dataset_id);
+      }
+    });
+    
+    return requirements;
+  }
+}
+
+// Export singleton instance
+export const serverWorkflowService = new ServerWorkflowService();

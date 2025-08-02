@@ -2,13 +2,164 @@
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import { unifiedDb } from '$lib/services/duckdb';
+  import { daprWorkflowGenerator, type GeneratedWorkflow } from '$lib/services/daprWorkflowGenerator';
+  import type { PublishedWorkflow, WorkflowExecution } from '$lib/services/serverWorkflowService';
   
+  // Available datasets from unified database
+  let availableDatasets = [];
+  let loadingDatasets = false;
+
   // Redirect to projects if no current project
-  onMount(() => {
+  onMount(async () => {
     if (!$currentProject) {
       window.location.href = '/projects';
+      return;
     }
+    
+    // Load available datasets on component mount
+    await loadAvailableDatasets();
   });
+
+  async function loadAvailableDatasets() {
+    try {
+      loadingDatasets = true;
+      await unifiedDb.connect();
+      
+      // Get available datasets from various sources
+      const datasets = [];
+      
+      // Check for posts data (main social media data)
+      try {
+        const postsCount = await unifiedDb.query(`
+          SELECT COUNT(*) as count 
+          FROM posts 
+          WHERE created_at >= '2024-01-01'
+        `);
+        if (postsCount[0]?.count > 0) {
+          datasets.push({
+            id: 'social_posts',
+            name: 'Social Media Posts',
+            description: `${postsCount[0].count.toLocaleString()} posts from social platforms`,
+            table: 'posts',
+            type: 'social_media'
+          });
+        }
+      } catch (e) {}
+      
+      // Check for sentiment analysis data
+      try {
+        const sentimentCount = await unifiedDb.query(`
+          SELECT COUNT(*) as count 
+          FROM sentiment_classifications
+        `);
+        if (sentimentCount[0]?.count > 0) {
+          datasets.push({
+            id: 'sentiment_data',
+            name: 'Sentiment Analysis Results',
+            description: `${sentimentCount[0].count.toLocaleString()} sentiment classifications`,
+            table: 'unified_post_analysis',
+            type: 'analytics'
+          });
+        }
+      } catch (e) {}
+      
+      // Check for topic modeling data
+      try {
+        const topicsCount = await unifiedDb.query(`
+          SELECT COUNT(DISTINCT topic_id) as count 
+          FROM topics
+        `);
+        if (topicsCount[0]?.count > 0) {
+          datasets.push({
+            id: 'topic_data',
+            name: 'Topic Modeling Results',
+            description: `${topicsCount[0].count} discovered topics`,
+            table: 'unified_post_analysis',
+            type: 'analytics'
+          });
+        }
+      } catch (e) {}
+      
+      // Check for language detection data
+      try {
+        const languageCount = await unifiedDb.query(`
+          SELECT COUNT(*) as count 
+          FROM language_detection
+        `);
+        if (languageCount[0]?.count > 0) {
+          datasets.push({
+            id: 'language_data',
+            name: 'Language Detection Results',
+            description: `${languageCount[0].count.toLocaleString()} language classifications`,
+            table: 'unified_post_analysis',
+            type: 'analytics'
+          });
+        }
+      } catch (e) {}
+      
+      // Check for engagement analysis data
+      try {
+        const engagementCount = await unifiedDb.query(`
+          SELECT COUNT(*) as count 
+          FROM post_engagement
+        `);
+        if (engagementCount[0]?.count > 0) {
+          datasets.push({
+            id: 'engagement_data',
+            name: 'Engagement Analysis Data',
+            description: `${engagementCount[0].count.toLocaleString()} engagement records`,
+            table: 'unified_post_analysis',
+            type: 'analytics'
+          });
+        }
+      } catch (e) {}
+      
+      // Check for Android analytics data
+      try {
+        const androidCount = await unifiedDb.query(`
+          SELECT COUNT(*) as count 
+          FROM android_app_usage
+        `);
+        if (androidCount[0]?.count > 0) {
+          datasets.push({
+            id: 'android_data',
+            name: 'Android Analytics Data',
+            description: `${androidCount[0].count.toLocaleString()} app usage records`,
+            table: 'android_app_usage',
+            type: 'mobile_analytics'
+          });
+        }
+      } catch (e) {}
+      
+      // Add unified cross-analysis dataset if we have multiple data types
+      if (datasets.length > 1) {
+        datasets.unshift({
+          id: 'unified_analysis',
+          name: 'Unified Cross-Platform Analysis',
+          description: 'Combined data from all analytics modules for cross-table analysis',
+          table: 'unified_post_analysis',
+          type: 'unified'
+        });
+      }
+      
+      availableDatasets = datasets;
+    } catch (error) {
+      console.error('Failed to load available datasets:', error);
+      // Fallback to sample datasets if database connection fails
+      availableDatasets = [
+        {
+          id: 'sample_social',
+          name: 'Sample Social Media Data',
+          description: 'Sample dataset for testing workflows',
+          table: 'posts',
+          type: 'sample'
+        }
+      ];
+    } finally {
+      loadingDatasets = false;
+    }
+  }
 
   // Workflow step types and their configurations
   let stepLibrary = [
@@ -195,6 +346,36 @@
   let workflowCanvas = null;
   let showStepConfig = false;
   
+  // Code generation and export
+  let showCodeExport = false;
+  let generatedWorkflow: GeneratedWorkflow | null = null;
+  let activeCodeTab = 'workflow';
+  
+  // Workflow publishing and execution
+  let showPublishDialog = false;
+  let showExecuteDialog = false;
+  let showExecutionMonitor = false;
+  let publishMetadata = {
+    name: '',
+    description: '',
+    version: '1.0.0',
+    tags: '',
+    createdBy: 'current-user' // TODO: Get from auth
+  };
+  let executionInput = {};
+  let executionOptions = {
+    priority: 'medium',
+    triggeredBy: 'manual'
+  };
+  let currentExecution: WorkflowExecution | null = null;
+  let publishedWorkflows: PublishedWorkflow[] = [];
+  let workflowExecutions: WorkflowExecution[] = [];
+  let loadingPublish = false;
+  let loadingExecute = false;
+  
+  // Placeholder text for execution input
+  const executionInputPlaceholder = '{"dataset": "social_posts", "parameters": {}}';
+  
   // Connection state
   let isConnecting = false;
   let connectionStart = null;
@@ -292,8 +473,353 @@
   }
 
   function runWorkflow() {
-    console.log('Running workflow:', workflow);
-    alert('Workflow execution started!');
+    if (workflow.steps.length === 0) {
+      alert('Please add steps to your workflow before running');
+      return;
+    }
+    showExecuteDialog = true;
+  }
+
+  async function publishWorkflow() {
+    if (workflow.steps.length === 0) {
+      alert('Please add steps to your workflow before publishing');
+      return;
+    }
+    
+    // Pre-fill metadata
+    publishMetadata.name = workflow.name || 'Untitled Workflow';
+    publishMetadata.description = workflow.description || '';
+    
+    showPublishDialog = true;
+  }
+
+  async function confirmPublishWorkflow() {
+    try {
+      loadingPublish = true;
+      
+      const response = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workflowDefinition: workflow,
+          metadata: {
+            ...publishMetadata,
+            tags: publishMetadata.tags.split(',').map(t => t.trim()).filter(Boolean)
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to publish workflow');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`Workflow "${publishMetadata.name}" published successfully!`);
+        showPublishDialog = false;
+        loadPublishedWorkflows();
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error publishing workflow:', error);
+      alert('Error publishing workflow: ' + error.message);
+    } finally {
+      loadingPublish = false;
+    }
+  }
+
+  async function executeWorkflow(workflowId?: string) {
+    try {
+      loadingExecute = true;
+      
+      // If no workflowId provided, we need to publish the current workflow first
+      let id = workflowId;
+      
+      if (!id) {
+        // First publish the current workflow
+        const tempMetadata = {
+          name: workflow.name || `Temp Workflow ${Date.now()}`,
+          description: workflow.description || 'Temporary workflow for execution',
+          version: '1.0.0',
+          tags: [],
+          createdBy: 'current-user'
+        };
+        
+        const publishResponse = await fetch('/api/workflows', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            workflowDefinition: workflow,
+            metadata: tempMetadata
+          })
+        });
+        
+        if (!publishResponse.ok) {
+          throw new Error('Failed to publish workflow for execution');
+        }
+        
+        const publishResult = await publishResponse.json();
+        if (!publishResult.success) {
+          throw new Error(publishResult.error || 'Failed to publish workflow');
+        }
+        
+        id = publishResult.workflow.id;
+      }
+      
+      const response = await fetch(`/api/workflows/${id}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: executionInput,
+          options: executionOptions
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to execute workflow');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        currentExecution = result.execution;
+        showExecuteDialog = false;
+        showExecutionMonitor = true;
+        
+        // Start monitoring the execution
+        monitorExecution(result.execution.id);
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error executing workflow:', error);
+      alert('Error executing workflow: ' + error.message);
+    } finally {
+      loadingExecute = false;
+    }
+  }
+
+  async function loadPublishedWorkflows() {
+    try {
+      const response = await fetch('/api/workflows');
+      if (response.ok) {
+        const result = await response.json();
+        publishedWorkflows = result.workflows || [];
+      }
+    } catch (error) {
+      console.error('Error loading published workflows:', error);
+    }
+  }
+
+  async function loadWorkflowExecutions() {
+    try {
+      const response = await fetch('/api/workflow-executions?limit=20');
+      if (response.ok) {
+        const result = await response.json();
+        workflowExecutions = result.executions || [];
+      }
+    } catch (error) {
+      console.error('Error loading workflow executions:', error);
+    }
+  }
+
+  async function monitorExecution(executionId: string) {
+    if (!executionId) return;
+    
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/workflow-executions/${executionId}`);
+        if (response.ok) {
+          const result = await response.json();
+          currentExecution = result.execution;
+          
+          // Continue monitoring if still running
+          if (currentExecution && (currentExecution.status === 'running' || currentExecution.status === 'queued')) {
+            setTimeout(checkStatus, 2000); // Check every 2 seconds
+          }
+        }
+      } catch (error) {
+        console.error('Error monitoring execution:', error);
+      }
+    };
+    
+    checkStatus();
+  }
+
+  async function cancelExecution() {
+    if (!currentExecution) return;
+    
+    try {
+      const response = await fetch(`/api/workflow-executions/${currentExecution.id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        currentExecution.status = 'cancelled';
+        alert('Workflow execution cancelled');
+      }
+    } catch (error) {
+      console.error('Error cancelling execution:', error);
+      alert('Error cancelling execution: ' + error.message);
+    }
+  }
+
+  function generateDaprCode() {
+    try {
+      generatedWorkflow = daprWorkflowGenerator.generateWorkflowCode(workflow);
+      showCodeExport = true;
+      console.log('Generated Dapr workflow code:', generatedWorkflow);
+    } catch (error) {
+      console.error('Error generating workflow code:', error);
+      alert('Error generating workflow code: ' + error.message);
+    }
+  }
+
+  function downloadCode() {
+    if (!generatedWorkflow) return;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const workflowName = workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    
+    // Create a zip-like structure with multiple files
+    const files = [
+      {
+        name: `${workflowName}_workflow.ts`,
+        content: generatedWorkflow.workflowCode + '\n\n' + generatedWorkflow.activityCode
+      },
+      {
+        name: `${workflowName}_app.ts`,
+        content: generatedWorkflow.appCode
+      },
+      {
+        name: `${workflowName}_readme.md`,
+        content: generateReadme()
+      },
+      {
+        name: `package.json`,
+        content: generatePackageJson()
+      }
+    ];
+    
+    // Download each file separately (since we can't create zip in browser easily)
+    files.forEach(file => {
+      const blob = new Blob([file.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function generateReadme(): string {
+    return `# ${workflow.name} - Dapr Workflow
+
+## Description
+${workflow.description || 'Generated Dapr workflow from visual workflow builder'}
+
+## Workflow Pattern
+**Pattern:** ${generatedWorkflow?.workflowPattern || 'activity-sequence'}
+
+## Execution Order
+${generatedWorkflow?.executionOrder.map((stepId, index) => {
+  const step = workflow.steps.find(s => s.id === stepId);
+  return `${index + 1}. ${step?.name || stepId} (${step?.type || 'unknown'})`;
+}).join('\n') || 'No steps defined'}
+
+## Setup Instructions
+
+1. **Install Dependencies**
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+2. **Start Dapr Sidecar**
+   \`\`\`bash
+   dapr run --app-id workflow-app --app-port 3000 --dapr-http-port 3500 --dapr-grpc-port 50001
+   \`\`\`
+
+3. **Run the Workflow**
+   \`\`\`bash
+   npm start
+   \`\`\`
+
+## Configuration
+
+Update the workflow input data in the main function to match your dataset and requirements.
+
+## Data Processing Steps
+
+${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_output').map(step => 
+  `- **${step.name}**: ${step.description} (Type: ${step.type})`
+).join('\n') || 'No processing steps defined'}
+
+## Generated Files
+
+- \`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_workflow.ts\`: Workflow and activity definitions
+- \`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_app.ts\`: Main application code
+- \`package.json\`: Dependencies and scripts
+- \`README.md\`: This documentation
+
+## Notes
+
+- This code is generated from the visual workflow builder
+- TODO comments indicate where you need to implement your specific data processing logic
+- Make sure to implement the data processing utility functions referenced in the activities
+- Adjust timeouts and retry policies based on your requirements
+`;
+  }
+
+  function generatePackageJson(): string {
+    const workflowName = workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    
+    return JSON.stringify({
+      "name": `${workflowName}-dapr-workflow`,
+      "version": "1.0.0",
+      "description": workflow.description || "Generated Dapr workflow",
+      "main": `${workflowName}_app.ts`,
+      "scripts": {
+        "start": `ts-node ${workflowName}_app.ts`,
+        "build": "tsc",
+        "dev": "ts-node-dev --respawn --transpile-only src/app.ts"
+      },
+      "dependencies": {
+        "@dapr/dapr": "^3.0.0",
+        "typescript": "^5.0.0",
+        "ts-node": "^10.9.0"
+      },
+      "devDependencies": {
+        "@types/node": "^20.0.0",
+        "ts-node-dev": "^2.0.0"
+      },
+      "keywords": ["dapr", "workflow", "data-processing"],
+      "author": "Workflow Builder",
+      "license": "MIT"
+    }, null, 2);
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Show a temporary success message
+      const button = event?.target as HTMLElement;
+      const originalText = button.textContent;
+      button.textContent = 'Copied!';
+      setTimeout(() => {
+        button.textContent = originalText;
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+      alert('Failed to copy to clipboard');
+    });
   }
 
   // Connection functionality
@@ -479,13 +1005,35 @@
         <div class="flex items-center space-x-3">
           <button 
             on:click={saveWorkflow}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
+            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-sm font-medium transition-colors">
             Save Workflow
           </button>
           <button 
+            on:click={generateDaprCode}
+            disabled={workflow.steps.length === 0}
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+            </svg>
+            <span>Generate Code</span>
+          </button>
+          <button 
+            on:click={publishWorkflow}
+            disabled={workflow.steps.length === 0}
+            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <span>Publish</span>
+          </button>
+          <button 
             on:click={runWorkflow}
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
-            Run Workflow
+            disabled={workflow.steps.length === 0}
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-7-9h6M12 5V3"></path>
+            </svg>
+            <span>Run</span>
           </button>
         </div>
       </div>
@@ -715,12 +1263,76 @@
             {#if selectedStep.type === 'dataset_input'}
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Dataset</label>
-                <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Select dataset...</option>
-                  <option value="ds1">Twitter Sentiment Dataset</option>
-                  <option value="ds2">Multi-Platform Engagement Data</option>
-                  <option value="ds3">Hashtag Analysis Results</option>
-                </select>
+                {#if loadingDatasets}
+                  <div class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 flex items-center justify-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-sm text-gray-600">Loading datasets...</span>
+                  </div>
+                {:else}
+                  <select 
+                    bind:value={selectedStep.config.dataset_id}
+                    on:change={(e) => updateStepConfig(selectedStep.id, { dataset_id: e.target.value })}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select dataset...</option>
+                    {#each availableDatasets as dataset}
+                      <option value={dataset.id}>{dataset.name}</option>
+                    {/each}
+                  </select>
+                  
+                  {#if selectedStep.config.dataset_id}
+                    {@const selectedDataset = availableDatasets.find(d => d.id === selectedStep.config.dataset_id)}
+                    {#if selectedDataset}
+                      <div class="mt-2 p-3 bg-blue-50 rounded-lg">
+                        <div class="flex items-start space-x-2">
+                          <div class="flex-shrink-0 mt-0.5">
+                            {#if selectedDataset.type === 'unified'}
+                              <span class="text-lg">🔗</span>
+                            {:else if selectedDataset.type === 'social_media'}
+                              <span class="text-lg">📱</span>
+                            {:else if selectedDataset.type === 'analytics'}
+                              <span class="text-lg">📊</span>
+                            {:else if selectedDataset.type === 'mobile_analytics'}
+                              <span class="text-lg">📱</span>
+                            {:else}
+                              <span class="text-lg">📄</span>
+                            {/if}
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-blue-900">{selectedDataset.name}</p>
+                            <p class="text-xs text-blue-700">{selectedDataset.description}</p>
+                            <p class="text-xs text-blue-600 mt-1">Table: {selectedDataset.table}</p>
+                          </div>
+                        </div>
+                      </div>
+                    {/if}
+                  {/if}
+                  
+                  {#if availableDatasets.length === 0}
+                    <div class="mt-2 p-3 bg-yellow-50 rounded-lg">
+                      <div class="flex items-center space-x-2">
+                        <span class="text-yellow-600">⚠️</span>
+                        <div>
+                          <p class="text-sm font-medium text-yellow-800">No datasets available</p>
+                          <p class="text-xs text-yellow-700">Run data collection or import datasets to get started</p>
+                        </div>
+                      </div>
+                    </div>
+                  {/if}
+                {/if}
+                
+                <div class="mt-3">
+                  <button 
+                    on:click={loadAvailableDatasets}
+                    class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>Refresh datasets</span>
+                  </button>
+                </div>
               </div>
             {:else if selectedStep.type === 'text_preprocessing'}
               <div class="space-y-3">
@@ -783,3 +1395,434 @@
     {/if}
   </div>
 </div>
+
+<!-- Code Export Modal -->
+{#if showCodeExport && generatedWorkflow}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">Generated Dapr Workflow Code</h3>
+            <p class="text-sm text-gray-600">Pattern: {generatedWorkflow.workflowPattern} • {workflow.steps.length} steps</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button 
+            on:click={downloadCode}
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <span>Download Files</span>
+          </button>
+          <button 
+            on:click={() => showCodeExport = false}
+            class="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Code Tabs -->
+      <div class="border-b border-gray-200">
+        <nav class="flex space-x-8 px-6">
+          <button 
+            on:click={() => activeCodeTab = 'workflow'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'workflow' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            Workflow Definition
+          </button>
+          <button 
+            on:click={() => activeCodeTab = 'activities'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'activities' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            Activities
+          </button>
+          <button 
+            on:click={() => activeCodeTab = 'app'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'app' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            Application
+          </button>
+          <button 
+            on:click={() => activeCodeTab = 'package'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'package' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            Package.json
+          </button>
+        </nav>
+      </div>
+
+      <!-- Code Content -->
+      <div class="flex-1 overflow-hidden">
+        {#if activeCodeTab === 'workflow'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">Workflow Function</h4>
+              <button 
+                on:click={() => copyToClipboard(generatedWorkflow.workflowCode)}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.workflowCode}</code></pre>
+            </div>
+          </div>
+        {:else if activeCodeTab === 'activities'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">Activity Functions</h4>
+              <button 
+                on:click={() => copyToClipboard(generatedWorkflow.activityCode)}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.activityCode}</code></pre>
+            </div>
+          </div>
+        {:else if activeCodeTab === 'app'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">Complete Application Code</h4>
+              <button 
+                on:click={() => copyToClipboard(generatedWorkflow.appCode)}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.appCode}</code></pre>
+            </div>
+          </div>
+        {:else if activeCodeTab === 'package'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">Package Configuration</h4>
+              <button 
+                on:click={() => copyToClipboard(generatePackageJson())}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatePackageJson()}</code></pre>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-6 border-t border-gray-200 bg-gray-50">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-600">
+            <p><strong>Workflow Pattern:</strong> {generatedWorkflow.workflowPattern}</p>
+            <p><strong>Steps:</strong> {generatedWorkflow.executionOrder.length} activities</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button 
+              on:click={() => showCodeExport = false}
+              class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+              Close
+            </button>
+            <button 
+              on:click={downloadCode}
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+              Download All Files
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Publish Workflow Dialog -->
+{#if showPublishDialog}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">Publish Workflow</h3>
+          <button 
+            on:click={() => showPublishDialog = false}
+            class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Workflow Name</label>
+            <input 
+              bind:value={publishMetadata.name}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter workflow name">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <textarea 
+              bind:value={publishMetadata.description}
+              rows="3"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Describe what this workflow does"></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Version</label>
+              <input 
+                bind:value={publishMetadata.version}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="1.0.0">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Created By</label>
+              <input 
+                bind:value={publishMetadata.createdBy}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Your name">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
+            <input 
+              bind:value={publishMetadata.tags}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="data-processing, analytics, nlp">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end space-x-3 mt-6">
+          <button 
+            on:click={() => showPublishDialog = false}
+            class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancel
+          </button>
+          <button 
+            on:click={confirmPublishWorkflow}
+            disabled={loadingPublish || !publishMetadata.name}
+            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
+            {#if loadingPublish}
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            {/if}
+            <span>{loadingPublish ? 'Publishing...' : 'Publish Workflow'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Execute Workflow Dialog -->
+{#if showExecuteDialog}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">Execute Workflow</h3>
+          <button 
+            on:click={() => showExecuteDialog = false}
+            class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Execution Input (JSON)</label>
+            <textarea 
+              bind:value={executionInput}
+              rows="4"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm"
+              placeholder={executionInputPlaceholder}></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+              <select 
+                bind:value={executionOptions.priority}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Triggered By</label>
+              <select 
+                bind:value={executionOptions.triggeredBy}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="manual">Manual</option>
+                <option value="api">API</option>
+                <option value="scheduled">Scheduled</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end space-x-3 mt-6">
+          <button 
+            on:click={() => showExecuteDialog = false}
+            class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+            Cancel
+          </button>
+          <button 
+            on:click={() => executeWorkflow()}
+            disabled={loadingExecute}
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
+            {#if loadingExecute}
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            {/if}
+            <span>{loadingExecute ? 'Starting...' : 'Start Execution'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Execution Monitor Dialog -->
+{#if showExecutionMonitor && currentExecution}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+            {#if currentExecution.status === 'running'}
+              <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+            {:else if currentExecution.status === 'completed'}
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            {:else if currentExecution.status === 'failed'}
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            {:else}
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            {/if}
+          </div>
+          <div>
+            <h3 class="text-xl font-semibold text-gray-900">Workflow Execution</h3>
+            <p class="text-sm text-gray-600">{currentExecution.workflowName} • {currentExecution.status}</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-3">
+          {#if currentExecution.status === 'running'}
+            <button 
+              on:click={cancelExecution}
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+              Cancel
+            </button>
+          {/if}
+          <button 
+            on:click={() => showExecutionMonitor = false}
+            class="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto p-6">
+        <!-- Progress Bar -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">Progress</span>
+            <span class="text-sm text-gray-600">{currentExecution.progress}%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-emerald-600 h-2 rounded-full transition-all duration-300" style="width: {currentExecution.progress}%"></div>
+          </div>
+          {#if currentExecution.currentStep}
+            <p class="text-sm text-gray-600 mt-2">Current step: {currentExecution.currentStep}</p>
+          {/if}
+        </div>
+
+        <!-- Execution Details -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-sm font-medium text-gray-900 mb-2">Execution Details</h4>
+            <div class="text-sm text-gray-600 space-y-1">
+              <p><strong>ID:</strong> {currentExecution.id}</p>
+              <p><strong>Started:</strong> {new Date(currentExecution.startedAt).toLocaleString()}</p>
+              {#if currentExecution.completedAt}
+                <p><strong>Completed:</strong> {new Date(currentExecution.completedAt).toLocaleString()}</p>
+              {/if}
+              {#if currentExecution.duration}
+                <p><strong>Duration:</strong> {Math.round(currentExecution.duration / 1000)}s</p>
+              {/if}
+              <p><strong>Priority:</strong> {currentExecution.metadata.priority}</p>
+            </div>
+          </div>
+
+          {#if currentExecution.output}
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h4 class="text-sm font-medium text-gray-900 mb-2">Results</h4>
+              <div class="text-sm text-gray-600">
+                <pre class="whitespace-pre-wrap">{JSON.stringify(currentExecution.output, null, 2)}</pre>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Execution Logs -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h4 class="text-sm font-medium text-gray-900 mb-4">Execution Logs</h4>
+          <div class="space-y-2 max-h-64 overflow-auto">
+            {#each currentExecution.logs as log}
+              <div class="flex items-start space-x-3 text-sm">
+                <span class="text-xs text-gray-500 font-mono w-20 flex-shrink-0">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                <span class="w-12 flex-shrink-0 {log.level === 'error' ? 'text-red-600' : log.level === 'warn' ? 'text-yellow-600' : 'text-gray-600'}">
+                  {log.level.toUpperCase()}
+                </span>
+                <span class="text-gray-700 flex-1">{log.message}</span>
+              </div>
+            {/each}
+            {#if currentExecution.logs.length === 0}
+              <p class="text-sm text-gray-500 italic">No logs available yet...</p>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

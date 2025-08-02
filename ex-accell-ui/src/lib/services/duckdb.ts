@@ -31,19 +31,23 @@ class UnifiedDuckDBService {
       // Test connection to unified analytics API
       const response = await fetch(`${this.baseUrl}?type=test`);
       if (!response.ok) {
-        throw new Error(`Unified DuckDB API connection failed: ${response.status}`);
+        console.warn(`Unified DuckDB API not available: ${response.status}`);
+        // Don't throw error, just mark as not connected for graceful degradation
+        return;
       }
 
       const result = await response.json();
       if (!result.success) {
-        throw new Error(result.error || 'Unified DuckDB connection test failed');
+        console.warn('Unified DuckDB connection test failed:', result.error);
+        // Don't throw error, allow graceful degradation
+        return;
       }
 
       this.initialized = true;
       console.log('Unified DuckDB Service connected successfully');
     } catch (error) {
-      console.error('Failed to connect to Unified DuckDB Service:', error);
-      throw error;
+      console.warn('Failed to connect to Unified DuckDB Service:', error);
+      // Don't throw error, allow graceful degradation
     }
   }
 
