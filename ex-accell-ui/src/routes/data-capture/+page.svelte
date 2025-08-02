@@ -121,7 +121,7 @@
   onMount(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
-    if (tabParam && ['schedule', 'crawler', 'upload', 'princeton-smart', 'wavepulse'].includes(tabParam)) {
+    if (tabParam && ['schedule', 'crawler', 'upload', 'princeton-smart', 'wavepulse', 'analytics'].includes(tabParam)) {
       activeTab = tabParam;
     }
     
@@ -176,11 +176,153 @@
   // UI state for collapsible sections
   let showCrawlLimits = false;
   
+  // URL validation functions
+  function validateTelegramUrl(url: string): boolean {
+    if (!url.trim()) return false;
+    
+    // Remove any trailing slashes and whitespace
+    const cleanUrl = url.trim().replace(/\/+$/, '');
+    
+    // Valid Telegram URL patterns based on https://core.telegram.org/api/links
+    const patterns = [
+      // Public username links: t.me/<username>
+      /^https?:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}$/,
+      // Public username with parameters: t.me/<username>?text=...&profile
+      /^https?:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}\?.*$/,
+      // Message links public: t.me/<username>/<id>
+      /^https?:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}\/\d+$/,
+      // Message links private: t.me/c/<channel>/<id>
+      /^https?:\/\/t\.me\/c\/\d+\/\d+$/,
+      // Phone number links: t.me/+<phone_number>
+      /^https?:\/\/t\.me\/\+\d+$/,
+      // Chat invite links: t.me/+<hash>
+      /^https?:\/\/t\.me\/\+[a-zA-Z0-9_-]+$/,
+      // Story links: t.me/<username>/s/<story_id>
+      /^https?:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}\/s\/\d+$/,
+      // tg:// protocol links
+      /^tg:\/\/resolve\?domain=[a-zA-Z][a-zA-Z0-9_]{4,31}.*$/
+    ];
+    
+    // Check against reserved usernames
+    const reservedNames = ['www', 'auth', 'login', 'addemoji', 'joinchat'];
+    const usernameMatch = cleanUrl.match(/t\.me\/([^\/\?]+)/);
+    if (usernameMatch && reservedNames.includes(usernameMatch[1].toLowerCase())) {
+      return false;
+    }
+    
+    return patterns.some(pattern => pattern.test(cleanUrl));
+  }
+  
+  function validateTdlibUrl(url: string): boolean {
+    if (!url.trim()) return false;
+    
+    // TDLib URLs must end in .tgz or .tar.gz
+    const cleanUrl = url.trim();
+    return cleanUrl.endsWith('.tgz') || cleanUrl.endsWith('.tar.gz');
+  }
+  
+  function getUrlValidationErrors(): string[] {
+    const errors: string[] = [];
+    
+    // Validate Telegram URLs
+    if (crawlerConfig.platform === 'telegram') {
+      for (const url of crawlerConfig.urls) {
+        if (url.trim() && !validateTelegramUrl(url)) {
+          errors.push(`Invalid Telegram URL: ${url}`);
+        }
+      }
+      
+      // Validate TDLib URLs
+      for (const url of crawlerConfig.tdlibDatabaseURLs) {
+        if (url.trim() && !validateTdlibUrl(url)) {
+          errors.push(`TDLib URL must end with .tgz or .tar.gz: ${url}`);
+        }
+      }
+    }
+    
+    return errors;
+  }
+
+  // Function to check if job name already exists across all sources
+  function isJobNameUnique(name: string): boolean {
+    if (!name.trim()) return true; // Empty names are handled by required validation
+    
+    const trimmedName = name.trim();
+    
+    // Check against existing jobs from all sources
+    const existingNames = allJobs.map(job => job.name.toLowerCase());
+    return !existingNames.includes(trimmedName.toLowerCase());
+  }
+
+  // Step-specific validation functions
+  function validateBasicStep(): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!crawlerConfig.name.trim()) {
+      errors.push('Job name is required');
+    } else if (!isJobNameUnique(crawlerConfig.name)) {
+      errors.push('Job name already exists. Please choose a unique name.');
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  function validatePlatformStep(): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    // Check if URLs are provided
+    if (crawlerConfig.urls.length === 0 && !crawlerConfig.urlFileURL.trim()) {
+      errors.push('At least one URL or URL file is required');
+    }
+    
+    // Validate URL formats
+    const urlErrors = getUrlValidationErrors();
+    errors.push(...urlErrors);
+    
+    // Platform-specific validation
+    if (crawlerConfig.platform === 'telegram') {
+      if (crawlerConfig.tdlibDatabaseURLs.length === 0 || !crawlerConfig.tdlibDatabaseURLs.some(u => u.trim())) {
+        errors.push('At least one TDLib database URL is required for Telegram crawling');
+      }
+    }
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  function validateAdvancedStep(): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    // Advanced step validation (add specific checks if needed)
+    // For now, this step doesn't have required fields
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  function validateCurrentStep(): { isValid: boolean; errors: string[] } {
+    switch (crawlerConfigStep) {
+      case 'basic':
+        return validateBasicStep();
+      case 'platform':
+        return validatePlatformStep();
+      case 'advanced':
+        return validateAdvancedStep();
+      case 'review':
+        return { isValid: true, errors: [] }; // Review step doesn't need validation
+      default:
+        return { isValid: true, errors: [] };
+    }
+  }
+
   // Form validation
   function validateForm() {
     if (!crawlerConfig.name.trim()) return false;
     if (crawlerConfig.urls.length === 0 && !crawlerConfig.urlFileURL.trim()) return false;
     if (crawlerConfig.platform === 'telegram' && crawlerConfig.tdlibDatabaseURLs.length === 0) return false;
+    
+    // Check URL validation
+    const urlErrors = getUrlValidationErrors();
+    if (urlErrors.length > 0) return false;
+    
     return true;
   }
   
@@ -200,6 +342,58 @@
   let scheduledJobs: any[] = [];
   let jobStates: JobState[] = [];
   let loadingJobStates = true;
+  
+  // Form validation state
+  let stepValidationErrors: string[] = [];
+  
+  // Edit functionality state
+  let editingJob = null;
+  let showEditModal = false;
+  
+  // Delete functionality state
+  let jobToDelete = null;
+  let showDeleteConfirmation = false;
+
+  // Analytics calculations
+  $: analyticsData = {
+    totalJobs: allJobs.length,
+    runningJobs: allJobs.filter(job => job.status === 'running').length,
+    completedJobs: allJobs.filter(job => job.status === 'completed').length,
+    failedJobs: allJobs.filter(job => job.status === 'failed').length,
+    pendingJobs: allJobs.filter(job => job.status === 'pending' || job.status === 'scheduled').length,
+    totalItemsCollected: allJobs.reduce((sum, job) => sum + (job.itemsCollected || 0), 0),
+    averageItemsPerJob: allJobs.length > 0 ? Math.round(allJobs.reduce((sum, job) => sum + (job.itemsCollected || 0), 0) / allJobs.filter(job => job.itemsCollected > 0).length) || 0 : 0,
+    jobsByPlatform: allJobs.reduce((acc, job) => {
+      const platform = job.platform || 'unknown';
+      acc[platform] = (acc[platform] || 0) + 1;
+      return acc;
+    }, {}),
+    recentJobs: allJobs
+      .filter(job => job.startTime)
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+      .slice(0, 10),
+    jobsByStatus: {
+      running: allJobs.filter(job => job.status === 'running'),
+      completed: allJobs.filter(job => job.status === 'completed'),
+      failed: allJobs.filter(job => job.status === 'failed'),
+      pending: allJobs.filter(job => job.status === 'pending' || job.status === 'scheduled')
+    }
+  };
+  
+  // Clear validation errors when form fields change
+  $: if (crawlerConfig.name) {
+    stepValidationErrors = stepValidationErrors.filter(error => 
+      !error.includes('Job name') && !error.includes('already exists')
+    );
+  }
+  
+  $: if (crawlerConfig.urls.length > 0 || crawlerConfig.urlFileURL.trim()) {
+    stepValidationErrors = stepValidationErrors.filter(error => !error.includes('URL') || error.includes('Invalid'));
+  }
+  
+  $: if (crawlerConfig.platform === 'telegram' && crawlerConfig.tdlibDatabaseURLs.some(u => u.trim())) {
+    stepValidationErrors = stepValidationErrors.filter(error => !error.includes('TDLib database URL is required'));
+  }
   
   // Global job monitoring
   let globalJobPollingInterval = null;
@@ -595,8 +789,99 @@
   function removeTdlibUrl(index: number) {
     crawlerConfig.tdlibDatabaseURLs = crawlerConfig.tdlibDatabaseURLs.filter((_, i) => i !== index);
   }
+
+  // Edit functionality
+  function editJob(job: any) {
+    editingJob = job;
+    
+    // Populate form with job data if it's a crawler job
+    if (job.stateData && job.stateData.jobData) {
+      const jobData = job.stateData.jobData;
+      crawlerConfig = {
+        name: job.name,
+        crawlId: jobData.crawlId || '',
+        logLevel: jobData.logLevel || 'debug',
+        concurrency: jobData.concurrency || 1,
+        timeout: jobData.timeout || 30,
+        userAgent: jobData.userAgent || 'Mozilla/5.0 Crawler',
+        outputFormat: jobData.outputFormat || 'json',
+        platform: jobData.platform || 'telegram',
+        urls: jobData.urls || [],
+        urlFileURL: jobData.urlFileURL || '',
+        minPostDate: jobData.minPostDate || '',
+        timeAgo: jobData.timeAgo || '1m',
+        dateBetween: jobData.dateBetween || '',
+        sampleSize: jobData.sampleSize || 0,
+        maxComments: jobData.maxComments || -1,
+        maxDepth: jobData.maxDepth || -1,
+        maxPosts: jobData.maxPosts || -1,
+        maxPages: jobData.maxPages || 108000,
+        minUsers: jobData.minUsers || 100,
+        minChannelVideos: jobData.minChannelVideos || 10,
+        tdlibDatabaseURLs: jobData.tdlibDatabaseURLs || [],
+        tdlibVerbosity: jobData.tdlibVerbosity || 1,
+        skipMediaDownload: jobData.skipMedia || false,
+        youtubeApiKey: jobData.youtubeApiKey || '',
+        samplingMethod: jobData.samplingMethod || 'channel'
+      };
+    }
+    
+    showEditModal = true;
+    activeTab = 'crawler';
+  }
+
+  function cancelEdit() {
+    editingJob = null;
+    showEditModal = false;
+    resetCrawlerForm();
+  }
+
+  // Delete functionality
+  function confirmDeleteJob(job: any) {
+    jobToDelete = job;
+    showDeleteConfirmation = true;
+  }
+
+  async function deleteJob() {
+    if (!jobToDelete) return;
+    
+    try {
+      const response = await fetch(`/api/jobs?name=${encodeURIComponent(jobToDelete.daprJobName || jobToDelete.name)}&jobId=${encodeURIComponent(jobToDelete.id)}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // Reload job states to reflect the deletion
+        await loadJobStates();
+        console.log('Job deleted successfully');
+      } else {
+        console.error('Failed to delete job:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error deleting job:', error);
+    } finally {
+      jobToDelete = null;
+      showDeleteConfirmation = false;
+    }
+  }
+
+  function cancelDelete() {
+    jobToDelete = null;
+    showDeleteConfirmation = false;
+  }
   
   function nextStep() {
+    // Clear previous validation errors
+    stepValidationErrors = [];
+    
+    // Validate current step before proceeding
+    const validation = validateCurrentStep();
+    if (!validation.isValid) {
+      stepValidationErrors = validation.errors;
+      return; // Don't proceed if validation fails
+    }
+    
+    // Proceed to next step
     const steps = ['basic', 'platform', 'advanced', 'review'];
     const currentIndex = steps.indexOf(crawlerConfigStep);
     if (currentIndex < steps.length - 1) {
@@ -605,6 +890,9 @@
   }
   
   function previousStep() {
+    // Clear validation errors when going back
+    stepValidationErrors = [];
+    
     const steps = ['basic', 'platform', 'advanced', 'review'];
     const currentIndex = steps.indexOf(crawlerConfigStep);
     if (currentIndex > 0) {
@@ -650,6 +938,12 @@
     schedulingError = '';
 
     try {
+      // Check URL validation errors
+      const urlErrors = getUrlValidationErrors();
+      if (urlErrors.length > 0) {
+        schedulingError = urlErrors.join('; ');
+        return;
+      }
       // Calculate due time based on scheduling mode
       let dueTime = '10s'; // Default to 10 seconds for immediate execution
       if (scheduleConfig.schedulingMode === 'delayed') {
@@ -681,15 +975,16 @@
         dueTime = `${Math.max(10, secondsFromNow)}s`; // Minimum 10 seconds
       }
 
-      // Use registered job handler name from telegram-scraper
-      const jobName = 'my-scheduled-job'; // Must match registered handler
+      // Generate unique job name based on user input and timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const jobName = `${crawlerConfig.name.trim().replace(/[^a-zA-Z0-9-]/g, '-')}-${timestamp}`;
 
       // Build job request
       const jobRequest: JobScheduleRequest = {
         name: jobName,
         dueTime: dueTime,
         data: {
-          droid: jobName,
+          droid: 'my-scheduled-job', // Must match registered handler in telegram-scraper
           task: `crawl ${crawlerConfig.platform} channels`,
           urls: crawlerConfig.urls.filter(url => url.trim()),
           platform: crawlerConfig.platform as 'telegram' | 'youtube',
@@ -1032,6 +1327,11 @@
           on:click={() => activeTab = 'wavepulse'}>
           WavePulse
         </button>
+        <button 
+          class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'analytics' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+          on:click={() => activeTab = 'analytics'}>
+          Analytics
+        </button>
       </div>
     </nav>
   </div>
@@ -1101,7 +1401,10 @@
                     type="text" 
                     placeholder="e.g., Telegram Sentiment Analysis"
                     required
-                    class="w-full px-3 py-2 border {crawlerConfig.name.trim() ? 'border-gray-300' : 'border-red-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="w-full px-3 py-2 border {crawlerConfig.name.trim() && isJobNameUnique(crawlerConfig.name) ? 'border-gray-300' : 'border-red-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {#if crawlerConfig.name.trim() && !isJobNameUnique(crawlerConfig.name)}
+                    <p class="text-red-600 text-xs mt-1">Job name already exists. Please choose a unique name.</p>
+                  {/if}
                 </div>
                 <div>
                   <div class="flex items-center mb-2">
@@ -1314,17 +1617,22 @@
                   </div>
                   <div class="space-y-2">
                     {#each crawlerConfig.urls as url, i}
-                      <div class="flex items-center space-x-2">
-                        <input 
-                          bind:value={crawlerConfig.urls[i]}
-                          type="url" 
-                          placeholder="https://example.com"
-                          class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button 
-                          on:click={() => removeUrl(i)}
-                          class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                          Remove
-                        </button>
+                      <div class="space-y-1">
+                        <div class="flex items-center space-x-2">
+                          <input 
+                            bind:value={crawlerConfig.urls[i]}
+                            type="url" 
+                            placeholder={crawlerConfig.platform === 'telegram' ? 'https://t.me/channel_name' : 'https://example.com'}
+                            class="flex-1 px-3 py-2 border {crawlerConfig.platform === 'telegram' && url.trim() && !validateTelegramUrl(url) ? 'border-red-300' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          <button 
+                            on:click={() => removeUrl(i)}
+                            class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                            Remove
+                          </button>
+                        </div>
+                        {#if crawlerConfig.platform === 'telegram' && url.trim() && !validateTelegramUrl(url)}
+                          <p class="text-red-600 text-xs ml-1">Invalid Telegram URL. Use format: https://t.me/channel_name</p>
+                        {/if}
                       </div>
                     {/each}
                     <button 
@@ -1390,17 +1698,22 @@
                       </div>
                       <div class="space-y-2">
                         {#each crawlerConfig.tdlibDatabaseURLs as url, i}
-                          <div class="flex items-center space-x-2">
-                            <input 
-                              bind:value={crawlerConfig.tdlibDatabaseURLs[i]}
-                              type="url" 
-                              placeholder="https://example.com/database.tar.gz"
-                              class="flex-1 px-3 py-2 border {crawlerConfig.tdlibDatabaseURLs.length > 0 && crawlerConfig.tdlibDatabaseURLs.some(u => u.trim()) ? 'border-gray-300' : 'border-red-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <button 
-                              on:click={() => removeTdlibUrl(i)}
-                              class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors">
-                              Remove
-                            </button>
+                          <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                              <input 
+                                bind:value={crawlerConfig.tdlibDatabaseURLs[i]}
+                                type="url" 
+                                placeholder="https://example.com/database.tar.gz"
+                                class="flex-1 px-3 py-2 border {url.trim() && !validateTdlibUrl(url) ? 'border-red-300' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                              <button 
+                                on:click={() => removeTdlibUrl(i)}
+                                class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                                Remove
+                              </button>
+                            </div>
+                            {#if url.trim() && !validateTdlibUrl(url)}
+                              <p class="text-red-600 text-xs ml-1">TDLib URL must end with .tgz or .tar.gz</p>
+                            {/if}
                           </div>
                         {/each}
                         <button 
@@ -1869,6 +2182,25 @@
                     </div>
                   </div>
                 {/if}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Step Validation Errors -->
+          {#if stepValidationErrors.length > 0}
+            <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <div class="flex">
+                <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 15.5C3.462 16.333 4.422 18 5.982 18z" />
+                </svg>
+                <div>
+                  <h4 class="text-sm font-medium text-red-800">Please fix the following errors before proceeding:</h4>
+                  <ul class="text-sm text-red-700 mt-1 list-disc list-inside">
+                    {#each stepValidationErrors as error}
+                      <li>{error}</li>
+                    {/each}
+                  </ul>
+                </div>
               </div>
             </div>
           {/if}
@@ -2427,8 +2759,15 @@
                           Run Now
                         </button>
                       {/if}
-                      <button class="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
+                      <button 
+                        on:click={() => editJob(job)}
+                        class="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
                         Edit
+                      </button>
+                      <button 
+                        on:click={() => confirmDeleteJob(job)}
+                        class="px-3 py-1 border border-red-300 text-red-700 text-sm rounded-md hover:bg-red-50 transition-colors">
+                        Delete
                       </button>
                     {/if}
                     {#if job.logs && job.logs.length > 0}
@@ -2879,6 +3218,248 @@
         </div>
       </div>
     {/if}
+
+    <!-- Analytics Dashboard -->
+    {#if activeTab === 'analytics'}
+      <div class="space-y-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-semibold text-gray-900">Analytics Dashboard</h2>
+            <p class="text-gray-600">Real-time statistics and insights for your data capture operations</p>
+          </div>
+          <button 
+            on:click={() => loadJobStates(true)}
+            disabled={loadingJobStates}
+            class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center">
+            <svg class="w-4 h-4 mr-2 {loadingJobStates ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh Data
+          </button>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
+            <div class="text-3xl font-bold text-blue-600 mb-2">{analyticsData.totalJobs}</div>
+            <div class="text-sm font-medium text-gray-600">Total Jobs</div>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-emerald-200">
+            <div class="text-3xl font-bold text-emerald-600 mb-2">{analyticsData.runningJobs}</div>
+            <div class="text-sm font-medium text-gray-600">Running</div>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-green-200">
+            <div class="text-3xl font-bold text-green-600 mb-2">{analyticsData.completedJobs}</div>
+            <div class="text-sm font-medium text-gray-600">Completed</div>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-red-200">
+            <div class="text-3xl font-bold text-red-600 mb-2">{analyticsData.failedJobs}</div>
+            <div class="text-sm font-medium text-gray-600">Failed</div>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-yellow-200">
+            <div class="text-3xl font-bold text-yellow-600 mb-2">{analyticsData.pendingJobs}</div>
+            <div class="text-sm font-medium text-gray-600">Pending</div>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-purple-200">
+            <div class="text-3xl font-bold text-purple-600 mb-2">{analyticsData.totalItemsCollected.toLocaleString()}</div>
+            <div class="text-sm font-medium text-gray-600">Items Collected</div>
+          </div>
+        </div>
+
+        <!-- Platform Distribution -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Jobs by Platform</h3>
+            <div class="space-y-3">
+              {#each Object.entries(analyticsData.jobsByPlatform) as [platform, count]}
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span class="text-sm font-medium text-gray-700 capitalize">{platform}</span>
+                  </div>
+                  <span class="text-sm font-bold text-gray-900">{count}</span>
+                </div>
+              {/each}
+              {#if Object.keys(analyticsData.jobsByPlatform).length === 0}
+                <div class="text-center text-gray-500 py-4">No jobs found</div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-600">Avg Items per Job</span>
+                <span class="text-sm font-bold text-gray-900">{analyticsData.averageItemsPerJob.toLocaleString()}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-600">Success Rate</span>
+                <span class="text-sm font-bold text-gray-900">
+                  {analyticsData.totalJobs > 0 ? Math.round((analyticsData.completedJobs / analyticsData.totalJobs) * 100) : 0}%
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-600">Active Jobs</span>
+                <span class="text-sm font-bold text-gray-900">{analyticsData.runningJobs + analyticsData.pendingJobs}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Jobs -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Recent Jobs</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Name</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                {#each analyticsData.recentJobs as job}
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm font-medium text-gray-900">{job.name}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-500 capitalize">{job.platform || 'unknown'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(job.status)}">
+                        {job.status}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {job.itemsCollected || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {job.startTime ? new Date(job.startTime).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      {#if job.stateData}
+                        <button 
+                          on:click={() => editJob(job)}
+                          class="text-blue-600 hover:text-blue-900 transition-colors">
+                          Edit
+                        </button>
+                        <button 
+                          on:click={() => confirmDeleteJob(job)}
+                          class="text-red-600 hover:text-red-900 transition-colors">
+                          Delete
+                        </button>
+                      {/if}
+                      {#if job.status === 'running'}
+                        <button 
+                          on:click={() => viewLogs(job)}
+                          class="text-green-600 hover:text-green-900 transition-colors">
+                          Logs
+                        </button>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+                {#if analyticsData.recentJobs.length === 0}
+                  <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                      No recent jobs found
+                    </td>
+                  </tr>
+                {/if}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Jobs by Status -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200">
+              <h4 class="text-md font-semibold text-emerald-600">Running Jobs ({analyticsData.jobsByStatus.running.length})</h4>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto">
+              {#each analyticsData.jobsByStatus.running as job}
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span class="text-sm text-gray-700 truncate">{job.name}</span>
+                  <span class="text-xs text-gray-500">{job.progress || 0}%</span>
+                </div>
+              {/each}
+              {#if analyticsData.jobsByStatus.running.length === 0}
+                <div class="text-center text-gray-500 py-4 text-sm">No running jobs</div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200">
+              <h4 class="text-md font-semibold text-green-600">Completed Jobs ({analyticsData.jobsByStatus.completed.length})</h4>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto">
+              {#each analyticsData.jobsByStatus.completed.slice(0, 10) as job}
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span class="text-sm text-gray-700 truncate">{job.name}</span>
+                  <span class="text-xs text-gray-500">{job.itemsCollected || 0} items</span>
+                </div>
+              {/each}
+              {#if analyticsData.jobsByStatus.completed.length === 0}
+                <div class="text-center text-gray-500 py-4 text-sm">No completed jobs</div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200">
+              <h4 class="text-md font-semibold text-red-600">Failed Jobs ({analyticsData.jobsByStatus.failed.length})</h4>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto">
+              {#each analyticsData.jobsByStatus.failed as job}
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span class="text-sm text-gray-700 truncate">{job.name}</span>
+                  <button 
+                    on:click={() => editJob(job)}
+                    class="text-xs text-blue-600 hover:text-blue-800">
+                    Retry
+                  </button>
+                </div>
+              {/each}
+              {#if analyticsData.jobsByStatus.failed.length === 0}
+                <div class="text-center text-gray-500 py-4 text-sm">No failed jobs</div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200">
+              <h4 class="text-md font-semibold text-yellow-600">Pending Jobs ({analyticsData.jobsByStatus.pending.length})</h4>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto">
+              {#each analyticsData.jobsByStatus.pending as job}
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <span class="text-sm text-gray-700 truncate">{job.name}</span>
+                  <span class="text-xs text-gray-500">Scheduled</span>
+                </div>
+              {/each}
+              {#if analyticsData.jobsByStatus.pending.length === 0}
+                <div class="text-center text-gray-500 py-4 text-sm">No pending jobs</div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -2989,6 +3570,42 @@
             Close
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Confirmation Modal -->
+{#if showDeleteConfirmation && jobToDelete}
+  <div class="fixed inset-0 bg-gray-500/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+      <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.232 15.5C3.462 16.333 4.422 18 5.982 18z"></path>
+        </svg>
+      </div>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete Job</h3>
+        <p class="text-sm text-gray-600">
+          Are you sure you want to delete the job "<span class="font-medium text-gray-900">{jobToDelete.name}</span>"?
+        </p>
+        <p class="text-sm text-red-600 mt-2">
+          This action cannot be undone. All job data and logs will be permanently removed.
+        </p>
+      </div>
+      
+      <div class="flex space-x-3">
+        <button 
+          on:click={cancelDelete}
+          class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button 
+          on:click={deleteJob}
+          class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+          Delete Job
+        </button>
       </div>
     </div>
   </div>

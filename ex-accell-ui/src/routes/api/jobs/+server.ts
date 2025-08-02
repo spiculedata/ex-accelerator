@@ -212,17 +212,29 @@ export const DELETE: RequestHandler = async ({ url }) => {
 		}
 
 		// Delete from state store
-		const targetJobId = jobId || jobName;
-		if (targetJobId) {
-			// Update job state to cancelled before deletion
+		let stateDeleted = false;
+		if (jobId) {
+			// Direct jobId provided
 			try {
-				await jobStateStore.updateJobStatus(targetJobId, 'cancelled');
-				await jobStateStore.addJobLog(targetJobId, 'Job cancelled and removed');
-				
-				// Optional: Keep cancelled jobs for history or delete completely
-				// await jobStateStore.deleteJobState(targetJobId);
+				await jobStateStore.deleteJobState(jobId);
+				stateDeleted = true;
 			} catch (stateError) {
-				console.warn('Could not update job state on deletion:', stateError);
+				console.warn('Could not delete job state:', stateError);
+			}
+		} else if (jobName) {
+			// Need to find jobId by job name
+			try {
+				const allJobStates = await jobStateStore.getAllJobStates();
+				const jobState = allJobStates.find(state => state.name === jobName);
+				
+				if (jobState) {
+					await jobStateStore.deleteJobState(jobState.id);
+					stateDeleted = true;
+				} else {
+					console.warn(`Job state not found for job name: ${jobName}`);
+				}
+			} catch (stateError) {
+				console.warn('Could not delete job state:', stateError);
 			}
 		}
 
@@ -230,7 +242,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 			success: true, 
 			message: `Job ${jobName || jobId} deleted successfully`,
 			deletedFromDapr: !!jobName,
-			updatedState: !!targetJobId
+			deletedFromState: stateDeleted
 		});
 	} catch (err) {
 		console.error('Job deletion error:', err);

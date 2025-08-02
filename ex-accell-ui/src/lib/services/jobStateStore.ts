@@ -124,6 +124,51 @@ export class JobStateStore {
 	}
 
 	/**
+	 * Remove a job ID from the job registry
+	 */
+	private async removeFromJobRegistry(jobId: string): Promise<void> {
+		try {
+			// Get current registry
+			const registryResponse = await fetch(`${this.baseUrl}/job-registry`, {
+				method: 'GET',
+			});
+
+			let jobIds: string[] = [];
+			if (registryResponse.ok) {
+				const responseText = await registryResponse.text();
+				if (responseText.trim()) {
+					const registryData = JSON.parse(responseText);
+					jobIds = registryData?.jobIds || [];
+				}
+			}
+
+			// Remove job ID if present
+			const originalLength = jobIds.length;
+			jobIds = jobIds.filter(id => id !== jobId);
+
+			// Only update if something was removed
+			if (jobIds.length < originalLength) {
+				// Save updated registry
+				await fetch(this.baseUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify([
+						{
+							key: 'job-registry',
+							value: { jobIds, lastUpdated: new Date().toISOString() },
+						},
+					]),
+				});
+			}
+		} catch (error) {
+			console.warn('Failed to remove job from registry:', error);
+			// Don't throw here as it's not critical for core functionality
+		}
+	}
+
+	/**
 	 * Get a specific job state by ID
 	 */
 	async getJobState(jobId: string): Promise<JobState | null> {
@@ -280,6 +325,7 @@ export class JobStateStore {
 	 */
 	async deleteJobState(jobId: string): Promise<void> {
 		try {
+			// Delete the job state
 			const response = await fetch(`${this.baseUrl}/job:${jobId}`, {
 				method: 'DELETE',
 			});
@@ -288,6 +334,9 @@ export class JobStateStore {
 				const errorText = await response.text();
 				throw new Error(`Failed to delete job state: ${response.status} - ${errorText}`);
 			}
+
+			// Remove from job registry
+			await this.removeFromJobRegistry(jobId);
 		} catch (error) {
 			console.error('Error deleting job state:', error);
 			throw error;
