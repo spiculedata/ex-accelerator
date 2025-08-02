@@ -251,13 +251,23 @@ The project uses a single `dapr.yaml` configuration file that manages both appli
   - App Port: 5173 (dev) / 4173 (preview)
 - **Telegram Scraper**:
   - App ID: `telegram-scraper`
-  - HTTP Port: 3501 (Dapr sidecar)
+  - HTTP Port: 3502 (Dapr sidecar)
   - gRPC Port: 50002 (Dapr sidecar)
-  - App Port: 3001 (scraper service)
+  - App Port: 3003 (scraper service)
+  - Protocol: gRPC
+- **State Management**:
+  - Redis state store for job tracking
+  - Dapr State API for persistent job states
+  - Real-time job status updates
   - Scheduler Host: localhost (for job scheduling)
 
 ### Job Scheduling Integration
 - **Job Handlers**: R2-D2, C-3PO, BB-8, my-scheduled-job
+- **State Store APIs**:
+  - `/api/jobs` - Core job scheduling and retrieval
+  - `/api/job-state` - Dedicated job state management for crawlers
+  - Real-time job status tracking with Redis state store
+  - Automatic job state persistence during scheduling and execution
 - **API Endpoints**: `/api/jobs` (POST, GET, DELETE)
 - **Job Store**: Uses Dapr's built-in job scheduling capabilities
 - **Storage**: Local directory `./telegram-data` for scraped content

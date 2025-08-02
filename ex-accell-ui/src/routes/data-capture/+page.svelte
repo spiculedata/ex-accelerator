@@ -1,19 +1,132 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { jobSchedulerService } from '$lib/services/jobSchedulerService';
   import type { JobScheduleRequest } from '$lib/services/jobSchedulerService';
+  import type { JobState } from '$lib/services/jobStateStore';
   
   let activeTab = 'schedule';
   
-  // Check URL parameters on mount
+  // Load job states from state store
+  async function loadJobStates(forceRefresh = false) {
+    loadingJobStates = true;
+    try {
+      // Add timestamp to bypass cache if forcing refresh
+      const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
+      const response = await fetch(`/api/jobs?state=true${timestamp}`);
+      
+      if (response.ok) {
+        jobStates = await response.json();
+        console.log('Loaded job states:', jobStates.length, 'jobs found');
+        
+        // Convert job states to UI format
+        crawlJobs = jobStates.map(state => ({
+          id: state.id,
+          name: state.name,
+          status: state.status,
+          progress: getProgressFromStatus(state.status, state.result?.itemsProcessed, state.jobData.maxPosts),
+          startTime: state.createdAt,
+          schedule: `Scheduled for ${new Date(state.scheduledFor).toLocaleString()}`,
+          itemsCollected: state.result?.itemsProcessed || 0,
+          totalEstimated: state.jobData.maxPosts || 0,
+          platform: state.platform,
+          crawlId: state.jobData.crawlId,
+          crawlLabel: state.name,
+          daprJobName: state.name,
+          logs: state.executionLog || [],
+          stateData: state,
+          lastLogCount: state.executionLog?.length || 0,
+          hasNewLogs: false // Reset new logs indicator
+        }));
+        
+        console.log('UI jobs updated:', crawlJobs.length, 'jobs');
+        
+        // If there are running jobs, start global polling
+        const runningJobs = crawlJobs.filter(job => job.status === 'running');
+        if (runningJobs.length > 0 && !isGlobalPollingActive) {
+          startGlobalJobMonitoring();
+        }
+      } else {
+        console.error('Failed to load job states:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Failed to load job states:', error);
+    } finally {
+      loadingJobStates = false;
+    }
+  }
+
+  // Load job states for a specific job (for real-time updates)
+  async function refreshJobState(jobId) {
+    try {
+      const response = await fetch(`/api/job-state?jobId=${jobId}`);
+      if (response.ok) {
+        const updatedState = await response.json();
+        
+        // Update the specific job in crawlJobs
+        const jobIndex = crawlJobs.findIndex(job => job.id === jobId);
+        if (jobIndex !== -1) {
+          const previousLogCount = crawlJobs[jobIndex].lastLogCount || 0;
+          const newLogCount = updatedState.executionLog?.length || 0;
+          
+          crawlJobs[jobIndex] = {
+            ...crawlJobs[jobIndex],
+            status: updatedState.status,
+            progress: getProgressFromStatus(updatedState.status, updatedState.result?.itemsProcessed, updatedState.jobData.maxPosts),
+            itemsCollected: updatedState.result?.itemsProcessed || 0,
+            logs: updatedState.executionLog || [],
+            stateData: updatedState,
+            lastLogCount: newLogCount,
+            hasNewLogs: newLogCount > previousLogCount // Flag for UI indication
+          };
+          
+          // Update currentLogJob if it's the same job being viewed
+          if (currentLogJob && currentLogJob.id === jobId) {
+            currentLogJob = crawlJobs[jobIndex];
+            
+            // Auto-scroll to new logs if they were added
+            if (newLogCount > previousLogCount && logScrollAnchor) {
+              setTimeout(() => {
+                logScrollAnchor?.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
+            }
+          }
+          
+          // Trigger reactivity
+          crawlJobs = [...crawlJobs];
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh job state:', error);
+    }
+  }
+
+  function getProgressFromStatus(status: string, itemsProcessed?: number, totalEstimated?: number): number {
+    switch (status) {
+      case 'scheduled': return 0;
+      case 'running': 
+        if (itemsProcessed && totalEstimated && totalEstimated > 0) {
+          return Math.min(Math.round((itemsProcessed / totalEstimated) * 100), 99); // Cap at 99% for running jobs
+        }
+        return 25; // Default progress for running jobs without estimates
+      case 'completed': return 100;
+      case 'failed': return 0;
+      case 'cancelled': return 0;
+      default: return 0;
+    }
+  }
+
+  // Check URL parameters on mount and load job states
   onMount(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     if (tabParam && ['schedule', 'crawler', 'upload', 'princeton-smart', 'wavepulse'].includes(tabParam)) {
       activeTab = tabParam;
     }
+    
+    // Load job states from the state store
+    loadJobStates();
   });
   let crawlerConfigStep = 'basic'; // basic, platform, advanced, review
   
@@ -85,112 +198,15 @@
   let isSchedulingJob = false;
   let schedulingError = '';
   let scheduledJobs: any[] = [];
+  let jobStates: JobState[] = [];
+  let loadingJobStates = true;
   
-  // Mock data for crawl jobs
-  let crawlJobs = [
-    {
-      id: '1',
-      name: 'Twitter Sentiment Analysis',
-      status: 'running',
-      progress: 65,
-      startTime: '2025-01-27T08:30:00Z',
-      schedule: 'Daily at 9:00 AM UTC',
-      itemsCollected: 2847,
-      totalEstimated: 4500,
-      logs: [
-        '[2025-01-27 08:30:12] INFO: Starting Twitter crawl job "Twitter Sentiment Analysis"',
-        '[2025-01-27 08:30:15] INFO: Initializing crawler with platform: twitter',
-        '[2025-01-27 08:30:18] INFO: Loaded 15 target URLs for crawling',
-        '[2025-01-27 08:31:22] INFO: Connected to Twitter API successfully',
-        '[2025-01-27 08:31:45] INFO: Starting data collection from timeline endpoints',
-        '[2025-01-27 08:32:10] DEBUG: Processing batch 1/15 - collected 245 posts',
-        '[2025-01-27 08:33:15] DEBUG: Processing batch 2/15 - collected 198 posts',
-        '[2025-01-27 08:34:22] DEBUG: Processing batch 3/15 - collected 312 posts',
-        '[2025-01-27 08:35:18] INFO: Rate limit reached, waiting 60 seconds...',
-        '[2025-01-27 08:36:25] DEBUG: Processing batch 4/15 - collected 289 posts',
-        '[2025-01-27 08:37:45] DEBUG: Processing batch 5/15 - collected 267 posts',
-        '[2025-01-27 08:38:52] DEBUG: Processing batch 6/15 - collected 198 posts',
-        '[2025-01-27 08:39:58] DEBUG: Processing batch 7/15 - collected 234 posts',
-        '[2025-01-27 08:41:12] DEBUG: Processing batch 8/15 - collected 176 posts',
-        '[2025-01-27 08:42:28] DEBUG: Processing batch 9/15 - collected 245 posts',
-        '[2025-01-27 08:43:35] INFO: Currently processing batch 10/15 - 683 posts remaining...'
-      ]
-    },
-    {
-      id: '2', 
-      name: 'Reddit Tech Discussion',
-      status: 'completed',
-      progress: 100,
-      startTime: '2025-01-27T06:00:00Z',
-      endTime: '2025-01-27T07:45:00Z',
-      schedule: 'Every 6 hours',
-      itemsCollected: 1253,
-      totalEstimated: 1253,
-      logs: [
-        '[2025-01-27 06:00:05] INFO: Starting Reddit crawl job "Reddit Tech Discussion"',
-        '[2025-01-27 06:00:08] INFO: Initializing crawler with platform: reddit',
-        '[2025-01-27 06:00:12] INFO: Loaded 8 subreddits for crawling',
-        '[2025-01-27 06:00:45] INFO: Connected to Reddit API successfully',
-        '[2025-01-27 06:01:15] INFO: Starting data collection from subreddit: r/programming',
-        '[2025-01-27 06:05:22] DEBUG: Collected 156 posts from r/programming',
-        '[2025-01-27 06:05:35] INFO: Starting data collection from subreddit: r/webdev',
-        '[2025-01-27 06:08:45] DEBUG: Collected 89 posts from r/webdev',
-        '[2025-01-27 06:09:02] INFO: Starting data collection from subreddit: r/javascript',
-        '[2025-01-27 06:12:18] DEBUG: Collected 234 posts from r/javascript',
-        '[2025-01-27 06:12:35] INFO: Starting data collection from subreddit: r/python',
-        '[2025-01-27 06:16:42] DEBUG: Collected 198 posts from r/python',
-        '[2025-01-27 06:17:05] INFO: Starting data collection from subreddit: r/MachineLearning',
-        '[2025-01-27 06:22:15] DEBUG: Collected 167 posts from r/MachineLearning',
-        '[2025-01-27 06:22:35] INFO: Starting data collection from subreddit: r/datascience',
-        '[2025-01-27 06:26:45] DEBUG: Collected 134 posts from r/datascience',
-        '[2025-01-27 06:27:05] INFO: Starting data collection from subreddit: r/artificial',
-        '[2025-01-27 06:30:25] DEBUG: Collected 89 posts from r/artificial',
-        '[2025-01-27 06:30:45] INFO: Starting data collection from subreddit: r/cscareerquestions',
-        '[2025-01-27 06:35:15] DEBUG: Collected 186 posts from r/cscareerquestions',
-        '[2025-01-27 06:35:35] INFO: Processing collected comments and metadata',
-        '[2025-01-27 06:42:22] INFO: Data processing completed',
-        '[2025-01-27 06:42:45] INFO: Saving 1253 posts to output format: json',
-        '[2025-01-27 07:44:58] INFO: Crawl job completed successfully',
-        '[2025-01-27 07:45:00] INFO: Total items collected: 1253 posts, 3847 comments'
-      ]
-    },
-    {
-      id: '3',
-      name: 'Instagram Hashtag Monitor',
-      status: 'scheduled',
-      progress: 0,
-      nextRun: '2025-01-28T12:00:00Z',
-      schedule: 'Weekly on Mondays',
-      itemsCollected: 0,
-      totalEstimated: 0,
-      logs: []
-    },
-    {
-      id: '4',
-      name: 'LinkedIn Company Posts',
-      status: 'failed',
-      progress: 0,
-      startTime: '2025-01-27T05:00:00Z',
-      error: 'API rate limit exceeded',
-      schedule: 'Daily at 5:00 AM UTC',
-      itemsCollected: 0,
-      totalEstimated: 0,
-      logs: [
-        '[2025-01-27 05:00:05] INFO: Starting LinkedIn crawl job "LinkedIn Company Posts"',
-        '[2025-01-27 05:00:08] INFO: Initializing crawler with platform: linkedin',
-        '[2025-01-27 05:00:12] INFO: Loaded 25 company pages for crawling',
-        '[2025-01-27 05:00:45] INFO: Attempting to connect to LinkedIn API',
-        '[2025-01-27 05:01:15] WARN: API response slow, retrying connection...',
-        '[2025-01-27 05:01:45] ERROR: Failed to authenticate with LinkedIn API',
-        '[2025-01-27 05:02:15] INFO: Retrying with backup authentication method',
-        '[2025-01-27 05:02:45] WARN: Rate limit warning received from API',
-        '[2025-01-27 05:03:15] ERROR: API rate limit exceeded - 429 Too Many Requests',
-        '[2025-01-27 05:03:16] ERROR: Maximum retry attempts reached',
-        '[2025-01-27 05:03:17] ERROR: Crawl job failed: API rate limit exceeded',
-        '[2025-01-27 05:03:18] INFO: Cleaning up resources and exiting'
-      ]
-    }
-  ];
+  // Global job monitoring
+  let globalJobPollingInterval = null;
+  let isGlobalPollingActive = false;
+  
+  // Crawl jobs loaded from state store
+  let crawlJobs: any[] = [];
 
   // Function to format WavePulse time slots into schedule text
   function formatWavePulseSchedule(timeSlots: Array<{start: string, end: string}>): string {
@@ -364,6 +380,8 @@
   let showLogViewer = false;
   let currentLogJob = null;
   let logUpdateInterval = null;
+  let logContainer = null;
+  let logScrollAnchor = null;
   
   // Princeton SMART functions
   function resetPrincetonSmartForm() {
@@ -694,26 +712,10 @@
 
       // Schedule the job
       const result = await jobSchedulerService.scheduleJob(jobRequest);
+      console.log('Job scheduled successfully:', result);
 
-      // Add to local job list for UI display
-      const newJob = {
-        id: jobName,
-        name: crawlerConfig.name || `${crawlerConfig.platform} crawl`,
-        status: scheduleConfig.schedulingMode === 'immediate' ? 'running' : 'scheduled',
-        progress: 0,
-        schedule: scheduleConfig.schedulingMode === 'immediate' ? 'Running now' : 
-                 scheduleConfig.schedulingMode === 'delayed' ? `Delayed: ${dueTime}` :
-                 `${scheduleConfig.frequency} at ${scheduleConfig.time} ${scheduleConfig.timezone}`,
-        itemsCollected: 0,
-        totalEstimated: 0,
-        nextRun: scheduleConfig.schedulingMode !== 'immediate' ? dueTime : undefined,
-        platform: crawlerConfig.platform,
-        crawlId: crawlerConfig.crawlId,
-        crawlLabel: crawlerConfig.name,
-        daprJobName: jobName
-      };
-      
-      crawlJobs = [newJob, ...crawlJobs];
+      // Reload job states from state store to reflect the new job
+      await loadJobStates();
       
       // Reset form
       resetCrawlerForm();
@@ -810,39 +812,126 @@
     currentLogJob = job;
     showLogViewer = true;
     
-    // For running jobs, simulate real-time log updates
-    if (job.status === 'running') {
-      logUpdateInterval = setInterval(() => {
-        simulateLogUpdate(job);
-      }, 3000);
+    // Clear new logs indicator
+    const jobIndex = crawlJobs.findIndex(j => j.id === job.id);
+    if (jobIndex !== -1) {
+      crawlJobs[jobIndex].hasNewLogs = false;
+      crawlJobs = [...crawlJobs]; // Trigger reactivity
     }
+    
+    // For running jobs, start real-time log updates
+    if (job.status === 'running') {
+      startRealTimeLogUpdates(job.id);
+    }
+    
+    // Auto-scroll to bottom initially
+    setTimeout(() => {
+      if (logScrollAnchor) {
+        logScrollAnchor.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 200);
   }
 
   function closeLogViewer() {
     showLogViewer = false;
     currentLogJob = null;
+    stopRealTimeLogUpdates();
+  }
+
+  // Real-time log update functions
+  function startRealTimeLogUpdates(jobId) {
+    if (logUpdateInterval) {
+      clearInterval(logUpdateInterval);
+    }
+    
+    // Immediately refresh the job state
+    refreshJobState(jobId);
+    
+    // Set up periodic updates every 2 seconds for running jobs
+    logUpdateInterval = setInterval(async () => {
+      await refreshJobState(jobId);
+      
+      // Stop polling if job is no longer running
+      if (currentLogJob && currentLogJob.status !== 'running') {
+        clearInterval(logUpdateInterval);
+        logUpdateInterval = null;
+      }
+    }, 2000);
+  }
+
+  function stopRealTimeLogUpdates() {
     if (logUpdateInterval) {
       clearInterval(logUpdateInterval);
       logUpdateInterval = null;
     }
   }
 
-  function simulateLogUpdate(job) {
-    if (job.status === 'running' && job.logs) {
-      const newLogMessages = [
-        `[${new Date().toISOString().slice(0, 19).replace('T', ' ')}] DEBUG: Processing batch ${Math.floor(Math.random() * 15) + 1}/15 - collected ${Math.floor(Math.random() * 300) + 100} posts`,
-        `[${new Date().toISOString().slice(0, 19).replace('T', ' ')}] INFO: Rate limit check passed, continuing...`,
-        `[${new Date().toISOString().slice(0, 19).replace('T', ' ')}] DEBUG: Validating data structure for ${Math.floor(Math.random() * 50) + 20} posts`,
-        `[${new Date().toISOString().slice(0, 19).replace('T', ' ')}] INFO: Memory usage: ${Math.floor(Math.random() * 40) + 30}MB`
-      ];
-      
-      const randomMessage = newLogMessages[Math.floor(Math.random() * newLogMessages.length)];
-      job.logs = [...job.logs, randomMessage];
-      
-      // Trigger reactivity
-      crawlJobs = [...crawlJobs];
+  // Global job monitoring functions
+  function startGlobalJobMonitoring() {
+    if (isGlobalPollingActive) return;
+    
+    isGlobalPollingActive = true;
+    
+    // Check for running jobs and start polling if any exist
+    const runningJobs = crawlJobs.filter(job => job.status === 'running');
+    
+    if (runningJobs.length > 0) {
+      globalJobPollingInterval = setInterval(async () => {
+        const currentRunningJobs = crawlJobs.filter(job => job.status === 'running');
+        
+        // Also check recently completed jobs (within last 5 minutes) for any final updates
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const recentlyCompletedJobs = crawlJobs.filter(job => {
+          if (job.status !== 'completed' && job.status !== 'failed') return false;
+          
+          // Check if job was updated recently
+          const updatedAt = new Date(job.stateData?.updatedAt || job.startTime);
+          return updatedAt > fiveMinutesAgo;
+        });
+        
+        const jobsToCheck = [...currentRunningJobs, ...recentlyCompletedJobs];
+        
+        // If no jobs to check, stop polling
+        if (jobsToCheck.length === 0) {
+          stopGlobalJobMonitoring();
+          return;
+        }
+        
+        // Update all jobs that need checking
+        for (const job of jobsToCheck) {
+          await refreshJobState(job.id);
+        }
+      }, 5000); // Poll every 5 seconds for global updates
+    } else {
+      isGlobalPollingActive = false;
     }
   }
+
+  function stopGlobalJobMonitoring() {
+    if (globalJobPollingInterval) {
+      clearInterval(globalJobPollingInterval);
+      globalJobPollingInterval = null;
+    }
+    isGlobalPollingActive = false;
+  }
+
+  // Auto-start monitoring when jobs are loaded or status changes
+  $: {
+    if (crawlJobs && crawlJobs.length > 0) {
+      const hasRunningJobs = crawlJobs.some(job => job.status === 'running');
+      if (hasRunningJobs && !isGlobalPollingActive) {
+        startGlobalJobMonitoring();
+      } else if (!hasRunningJobs && isGlobalPollingActive) {
+        stopGlobalJobMonitoring();
+      }
+    }
+  }
+
+  // Cleanup on component destroy
+  onDestroy(() => {
+    stopGlobalJobMonitoring();
+    stopRealTimeLogUpdates();
+  });
 </script>
 
 <svelte:head>
@@ -889,6 +978,15 @@
               {crawlJobs.filter(job => job.status === 'running').length} jobs running
             </div>
           </div>
+          <button 
+            on:click={() => loadJobStates(true)}
+            disabled={loadingJobStates}
+            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4 mr-2 {loadingJobStates ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            {loadingJobStates ? 'Refreshing...' : 'Refresh Jobs'}
+          </button>
           <button 
             class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center border border-white/20">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2216,10 +2314,48 @@
         <!-- Jobs List -->
         <div class="bg-white rounded-xl shadow-sm overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">All Scheduled Jobs</h2>
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-semibold text-gray-900">All Scheduled Jobs</h2>
+              {#if loadingJobStates}
+                <div class="flex items-center text-sm text-gray-500">
+                  <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Loading jobs...
+                </div>
+              {:else}
+                <button 
+                  on:click={loadJobStates}
+                  class="flex items-center text-sm text-blue-600 hover:text-blue-800"
+                >
+                  <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  Refresh
+                </button>
+              {/if}
+            </div>
           </div>
           <div class="divide-y divide-gray-200">
-            {#each allJobs as job}
+            {#if loadingJobStates}
+              <div class="p-6 text-center text-gray-500">
+                <svg class="mx-auto h-8 w-8 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-2">Loading job states from Dapr state store...</p>
+              </div>
+            {:else if allJobs.length === 0}
+              <div class="p-6 text-center text-gray-500">
+                <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <p class="mt-2">No jobs scheduled yet</p>
+                <p class="text-sm">Create a new crawl job to get started</p>
+              </div>
+            {:else}
+              {#each allJobs as job}
               <div class="p-6" data-job-id="{job.id}" data-job-type="{job.type}">
                 <div class="flex items-center justify-between mb-4">
                   <div class="flex items-center">
@@ -2298,8 +2434,14 @@
                     {#if job.logs && job.logs.length > 0}
                       <button 
                         on:click={() => openLogViewer(job)}
-                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
+                        class="relative px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
                         View Logs
+                        {#if job.hasNewLogs}
+                          <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                        {/if}
+                        {#if job.status === 'running'}
+                          <span class="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        {/if}
                       </button>
                     {/if}
                   </div>
@@ -2361,7 +2503,8 @@
                   </div>
                 {/if}
               </div>
-            {/each}
+              {/each}
+            {/if}
           </div>
         </div>
       </div>
@@ -2799,20 +2942,30 @@
             {currentLogJob.status === 'running' ? 'Live Logs' : 'Complete Log Output'}
           </h3>
           {#if currentLogJob.status === 'running'}
-            <div class="flex items-center text-sm text-blue-600">
-              <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
-              Live updating
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center text-sm text-blue-600">
+                <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                Live updating
+              </div>
+              <div class="text-xs text-gray-500">
+                Updates every 2 seconds
+              </div>
             </div>
           {/if}
         </div>
         
-        <div class="bg-gray-900 rounded-xl p-4 h-96 overflow-y-auto font-mono text-sm">
+        <div 
+          bind:this={logContainer}
+          class="bg-gray-900 rounded-xl p-4 h-96 overflow-y-auto font-mono text-sm">
           {#if currentLogJob.logs && currentLogJob.logs.length > 0}
-            {#each currentLogJob.logs as logLine}
-              <div class="mb-1 {logLine.includes('ERROR') ? 'text-red-400' : logLine.includes('WARN') ? 'text-yellow-400' : logLine.includes('DEBUG') ? 'text-blue-400' : 'text-blue-400'}">
+            {#each currentLogJob.logs as logLine, index}
+              <div class="mb-1 {logLine.includes('ERROR') ? 'text-red-400' : logLine.includes('WARN') ? 'text-yellow-400' : logLine.includes('DEBUG') ? 'text-blue-400' : logLine.includes('INFO') ? 'text-green-400' : 'text-gray-300'}">
+                <span class="text-gray-500 text-xs mr-2">{index + 1}</span>
                 {logLine}
               </div>
             {/each}
+            <!-- Auto-scroll anchor -->
+            <div bind:this={logScrollAnchor}></div>
           {:else}
             <div class="text-gray-500 italic">No logs available for this job.</div>
           {/if}

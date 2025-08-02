@@ -46,7 +46,7 @@ npm run dev:dapr        # Unified deployment (UI + telegram-scraper)
 ### Deployment Management
 ```bash
 npm run dapr:setup      # Setup dependencies (Redis, telegram-scraper)
-npm run dapr:stop       # Stop all Dapr services
+npm run dapr:stop       # Stop all Dapr services and cleanup processes
 npm run dapr:logs       # View deployment logs
 ```
 

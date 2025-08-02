@@ -6,7 +6,9 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:jupyter": "./start-dev.sh",
-		"dev:dapr": "dapr run -f ./dapr.yaml",
+		"dev:dapr": "dapr run -f ./dapr.yaml 2>&1 | node tee-monitor.cjs",
+		"dev:dapr:verbose": "dapr run -f ./dapr.yaml 2>&1 | node monitor-crawler-logs.cjs",
+		"dev:dapr:plain": "dapr run -f ./dapr.yaml",
 		"build": "vite build",
 		"preview": "vite preview",
 		"preview:dapr": "dapr run -f ./dapr.yaml --build-only && npm run preview",
@@ -23,7 +25,7 @@
 		"jupyter:bootstrap": "poetry install && poetry run python bootstrap_notebooks.py",
 		"dapr:init": "dapr init",
 		"dapr:setup": "./setup-deployment.sh",
-		"dapr:stop": "dapr stop --app-id ex-accell-ui && dapr stop --app-id telegram-scraper",
+		"dapr:stop": "dapr stop --app-id ex-accell-ui; dapr stop --app-id telegram-scraper; pkill -f 'vite dev' || true; pkill -f 'telegram-scraper' || true; pkill -f 'daprd' || true",
 		"dapr:logs": "tail -f dapr-run.log",
 		"test:integration": "node test-dapr-job-integration.js"
 	},
