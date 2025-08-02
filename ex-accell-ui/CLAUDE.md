@@ -15,7 +15,7 @@ This is the frontend UI component of the ex-accelerator project, built with Svel
 - **Package Manager**: npm (with engine-strict=true for version enforcement)
 - **Adapter**: @sveltejs/adapter-auto for automatic deployment detection
 - **Runtime**: Dapr-enabled for microservices architecture
-- **Database**: DuckDB with SQL queries (MANDATORY for data persistence and analytics)
+- **Database**: Unified DuckDB database with SQL queries (MANDATORY for data persistence and analytics)
 
 ## Common Commands
 
@@ -87,6 +87,14 @@ npm run prepare
 - Database service imports are resolved correctly
 - Charts and data loading work properly
 - No runtime errors in the dashboard
+
+**CRITICAL**: For any new UI functionality, you MUST create corresponding Cypress test cases:
+- Add component tests for new components in `cypress/component/`
+- Add E2E tests for new pages in `cypress/e2e/`
+- Include both positive and negative test scenarios
+- Test responsive design across mobile, tablet, and desktop
+- Validate accessibility and error handling
+- Run `npm run cypress:run` to verify all tests pass before completion
 
 ## Key Technical Details
 
@@ -245,57 +253,97 @@ When running with Dapr, the following APIs are available:
 
 ## Database Integration Guidelines
 
-**CRITICAL: This project uses DuckDB with SQL queries for all data operations. Never use in-memory data models or hardcoded sample data for production features.**
+**CRITICAL: This project uses a unified DuckDB database (`unified_social_analytics.db`) for all data operations. All analytics modules connect to the same database for cross-table analysis capabilities.**
+
+### Unified Database Architecture
+
+The application uses a single DuckDB database that combines all analytics modules:
+
+**Database File**: `unified_social_analytics.db` - Single source of truth for all analytics  
+**Schema File**: `unified_social_analytics_schema.sql` - Complete database structure  
+**Connection Service**: `src/lib/services/duckdb.ts` (UnifiedDuckDBService)
+
+**Core Tables**:
+- `posts` - Foundation table for all analytics (linked to all modules)
+- `data_sources` - Social media platforms (Twitter, Facebook, Instagram, etc.)
+- `crawlers` - Data collection processes
+
+**Analytics Module Tables**:
+- **Sentiment Analysis**: `sentiment_classifications`, `emotion_analysis`, `sentiment_temporal_trends`, `sentiment_keywords`
+- **Topic Modeling**: `topics`, `topic_keywords`, `document_topics`, `topic_relationships`, `topic_trends`
+- **Language Detection**: `languages`, `language_detection`, `language_mixing`, `language_trends`
+- **Engagement Analysis**: `post_engagement`, `content_types`, `daily_engagement`, `hashtag_engagement`
+- **Android Analytics**: `android_devices`, `android_app_usage`, `android_system_metrics`
+
+**Cross-Table Analysis Views** (Pre-built for complex queries):
+- `unified_post_analysis` - Every post with ALL analytics data (sentiment, topics, language, engagement)
+- `cross_platform_sentiment` - Sentiment analysis across all platforms
+- `topic_platform_performance` - Topic performance by platform
+- `language_sentiment_correlation` - Language-sentiment relationships
+- `content_performance_analysis` - Content performance by characteristics
+- `analytics_dashboard_summary` - Comprehensive dashboard metrics
 
 ### Mandatory Database Architecture
 
-When asked to implement database integration or data-driven features, you MUST follow this pattern:
+When asked to implement database integration or data-driven features, you MUST use the unified database:
 
-1. **Create DuckDB Schema** (`<feature>_schema.sql`):
-   - Design comprehensive table structures with foreign key relationships
-   - Include realistic sample data generation using SQL functions
-   - Create analytical views for performance optimization
-   - Use proper data types and constraints
+1. **Use Unified Connection** (`src/lib/services/duckdb.ts`):
+   - Import `unifiedDb` from the DuckDB service
+   - Connect to the unified analytics database
+   - Use cross-table analysis views for complex queries
 
-2. **Build Database Service Layer** (`src/lib/services/<feature>Db.ts`):
-   - Create TypeScript service class with async methods
-   - Implement browser-compatible simulation layer for development
-   - Include comprehensive error handling and fallback mechanisms
-   - Follow consistent naming patterns: `get<EntityName>()`, `export<Feature>Data()`
+2. **Database Service Pattern**:
+   - All services connect to the same unified database
+   - Use `unifiedDb.queryByType()` for predefined query types
+   - Use `unifiedDb.query()` for custom SQL queries
+   - Leverage cross-table analysis views for advanced insights
 
-3. **Dashboard Integration**:
-   - Replace hardcoded data with database service calls
-   - Add loading states and error handling
-   - Implement reactive filtering with database queries
-   - Maintain graceful fallback to sample data if database fails
+3. **Cross-Table Analysis Integration**:
+   - Use `unified_post_analysis` view for comprehensive post data
+   - Query multiple modules simultaneously (sentiment + topics + language + engagement)
+   - Enable platform comparisons and correlation analysis
+   - Avoid separate database connections
 
 ### Database Service Pattern
 
 ```typescript
+import { unifiedDb } from './duckdb';
+
 class FeatureDatabase {
   private initialized = false;
 
   async connect() {
     if (this.initialized) return;
-    // Database connection logic
+    // Connect to unified DuckDB service
+    await unifiedDb.connect();
     this.initialized = true;
   }
 
   async getFeatureData(filters: any = {}) {
     if (!this.initialized) await this.connect();
     
-    // In production: actual DuckDB queries
-    // In browser: simulate SQL query results
-    return Promise.resolve(simulatedData);
+    // Use unified database for cross-table analysis
+    return unifiedDb.queryByType('feature-data', filters);
+  }
+
+  async getCrossTableAnalysis(filters: any = {}) {
+    if (!this.initialized) await this.connect();
+    
+    // Advanced cross-table analysis using unified views
+    return unifiedDb.getUnifiedPostAnalysis(filters);
   }
 
   async exportFeatureData(filters: any = {}) {
-    // Comprehensive data export with filters
-    return Promise.resolve({
+    // Export with cross-table analysis data
+    const data = await this.getFeatureData(filters);
+    const crossData = await this.getCrossTableAnalysis(filters);
+    
+    return {
       exportDate: new Date().toISOString(),
-      data: await this.getFeatureData(filters),
+      data,
+      crossTableAnalysis: crossData,
       filters
-    });
+    };
   }
 }
 
@@ -306,57 +354,78 @@ export const featureDb = new FeatureDatabase();
 
 ```svelte
 <script lang="ts">
-  import { featureDb } from '$lib/services/featureDb';
+  import { unifiedDb } from '$lib/services/duckdb';
   
   let loading = true;
   let featureData = [];
+  let crossTableData = [];
   
   async function loadFeatureData() {
     try {
-      featureData = await featureDb.getFeatureData(filters);
+      // Load feature-specific data
+      featureData = await unifiedDb.queryByType('feature-data', filters);
+      
+      // Load cross-table analysis for advanced insights
+      crossTableData = await unifiedDb.getUnifiedPostAnalysis(filters);
+      
       loading = false;
     } catch (error) {
-      console.error('Database error:', error);
-      loadFallbackData(); // Graceful degradation
+      console.error('Unified database error:', error);
+      throw error; // No fallback - database required
     }
   }
   
   onMount(loadFeatureData);
   
-  // Reactive filtering with database queries
+  // Reactive filtering with unified database queries
   $: if (filtersChanged && !loading) {
     loadFeatureData();
   }
 </script>
 
 {#if loading}
-  <div>Loading data from database...</div>
+  <div>Loading unified analytics data...</div>
 {:else}
-  <!-- Render data-driven content -->
+  <!-- Render data-driven content with cross-table insights -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Feature-specific data -->
+    <div>Feature Data: {featureData.length} items</div>
+    
+    <!-- Cross-table analysis insights -->
+    <div>Cross-Table Analysis: {crossTableData.length} posts analyzed</div>
+  </div>
 {/if}
 ```
 
-### When to Use Database Integration
+### When to Use Unified Database Integration
 
-**ALWAYS use DuckDB SQL approach when:**
+**ALWAYS use unified DuckDB approach when:**
 - Implementing analytics dashboards or data visualizations
 - Asked to "use SQL tables and queries" or "database-driven"
 - Creating features that process, filter, or analyze data
-- Building any data-heavy component requiring persistence
+- Building cross-platform or cross-module analysis features
 - Implementing search, filtering, or reporting functionality
+- Enabling correlation analysis between different analytics modules
 
-**Browser simulation layer is acceptable for:**
-- Development and testing environments
-- When actual DuckDB connection is not available
-- Prototyping new features before database deployment
+**Cross-Table Analysis is REQUIRED for:**
+- Comparing sentiment across platforms
+- Analyzing topic performance by platform
+- Language-sentiment correlation studies
+- Content type effectiveness analysis
+- Multi-dimensional filtering and insights
 
-### Existing Database Implementations
+### Unified Database Implementation
 
-Reference these existing implementations as patterns:
+The application now uses a single database with these key services:
 
-- **Topic Modeling**: `topic_modeling_schema.sql` + `topicModelingDb.ts`
-- **Language Detection**: `language_detection_schema.sql` + `languageDetectionDb.ts`  
-- **Engagement Analysis**: `engagement_analysis_schema.sql` + `engagementAnalysisDb.ts`
+- **Core Connection**: `src/lib/services/duckdb.ts` (UnifiedDuckDBService)
+- **Dashboard**: `src/lib/services/dashboardDb.ts` - Cross-platform dashboard metrics
+- **Sentiment Analysis**: `src/lib/services/sentimentAnalysisDb.ts` - Multi-platform sentiment
+- **Topic Modeling**: `src/lib/services/topicModelingDb.ts` - Cross-platform topic analysis
+- **Language Detection**: `src/lib/services/languageDetectionDb.ts` - Language patterns
+- **Engagement Analysis**: `src/lib/services/engagementAnalysisDb.ts` - Performance metrics
+
+**Schema File**: `unified_social_analytics_schema.sql` - Complete unified structure
 
 ### Forbidden Data Approaches
 

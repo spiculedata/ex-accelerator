@@ -1,41 +1,22 @@
 // DuckDB connection and query service for Sentiment Analysis data
-// Server-side API integration for real database queries
+// Uses the unified social analytics database for cross-platform sentiment analysis
+import { unifiedDb } from './duckdb';
+
 class SentimentAnalysisDatabase {
   private initialized = false;
-  private baseUrl = '/api/sentiment-analysis';
 
   async connect() {
     if (this.initialized) return; // Already connected
 
     try {
-      // Test API connection
-      const response = await fetch(`${this.baseUrl}?type=test`);
-      if (!response.ok) {
-        throw new Error(`API test failed: ${response.status} ${response.statusText}`);
-      }
-      
+      // Connect to unified DuckDB service
+      await unifiedDb.connect();
       this.initialized = true;
-      console.log('SentimentAnalysisDatabase connected successfully');
+      console.log('SentimentAnalysisDatabase connected to unified analytics successfully');
     } catch (error) {
       console.error('Failed to connect to SentimentAnalysisDatabase:', error);
       throw error;
     }
-  }
-
-  private async queryAPI(queryType: string, params: Record<string, any> = {}): Promise<any[]> {
-    const urlParams = new URLSearchParams({ type: queryType, ...params });
-    const response = await fetch(`${this.baseUrl}?${urlParams}`);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || 'API request failed');
-    }
-    
-    return result.data;
   }
 
   // Get overall sentiment statistics
@@ -43,30 +24,60 @@ class SentimentAnalysisDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      const data = await this.queryAPI('sentiment-stats');
-      const stats = data[0] || {};
+      // Query cross-platform sentiment data from unified database
+      const data = await unifiedDb.getCrossPlatformSentiment();
       
+      // Aggregate sentiment stats across all platforms
+      const sentimentMap = new Map();
+      let totalPosts = 0;
+      let totalConfidence = 0;
+      let confidenceCount = 0;
+
+      data.forEach(row => {
+        const sentiment = row.sentiment_category.toLowerCase().includes('positive') ? 'positive' :
+                         row.sentiment_category.toLowerCase().includes('negative') ? 'negative' : 'neutral';
+        
+        if (!sentimentMap.has(sentiment)) {
+          sentimentMap.set(sentiment, { count: 0, confidence: 0 });
+        }
+        
+        const current = sentimentMap.get(sentiment);
+        current.count += row.post_count;
+        totalPosts += row.post_count;
+        
+        if (row.avg_confidence) {
+          current.confidence = (current.confidence + row.avg_confidence) / 2;
+          totalConfidence += row.avg_confidence;
+          confidenceCount++;
+        }
+      });
+
+      // Calculate percentages
+      const positive = sentimentMap.get('positive') || { count: 0, confidence: 0 };
+      const negative = sentimentMap.get('negative') || { count: 0, confidence: 0 };
+      const neutral = sentimentMap.get('neutral') || { count: 0, confidence: 0 };
+
       return {
         positive: { 
-          count: stats.positive_count || 0, 
-          percentage: stats.positive_percentage || 0, 
-          confidence: stats.avg_confidence || 0 
+          count: positive.count, 
+          percentage: totalPosts > 0 ? (positive.count / totalPosts * 100) : 0, 
+          confidence: positive.confidence || 0
         },
         negative: { 
-          count: stats.negative_count || 0, 
-          percentage: stats.negative_percentage || 0, 
-          confidence: stats.avg_confidence || 0 
+          count: negative.count, 
+          percentage: totalPosts > 0 ? (negative.count / totalPosts * 100) : 0, 
+          confidence: negative.confidence || 0
         },
         neutral: { 
-          count: stats.neutral_count || 0, 
-          percentage: stats.neutral_percentage || 0, 
-          confidence: stats.avg_confidence || 0 
+          count: neutral.count, 
+          percentage: totalPosts > 0 ? (neutral.count / totalPosts * 100) : 0, 
+          confidence: neutral.confidence || 0
         },
-        total: stats.total_posts || 0,
-        avgConfidence: stats.avg_confidence || 0
+        total: totalPosts,
+        avgConfidence: confidenceCount > 0 ? (totalConfidence / confidenceCount) : 0
       };
     } catch (error) {
-      console.error('Error getting sentiment stats:', error);
+      console.error('Error getting sentiment stats from unified DB:', error);
       throw error;
     }
   }
@@ -76,15 +87,26 @@ class SentimentAnalysisDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      const data = await this.queryAPI('detailed-sentiments');
+      // Query detailed sentiment classifications from unified database
+      const data = await unifiedDb.queryByType('sentiment-classifications');
+      
+      // Define colors for each sentiment category
+      const sentimentColors = {
+        'Very Positive': '#22c55e',
+        'Positive': '#84cc16', 
+        'Neutral': '#6b7280',
+        'Negative': '#f97316',
+        'Very Negative': '#ef4444'
+      };
+
       return data.map(item => ({
-        label: item.label,
-        count: item.count,
-        color: item.color,
+        label: item.sentiment_category,
+        count: item.post_count,
+        color: sentimentColors[item.sentiment_category] || '#6b7280',
         percentage: item.percentage
       }));
     } catch (error) {
-      console.error('Error getting detailed sentiments:', error);
+      console.error('Error getting detailed sentiments from unified DB:', error);
       throw error;
     }
   }
@@ -94,15 +116,28 @@ class SentimentAnalysisDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      const data = await this.queryAPI('emotion-stats');
+      // Query emotion analysis from unified database
+      const data = await unifiedDb.queryByType('emotion-analysis');
+      
+      // Define colors for each emotion
+      const emotionColors = {
+        'Joy': '#fbbf24',
+        'Trust': '#3b82f6',
+        'Fear': '#8b5cf6',
+        'Surprise': '#f59e0b',
+        'Sadness': '#6366f1',
+        'Disgust': '#10b981',
+        'Anger': '#ef4444'
+      };
+
       return data.map(item => ({
         emotion: item.emotion,
-        count: item.count,
+        count: item.post_count,
         percentage: item.percentage,
-        color: item.color
+        color: emotionColors[item.emotion] || '#6b7280'
       }));
     } catch (error) {
-      console.error('Error getting emotion stats:', error);
+      console.error('Error getting emotion stats from unified DB:', error);
       throw error;
     }
   }

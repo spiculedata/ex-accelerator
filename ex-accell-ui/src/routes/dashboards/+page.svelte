@@ -105,108 +105,11 @@
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      // Fallback to sample data if database fails
-      loadFallbackData();
+      // No fallback - dashboard requires database connection
+      loading = false;
     }
   }
 
-  // Fallback sample data if database connection fails
-  function loadFallbackData() {
-    dashboardStats = {
-      totalPosts: 847293,
-      totalSources: 7,
-      activeCrawlers: 8,
-      lastUpdated: '2025-01-27T15:30:00Z',
-      processingRate: 1247,
-      dataQuality: 94.8
-    };
-
-    dataSources = [
-      { name: 'Twitter', posts: 324567, percentage: 38.3, status: 'active', last_sync: '2025-01-27T15:25:00Z', health: 98 },
-      { name: 'Facebook', posts: 189234, percentage: 22.3, status: 'active', last_sync: '2025-01-27T15:20:00Z', health: 96 },
-      { name: 'Instagram', posts: 145789, percentage: 17.2, status: 'active', last_sync: '2025-01-27T15:15:00Z', health: 94 },
-      { name: 'Reddit', posts: 89567, percentage: 10.6, status: 'active', last_sync: '2025-01-27T15:10:00Z', health: 92 },
-      { name: 'LinkedIn', posts: 56789, percentage: 6.7, status: 'active', last_sync: '2025-01-27T15:05:00Z', health: 99 },
-      { name: 'TikTok', posts: 34567, percentage: 4.1, status: 'paused', last_sync: '2025-01-27T14:30:00Z', health: 87 },
-      { name: 'YouTube', posts: 6780, percentage: 0.8, status: 'active', last_sync: '2025-01-27T15:00:00Z', health: 95 }
-    ];
-
-    textAnalytics = {
-      sentimentBreakdown: {
-        positive: { count: 456789, percentage: 53.9 },
-        negative: { count: 234567, percentage: 27.7 },
-        neutral: { count: 155937, percentage: 18.4 }
-      },
-      topLanguages: [
-        { language: 'English', count: 678234, percentage: 80.1 },
-        { language: 'Spanish', count: 89567, percentage: 10.6 },
-        { language: 'French', count: 45678, percentage: 5.4 },
-        { language: 'German', count: 23456, percentage: 2.8 },
-        { language: 'Portuguese', count: 10358, percentage: 1.1 }
-      ],
-      topTopics: [
-        { topic: 'Artificial Intelligence', posts: 89567, trend: 'up' },
-        { topic: 'Climate Change', posts: 67890, trend: 'up' },
-        { topic: 'Cryptocurrency', posts: 56789, trend: 'down' },
-        { topic: 'Health & Wellness', posts: 45678, trend: 'stable' },
-        { topic: 'Technology Trends', posts: 34567, trend: 'up' }
-      ]
-    };
-
-    crawlingActivity = [
-      { time: '00:00', posts: 1245 },
-      { time: '04:00', posts: 892 },
-      { time: '08:00', posts: 2134 },
-      { time: '12:00', posts: 1876 },
-      { time: '16:00', posts: 2456 },
-      { time: '20:00', posts: 1932 }
-    ];
-
-    recentActivity = [
-      {
-        id: 1,
-        type: 'data_ingestion',
-        message: 'Successfully processed 2,456 new posts from Twitter',
-        timestamp: '2025-01-27T15:25:00Z',
-        status: 'success'
-      },
-      {
-        id: 2,
-        type: 'sentiment_analysis',
-        message: 'Completed sentiment analysis for 1,892 posts',
-        timestamp: '2025-01-27T15:20:00Z',
-        status: 'success'
-      },
-      {
-        id: 3,
-        type: 'language_detection',
-        message: 'Detected 8 new languages in recent posts',
-        timestamp: '2025-01-27T15:15:00Z',
-        status: 'info'
-      },
-      {
-        id: 4,
-        type: 'topic_modeling',
-        message: 'Updated topic relationships for Technology category',
-        timestamp: '2025-01-27T15:10:00Z',
-        status: 'success'
-      },
-      {
-        id: 5,
-        type: 'crawler_warning',
-        message: 'TikTok crawler paused due to rate limiting',
-        timestamp: '2025-01-27T14:30:00Z',
-        status: 'warning'
-      }
-    ];
-    
-    // Initialize charts after fallback data is loaded
-    if (typeof window !== 'undefined' && (window as any).echarts) {
-      setTimeout(() => {
-        initializeCharts();
-      }, 100);
-    }
-  }
 
   // Time range filter
   let timeRange = '24h';

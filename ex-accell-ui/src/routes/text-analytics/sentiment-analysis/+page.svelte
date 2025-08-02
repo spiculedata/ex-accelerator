@@ -65,8 +65,8 @@
       }
     } catch (error) {
       console.error('Error loading sentiment data:', error);
-      // Fallback to sample data if database fails
-      loadFallbackData();
+      // No fallback - sentiment analysis requires database connection
+      loading = false;
     }
   }
 
@@ -85,73 +85,6 @@
     }
   }
 
-  // Fallback sample data if database connection fails
-  function loadFallbackData() {
-    sentimentStats = {
-      positive: { count: 15847, percentage: 52.8, confidence: 0.89 },
-      negative: { count: 8234, percentage: 27.4, confidence: 0.91 },
-      neutral: { count: 5947, percentage: 19.8, confidence: 0.85 }
-    };
-
-    totalPosts = sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count;
-
-    detailedSentiments = [
-      { label: 'Very Positive', count: 6234, color: '#06d6a0', percentage: 20.8 },
-      { label: 'Positive', count: 9613, color: '#26d0ce', percentage: 32.0 },
-      { label: 'Neutral', count: 5947, color: '#8b5cf6', percentage: 19.8 },
-      { label: 'Negative', count: 5890, color: '#ff6b9d', percentage: 19.6 },
-      { label: 'Very Negative', count: 2344, color: '#f72585', percentage: 7.8 }
-    ];
-
-    emotionStats = [
-      { emotion: 'Joy', count: 8234, percentage: 27.4, color: '#ffd23f' },
-      { emotion: 'Trust', count: 6789, percentage: 22.6, color: '#06d6a0' },
-      { emotion: 'Fear', count: 4567, percentage: 15.2, color: '#8b5cf6' },
-      { emotion: 'Surprise', count: 3456, percentage: 11.5, color: '#26d0ce' },
-      { emotion: 'Sadness', count: 3234, percentage: 10.8, color: '#667eea' },
-      { emotion: 'Disgust', count: 2456, percentage: 8.2, color: '#f72585' },
-      { emotion: 'Anger', count: 1292, percentage: 4.3, color: '#ff6b9d' }
-    ];
-
-    sentimentTrends = [
-      { date: '2025-01-20', positive: 58, negative: 23, neutral: 19 },
-      { date: '2025-01-21', positive: 62, negative: 20, neutral: 18 },
-      { date: '2025-01-22', positive: 55, negative: 28, neutral: 17 },
-      { date: '2025-01-23', positive: 49, negative: 35, neutral: 16 },
-      { date: '2025-01-24', positive: 53, negative: 29, neutral: 18 },
-      { date: '2025-01-25', positive: 61, negative: 22, neutral: 17 },
-      { date: '2025-01-26', positive: 56, negative: 26, neutral: 18 },
-      { date: '2025-01-27', positive: 53, negative: 27, neutral: 20 }
-    ];
-
-    samplePosts = [
-      {
-        id: 1,
-        text: "This new product launch is absolutely incredible! Best decision I've ever made 🎉",
-        sentiment: 'Very Positive',
-        confidence: 0.94,
-        emotions: ['Joy', 'Trust'],
-        platform: 'twitter',
-        timestamp: '2025-01-27T14:32:00Z',
-        engagement: { likes: 24, shares: 8, comments: 12 }
-      },
-      {
-        id: 2,
-        text: "The customer service was helpful and resolved my issue quickly. Thank you!",
-        sentiment: 'Positive',
-        confidence: 0.87,
-        emotions: ['Trust', 'Joy'],
-        platform: 'facebook',
-        timestamp: '2025-01-27T13:15:00Z',
-        engagement: { likes: 15, shares: 3, comments: 5 }
-      }
-    ];
-
-    loading = false;
-    setTimeout(() => {
-      initializeCharts();
-    }, 100);
-  }
 
   // Filters
   let selectedSentiment = 'all';
@@ -231,21 +164,7 @@
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting sentiment data:', error);
-      // Fallback to current data
-      const csvData = filteredPosts.map(post => 
-        `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
-      ).join('\n');
-      
-      const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sentiment_analysis_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
+      alert('Export failed: Database connection required');
     }
   }
 

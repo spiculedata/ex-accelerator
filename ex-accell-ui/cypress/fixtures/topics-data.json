@@ -1,0 +1,32 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": "tech-ai",
+      "name": "Artificial Intelligence",
+      "category": "Technology",
+      "categoryColor": "#3b82f6",
+      "size": 847,
+      "weight": 0.245,
+      "keywords": ["artificial intelligence", "machine learning", "neural networks", "deep learning", "algorithms"]
+    },
+    {
+      "id": "health-mental",
+      "name": "Mental Health Awareness",
+      "category": "Health",
+      "categoryColor": "#ef4444",
+      "size": 723,
+      "weight": 0.201,
+      "keywords": ["mental health", "depression", "anxiety", "therapy", "counseling"]
+    },
+    {
+      "id": "env-climate",
+      "name": "Climate Change Impact",
+      "category": "Environment",
+      "categoryColor": "#10b981",
+      "size": 656,
+      "weight": 0.189,
+      "keywords": ["climate change", "global warming", "emissions", "environmental impact", "sustainability"]
+    }
+  ]
+}

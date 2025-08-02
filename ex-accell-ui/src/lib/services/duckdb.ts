@@ -1,74 +1,168 @@
-// DuckDB connection utility
-// This provides a unified interface for DuckDB queries across the application
-// Uses server-side API endpoints to execute DuckDB queries
+// Unified DuckDB connection utility
+// This provides a centralized interface for all DuckDB queries across the application
+// Uses the unified social analytics database schema for cross-table analysis
 
 interface QueryResult {
   [key: string]: any;
 }
 
-// Execute DuckDB queries via server-side API endpoints
-export async function query(sql: string, queryType?: string): Promise<QueryResult[]> {
-  try {
-    // For engagement analysis queries, use the dedicated API endpoint
-    if (queryType) {
-      const response = await fetch(`/api/engagement-analysis?type=${queryType}`);
-      const result = await response.json();
-      
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.error || 'API query failed');
+interface DatabaseConfig {
+  databaseFile: string;
+  schemaFile: string;
+  apiEndpoint: string;
+}
+
+// Unified database configuration
+const UNIFIED_DB_CONFIG: DatabaseConfig = {
+  databaseFile: 'unified_social_analytics.db',
+  schemaFile: 'unified_social_analytics_schema.sql',
+  apiEndpoint: '/api/unified-analytics'
+};
+
+// Unified DuckDB Service Class
+class UnifiedDuckDBService {
+  private initialized = false;
+  private baseUrl = UNIFIED_DB_CONFIG.apiEndpoint;
+
+  async connect(): Promise<void> {
+    if (this.initialized) return;
+
+    try {
+      // Test connection to unified analytics API
+      const response = await fetch(`${this.baseUrl}?type=test`);
+      if (!response.ok) {
+        throw new Error(`Unified DuckDB API connection failed: ${response.status}`);
       }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Unified DuckDB connection test failed');
+      }
+
+      this.initialized = true;
+      console.log('Unified DuckDB Service connected successfully');
+    } catch (error) {
+      console.error('Failed to connect to Unified DuckDB Service:', error);
+      throw error;
     }
-    
-    // For generic queries, we still need to implement a generic endpoint
-    // For now, throw an error to maintain existing fallback behavior
-    throw new Error('Generic DuckDB queries not yet implemented via API');
-  } catch (error) {
-    console.warn('DuckDB API query failed:', error);
-    throw error;
+  }
+
+  async query(sql: string, params: Record<string, any> = {}): Promise<QueryResult[]> {
+    if (!this.initialized) await this.connect();
+
+    try {
+      const requestBody = {
+        sql,
+        params,
+        timestamp: Date.now()
+      };
+
+      const response = await fetch(`${this.baseUrl}/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Query failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Query execution failed');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Unified DuckDB query error:', error);
+      throw error;
+    }
+  }
+
+  async queryByType(queryType: string, params: Record<string, any> = {}): Promise<QueryResult[]> {
+    if (!this.initialized) await this.connect();
+
+    try {
+      const urlParams = new URLSearchParams({ type: queryType, ...params });
+      const response = await fetch(`${this.baseUrl}?${urlParams.toString()}`);
+
+      if (!response.ok) {
+        throw new Error(`Query type '${queryType}' failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || `Query type '${queryType}' failed`);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error(`Unified DuckDB query type '${queryType}' error:`, error);
+      throw error;
+    }
+  }
+
+  // Cross-table analysis methods
+  async getUnifiedPostAnalysis(filters: any = {}): Promise<QueryResult[]> {
+    return this.queryByType('unified-post-analysis', filters);
+  }
+
+  async getCrossPlatformSentiment(filters: any = {}): Promise<QueryResult[]> {
+    return this.queryByType('cross-platform-sentiment', filters);
+  }
+
+  async getTopicPlatformPerformance(filters: any = {}): Promise<QueryResult[]> {
+    return this.queryByType('topic-platform-performance', filters);
+  }
+
+  async getLanguageSentimentCorrelation(filters: any = {}): Promise<QueryResult[]> {
+    return this.queryByType('language-sentiment-correlation', filters);
+  }
+
+  async getContentPerformanceAnalysis(filters: any = {}): Promise<QueryResult[]> {
+    return this.queryByType('content-performance-analysis', filters);
+  }
+
+  async getAnalyticsDashboardSummary(): Promise<QueryResult[]> {
+    return this.queryByType('analytics-dashboard-summary');
+  }
+
+  isConnected(): boolean {
+    return this.initialized;
+  }
+
+  async close(): Promise<void> {
+    this.initialized = false;
   }
 }
 
-// Execute engagement analysis specific queries
-export async function queryEngagementAnalysis(queryType: string, filters: any = {}): Promise<QueryResult[]> {
-  try {
-    const params = new URLSearchParams();
-    params.append('type', queryType);
-    
-    // Add filters as query parameters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, String(value));
-      }
-    });
-    
-    const response = await fetch(`/api/engagement-analysis?${params.toString()}`);
-    const result = await response.json();
-    
-    if (result.success) {
-      return result.data;
-    } else {
-      throw new Error(result.error || 'Engagement analysis query failed');
-    }
-  } catch (error) {
-    console.error('Engagement analysis API error:', error);
-    throw error;
+// Create singleton instance
+export const unifiedDb = new UnifiedDuckDBService();
+
+// Legacy compatibility functions for backward compatibility
+export async function query(sql: string, queryType?: string): Promise<QueryResult[]> {
+  if (queryType) {
+    return unifiedDb.queryByType(queryType);
   }
+  return unifiedDb.query(sql);
+}
+
+export async function queryEngagementAnalysis(queryType: string, filters: any = {}): Promise<QueryResult[]> {
+  return unifiedDb.queryByType(`engagement-${queryType}`, filters);
 }
 
 export async function executeSchema(schemaFile: string): Promise<void> {
   try {
-    // Schema execution is handled server-side during API initialization
-    console.log(`Schema ${schemaFile} will be executed server-side`);
+    console.log(`Schema ${schemaFile} will be executed server-side with unified schema`);
     return Promise.resolve();
   } catch (error) {
-    console.warn('Schema execution delegated to server-side');
+    console.warn('Schema execution delegated to unified server-side database');
     throw error;
   }
 }
 
 export function isConnected(): boolean {
-  // Connection status is managed server-side
-  return true; // Assume connected if API is available
+  return unifiedDb.isConnected();
 }

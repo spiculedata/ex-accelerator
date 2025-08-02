@@ -1,41 +1,22 @@
 // DuckDB connection and query service for Topic Modeling data
-// Server-side API integration for real database queries
+// Uses the unified social analytics database for cross-platform topic analysis
+import { unifiedDb } from './duckdb';
+
 class TopicModelingDatabase {
   private initialized = false;
-  private baseUrl = '/api/topic-modeling';
 
   async connect() {
     if (this.initialized) return; // Already connected
 
     try {
-      // Test API connection
-      const response = await fetch(`${this.baseUrl}?type=test`);
-      if (!response.ok) {
-        throw new Error(`API test failed: ${response.status} ${response.statusText}`);
-      }
-      
+      // Connect to unified DuckDB service
+      await unifiedDb.connect();
       this.initialized = true;
-      console.log('TopicModelingDatabase connected successfully');
+      console.log('TopicModelingDatabase connected to unified analytics successfully');
     } catch (error) {
       console.error('Failed to connect to TopicModelingDatabase:', error);
       throw error;
     }
-  }
-
-  private async queryAPI(queryType: string, params: Record<string, any> = {}): Promise<any[]> {
-    const urlParams = new URLSearchParams({ type: queryType, ...params });
-    const response = await fetch(`${this.baseUrl}?${urlParams}`);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || 'API request failed');
-    }
-    
-    return result.data;
   }
 
   // Get all topics with category information
@@ -43,14 +24,14 @@ class TopicModelingDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      const params = {
+      // Query topics from unified database with filters
+      const data = await unifiedDb.queryByType('topic-overview', {
         category: filters.category || 'all',
         search: filters.search || '',
         minSize: filters.minSize || 0,
         limit: filters.limit || 50
-      };
+      });
       
-      const data = await this.queryAPI('topics', params);
       return data.map(topic => ({
         id: topic.id,
         name: topic.name,
@@ -61,7 +42,7 @@ class TopicModelingDatabase {
         keywords: topic.keywords ? topic.keywords.split(',') : []
       }));
     } catch (error) {
-      console.error('Error getting topics:', error);
+      console.error('Error getting topics from unified DB:', error);
       throw error;
     }
   }
@@ -71,17 +52,19 @@ class TopicModelingDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      const data = await this.queryAPI('categories');
+      // Query topic categories from unified database
+      const data = await unifiedDb.queryByType('topic-categories');
+      
       return data.map(category => ({
-        name: category.name,
-        color: category.color,
+        name: category.category,
+        color: category.category_color,
         topicCount: category.topic_count,
         totalDocuments: category.total_documents,
         avgWeight: category.avg_weight,
         avgCoherence: category.avg_coherence
       }));
     } catch (error) {
-      console.error('Error getting topic categories:', error);
+      console.error('Error getting topic categories from unified DB:', error);
       throw error;
     }
   }

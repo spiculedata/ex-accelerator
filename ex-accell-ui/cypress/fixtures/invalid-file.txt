@@ -1,0 +1,2 @@
+This is an invalid file for testing file upload validation.
+It should trigger validation errors when uploaded to components that expect specific file types.

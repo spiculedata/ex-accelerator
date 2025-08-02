@@ -68,6 +68,12 @@ This is a **SvelteKit 2.x** application enhanced with **Dapr** for microservices
 
 ## 🌟 Key Features
 
+### Unified DuckDB Analytics
+- **Cross-Table Analysis** - Single database for all analytics modules
+- **Multi-Platform Insights** - Compare sentiment, topics, and engagement across platforms
+- **Advanced Correlations** - Language-sentiment relationships and topic performance analysis
+- **Real-Time Dashboards** - Comprehensive analytics from unified data source
+
 ### Dapr Integration
 - **State Management** - Redis-backed persistent state
 - **Pub/Sub Messaging** - Event-driven communication
@@ -82,7 +88,16 @@ This is a **SvelteKit 2.x** application enhanced with **Dapr** for microservices
 
 ## 🔧 Configuration
 
-The project includes pre-configured Dapr components:
+### Database Architecture
+
+The application uses a **unified DuckDB database** for all analytics:
+
+- **Single Database**: `unified_social_analytics.db` - Contains all analytics modules
+- **Cross-Platform Analysis**: Sentiment, topics, language detection, and engagement in one place
+- **Advanced Views**: Pre-built analytical views for complex cross-table queries
+- **Schema**: `unified_social_analytics_schema.sql` - Complete database structure
+
+### Dapr Components
 
 - **State Store**: Redis (`components/statestore.yaml`)
 - **Pub/Sub**: Redis messaging (`components/pubsub.yaml`) 
