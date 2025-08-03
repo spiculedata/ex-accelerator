@@ -3,7 +3,7 @@
 
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
 import { daprWorkflowExecutor } from './daprWorkflowExecutor';
-import { pythonDaprWorkflowExecutor } from './pythonDaprWorkflowExecutor';
+import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
 import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
 
 export interface PublishedWorkflow {
@@ -236,15 +236,15 @@ class ServerWorkflowService {
     const execution = this.executions.get(executionId);
     if (execution && (execution.status === 'queued' || execution.status === 'running')) {
       try {
-        // Cancel in Python-based Dapr workflow runtime
-        await pythonDaprWorkflowExecutor.cancelWorkflow(executionId);
+        // Cancel in hybrid Dapr workflow runtime (JS SDK management)
+        await hybridDaprWorkflowExecutor.cancelWorkflow(executionId);
         
         execution.status = 'cancelled';
         execution.completedAt = new Date().toISOString();
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'info',
-          message: 'Workflow execution cancelled by user via Dapr'
+          message: 'Workflow execution cancelled by user via Dapr JS SDK'
         });
         this.executions.set(executionId, execution);
       } catch (error) {
@@ -264,35 +264,35 @@ class ServerWorkflowService {
   }
 
   /**
-   * Execute real workflow using Python-based Dapr
+   * Execute real workflow using hybrid approach (Python registration + JS SDK execution)
    */
   private async executeRealWorkflow(execution: WorkflowExecution, workflow: PublishedWorkflow): Promise<void> {
     try {
       execution.status = 'running';
-      execution.currentStep = 'Initializing Python-based workflow';
+      execution.currentStep = 'Initializing hybrid Dapr workflow';
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'info',
-        message: `Starting Python-based Dapr workflow execution: ${workflow.name}`
+        message: `Starting hybrid Dapr workflow execution: ${workflow.name} (Python registration + JS SDK execution)`
       });
 
       // Update execution in storage
       this.executions.set(execution.id, execution);
 
-      // Execute using Python-based Dapr workflow executor
-      await pythonDaprWorkflowExecutor.executeWorkflow(workflow, execution, execution.input);
+      // Execute using hybrid Dapr workflow executor
+      await hybridDaprWorkflowExecutor.executeWorkflow(workflow, execution, execution.input);
 
-      // The pythonDaprWorkflowExecutor will update the execution status during monitoring
+      // The hybridDaprWorkflowExecutor will update the execution status during monitoring
       
     } catch (error) {
-      console.error(`Python workflow execution ${execution.id} failed:`, error);
+      console.error(`Hybrid workflow execution ${execution.id} failed:`, error);
       execution.status = 'failed';
       execution.error = error.message;
       execution.completedAt = new Date().toISOString();
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Python workflow execution failed: ${error.message}`
+        message: `Hybrid workflow execution failed: ${error.message}`
       });
       this.executions.set(execution.id, execution);
     }

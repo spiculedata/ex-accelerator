@@ -8,16 +8,7 @@ apps:
     appProtocol: http
     daprHTTPPort: 3500
     daprGRPCPort: 50001
-    command: ["npm", "run", "dev"]
-  - appID: telegram-scraper
-    appDirPath: /Users/tombarber/Projects/telegram-scraper/
-    appPort: 3003
-    appProtocol: grpc
-    daprHTTPPort: 3502
-    daprGRPCPort: 50002
-    schedulerHostAddress: localhost
-    env:
-      CGO_CFLAGS: "-I/opt/homebrew/include"
-      CGO_LDFLAGS: "-L/opt/homebrew/lib -lssl -lcrypto"
-      STORAGE_ROOT: "./telegram-data"
-    command: ["./telegram-scraper", "--mode=dapr-job", "--dapr-port=3003"]
+    appHealthCheckPath: "/api/health"
+    appHealthProbeInterval: 10
+    appHealthProbeTimeout: 120
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

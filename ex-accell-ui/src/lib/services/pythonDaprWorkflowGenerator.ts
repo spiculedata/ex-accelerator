@@ -253,6 +253,7 @@ ${this.generateDaprWorkflowStepCalls(steps)}
 # ============================================================================
 
 # Create workflow runtime globally
+# Note: WorkflowRuntime will use environment variables for Dapr connection
 wfr = WorkflowRuntime()
 
 # Register workflow with decorator pattern
@@ -346,51 +347,45 @@ def load_data_activity(ctx: WorkflowActivityContext, input_data: dict):
 ${this.generateDaprDecoratedActivityMethods(steps)}
 
 def main():
-    """Main function to run the Dapr workflow - following official examples"""
+    """Main function to register workflows with Dapr runtime - for JS SDK execution"""
     
-    # Start the workflow runtime
-    logger.info("Starting Dapr workflow runtime...")
+    # Configure Dapr connection from environment variables
+    import os
+    dapr_http_port = os.getenv('DAPR_HTTP_PORT', '3500')
+    dapr_grpc_port = os.getenv('DAPR_GRPC_PORT', '50001')
+    dapr_http_endpoint = os.getenv('DAPR_HTTP_ENDPOINT', f'http://localhost:{dapr_http_port}')
+    dapr_grpc_endpoint = os.getenv('DAPR_GRPC_ENDPOINT', f'http://localhost:{dapr_grpc_port}')
+    
+    logger.info(f"Dapr configuration - HTTP Port: {dapr_http_port}, gRPC Port: {dapr_grpc_port}")
+    logger.info(f"Connecting to Dapr at HTTP: {dapr_http_endpoint}, gRPC: {dapr_grpc_endpoint}")
+    
+    # Debug: Show all Dapr-related environment variables
+    logger.info("All Dapr environment variables:")
+    for key, value in os.environ.items():
+        if 'DAPR' in key.upper():
+            logger.info(f"  {key} = {value}")
+    
+    # Start the workflow runtime to register workflows and activities
+    logger.info("Starting Dapr workflow runtime for workflow registration...")
     wfr.start()
-    print("Dapr workflow runtime started successfully")
+    print(f"Workflow '{${workflowName}}' registered successfully with Dapr runtime")
+    print("Workflow runtime ready for JS SDK execution")
+    print("ready to accept workflow execution requests from Dapr JS SDK")
     
-    # Create workflow client
-    wf_client = DaprWorkflowClient()
-    
-    # Get input data from command line or use default
-    if len(sys.argv) > 1:
-        try:
-            input_data = json.loads(sys.argv[1])
-        except json.JSONDecodeError:
-            logger.warning("Invalid JSON in command line argument, using default input")
-            input_data = {}
-    else:
-        input_data = {}
-    
-    # Start workflow instance
-    logger.info(f"Starting workflow instance with input: {input_data}")
-    instance_id = wf_client.schedule_new_workflow(
-        workflow=${workflowName},
-        input=input_data
-    )
-    logger.info(f"Workflow instance started: {instance_id}")
-    
-    # Wait for workflow completion
-    logger.info("Waiting for workflow completion...")
-    result = wf_client.wait_for_workflow_completion(
-        instance_id=instance_id,
-        timeout_in_seconds=300  # 5 minute timeout
-    )
-    
-    logger.info("Workflow completed!")
-    print("=" * 50)
-    print("WORKFLOW RESULTS:")
-    print("=" * 50)
-    print(json.dumps(result, indent=2))
-    
-    # Shutdown the runtime
-    wf_client.shutdown()
-    wfr.shutdown()
-    logger.info("Workflow runtime shutdown complete")
+    # Keep the runtime alive to serve workflow execution requests from JS SDK
+    try:
+        logger.info("Workflow runtime is running and ready to serve execution requests...")
+        print("Ready to accept workflow execution requests from Dapr JS SDK")
+        print(f"Listening on Dapr endpoints: {dapr_http_endpoint} (HTTP), {dapr_grpc_endpoint} (gRPC)")
+        
+        # Runtime stays alive to handle workflow executions triggered by JS SDK
+        import time
+        while True:
+            time.sleep(1)  # Keep runtime alive
+    except KeyboardInterrupt:
+        logger.info("Shutting down workflow runtime...")
+        wfr.shutdown()
+        logger.info("Workflow runtime shutdown complete")
 
 if __name__ == "__main__":
     main()

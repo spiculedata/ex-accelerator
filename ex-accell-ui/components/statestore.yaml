@@ -12,5 +12,5 @@ spec:
     value: ""
   - name: enableTLS
     value: false
-scopes:
-- ex-accell-ui
+  - name: actorStateStore
+    value: "true"
