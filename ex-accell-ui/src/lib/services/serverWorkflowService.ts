@@ -2,6 +2,9 @@
 // Handles workflow operations on the server without fetch dependencies
 
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
+import { daprWorkflowExecutor } from './daprWorkflowExecutor';
+import { pythonDaprWorkflowExecutor } from './pythonDaprWorkflowExecutor';
+import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
 
 export interface PublishedWorkflow {
   id: string;
@@ -184,8 +187,8 @@ class ServerWorkflowService {
     // Store execution
     this.executions.set(execution.id, execution);
 
-    // Start workflow execution (simulate asynchronously)
-    this.simulateWorkflowExecution(execution, workflow);
+    // Start real workflow execution using Dapr
+    this.executeRealWorkflow(execution, workflow);
 
     return execution;
   }
@@ -232,88 +235,67 @@ class ServerWorkflowService {
   async cancelWorkflowExecution(executionId: string): Promise<void> {
     const execution = this.executions.get(executionId);
     if (execution && (execution.status === 'queued' || execution.status === 'running')) {
-      execution.status = 'cancelled';
-      execution.completedAt = new Date().toISOString();
-      execution.logs.push({
-        timestamp: new Date().toISOString(),
-        level: 'info',
-        message: 'Workflow execution cancelled by user'
-      });
-      this.executions.set(executionId, execution);
+      try {
+        // Cancel in Python-based Dapr workflow runtime
+        await pythonDaprWorkflowExecutor.cancelWorkflow(executionId);
+        
+        execution.status = 'cancelled';
+        execution.completedAt = new Date().toISOString();
+        execution.logs.push({
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          message: 'Workflow execution cancelled by user via Dapr'
+        });
+        this.executions.set(executionId, execution);
+      } catch (error) {
+        console.error('Failed to cancel workflow in Dapr:', error);
+        // Still mark as cancelled locally
+        execution.status = 'cancelled';
+        execution.completedAt = new Date().toISOString();
+        execution.error = `Cancellation error: ${error.message}`;
+        execution.logs.push({
+          timestamp: new Date().toISOString(),
+          level: 'warn',
+          message: `Workflow marked as cancelled locally, Dapr cancellation failed: ${error.message}`
+        });
+        this.executions.set(executionId, execution);
+      }
     }
   }
 
   /**
-   * Simulate workflow execution
+   * Execute real workflow using Python-based Dapr
    */
-  private async simulateWorkflowExecution(execution: WorkflowExecution, workflow: PublishedWorkflow): Promise<void> {
-    // Simulate async execution
-    setTimeout(async () => {
-      try {
-        execution.status = 'running';
-        execution.currentStep = 'Starting workflow';
-        execution.logs.push({
-          timestamp: new Date().toISOString(),
-          level: 'info',
-          message: `Starting workflow: ${workflow.name}`
-        });
+  private async executeRealWorkflow(execution: WorkflowExecution, workflow: PublishedWorkflow): Promise<void> {
+    try {
+      execution.status = 'running';
+      execution.currentStep = 'Initializing Python-based workflow';
+      execution.logs.push({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: `Starting Python-based Dapr workflow execution: ${workflow.name}`
+      });
 
-        const steps = workflow.definition.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_output');
-        const totalSteps = steps.length;
+      // Update execution in storage
+      this.executions.set(execution.id, execution);
 
-        for (let i = 0; i < totalSteps; i++) {
-          const step = steps[i];
-          
-          execution.currentStep = step.name;
-          execution.progress = Math.round(((i + 1) / totalSteps) * 100);
-          
-          execution.logs.push({
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            message: `Executing step: ${step.name}`,
-            stepId: step.id,
-            stepName: step.name
-          });
+      // Execute using Python-based Dapr workflow executor
+      await pythonDaprWorkflowExecutor.executeWorkflow(workflow, execution, execution.input);
 
-          // Simulate step processing time
-          await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-        }
-
-        // Complete execution
-        execution.status = 'completed';
-        execution.progress = 100;
-        execution.currentStep = 'Completed';
-        execution.completedAt = new Date().toISOString();
-        execution.duration = new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime();
-        execution.output = {
-          processedRecords: Math.floor(Math.random() * 10000) + 1000,
-          resultDataset: `result_${execution.id}`,
-          summary: `Workflow ${workflow.name} completed successfully`
-        };
-
-        execution.logs.push({
-          timestamp: new Date().toISOString(),
-          level: 'info',
-          message: 'Workflow completed successfully',
-          data: execution.output
-        });
-
-        this.executions.set(execution.id, execution);
-        console.log(`Workflow execution ${execution.id} completed`);
-
-      } catch (error) {
-        execution.status = 'failed';
-        execution.error = error.message;
-        execution.completedAt = new Date().toISOString();
-        execution.logs.push({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          message: `Workflow failed: ${error.message}`
-        });
-        this.executions.set(execution.id, execution);
-        console.error(`Workflow execution ${execution.id} failed:`, error);
-      }
-    }, 500); // Start after 500ms
+      // The pythonDaprWorkflowExecutor will update the execution status during monitoring
+      
+    } catch (error) {
+      console.error(`Python workflow execution ${execution.id} failed:`, error);
+      execution.status = 'failed';
+      execution.error = error.message;
+      execution.completedAt = new Date().toISOString();
+      execution.logs.push({
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: `Python workflow execution failed: ${error.message}`
+      });
+      this.executions.set(execution.id, execution);
+    }
   }
 
   private estimateWorkflowDuration(workflowDefinition: any): number {

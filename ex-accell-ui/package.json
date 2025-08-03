@@ -5,9 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"dev:jupyter": "./start-dev.sh",
-		"dev:dapr": "dapr run -f ./dapr.yaml 2>&1 | node tee-monitor.cjs",
-		"dev:dapr:verbose": "dapr run -f ./dapr.yaml 2>&1 | node monitor-crawler-logs.cjs",
+		"dev:jupyter": "./scripts/start-dev.sh",
+		"dev:dapr": "dapr run -f ./dapr.yaml 2>&1 | node scripts/tee-monitor.cjs",
+		"dev:dapr:verbose": "dapr run -f ./dapr.yaml 2>&1 | node scripts/monitor-crawler-logs.cjs",
 		"dev:dapr:plain": "dapr run -f ./dapr.yaml",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -22,12 +22,12 @@
 		"test:component": "cypress run --component",
 		"test": "npm run cypress:run",
 		"jupyter:start": "poetry run jupyter lab --port=8888 --no-browser --allow-root",
-		"jupyter:bootstrap": "poetry install && poetry run python bootstrap_notebooks.py",
+		"jupyter:bootstrap": "poetry install && poetry run python scripts/bootstrap_notebooks.py",
 		"dapr:init": "dapr init",
-		"dapr:setup": "./setup-deployment.sh",
+		"dapr:setup": "./scripts/setup-deployment.sh",
 		"dapr:stop": "dapr stop --app-id ex-accell-ui; dapr stop --app-id telegram-scraper; pkill -f 'vite dev' || true; pkill -f 'telegram-scraper' || true; pkill -f 'daprd' || true",
 		"dapr:logs": "tail -f dapr-run.log",
-		"test:integration": "node test-dapr-job-integration.js"
+		"test:integration": "node scripts/test-dapr-job-integration.js"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -47,6 +47,7 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
+		"@dapr/dapr": "^3.5.2",
 		"@duckdb/node-api": "^1.3.2-alpha.25",
 		"@tailwindcss/vite": "^4.1.11",
 		"countries-list": "^3.1.1",

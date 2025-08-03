@@ -4,7 +4,20 @@
   import { onMount } from 'svelte';
   import { unifiedDb } from '$lib/services/duckdb';
   import { daprWorkflowGenerator, type GeneratedWorkflow } from '$lib/services/daprWorkflowGenerator';
+  // Remove client-side import - Python workflow generation now happens on server
   import type { PublishedWorkflow, WorkflowExecution } from '$lib/services/serverWorkflowService';
+  
+  // Type definition for Python workflow (matches server response)
+  interface PythonDaprWorkflow {
+    pythonScript: string;
+    requirements: string;
+    workflowCode: string;
+    activityCode: string;
+    appCode: string;
+    workflowPattern: string;
+    executionOrder: string[];
+    workflowName: string;
+  }
   
   // Available datasets from unified database
   let availableDatasets = [];
@@ -349,7 +362,8 @@
   // Code generation and export
   let showCodeExport = false;
   let generatedWorkflow: GeneratedWorkflow | null = null;
-  let activeCodeTab = 'workflow';
+  let pythonWorkflow: PythonDaprWorkflow | null = null;
+  let activeCodeTab = 'python';
   
   // Workflow publishing and execution
   let showPublishDialog = false;
@@ -672,40 +686,69 @@
     }
   }
 
-  function generateDaprCode() {
+  async function generateDaprCode() {
     try {
-      generatedWorkflow = daprWorkflowGenerator.generateWorkflowCode(workflow);
-      showCodeExport = true;
-      console.log('Generated Dapr workflow code:', generatedWorkflow);
+      // Generate Python-based Dapr workflow via server API
+      const response = await fetch('/api/generate-python-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workflowDefinition: workflow
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate Python workflow: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        pythonWorkflow = result.pythonWorkflow;
+        showCodeExport = true;
+        console.log('Generated Python-based Dapr workflow:', pythonWorkflow);
+      } else {
+        throw new Error(result.error || 'Unknown error generating Python workflow');
+      }
     } catch (error) {
-      console.error('Error generating workflow code:', error);
-      alert('Error generating workflow code: ' + error.message);
+      console.error('Error generating Python workflow code:', error);
+      alert('Error generating Python workflow code: ' + error.message);
     }
   }
 
   function downloadCode() {
-    if (!generatedWorkflow) return;
+    if (!pythonWorkflow) return;
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const workflowName = workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     
-    // Create a zip-like structure with multiple files
+    // Create a zip-like structure with multiple Python workflow files
     const files = [
       {
-        name: `${workflowName}_workflow.ts`,
-        content: generatedWorkflow.workflowCode + '\n\n' + generatedWorkflow.activityCode
+        name: `${workflowName}_workflow.py`,
+        content: pythonWorkflow.pythonScript
       },
       {
-        name: `${workflowName}_app.ts`,
-        content: generatedWorkflow.appCode
+        name: 'requirements.txt',
+        content: pythonWorkflow.requirements
+      },
+      {
+        name: `${workflowName}_dapr_workflow.ts`,
+        content: pythonWorkflow.workflowCode
+      },
+      {
+        name: `${workflowName}_dapr_activities.ts`,
+        content: pythonWorkflow.activityCode
+      },
+      {
+        name: `${workflowName}_dapr_app.ts`,
+        content: pythonWorkflow.appCode
       },
       {
         name: `${workflowName}_readme.md`,
-        content: generateReadme()
-      },
-      {
-        name: `package.json`,
-        content: generatePackageJson()
+        content: generatePythonReadme()
       }
     ];
     
@@ -776,6 +819,104 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
 - TODO comments indicate where you need to implement your specific data processing logic
 - Make sure to implement the data processing utility functions referenced in the activities
 - Adjust timeouts and retry policies based on your requirements
+`;
+  }
+
+  function generatePythonReadme(): string {
+    return `# ${workflow.name} - Python + Dapr Workflow
+
+## Description
+${workflow.description || 'Generated Python-based Dapr workflow from visual workflow builder'}
+
+## Architecture
+This workflow combines **Python data processing** with **Dapr workflow orchestration**:
+
+- **🐍 Python Script**: Contains the actual data processing logic with ML/NLP libraries
+- **⚡ Dapr Workflow**: Orchestrates Python script execution with monitoring and error handling
+- **🔧 Dapr Activities**: Bridge between Dapr workflow and Python script execution
+- **📦 Virtual Environment**: Isolated Python environment for dependencies
+
+## Workflow Pattern
+**Pattern:** ${pythonWorkflow?.workflowPattern || 'python-activity-sequence'}
+
+## Processing Steps
+${pythonWorkflow?.executionOrder.map((stepId, index) => {
+  const step = workflow.steps.find(s => s.id === stepId);
+  return `${index + 1}. ${step?.name || stepId} (${step?.type || 'unknown'})`;
+}).join('\n') || 'No steps defined'}
+
+## Setup Instructions
+
+### 1. Python Environment Setup
+\`\`\`bash
+# Create virtual environment
+python3 -m venv workflow_env
+source workflow_env/bin/activate  # On Windows: workflow_env\\Scripts\\activate
+
+# Install dependencies
+pip install -r requirements.txt
+\`\`\`
+
+### 2. Dapr Setup
+\`\`\`bash
+# Initialize Dapr (if not already done)
+dapr init
+
+# Start the Dapr workflow runtime
+npm install
+npm start
+\`\`\`
+
+### 3. Test Python Script Directly
+\`\`\`bash
+# Test the Python workflow script directly
+python ${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_workflow.py '{"dataset": "test_data", "parameters": {}}'
+\`\`\`
+
+### 4. Run Complete Workflow
+\`\`\`bash
+# Run through Dapr workflow orchestration
+dapr run --app-id python-workflow --app-port 3000 --dapr-http-port 3500 \\
+  node ${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_dapr_app.ts
+\`\`\`
+
+## Python Dependencies
+The following libraries are included for advanced data processing:
+- **pandas**: Data manipulation and analysis
+- **numpy**: Numerical computing
+- **scikit-learn**: Machine learning algorithms
+- **textblob**: Text processing and sentiment analysis
+- **nltk**: Natural language processing toolkit
+
+## Generated Files
+1. **\`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_workflow.py\`**: Main Python script with ML/NLP processing
+2. **\`requirements.txt\`**: Python dependencies
+3. **\`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_dapr_workflow.ts\`**: Dapr workflow orchestration
+4. **\`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_dapr_activities.ts\`**: Dapr activities for Python execution
+5. **\`${workflow.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_dapr_app.ts\`**: Complete Dapr application
+
+## Features
+- ✅ **Real Python ML/NLP Processing**: Uses actual libraries like scikit-learn, pandas, textblob
+- ✅ **Virtual Environment Isolation**: Each workflow has its own Python environment
+- ✅ **Dapr Orchestration**: Enterprise-grade workflow management
+- ✅ **Error Handling**: Comprehensive error handling and logging
+- ✅ **Monitoring**: Real-time progress tracking and status updates
+- ✅ **Scalability**: Dapr provides distributed computing capabilities
+
+## Workflow Execution Flow
+1. **Visual Design** → User creates workflow in visual builder
+2. **Code Generation** → System generates Python + Dapr code
+3. **Environment Setup** → Creates virtual environment and installs dependencies
+4. **Dapr Orchestration** → Dapr workflow manages Python script execution
+5. **Data Processing** → Python script performs actual ML/NLP operations
+6. **Results** → Comprehensive output with processing results
+
+## Notes
+- Ensure Python 3.8+ is installed
+- NLTK data will be downloaded automatically on first run
+- Virtual environment path: \`workflow-venvs/<workflow-id>/\`
+- Adjust timeout settings in Dapr activities based on your data size
+- Monitor logs through Dapr dashboard or application logs
 `;
   }
 
@@ -1397,7 +1538,7 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
 </div>
 
 <!-- Code Export Modal -->
-{#if showCodeExport && generatedWorkflow}
+{#if showCodeExport && pythonWorkflow}
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white rounded-xl shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] flex flex-col">
       <!-- Modal Header -->
@@ -1409,8 +1550,8 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
             </svg>
           </div>
           <div>
-            <h3 class="text-xl font-semibold text-gray-900">Generated Dapr Workflow Code</h3>
-            <p class="text-sm text-gray-600">Pattern: {generatedWorkflow.workflowPattern} • {workflow.steps.length} steps</p>
+            <h3 class="text-xl font-semibold text-gray-900">Generated Python Workflow</h3>
+            <p class="text-sm text-gray-600">Pattern: {pythonWorkflow.workflowPattern} • {workflow.steps.length} steps • Virtual Environment Enabled</p>
           </div>
         </div>
         <div class="flex items-center space-x-3">
@@ -1436,36 +1577,36 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
       <div class="border-b border-gray-200">
         <nav class="flex space-x-8 px-6">
           <button 
-            on:click={() => activeCodeTab = 'workflow'}
-            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'workflow' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
-            Workflow Definition
+            on:click={() => activeCodeTab = 'python'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'python' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            🐍 Python Script
+          </button>
+          <button 
+            on:click={() => activeCodeTab = 'requirements'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'requirements' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            📦 Requirements
+          </button>
+          <button 
+            on:click={() => activeCodeTab = 'dapr'}
+            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'dapr' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
+            ⚡ Dapr Workflow
           </button>
           <button 
             on:click={() => activeCodeTab = 'activities'}
             class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'activities' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
-            Activities
-          </button>
-          <button 
-            on:click={() => activeCodeTab = 'app'}
-            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'app' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
-            Application
-          </button>
-          <button 
-            on:click={() => activeCodeTab = 'package'}
-            class="py-3 border-b-2 font-medium text-sm transition-colors {activeCodeTab === 'package' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
-            Package.json
+            🔧 Activities
           </button>
         </nav>
       </div>
 
       <!-- Code Content -->
       <div class="flex-1 overflow-hidden">
-        {#if activeCodeTab === 'workflow'}
+        {#if activeCodeTab === 'python'}
           <div class="h-full flex flex-col">
             <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-              <h4 class="text-sm font-medium text-gray-900">Workflow Function</h4>
+              <h4 class="text-sm font-medium text-gray-900">🐍 Python Workflow Script</h4>
               <button 
-                on:click={() => copyToClipboard(generatedWorkflow.workflowCode)}
+                on:click={() => copyToClipboard(pythonWorkflow.pythonScript)}
                 class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -1474,15 +1615,49 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
               </button>
             </div>
             <div class="flex-1 overflow-auto">
-              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.workflowCode}</code></pre>
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{pythonWorkflow.pythonScript}</code></pre>
+            </div>
+          </div>
+        {:else if activeCodeTab === 'requirements'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">📦 Python Requirements</h4>
+              <button 
+                on:click={() => copyToClipboard(pythonWorkflow.requirements)}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{pythonWorkflow.requirements}</code></pre>
+            </div>
+          </div>
+        {:else if activeCodeTab === 'dapr'}
+          <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
+              <h4 class="text-sm font-medium text-gray-900">⚡ Dapr Workflow Orchestration</h4>
+              <button 
+                on:click={() => copyToClipboard(pythonWorkflow.workflowCode)}
+                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-auto">
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{pythonWorkflow.workflowCode}</code></pre>
             </div>
           </div>
         {:else if activeCodeTab === 'activities'}
           <div class="h-full flex flex-col">
             <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-              <h4 class="text-sm font-medium text-gray-900">Activity Functions</h4>
+              <h4 class="text-sm font-medium text-gray-900">🔧 Dapr Activities</h4>
               <button 
-                on:click={() => copyToClipboard(generatedWorkflow.activityCode)}
+                on:click={() => copyToClipboard(pythonWorkflow.activityCode)}
                 class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -1491,41 +1666,7 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
               </button>
             </div>
             <div class="flex-1 overflow-auto">
-              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.activityCode}</code></pre>
-            </div>
-          </div>
-        {:else if activeCodeTab === 'app'}
-          <div class="h-full flex flex-col">
-            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-              <h4 class="text-sm font-medium text-gray-900">Complete Application Code</h4>
-              <button 
-                on:click={() => copyToClipboard(generatedWorkflow.appCode)}
-                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
-            </div>
-            <div class="flex-1 overflow-auto">
-              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatedWorkflow.appCode}</code></pre>
-            </div>
-          </div>
-        {:else if activeCodeTab === 'package'}
-          <div class="h-full flex flex-col">
-            <div class="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-              <h4 class="text-sm font-medium text-gray-900">Package Configuration</h4>
-              <button 
-                on:click={() => copyToClipboard(generatePackageJson())}
-                class="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                </svg>
-                <span>Copy</span>
-              </button>
-            </div>
-            <div class="flex-1 overflow-auto">
-              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{generatePackageJson()}</code></pre>
+              <pre class="text-xs text-gray-800 p-4 bg-gray-50 h-full overflow-auto"><code>{pythonWorkflow.activityCode}</code></pre>
             </div>
           </div>
         {/if}
@@ -1535,8 +1676,9 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
       <div class="p-6 border-t border-gray-200 bg-gray-50">
         <div class="flex items-center justify-between">
           <div class="text-sm text-gray-600">
-            <p><strong>Workflow Pattern:</strong> {generatedWorkflow.workflowPattern}</p>
-            <p><strong>Steps:</strong> {generatedWorkflow.executionOrder.length} activities</p>
+            <p><strong>Workflow Pattern:</strong> {pythonWorkflow.workflowPattern}</p>
+            <p><strong>Steps:</strong> {pythonWorkflow.executionOrder.length} activities</p>
+            <p><strong>Runtime:</strong> Python + Dapr with Virtual Environment</p>
           </div>
           <div class="flex items-center space-x-3">
             <button 
@@ -1717,7 +1859,7 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
 <!-- Execution Monitor Dialog -->
 {#if showExecutionMonitor && currentExecution}
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+    <div class="bg-white rounded-xl shadow-xl max-w-7xl w-full mx-4 max-h-[95vh] flex flex-col">
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div class="flex items-center space-x-3">
           <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
@@ -1775,8 +1917,29 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
           {/if}
         </div>
 
-        <!-- Execution Details -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Execution Logs (Primary Focus) -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+          <h4 class="text-sm font-medium text-gray-900 mb-4">Execution Logs</h4>
+          <div class="space-y-1 max-h-[50vh] overflow-auto bg-gray-900 rounded-lg p-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+            {#each currentExecution.logs as log}
+              <div class="flex items-start space-x-3 text-sm font-mono hover:bg-gray-800 px-2 py-1 rounded">
+                <span class="text-xs text-gray-400 w-20 flex-shrink-0">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                <span class="w-12 flex-shrink-0 font-semibold {log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-yellow-400' : 'text-green-400'}">
+                  {log.level.toUpperCase()}
+                </span>
+                <span class="text-gray-100 flex-1 break-words leading-relaxed">{log.message}</span>
+              </div>
+            {/each}
+            {#if currentExecution.logs.length === 0}
+              <p class="text-sm text-gray-400 italic">No logs available yet...</p>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Execution Details & Results -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-gray-50 rounded-lg p-4">
             <h4 class="text-sm font-medium text-gray-900 mb-2">Execution Details</h4>
             <div class="text-sm text-gray-600 space-y-1">
@@ -1795,32 +1958,11 @@ ${workflow.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_o
           {#if currentExecution.output}
             <div class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-medium text-gray-900 mb-2">Results</h4>
-              <div class="text-sm text-gray-600">
-                <pre class="whitespace-pre-wrap">{JSON.stringify(currentExecution.output, null, 2)}</pre>
+              <div class="text-sm text-gray-600 max-h-64 overflow-auto">
+                <pre class="whitespace-pre-wrap font-mono bg-gray-800 text-gray-100 p-3 rounded">{JSON.stringify(currentExecution.output, null, 2)}</pre>
               </div>
             </div>
           {/if}
-        </div>
-
-        <!-- Execution Logs -->
-        <div class="bg-gray-50 rounded-lg p-4">
-          <h4 class="text-sm font-medium text-gray-900 mb-4">Execution Logs</h4>
-          <div class="space-y-2 max-h-64 overflow-auto">
-            {#each currentExecution.logs as log}
-              <div class="flex items-start space-x-3 text-sm">
-                <span class="text-xs text-gray-500 font-mono w-20 flex-shrink-0">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-                <span class="w-12 flex-shrink-0 {log.level === 'error' ? 'text-red-600' : log.level === 'warn' ? 'text-yellow-600' : 'text-gray-600'}">
-                  {log.level.toUpperCase()}
-                </span>
-                <span class="text-gray-700 flex-1">{log.message}</span>
-              </div>
-            {/each}
-            {#if currentExecution.logs.length === 0}
-              <p class="text-sm text-gray-500 italic">No logs available yet...</p>
-            {/if}
-          </div>
         </div>
       </div>
     </div>

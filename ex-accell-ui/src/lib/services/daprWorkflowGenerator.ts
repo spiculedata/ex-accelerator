@@ -32,6 +32,7 @@ interface WorkflowDefinition {
 }
 
 export interface GeneratedWorkflow {
+  workflowName: string;
   workflowCode: string;
   activityCode: string;
   appCode: string;
@@ -48,13 +49,42 @@ export class DaprWorkflowGenerator {
     const pattern = this.detectWorkflowPattern(workflow);
     const executionOrder = this.calculateExecutionOrder(workflow);
     
+    // Generate a valid workflow name from the workflow definition
+    const workflowName = this.generateWorkflowName(workflow);
+    
     return {
+      workflowName,
       workflowCode: this.generateWorkflowFunction(workflow, pattern, executionOrder),
       activityCode: this.generateActivities(workflow),
       appCode: this.generateApplicationCode(workflow),
       workflowPattern: pattern,
       executionOrder
     };
+  }
+
+  /**
+   * Generate a valid workflow name for Dapr
+   */
+  private generateWorkflowName(workflow: WorkflowDefinition): string {
+    // Create a valid workflow name from the workflow name
+    const baseName = workflow.name || 'UntitledWorkflow';
+    
+    // Convert to camelCase and remove invalid characters
+    const workflowName = baseName
+      .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+      .split(' ')
+      .map((word, index) => {
+        if (index === 0) {
+          return word.toLowerCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join('');
+    
+    // Ensure it starts with a letter and is not empty
+    const finalName = workflowName.match(/^[a-zA-Z]/) ? workflowName : `workflow${workflowName}`;
+    
+    return finalName || 'defaultWorkflow';
   }
 
   /**
