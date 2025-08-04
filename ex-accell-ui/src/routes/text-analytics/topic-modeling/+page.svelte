@@ -75,13 +75,13 @@
   let selectedCategory = 'all';
   let selectedTopic: Topic | null = null;
   let searchQuery = '';
-  let minTopicSize = 100;
+  let minTopicSize = 1;
   let showNetworkDiagram = true;
   let networkChart: any = null;
   let treemapChart: any = null;
 
   // Reactive statements for filter changes - only reload after initial load
-  $: if ((selectedCategory !== 'all' || searchQuery !== '' || minTopicSize !== 100) && !loading && topicsData.length > 0) {
+  $: if ((selectedCategory !== 'all' || searchQuery !== '' || minTopicSize !== 1) && !loading && topicsData.length > 0) {
     loadFilteredTopics();
   }
 
@@ -658,9 +658,9 @@
           <input 
             type="range" 
             bind:value={minTopicSize}
-            min="500" 
-            max="5000" 
-            step="100"
+            min="1" 
+            max="100" 
+            step="1"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
         

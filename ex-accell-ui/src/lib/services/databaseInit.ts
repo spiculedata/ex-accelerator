@@ -1,7 +1,33 @@
 // Database Initialization Service
 // Ensures all required tables exist for the workflow system
 
-import { unifiedDb } from './duckdb';
+import { DuckDBInstance } from '@duckdb/node-api';
+import { join } from 'path';
+
+// Direct DuckDB connection for server-side operations
+let db: DuckDBInstance | null = null;
+
+async function getDb() {
+  if (!db) {
+    const dbPath = join(process.cwd(), 'unified_social_analytics.db');
+    db = await DuckDBInstance.create(dbPath);
+  }
+  return db;
+}
+
+async function executeQuery(sql: string): Promise<any[]> {
+  try {
+    const database = await getDb();
+    const connection = await database.connect();
+    const result = await connection.runAndReadAll(sql);
+    const rows = result.getRowObjectsJS();
+    connection.closeSync();
+    return rows;
+  } catch (error) {
+    console.error('Direct DuckDB query error:', error);
+    return [];
+  }
+}
 
 export class DatabaseInitService {
   private initialized = false;
@@ -10,7 +36,8 @@ export class DatabaseInitService {
     if (this.initialized) return;
 
     try {
-      await unifiedDb.connect();
+      // Ensure database connection exists
+      await getDb();
 
       // Create workflow management tables
       await this.createWorkflowTables();
@@ -25,7 +52,7 @@ export class DatabaseInitService {
 
   private async createWorkflowTables(): Promise<void> {
     // Published Workflows Table
-    await unifiedDb.query(`
+    await executeQuery(`
       CREATE TABLE IF NOT EXISTS published_workflows (
         id VARCHAR PRIMARY KEY,
         name VARCHAR NOT NULL,
@@ -44,7 +71,7 @@ export class DatabaseInitService {
     `);
 
     // Workflow Executions Table
-    await unifiedDb.query(`
+    await executeQuery(`
       CREATE TABLE IF NOT EXISTS workflow_executions (
         id VARCHAR PRIMARY KEY,
         workflow_id VARCHAR NOT NULL,
@@ -64,17 +91,17 @@ export class DatabaseInitService {
     `);
 
     // Create indexes for performance
-    await unifiedDb.query(`
+    await executeQuery(`
       CREATE INDEX IF NOT EXISTS idx_published_workflows_status 
       ON published_workflows(status)
     `);
 
-    await unifiedDb.query(`
+    await executeQuery(`
       CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id 
       ON workflow_executions(workflow_id)
     `);
 
-    await unifiedDb.query(`
+    await executeQuery(`
       CREATE INDEX IF NOT EXISTS idx_workflow_executions_status 
       ON workflow_executions(status)
     `);
@@ -82,8 +109,8 @@ export class DatabaseInitService {
 
   async testConnection(): Promise<boolean> {
     try {
-      await unifiedDb.connect();
-      await unifiedDb.query('SELECT 1 as test');
+      await getDb();
+      await executeQuery('SELECT 1 as test');
       return true;
     } catch (error) {
       console.error('Database connection test failed:', error);

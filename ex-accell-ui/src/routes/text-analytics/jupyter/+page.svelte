@@ -61,7 +61,8 @@
           <div class="flex items-center">
             <button 
               on:click={() => window.location.href='/text-analytics'}
-              class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
+              class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm"
+              aria-label="Go back to Text Analytics">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
               </svg>
@@ -122,7 +123,8 @@
       
       <button 
         on:click={openInNewTab}
-        class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors">
+        class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors"
+        aria-label="Open Jupyter Lab in new tab">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
         </svg>
@@ -130,7 +132,8 @@
       
       <button 
         on:click={toggleFullScreen}
-        class="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-colors">
+        class="p-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-colors"
+        aria-label="Exit full screen mode">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>

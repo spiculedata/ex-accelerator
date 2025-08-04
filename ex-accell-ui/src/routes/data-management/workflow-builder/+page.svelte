@@ -1475,6 +1475,41 @@ The following libraries are included for advanced data processing:
                   </button>
                 </div>
               </div>
+            {:else if selectedStep.type === 'remove_duplicates'}
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Columns to Check for Duplicates</label>
+                  <input 
+                    type="text" 
+                    bind:value={selectedStep.config.columns}
+                    on:input={(e) => updateStepConfig(selectedStep.id, { columns: e.target.value.split(',').map(c => c.trim()).filter(Boolean) })}
+                    placeholder="e.g., id, email, name (leave empty for all columns)" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <p class="text-xs text-gray-500 mt-1">Enter column names separated by commas, or leave empty to check all columns</p>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Keep Strategy</label>
+                  <select 
+                    bind:value={selectedStep.config.keep}
+                    on:change={(e) => updateStepConfig(selectedStep.id, { keep: e.target.value })}
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="first">Keep First Occurrence</option>
+                    <option value="last">Keep Last Occurrence</option>
+                  </select>
+                  <p class="text-xs text-gray-500 mt-1">Choose which duplicate record to keep when duplicates are found</p>
+                </div>
+                
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <div class="flex items-start space-x-2">
+                    <span class="text-blue-600 mt-0.5">ℹ️</span>
+                    <div>
+                      <p class="text-sm font-medium text-blue-900">Duplicate Detection</p>
+                      <p class="text-xs text-blue-700">Uses Polars for high-performance duplicate detection. If no columns are specified, all columns will be compared for exact matches.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             {:else if selectedStep.type === 'text_preprocessing'}
               <div class="space-y-3">
                 <div>

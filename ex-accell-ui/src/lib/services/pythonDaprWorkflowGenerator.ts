@@ -663,6 +663,68 @@ def ${activityName}(ctx: WorkflowActivityContext, input_data: dict):
         
         logger.info(f"Formed {n_clusters} clusters from {len(cluster_labels)} data points")`;
 
+      case 'remove_duplicates':
+        return `# Remove duplicates implementation using Polars
+        if workflow_df is None:
+            raise ValueError("No data available for duplicate removal")
+        
+        # Convert pandas DataFrame to Polars if needed
+        import polars as pl
+        original_count = len(workflow_df)
+        
+        # Convert to Polars DataFrame for efficient duplicate handling
+        if hasattr(workflow_df, 'to_dict'):
+            # If it's a pandas DataFrame
+            polars_df = pl.DataFrame(workflow_df.to_dict(orient='list'))
+        else:
+            # Assume it's already a Polars DataFrame
+            polars_df = workflow_df
+        
+        # Get configuration from step config
+        columns_config = '${JSON.stringify(step.config.columns || [])}'
+        keep_strategy = '${step.config.keep || 'first'}'
+        
+        # Parse columns configuration
+        import json
+        columns_to_check = json.loads(columns_config) if columns_config != '[]' else None
+        
+        if columns_to_check and len(columns_to_check) > 0:
+            # Remove duplicates based on specified columns
+            if keep_strategy == 'first':
+                deduplicated_df = polars_df.unique(subset=columns_to_check, keep='first')
+            elif keep_strategy == 'last':
+                deduplicated_df = polars_df.unique(subset=columns_to_check, keep='last')
+            else:
+                # Remove all duplicates (keep='none' equivalent)
+                deduplicated_df = polars_df.unique(subset=columns_to_check, keep='first')
+        else:
+            # Remove duplicates across all columns
+            if keep_strategy == 'first':
+                deduplicated_df = polars_df.unique(keep='first')
+            elif keep_strategy == 'last':
+                deduplicated_df = polars_df.unique(keep='last')
+            else:
+                deduplicated_df = polars_df.unique(keep='first')
+        
+        # Convert back to pandas DataFrame for compatibility with other steps
+        workflow_df = deduplicated_df.to_pandas()
+        
+        final_count = len(workflow_df)
+        duplicates_removed = original_count - final_count
+        
+        result = {
+            'success': True,
+            'original_count': original_count,
+            'final_count': final_count,
+            'duplicates_removed': duplicates_removed,
+            'columns_checked': columns_to_check or 'all_columns',
+            'keep_strategy': keep_strategy,
+            'duplicate_percentage': round((duplicates_removed / original_count) * 100, 2) if original_count > 0 else 0,
+            'method': 'polars_unique'
+        }
+        
+        logger.info(f"Removed {duplicates_removed} duplicates ({result['duplicate_percentage']}%) from {original_count} records")`;
+
       default:
         return `# Generic step implementation
         logger.info(f"Executing generic step: ${step.type}")
@@ -688,6 +750,7 @@ def ${activityName}(ctx: WorkflowActivityContext, input_data: dict):
       'dapr-ext-workflow>=1.15.0',  // Dapr Workflow Extension
       'pandas>=2.0.0',
       'numpy>=1.24.0',
+      'polars>=0.20.0',         // High-performance DataFrame library
       'scikit-learn>=1.3.0',
       'textblob>=0.17.1',
       'nltk>=3.8.1'
