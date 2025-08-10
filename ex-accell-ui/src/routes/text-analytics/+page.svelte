@@ -126,6 +126,33 @@
         </div>
       </div>
 
+      <!-- Trigrams Analysis -->
+      <div 
+        class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-purple-500 cursor-pointer transition-all duration-200"
+        on:click={() => window.location.href='/text-analytics/trigrams'}>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mr-3">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900">Trigrams Analysis</h3>
+          </div>
+          <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Available</span>
+        </div>
+        <p class="text-gray-600 mb-4">Discover three-word phrase patterns and linguistic trends in social media content.</p>
+        <div class="flex items-center justify-between">
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">social media marketing</span>
+            <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">artificial intelligence technology</span>
+          </div>
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+      </div>
+
       <!-- Language Detection -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200"

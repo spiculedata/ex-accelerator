@@ -85,10 +85,16 @@
           if (currentLogJob && currentLogJob.id === jobId) {
             currentLogJob = crawlJobs[jobIndex];
             
-            // Auto-scroll to new logs if they were added
-            if (newLogCount > previousLogCount && logScrollAnchor) {
+            // Auto-scroll to new logs only if user is near the bottom
+            if (newLogCount > previousLogCount && logScrollAnchor && logContainer) {
               setTimeout(() => {
-                logScrollAnchor?.scrollIntoView({ behavior: 'smooth' });
+                const container = logContainer;
+                const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 50;
+                
+                // Only auto-scroll if user was already viewing the bottom
+                if (isNearBottom) {
+                  logScrollAnchor?.scrollIntoView({ behavior: 'smooth' });
+                }
               }, 100);
             }
           }
@@ -353,6 +359,10 @@
   // Delete functionality state
   let jobToDelete = null;
   let showDeleteConfirmation = false;
+  
+  // Error modal state
+  let showErrorModal = false;
+  let errorModalMessage = '';
 
   // Analytics calculations
   $: analyticsData = {
@@ -1059,12 +1069,137 @@
     activeTab = 'schedule';
   }
   
-  function runCrawl(jobId: string) {
-    crawlJobs = crawlJobs.map(job => 
-      job.id === jobId 
-        ? { ...job, status: 'running', progress: 0, startTime: new Date().toISOString() }
-        : job
+  async function runCrawl(jobId: string) {
+    // Find the job to run
+    const job = crawlJobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    // Update UI to show running status
+    crawlJobs = crawlJobs.map(j => 
+      j.id === jobId 
+        ? { ...j, status: 'running', progress: 0, startTime: new Date().toISOString() }
+        : j
     );
+
+    try {
+      // Submit job to API for immediate execution - format matches telegram-scraper README
+      const jobPayload = {
+        name: `run-now-${job.name || jobId}-${Date.now()}`,
+        dueTime: "1s", // Execute immediately
+        data: {
+          droid: job.jobData?.droid || job.name || `crawl-job-${Date.now()}`,
+          task: job.platform === 'youtube' ? "crawl youtube channels" : "crawl telegram channels",
+          urls: job.jobData?.urls || [],
+          platform: job.platform || "telegram",
+          crawlId: job.jobData?.crawlId || `crawl-${Date.now()}`,
+          // Core parameters
+          maxPosts: job.jobData?.maxPosts || 100,
+          maxDepth: job.jobData?.maxDepth || 2,
+          concurrency: job.jobData?.concurrency || 1,
+          // YouTube specific
+          youtubeApiKey: job.jobData?.youtubeApiKey,
+          samplingMethod: job.jobData?.samplingMethod,
+          minChannelVideos: job.jobData?.minChannelVideos,
+          sampleSize: job.jobData?.sampleSize,
+          // Date filtering
+          minPostDate: job.jobData?.minPostDate,
+          dateBetweenMin: job.jobData?.dateBetweenMin,
+          dateBetweenMax: job.jobData?.dateBetweenMax,
+          timeAgo: job.jobData?.timeAgo || "7d",
+          // Media options
+          skipMedia: job.jobData?.skipMedia !== false, // Default to true unless explicitly false
+          // Advanced options
+          maxPages: job.jobData?.maxPages,
+          urlFile: job.jobData?.urlFile,
+          tdlibDatabaseUrls: job.jobData?.tdlibDatabaseUrls
+        }
+      };
+
+      console.log('Submitting job for execution:', jobPayload);
+
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(jobPayload)
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to submit job: ${response.status}`;
+        
+        // Log response details for debugging
+        console.log('Error response status:', response.status);
+        console.log('Error response statusText:', response.statusText);
+        console.log('Error response headers:', Object.fromEntries(response.headers.entries()));
+        
+        try {
+          const errorData = await response.json();
+          console.log('Server error response (parsed JSON):', errorData);
+          console.log('Error data type:', typeof errorData);
+          console.log('Error data keys:', Object.keys(errorData || {}));
+          
+          // SvelteKit error() returns { message, status } format
+          // Try to extract the actual error message from various response formats
+          if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          } else if (errorData.body?.message) {
+            errorMessage = errorData.body.message;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          } else {
+            // If we have an object but can't find message, stringify for debugging
+            console.log('No message field found, full error data:', JSON.stringify(errorData, null, 2));
+          }
+        } catch (jsonError) {
+          console.log('Failed to parse JSON, trying text response:', jsonError.message);
+          // If we can't parse JSON, try to get text response
+          try {
+            // Clone the response to avoid consuming it twice
+            const responseClone = response.clone();
+            const errorText = await responseClone.text();
+            console.log('Server error text:', errorText);
+            if (errorText.trim()) {
+              errorMessage = errorText;
+            }
+          } catch (textError) {
+            console.log('Failed to get text response:', textError.message);
+            errorMessage = `Failed to submit job: ${response.status} ${response.statusText}`;
+          }
+        }
+        
+        console.log('Final error message being thrown:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('Job submitted successfully:', result);
+
+      // Update job status to indicate submission succeeded
+      crawlJobs = crawlJobs.map(j => 
+        j.id === jobId 
+          ? { ...j, status: 'running', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Job execution started via Run Now`] }
+          : j
+      );
+
+    } catch (error) {
+      console.error('Failed to run job:', error);
+      
+      // Show error modal instead of alert
+      errorModalMessage = error.message;
+      showErrorModal = true;
+      
+      // Revert status on error
+      crawlJobs = crawlJobs.map(j => 
+        j.id === jobId 
+          ? { ...j, status: 'scheduled', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Failed to start execution: ${error.message}`] }
+          : j
+      );
+    }
   }
   
   function handleFileUpload() {
@@ -1119,12 +1254,12 @@
       startRealTimeLogUpdates(job.id);
     }
     
-    // Auto-scroll to bottom initially
+    // Reset scroll position to show logs from the top
     setTimeout(() => {
-      if (logScrollAnchor) {
-        logScrollAnchor.scrollIntoView({ behavior: 'smooth' });
+      if (logContainer) {
+        logContainer.scrollTop = 0;
       }
-    }, 200);
+    }, 50);
   }
 
   function closeLogViewer() {
@@ -3537,7 +3672,7 @@
         
         <div 
           bind:this={logContainer}
-          class="bg-gray-900 rounded-xl p-4 h-96 overflow-y-auto font-mono text-sm">
+          class="bg-gray-900 rounded-xl p-4 overflow-y-auto font-mono text-sm" style="height: 24rem; max-height: 50vh;">
           {#if currentLogJob.logs && currentLogJob.logs.length > 0}
             {#each currentLogJob.logs as logLine, index}
               <div class="mb-1 {logLine.includes('ERROR') ? 'text-red-400' : logLine.includes('WARN') ? 'text-yellow-400' : logLine.includes('DEBUG') ? 'text-blue-400' : logLine.includes('INFO') ? 'text-green-400' : 'text-gray-300'}">
@@ -3605,6 +3740,34 @@
           on:click={deleteJob}
           class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
           Delete Job
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Error Modal -->
+{#if showErrorModal}
+  <div class="fixed inset-0 bg-gray-500/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+      <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </div>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Job Execution Failed</h3>
+        <p class="text-sm text-gray-600 text-left bg-gray-50 p-3 rounded-lg border">
+          {errorModalMessage}
+        </p>
+      </div>
+      
+      <div class="flex justify-center">
+        <button 
+          on:click={() => showErrorModal = false}
+          class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+          OK
         </button>
       </div>
     </div>

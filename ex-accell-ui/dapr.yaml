@@ -12,3 +12,10 @@ apps:
     appHealthProbeInterval: 10
     appHealthProbeTimeout: 120
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+  - appID: telegram-scraper
+    appDirPath: /Users/tombarber/Projects/telegram-scraper
+    appPort: 6481
+    appProtocol: grpc
+    daprHTTPPort: 3502
+    daprGRPCPort: 50002
+    command: ["./telegram-scraper", "--mode", "dapr-job"]

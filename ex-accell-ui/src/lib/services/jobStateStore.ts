@@ -41,6 +41,13 @@ export interface JobState {
 	};
 }
 
+class DaprConnectionError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'DaprConnectionError';
+	}
+}
+
 export class JobStateStore {
 	private baseUrl: string;
 
@@ -49,10 +56,46 @@ export class JobStateStore {
 	}
 
 	/**
+	 * Check if Dapr state store is available and provide helpful error
+	 */
+	private async checkDaprConnection(): Promise<void> {
+		try {
+			// Test the state store directly instead of health endpoint
+			const response = await fetch(`${this.baseUrl}/dapr-health-test`, {
+				method: 'GET',
+				signal: AbortSignal.timeout(3000) // 3 second timeout
+			});
+			
+			// 204 (not found) is fine - it means Dapr state store is responding
+			if (response.status !== 204 && response.status !== 404) {
+				throw new DaprConnectionError(
+					`Dapr state store is not responding properly (status: ${response.status}). Please check Dapr configuration.`
+				);
+			}
+		} catch (error) {
+			if (error instanceof DaprConnectionError) {
+				throw error;
+			}
+			
+			// Connection refused or timeout
+			throw new DaprConnectionError(
+				`Failed to connect to Dapr sidecar on port ${DAPR_HTTP_PORT}. ` +
+				`Please ensure the unified deployment is running:\n\n` +
+				`1. Start Docker Desktop\n` +
+				`2. Run: npm run dapr:setup\n` +
+				`3. Run: npm run dev:dapr\n\n` +
+				`Or check if Redis is running: docker ps | grep redis`
+			);
+		}
+	}
+
+	/**
 	 * Save a job state to the Dapr state store
 	 */
 	async saveJobState(jobState: JobState): Promise<void> {
 		try {
+			await this.checkDaprConnection();
+			
 			// Save the job state
 			const saveJobResponse = await fetch(this.baseUrl, {
 				method: 'POST',
@@ -75,7 +118,11 @@ export class JobStateStore {
 			// Maintain a job registry for listing all jobs
 			await this.updateJobRegistry(jobState.id);
 		} catch (error) {
-			console.error('Error saving job state:', error);
+			if (error instanceof DaprConnectionError) {
+				console.error('Dapr Connection Error:', error.message);
+			} else {
+				console.error('Error saving job state:', error);
+			}
 			throw error;
 		}
 	}
@@ -173,6 +220,8 @@ export class JobStateStore {
 	 */
 	async getJobState(jobId: string): Promise<JobState | null> {
 		try {
+			await this.checkDaprConnection();
+			
 			const response = await fetch(`${this.baseUrl}/job:${jobId}`, {
 				method: 'GET',
 			});
@@ -204,6 +253,8 @@ export class JobStateStore {
 	 */
 	async getAllJobStates(): Promise<JobState[]> {
 		try {
+			await this.checkDaprConnection();
+			
 			// Get job registry to find all job IDs
 			const registryResponse = await fetch(`${this.baseUrl}/job-registry`, {
 				method: 'GET',
@@ -262,8 +313,7 @@ export class JobStateStore {
 			);
 		} catch (error) {
 			console.error('Error getting all job states:', error);
-			// Fallback: return empty array instead of throwing
-			return [];
+			throw error;
 		}
 	}
 
@@ -325,6 +375,8 @@ export class JobStateStore {
 	 */
 	async deleteJobState(jobId: string): Promise<void> {
 		try {
+			await this.checkDaprConnection();
+			
 			// Delete the job state
 			const response = await fetch(`${this.baseUrl}/job:${jobId}`, {
 				method: 'DELETE',
