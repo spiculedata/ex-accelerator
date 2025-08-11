@@ -160,6 +160,7 @@ class JobSchedulerService {
 	}
 
 	validateJobRequest(request: Partial<JobScheduleRequest>): string[] {
+		// Only validate absolutely essential fields - let crawler handle platform-specific validation
 		const errors: string[] = [];
 
 		if (!request.name) {
@@ -172,25 +173,9 @@ class JobSchedulerService {
 
 		if (!request.data) {
 			errors.push('Job data is required');
-			return errors;
 		}
 
-		if (!request.data.task || !request.data.task.toLowerCase().includes('crawl')) {
-			errors.push('Task must contain "crawl"');
-		}
-
-		if (!request.data.urls && !request.data.urlFile) {
-			errors.push('Either URLs or URL file must be provided');
-		}
-
-		if (!request.data.platform) {
-			errors.push('Platform is required');
-		}
-
-		if (request.data.platform === 'youtube' && !request.data.youtubeApiKey) {
-			errors.push('YouTube API key is required for YouTube platform');
-		}
-
+		// Remove all other validations to let crawler provide accurate error messages
 		return errors;
 	}
 }

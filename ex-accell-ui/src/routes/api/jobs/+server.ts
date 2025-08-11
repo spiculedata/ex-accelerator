@@ -1,9 +1,23 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jobStateStore } from '$lib/services/jobStateStore.js';
+import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
 
-const DAPR_HTTP_PORT = 3500;
 const TELEGRAM_SCRAPER_APP_ID = 'telegram-scraper';
+
+// Initialize Dapr client using the job-scheduler pattern
+let daprClient: DaprClient | null = null;
+
+async function getDaprClient(): Promise<DaprClient> {
+	if (!daprClient) {
+		daprClient = new DaprClient({
+			daprHost: 'localhost',
+			daprPort: '3500', // UI app's Dapr sidecar port
+			communicationProtocol: CommunicationProtocolEnum.HTTP,
+		});
+	}
+	return daprClient;
+}
 
 interface JobScheduleRequest {
 	name: string;
@@ -49,22 +63,23 @@ interface JobStatusResponse {
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const jobRequest: JobScheduleRequest = await request.json();
+		
+		console.log('🎯 JOB SCHEDULING REQUEST:', {
+			name: jobRequest.name,
+			dueTime: jobRequest.dueTime,
+			platform: jobRequest.data?.platform,
+			droid: jobRequest.data?.droid,
+			task: jobRequest.data?.task,
+			timestamp: new Date().toISOString()
+		});
 
 		if (!jobRequest.name || !jobRequest.dueTime || !jobRequest.data) {
+			console.error('❌ JOB SCHEDULING FAILED: Missing required fields');
 			return error(400, 'Missing required fields: name, dueTime, data');
 		}
 
-		if (!jobRequest.data.task || !jobRequest.data.task.toLowerCase().includes('crawl')) {
-			return error(400, 'Job task must contain "crawl"');
-		}
-
-		if (!jobRequest.data.urls && !jobRequest.data.urlFile) {
-			return error(400, 'Either urls or urlFile must be provided');
-		}
-
-		if (jobRequest.data.platform === 'youtube' && !jobRequest.data.youtubeApiKey) {
-			return error(400, 'YouTube API key is required for YouTube platform');
-		}
+		// Let the crawler handle validation - this provides more accurate error messages
+		// Remove platform validation checks to allow crawler to provide specific errors
 
 		// Create job state before scheduling
 		const jobId = `${jobRequest.name}-${Date.now()}`;
@@ -72,6 +87,12 @@ export const POST: RequestHandler = async ({ request }) => {
 			parseInt(jobRequest.dueTime.slice(0, -1)) * 1000 : 
 			parseInt(jobRequest.dueTime.slice(0, -1)) * 60 * 1000
 		)).toISOString();
+
+		console.log('📋 CREATING JOB STATE:', {
+			jobId,
+			scheduledFor,
+			dueInSeconds: jobRequest.dueTime
+		});
 
 		const jobState = jobStateStore.createJobState(
 			jobId,
@@ -84,10 +105,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Try to save job state to store (don't fail if this doesn't work)
 		let jobStateSaved = false;
 		try {
+			console.log('💾 SAVING JOB STATE TO STORE...');
 			await jobStateStore.saveJobState(jobState);
 			jobStateSaved = true;
+			console.log('✅ JOB STATE SAVED SUCCESSFULLY');
 		} catch (stateError) {
-			console.warn('Could not save job state (Dapr may not be running):', stateError.message);
+			console.error('❌ FAILED TO SAVE JOB STATE:', stateError.message);
 			// Check if this is a Dapr connection error and provide helpful message
 			if (stateError.name === 'DaprConnectionError') {
 				return error(503, {
@@ -98,35 +121,46 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		}
 
-		// Use the working job scheduling format - job name in URL, no name in body
-		const daprJobsUrl = `http://localhost:3502/v1.0-alpha1/jobs/${jobRequest.name}`;
-		
-		// Remove name from request body since it goes in URL
-		const { name, ...jobBody } = jobRequest;
+		// Use Dapr SDK to schedule job via service invocation (job-scheduler pattern)
+		const daprClient = await getDaprClient();
 
-		const response = await fetch(daprJobsUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				...jobBody,
-				data: {
-					...jobBody.data,
-					jobId, // Add jobId to the job data for tracking
-				}
-			}),
+		// Prepare job data following telegram-scraper JobData format
+		const jobData = {
+			dueTime: jobRequest.dueTime,
+			droid: jobRequest.name, // Job name maps to droid in quickstart pattern
+			task: `crawl:${jobRequest.data.platform}`, // Task indicates crawling operation
+			jobId, // Add jobId for tracking
+			...jobRequest.data // Include all crawler configuration
+		};
+
+		console.log('📤 SUBMITTING JOB VIA DAPR SDK:', {
+			appId: TELEGRAM_SCRAPER_APP_ID,
+			methodName: 'scheduleJob',
+			jobName: jobRequest.name,
+			jobData
 		});
 
-		if (!response.ok) {
+		try {
+			// Use service invocation to call the job-service's scheduleJob handler
+			const result = await daprClient.invoker.invoke(
+				TELEGRAM_SCRAPER_APP_ID,
+				'scheduleJob',
+				'POST',
+				jobData
+			);
+
+			console.log('✅ JOB SCHEDULED VIA DAPR SDK:', result);
+		} catch (daprError) {
+			console.error('❌ DAPR SDK SCHEDULING ERROR:', daprError);
+			
 			// If scheduling fails, try to update job state to failed (if we could save it initially)
 			if (jobStateSaved) {
 				try {
 					await jobStateStore.updateJobStatus(jobId, 'failed', {
 						result: {
 							success: false,
-							message: 'Failed to schedule job with Dapr',
-							errors: [await response.text()]
+							message: 'Failed to schedule job with Dapr SDK',
+							errors: [daprError.message]
 						}
 					});
 				} catch (stateError) {
@@ -134,27 +168,35 @@ export const POST: RequestHandler = async ({ request }) => {
 				}
 			}
 
-			const errorText = await response.text();
-			console.error('Dapr Jobs API error:', errorText);
-			return error(response.status, `Failed to schedule job: ${errorText}`);
+			return error(500, `Failed to schedule job via Dapr SDK: ${daprError.message}`);
 		}
 
+		console.log('✅ JOB SUCCESSFULLY SUBMITTED TO DAPR');
+		
 		// Update job state to indicate successful scheduling (if we can)
 		if (jobStateSaved) {
 			try {
+				console.log('📝 ADDING SUCCESS LOG TO JOB STATE...');
 				await jobStateStore.addJobLog(jobId, 'Job successfully scheduled with Dapr');
+				console.log('✅ SUCCESS LOG ADDED TO JOB STATE');
 			} catch (stateError) {
-				console.warn('Could not add job log:', stateError);
+				console.error('❌ FAILED TO ADD JOB LOG:', stateError);
 			}
 		}
 
-		let result;
-		try {
-			const responseText = await response.text();
-			result = responseText ? JSON.parse(responseText) : {};
-		} catch (e) {
-			result = {};
-		}
+		// Job scheduled successfully via SDK
+		const result = {
+			scheduled: true,
+			jobName: jobRequest.name,
+			method: 'dapr-sdk'
+		};
+
+		console.log('🎉 JOB SCHEDULING COMPLETED SUCCESSFULLY:', {
+			jobId,
+			jobName: jobRequest.name,
+			scheduledFor,
+			stateSaved: jobStateSaved
+		});
 
 		return json({ 
 			success: true, 
@@ -188,6 +230,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		const jobName = url.searchParams.get('name');
 		const stateOnly = url.searchParams.get('state') === 'true';
 		
+		console.log('🔍 JOB STATUS QUERY:', {
+			jobName: jobName || 'ALL_JOBS',
+			stateOnly,
+			timestamp: new Date().toISOString()
+		});
+		
 		// If requesting state only, return from state store
 		if (stateOnly) {
 			try {
@@ -213,29 +261,54 @@ export const GET: RequestHandler = async ({ url }) => {
 		let daprJobs = null;
 		let jobStates = [];
 
-		// Try to get from Dapr Jobs API
+		// Try to get from Dapr service using SDK
 		try {
-			let daprJobsUrl = `http://localhost:3502/v1.0-alpha1/jobs`;
+			const daprClient = await getDaprClient();
+			
+			console.log('📡 QUERYING JOBS VIA DAPR SDK:', {
+				appId: TELEGRAM_SCRAPER_APP_ID,
+				method: 'getJob',
+				jobName: jobName || 'ALL_JOBS'
+			});
+
+			// Use service invocation to get job(s) from job-service
 			if (jobName) {
-				daprJobsUrl += `/${jobName}`;
-			}
-
-			const response = await fetch(daprJobsUrl);
-
-			if (response.ok) {
-				daprJobs = await response.json();
+				daprJobs = await daprClient.invoker.invoke(
+					TELEGRAM_SCRAPER_APP_ID,
+					'getJob',
+					'POST',
+					jobName
+				);
 			} else {
-				console.warn('Dapr Jobs API not available:', response.status);
+				// For getting all jobs, we'll still use HTTP API as it's more appropriate
+				const response = await fetch(`http://localhost:3500/v1.0-alpha1/jobs`);
+				if (response.ok) {
+					daprJobs = await response.json();
+				}
 			}
+
+			console.log('✅ DAPR SDK JOB QUERY SUCCESS:', {
+				jobCount: Array.isArray(daprJobs) ? daprJobs.length : 1,
+				data: daprJobs
+			});
 		} catch (daprError) {
-			console.warn('Could not connect to Dapr Jobs API:', daprError.message);
+			console.error('❌ FAILED TO QUERY JOBS VIA DAPR SDK:', daprError.message);
 		}
 
 		// Try to get job states from state store
 		try {
+			console.log('💾 QUERYING JOB STATE STORE...');
 			jobStates = await jobStateStore.getAllJobStates();
+			console.log('✅ JOB STATE STORE QUERY SUCCESS:', {
+				jobCount: jobStates.length,
+				recentJobs: jobStates.slice(0, 3).map(j => ({
+					name: j.name,
+					status: j.status,
+					scheduledFor: j.scheduledFor
+				}))
+			});
 		} catch (stateError) {
-			console.warn('Could not get job states:', stateError.message);
+			console.error('❌ FAILED TO GET JOB STATES:', stateError.message);
 			if (stateError.name === 'DaprConnectionError' && !daprJobs) {
 				// If both services are unavailable, return helpful error
 				return error(503, {
@@ -289,10 +362,10 @@ export const DELETE: RequestHandler = async ({ url }) => {
 		let deletedFromDapr = false;
 		let stateDeleted = false;
 
-		// Delete from Dapr Jobs API if jobName provided
+		// Delete from Dapr Jobs API if jobName provided (still use HTTP API for deletion)
 		if (jobName) {
 			try {
-				const daprJobsUrl = `http://localhost:3502/v1.0-alpha1/jobs/${jobName}`;
+				const daprJobsUrl = `http://localhost:3500/v1.0-alpha1/jobs/${jobName}`;
 
 				const response = await fetch(daprJobsUrl, {
 					method: 'DELETE',
@@ -300,12 +373,13 @@ export const DELETE: RequestHandler = async ({ url }) => {
 
 				if (response.ok || response.status === 404) {
 					deletedFromDapr = true;
+					console.log('✅ JOB DELETED FROM DAPR:', jobName);
 				} else {
 					const errorText = await response.text();
-					console.warn('Dapr Jobs API error:', errorText);
+					console.warn('⚠️ DAPR JOBS API DELETE ERROR:', errorText);
 				}
 			} catch (daprError) {
-				console.warn('Could not delete from Dapr (may not be running):', daprError.message);
+				console.warn('❌ Could not delete from Dapr (may not be running):', daprError.message);
 				// Don't fail the whole operation if Dapr is down
 			}
 		}

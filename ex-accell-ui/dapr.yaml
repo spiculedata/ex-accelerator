@@ -18,4 +18,4 @@ apps:
     appProtocol: grpc
     daprHTTPPort: 3502
     daprGRPCPort: 50002
-    command: ["./telegram-scraper", "--mode", "dapr-job"]
+    command: ["./telegram-scraper", "--mode", "dapr-job", "--dapr-port", "6481"]

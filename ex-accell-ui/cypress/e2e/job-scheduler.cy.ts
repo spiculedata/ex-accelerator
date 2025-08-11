@@ -214,10 +214,10 @@ describe('Job Scheduler - Dapr Integration', () => {
       cy.contains('button', 'Next').click();
       cy.contains('button', 'Next').click();
       
-      // Mock API validation error
+      // Mock crawler validation error (from actual crawler, not platform validation)
       cy.intercept('POST', '/api/jobs', {
         statusCode: 400,
-        body: { error: 'YouTube API key is required for YouTube platform' }
+        body: { error: 'Crawler validation error from telegram-scraper' }
       }).as('validateJob');
       
       cy.contains('button', 'Schedule Crawler Job').click();
