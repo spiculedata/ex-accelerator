@@ -2887,36 +2887,38 @@
                         Configure
                       </button>
                     {:else}
-                      {#if job.status === 'scheduled' || job.status === 'pending'}
+                      <div class="flex items-center justify-end gap-1.5 min-w-0">
+                        {#if job.status === 'scheduled' || job.status === 'pending'}
+                          <button 
+                            on:click={() => runCrawl(job.id)}
+                            class="inline-flex items-center justify-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors whitespace-nowrap flex-shrink-0">
+                            Run Now
+                          </button>
+                        {/if}
                         <button 
-                          on:click={() => runCrawl(job.id)}
-                          class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
-                          Run Now
+                          on:click={() => editJob(job)}
+                          class="inline-flex items-center justify-center px-2.5 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors whitespace-nowrap flex-shrink-0">
+                          Edit
                         </button>
-                      {/if}
-                      <button 
-                        on:click={() => editJob(job)}
-                        class="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
-                        Edit
-                      </button>
-                      <button 
-                        on:click={() => confirmDeleteJob(job)}
-                        class="px-3 py-1 border border-red-300 text-red-700 text-sm rounded-md hover:bg-red-50 transition-colors">
-                        Delete
-                      </button>
-                    {/if}
-                    {#if job.logs && job.logs.length > 0}
-                      <button 
-                        on:click={() => openLogViewer(job)}
-                        class="relative px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
-                        View Logs
-                        {#if job.hasNewLogs}
-                          <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                        <button 
+                          on:click={() => confirmDeleteJob(job)}
+                          class="inline-flex items-center justify-center px-2.5 py-1.5 border border-red-300 text-red-700 text-xs font-medium rounded-md hover:bg-red-50 transition-colors whitespace-nowrap flex-shrink-0">
+                          Delete
+                        </button>
+                        {#if job.logs && job.logs.length > 0}
+                          <button 
+                            on:click={() => openLogViewer(job)}
+                            class="relative inline-flex items-center justify-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors whitespace-nowrap flex-shrink-0">
+                            View Logs
+                            {#if job.hasNewLogs}
+                              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                            {/if}
+                            {#if job.status === 'running'}
+                              <span class="ml-1 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                            {/if}
+                          </button>
                         {/if}
-                        {#if job.status === 'running'}
-                          <span class="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                        {/if}
-                      </button>
+                      </div>
                     {/if}
                   </div>
                 </div>

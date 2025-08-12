@@ -19,6 +19,30 @@ async function getDaprClient(): Promise<DaprClient> {
 	return daprClient;
 }
 
+// Map platform to proper job type as expected by telegram-scraper
+function getJobTypeFromPlatform(platform: string): string {
+	switch (platform?.toLowerCase()) {
+		case 'telegram':
+			return 'telegram-crawl';
+		case 'youtube':
+			return 'youtube-crawl';
+		default:
+			return 'scheduled-crawl'; // Generic fallback
+	}
+}
+
+// Generate human-readable task description
+function getTaskDescription(platform: string): string {
+	switch (platform?.toLowerCase()) {
+		case 'telegram':
+			return 'crawl telegram channels';
+		case 'youtube':
+			return 'crawl youtube channels';
+		default:
+			return 'crawl channels';
+	}
+}
+
 interface JobScheduleRequest {
 	name: string;
 	dueTime: string;
@@ -68,9 +92,12 @@ export const POST: RequestHandler = async ({ request }) => {
 			name: jobRequest.name,
 			dueTime: jobRequest.dueTime,
 			platform: jobRequest.data?.platform,
+			urls: jobRequest.data?.urls, // Debug: check what URLs are being passed
+			urlsLength: jobRequest.data?.urls?.length, // Debug: check URLs array length
 			droid: jobRequest.data?.droid,
 			task: jobRequest.data?.task,
-			timestamp: new Date().toISOString()
+			timestamp: new Date().toISOString(),
+			fullRequestData: JSON.stringify(jobRequest.data, null, 2) // Debug: full request data
 		});
 
 		if (!jobRequest.name || !jobRequest.dueTime || !jobRequest.data) {
@@ -83,10 +110,20 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Create job state before scheduling
 		const jobId = `${jobRequest.name}-${Date.now()}`;
-		const scheduledFor = new Date(Date.now() + (jobRequest.dueTime.endsWith('s') ? 
-			parseInt(jobRequest.dueTime.slice(0, -1)) * 1000 : 
-			parseInt(jobRequest.dueTime.slice(0, -1)) * 60 * 1000
-		)).toISOString();
+		let scheduledFor: string;
+		
+		if (jobRequest.dueTime === 'now') {
+			// Immediate execution
+			scheduledFor = new Date().toISOString();
+		} else if (jobRequest.dueTime.endsWith('s')) {
+			// Duration in seconds (e.g., "30s")
+			const seconds = parseInt(jobRequest.dueTime.slice(0, -1));
+			scheduledFor = new Date(Date.now() + seconds * 1000).toISOString();
+		} else {
+			// Duration in minutes (e.g., "5" = 5 minutes)  
+			const minutes = parseInt(jobRequest.dueTime);
+			scheduledFor = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+		}
 
 		console.log('📋 CREATING JOB STATE:', {
 			jobId,
@@ -124,24 +161,63 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Use Dapr SDK to schedule job via service invocation (job-scheduler pattern)
 		const daprClient = await getDaprClient();
 
+		// Generate job name - use base job type as the job name for Dapr
+		const jobTypeName = getJobTypeFromPlatform(jobRequest.data.platform);
+		
+		// Validate job name is not empty
+		if (!jobTypeName || jobTypeName.trim() === '') {
+			console.error('❌ Generated job name is empty:', { jobTypeName, platform: jobRequest.data.platform });
+			return error(400, 'Failed to generate valid job name');
+		}
+
 		// Prepare job data following telegram-scraper JobData format
 		const jobData = {
-			dueTime: jobRequest.dueTime,
-			droid: jobRequest.name, // Job name maps to droid in quickstart pattern
-			task: `crawl:${jobRequest.data.platform}`, // Task indicates crawling operation
-			jobId, // Add jobId for tracking
-			...jobRequest.data // Include all crawler configuration
+			jobName: jobTypeName, // Base job type name (e.g., "youtube-crawl", "telegram-crawl")
+			task: getTaskDescription(jobRequest.data.platform), // Human-readable task description
+			dueTime: jobRequest.dueTime === 'now' ? '0s' : jobRequest.dueTime, // Convert 'now' to immediate Dapr format
+			jobId, // Add jobId for tracking (UI-specific identifier)
+			urls: jobRequest.data.urls || [], // URLs to crawl
+			platform: jobRequest.data.platform, // Platform for configuration
+			// Include all other crawler configuration fields
+			crawlId: jobRequest.data.crawlId || `crawl-${Date.now()}`,
+			maxDepth: jobRequest.data.maxDepth || 1,
+			concurrency: jobRequest.data.concurrency || 1,
+			maxPosts: jobRequest.data.maxPosts || 1000,
+			...(jobRequest.data.platform === 'youtube' && {
+				youtubeApiKey: jobRequest.data.youtubeApiKey,
+				samplingMethod: jobRequest.data.samplingMethod || 'channel',
+				minChannelVideos: jobRequest.data.minChannelVideos || 10,
+				sampleSize: jobRequest.data.sampleSize || 100
+			}),
+			...(jobRequest.data.platform === 'telegram' && {
+				tdlibDatabaseUrls: jobRequest.data.tdlibDatabaseUrls || []
+			}),
+			// Other optional fields
+			urlFile: jobRequest.data.urlFile,
+			maxPages: jobRequest.data.maxPages,
+			skipMedia: jobRequest.data.skipMedia,
+			timeAgo: jobRequest.data.timeAgo
 		};
 
 		console.log('📤 SUBMITTING JOB VIA DAPR SDK:', {
 			appId: TELEGRAM_SCRAPER_APP_ID,
 			methodName: 'scheduleJob',
-			jobName: jobRequest.name,
-			jobData
+			jobName: jobTypeName,
+			jobType: jobTypeName,
+			platform: jobRequest.data.platform,
+			dueTime: jobData.dueTime,
+			urlCount: jobData.urls.length
 		});
 
+		// Final validation before sending to telegram-scraper
+		if (!jobData.jobName || jobData.jobName.trim() === '') {
+			console.error('❌ jobData.jobName is empty before service invocation:', jobData);
+			return error(400, 'Job name validation failed - empty job name');
+		}
+
 		try {
-			// Use service invocation to call the job-service's scheduleJob handler
+			// Use service invocation to call the telegram-scraper's scheduleJob handler
+			// This will create the Dapr job with the appropriate job type for handler routing
 			const result = await daprClient.invoker.invoke(
 				TELEGRAM_SCRAPER_APP_ID,
 				'scheduleJob',

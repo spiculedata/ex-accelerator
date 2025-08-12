@@ -105,6 +105,27 @@ npm run prepare
 - Validate accessibility and error handling
 - Run `npm run cypress:run` to verify all tests pass before completion
 
+### Testing Framework
+```bash
+# Run all tests
+npm run test
+
+# Run Cypress tests interactively
+npm run cypress:open
+
+# Run all E2E and component tests
+npm run cypress:run
+
+# Run E2E tests only
+npm run test:e2e
+
+# Run component tests only
+npm run test:component
+
+# Run Dapr integration tests
+npm run test:integration
+```
+
 ## Key Technical Details
 
 ### Project Structure
@@ -424,6 +445,192 @@ Run tests with:
 ```bash
 npm run cypress:run
 ```
+
+## Dapr Job Scheduler Testing
+
+### Test Coverage Overview
+
+The project includes comprehensive testing for the Dapr SDK job scheduler integration:
+
+#### 1. API Endpoint Tests (`cypress/e2e/job-scheduler-api.cy.ts`)
+- **Dapr SDK Integration**: Tests service invocation patterns
+- **Job Data Transformation**: Validates data format for `telegram-scraper` JobData struct
+- **Error Handling**: Connection errors, validation failures, timeouts
+- **Platform Support**: Both Telegram and YouTube job configurations
+- **State Store Integration**: Job state tracking and persistence
+- **Concurrent Operations**: Multiple job scheduling and resource management
+
+#### 2. Dapr SDK Integration Tests (`cypress/e2e/dapr-sdk-integration.cy.ts`)
+- **Service Invocation**: Direct app-to-app communication via Dapr SDK
+- **Job Handler Registration**: Predefined job names (R2-D2, C-3PO, BB-8, my-scheduled-job)
+- **gRPC Communication**: Protocol-specific testing for job-service communication
+- **Multi-App Deployment**: Port configuration and service discovery
+- **Performance Testing**: Load testing and concurrent job handling
+- **Resource Cleanup**: Memory management and connection lifecycle
+
+#### 3. Component Tests (`cypress/component/DaprJobScheduler.cy.ts`)
+- **UI Components**: Dapr-specific form elements and status indicators
+- **Connection Status**: Real-time Dapr sidecar and service connectivity
+- **Job Status Display**: State store integration with job execution logs
+- **Error Messages**: Dapr-specific error handling and user feedback
+- **Data Transformation**: Frontend form data to JobData struct mapping
+
+### Testing Best Practices
+
+#### API Testing Pattern
+```typescript
+describe('Dapr SDK Job Scheduling', () => {
+  it('should schedule job via service invocation', () => {
+    const jobRequest = {
+      name: 'test-job',
+      dueTime: '30s',
+      data: {
+        droid: 'test-job',
+        task: 'crawl:telegram',
+        platform: 'telegram',
+        urls: ['@testchannel']
+      }
+    };
+
+    cy.intercept('POST', '/api/jobs', {
+      statusCode: 200,
+      body: {
+        success: true,
+        job: { method: 'dapr-sdk', scheduled: true },
+        message: 'Job scheduled successfully'
+      }
+    }).as('scheduleJob');
+
+    cy.request('POST', '/api/jobs', jobRequest);
+    cy.wait('@scheduleJob');
+  });
+});
+```
+
+#### Component Testing Pattern
+```typescript
+describe('Dapr Job Components', () => {
+  it('should display service status', () => {
+    mount(`
+      <div class="flex items-center">
+        <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+        <span>Dapr Sidecar (localhost:3500)</span>
+      </div>
+    `);
+    
+    cy.contains('Dapr Sidecar').should('be.visible');
+    cy.get('.bg-green-500').should('exist');
+  });
+});
+```
+
+### Test Data Patterns
+
+#### Telegram Job Configuration
+```typescript
+const telegramJob = {
+  name: 'telegram-test-job',
+  dueTime: '1m',
+  data: {
+    droid: 'telegram-test-job',
+    task: 'crawl:telegram',
+    platform: 'telegram',
+    urls: ['@channel1', '@channel2'],
+    maxPosts: 1000,
+    concurrency: 2,
+    skipMedia: true,
+    timeAgo: '30d'
+  }
+};
+```
+
+#### YouTube Job Configuration
+```typescript
+const youtubeJob = {
+  name: 'youtube-test-job',
+  dueTime: '15m',
+  data: {
+    droid: 'youtube-test-job', 
+    task: 'crawl:youtube',
+    platform: 'youtube',
+    urls: ['UCChannel1', 'UCChannel2'],
+    youtubeApiKey: 'test-api-key',
+    samplingMethod: 'channel',
+    minChannelVideos: 50,
+    sampleSize: 100
+  }
+};
+```
+
+### Error Testing Scenarios
+
+#### Connection Failures
+- Dapr sidecar unavailable (port 3500)
+- telegram-scraper service unreachable (port 6481)
+- State store (Redis) connection issues
+- gRPC communication failures
+
+#### Validation Errors  
+- Missing required job fields
+- Invalid platform configurations
+- Malformed job data structures
+- Large payload handling
+
+#### Timeout Scenarios
+- Long-running job scheduling operations
+- Service invocation timeouts
+- State store operation delays
+
+### Running Tests
+
+#### Development Testing
+```bash
+# Run all job scheduler tests
+npm run cypress:run -- --spec "cypress/e2e/*job*"
+
+# Run API tests only
+npm run cypress:run -- --spec "cypress/e2e/job-scheduler-api.cy.ts"
+
+# Run Dapr integration tests
+npm run cypress:run -- --spec "cypress/e2e/dapr-sdk-integration.cy.ts"
+
+# Run component tests
+npm run cypress:run -- --component --spec "cypress/component/*Job*.cy.ts"
+```
+
+#### CI/CD Integration
+```bash
+# Complete test suite (used in CI)
+npm run cypress:run
+
+# Test with coverage reporting
+npm run test:coverage
+
+# Integration test with live Dapr services
+npm run test:integration
+```
+
+### Test Environment Setup
+
+#### Prerequisites
+- Dapr CLI installed and initialized (`dapr init`)
+- Redis running for state store (automatic via `npm run dapr:setup`)
+- telegram-scraper binary built and available
+
+#### Mock Services
+Tests use comprehensive mocking for:
+- Dapr SDK service invocation responses
+- State store operations
+- gRPC communication patterns
+- Job execution workflows
+
+#### Real Integration Testing
+For end-to-end validation:
+1. Start unified deployment: `npm run dev:dapr`
+2. Run integration tests: `npm run test:integration`
+3. Monitor logs: `npm run dapr:logs`
+
+This ensures the complete Dapr job scheduling pipeline functions correctly from UI → Dapr SDK → telegram-scraper → job execution.
 
 ## Database Integration Guidelines
 
