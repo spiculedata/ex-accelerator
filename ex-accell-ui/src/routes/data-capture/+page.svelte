@@ -412,6 +412,10 @@
   // Crawl jobs loaded from state store
   let crawlJobs: any[] = [];
 
+  // Job sorting state
+  let sortBy: 'type' | 'date' | 'status' | 'repeat' | 'size' | 'nextRun' | 'url' = 'date';
+  let sortDirection: 'asc' | 'desc' = 'desc';
+
   // Function to format WavePulse time slots into schedule text
   function formatWavePulseSchedule(timeSlots: Array<{start: string, end: string}>): string {
     if (timeSlots.length === 0) return 'No schedule configured';
@@ -419,6 +423,88 @@
       return `Daily ${timeSlots[0].start} - ${timeSlots[0].end}`;
     }
     return `Daily (${timeSlots.length} time slots)`;
+  }
+
+  // Function to determine if a job is a repeat/recurring crawl
+  function isRepeatCrawl(job: any): boolean {
+    // WavePulse and Princeton SMART jobs are recurring by nature
+    if (job.type === 'wavepulse' || job.type === 'princeton-smart') return true;
+    // For crawler jobs, check if they have a recurring schedule pattern
+    // (This could be enhanced based on actual scheduling data)
+    return false;
+  }
+
+  // Function to sort jobs
+  function sortJobs(jobs: any[]): any[] {
+    const sorted = [...jobs].sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortBy) {
+        case 'type':
+          // Sort by job type/platform
+          const typeA = a.type || a.platform || 'unknown';
+          const typeB = b.type || b.platform || 'unknown';
+          compareValue = typeA.localeCompare(typeB);
+          break;
+
+        case 'date':
+          // Sort by creation/scheduled date
+          const dateA = new Date(a.startTime || a.createdAt || 0).getTime();
+          const dateB = new Date(b.startTime || b.createdAt || 0).getTime();
+          compareValue = dateA - dateB;
+          break;
+
+        case 'status':
+          // Sort by status
+          const statusOrder = { running: 0, scheduled: 1, pending: 2, completed: 3, failed: 4 };
+          const statusA = statusOrder[a.status] ?? 99;
+          const statusB = statusOrder[b.status] ?? 99;
+          compareValue = statusA - statusB;
+          break;
+
+        case 'repeat':
+          // Sort by whether it's a repeat/recurring crawl
+          const repeatA = isRepeatCrawl(a) ? 1 : 0;
+          const repeatB = isRepeatCrawl(b) ? 1 : 0;
+          compareValue = repeatA - repeatB;
+          break;
+
+        case 'size':
+          // Sort by items collected
+          compareValue = (a.itemsCollected || 0) - (b.itemsCollected || 0);
+          break;
+
+        case 'nextRun':
+          // Sort by next run time
+          const nextRunA = a.nextRun ? new Date(a.nextRun).getTime() : 0;
+          const nextRunB = b.nextRun ? new Date(b.nextRun).getTime() : 0;
+          compareValue = nextRunA - nextRunB;
+          break;
+
+        case 'url':
+          // Sort by URL/crawlId
+          const urlA = a.streamUrl || a.crawlId || '';
+          const urlB = b.streamUrl || b.crawlId || '';
+          compareValue = urlA.localeCompare(urlB);
+          break;
+      }
+
+      return sortDirection === 'asc' ? compareValue : -compareValue;
+    });
+
+    return sorted;
+  }
+
+  // Function to toggle sort direction or change sort field
+  function handleSort(field: typeof sortBy) {
+    if (sortBy === field) {
+      // Toggle direction if same field
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New field, default to descending
+      sortBy = field;
+      sortDirection = 'desc';
+    }
   }
 
   // Combine crawler jobs, WavePulse schedules, and Princeton SMART extracts
@@ -484,8 +570,11 @@
       ]
     }
   ];
-  
-  
+
+  // Apply sorting to jobs
+  $: sortedJobs = sortJobs(allJobs);
+
+
   // User upload state
   let uploadFiles: FileList | null = null;
   let uploadProgress = 0;
@@ -2803,6 +2892,69 @@
                 </button>
               {/if}
             </div>
+
+            <!-- Sorting Controls -->
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+              <div class="flex items-center gap-2 text-sm">
+                <span class="text-gray-600 font-medium">Sort by:</span>
+                <button
+                  on:click={() => handleSort('type')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'type' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Job Type
+                  {#if sortBy === 'type'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('date')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'date' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Date
+                  {#if sortBy === 'date'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('status')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'status' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Status
+                  {#if sortBy === 'status'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('repeat')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'repeat' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Type (Repeat/Single)
+                  {#if sortBy === 'repeat'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('size')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'size' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Size Collected
+                  {#if sortBy === 'size'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('nextRun')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'nextRun' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  Next Run
+                  {#if sortBy === 'nextRun'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+                <button
+                  on:click={() => handleSort('url')}
+                  class="px-3 py-1 rounded-md transition-colors {sortBy === 'url' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}">
+                  URL
+                  {#if sortBy === 'url'}
+                    <span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  {/if}
+                </button>
+              </div>
+            </div>
           </div>
           <div class="divide-y divide-gray-200">
             {#if loadingJobStates}
@@ -2813,7 +2965,7 @@
                 </svg>
                 <p class="mt-2">Loading job states from Dapr state store...</p>
               </div>
-            {:else if allJobs.length === 0}
+            {:else if sortedJobs.length === 0}
               <div class="p-6 text-center text-gray-500">
                 <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -2822,7 +2974,7 @@
                 <p class="text-sm">Create a new crawl job to get started</p>
               </div>
             {:else}
-              {#each allJobs as job}
+              {#each sortedJobs as job}
               <div class="p-6" data-job-id="{job.id}" data-job-type="{job.type}">
                 <div class="flex items-center justify-between mb-4">
                   <div class="flex items-center">
