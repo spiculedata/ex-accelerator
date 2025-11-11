@@ -4,7 +4,7 @@
   import { overviewDb } from '$lib/services/overviewDb';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  
+
   // Overview dashboard data
   let loading = true;
   let overviewStats = {
@@ -17,16 +17,35 @@
   let recentActivities = [];
   let systemStatus = [];
   let currentWorkspace = null;
+
+  // Workspace selection state
+  let workspaceSelectorOpen = false;
+  let availableWorkspaces = [
+    { id: 1, name: 'Twitter Research Workspace', description: 'Primary workspace for twitter content analysis and insights', activityCount: 24 },
+    { id: 2, name: 'Marketing Analytics', description: 'Campaign performance and brand monitoring', activityCount: 18 },
+    { id: 3, name: 'Product Research', description: 'Customer feedback and product insights', activityCount: 12 }
+  ];
   
   onMount(async () => {
     loadCurrentProject();
     await loadOverviewData();
+
+    // Click outside handler for workspace selector
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.workspace-selector')) {
+        workspaceSelectorOpen = false;
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   });
 
   async function loadOverviewData() {
     try {
       loading = true;
-      
+
       // Load all overview data from database
       const [stats, modules, activities, status, workspace] = await Promise.all([
         overviewDb.getOverviewStats(),
@@ -35,13 +54,13 @@
         overviewDb.getSystemStatus(),
         overviewDb.getCurrentWorkspace()
       ]);
-      
+
       overviewStats = stats;
       appModules = modules.length > 0 ? modules : getFallbackModules();
       recentActivities = activities;
       systemStatus = status;
-      currentWorkspace = workspace;
-      
+      currentWorkspace = workspace || availableWorkspaces[0];
+
       console.log('Overview dashboard data loaded successfully from database');
     } catch (error) {
       console.error('Error loading overview data:', error);
@@ -49,9 +68,25 @@
       appModules = getFallbackModules();
       recentActivities = getFallbackActivities();
       systemStatus = getFallbackSystemStatus();
+      currentWorkspace = availableWorkspaces[0];
     } finally {
       loading = false;
     }
+  }
+
+  function switchWorkspace(workspace: any) {
+    currentWorkspace = workspace;
+    workspaceSelectorOpen = false;
+    // Reload data for the new workspace
+    loadOverviewData();
+  }
+
+  function navigateToProjects() {
+    goto('/projects');
+  }
+
+  function navigateToReports() {
+    goto('/text-analytics/research-investigation');
   }
 
   function getFallbackModules() {
@@ -272,76 +307,150 @@
 
 <Navigation />
 
-<!-- Dashboard Header -->
+<!-- Workspace Selector -->
+<section class="bg-gray-50 border-b border-gray-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class="relative workspace-selector inline-block">
+      <button
+        on:click={() => workspaceSelectorOpen = !workspaceSelectorOpen}
+        class="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-colors border border-gray-300 shadow-sm">
+        <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+        </svg>
+        <span class="font-semibold">{currentWorkspace?.name || 'Select Workspace'}</span>
+        <svg class="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+
+      <!-- Workspace Dropdown -->
+      {#if workspaceSelectorOpen}
+        <div class="absolute top-full left-0 mt-2 w-96 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+          <div class="p-4 border-b border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-900">Switch Workspace</h3>
+            <p class="text-xs text-gray-500 mt-1">Select a workspace to view its analytics and projects</p>
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            {#each availableWorkspaces as workspace}
+              <button
+                on:click={() => switchWorkspace(workspace)}
+                class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {currentWorkspace?.id === workspace.id ? 'bg-blue-50' : ''}">
+                <div class="flex items-start">
+                  <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mr-3 flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 truncate">{workspace.name}</div>
+                    <div class="text-xs text-gray-500 truncate mt-1">{workspace.description}</div>
+                  </div>
+                  {#if currentWorkspace?.id === workspace.id}
+                    <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  {/if}
+                </div>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
+  </div>
+</section>
+
+<!-- Dashboard Header (Simplified - No Metrics) -->
 <section class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
   <div class="absolute inset-0 bg-black opacity-10"></div>
   <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-      <!-- User Welcome -->
-      <div class="mb-6 lg:mb-0">
-        <div class="flex items-center mb-2">
-          <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
-            <span class="text-white font-bold text-lg">JD</span>
-          </div>
-          <div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-white">
-              Welcome back, John
-            </h1>
-            <p class="text-blue-100">Ready to explore your social data?</p>
-          </div>
-        </div>
+    <div class="flex items-center">
+      <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
+        <span class="text-white font-bold text-lg">JD</span>
       </div>
-
-      <!-- Quick Stats -->
-      <div class="grid grid-cols-3 gap-4 lg:gap-6">
-        {#if loading}
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="animate-pulse">
-              <div class="h-8 bg-gray-700 rounded mb-2"></div>
-              <div class="h-4 bg-gray-700 rounded"></div>
-            </div>
-          </div>
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="animate-pulse">
-              <div class="h-8 bg-gray-700 rounded mb-2"></div>
-              <div class="h-4 bg-gray-700 rounded"></div>
-            </div>
-          </div>
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="animate-pulse">
-              <div class="h-8 bg-gray-700 rounded mb-2"></div>
-              <div class="h-4 bg-gray-700 rounded"></div>
-            </div>
-          </div>
-        {:else}
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="text-2xl font-bold text-white">{overviewStats.activeProjects}</div>
-            <div class="text-gray-200 text-sm font-medium">Active Projects</div>
-          </div>
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="text-2xl font-bold text-white">{formatNumber(overviewStats.postsAnalyzed)}</div>
-            <div class="text-gray-200 text-sm font-medium">Posts Analyzed</div>
-          </div>
-          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="text-2xl font-bold text-white">{overviewStats.reportsReady}</div>
-            <div class="text-gray-200 text-sm font-medium">Reports Ready</div>
-          </div>
-        {/if}
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-white">
+          Welcome back, John
+        </h1>
+        <p class="text-blue-100">Ready to explore your social data?</p>
       </div>
     </div>
   </div>
-  
+
   <!-- Floating elements -->
   <div class="absolute top-20 left-10 w-20 h-20 bg-white opacity-10 rounded-full blur-xl animate-pulse"></div>
   <div class="absolute bottom-20 right-10 w-32 h-32 bg-yellow-400 opacity-10 rounded-full blur-xl animate-pulse"></div>
 </section>
 
-<!-- App Modules -->
+<!-- Dashboard Summary Section (New) -->
+<section class="py-8 bg-white border-b border-gray-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h2 class="text-xl font-bold text-gray-900 mb-6">Dashboard Summary</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Active Projects - Clickable -->
+      <button
+        on:click={navigateToProjects}
+        class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 text-left hover:shadow-lg transition-all duration-200 hover:scale-105">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+            </svg>
+          </div>
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+        <div class="text-3xl font-bold text-blue-900 mb-2">{overviewStats.activeProjects}</div>
+        <div class="text-sm font-medium text-blue-800">Active Projects</div>
+        <div class="text-xs text-blue-600 mt-2">Click to view all projects</div>
+      </button>
+
+      <!-- Posts Analyzed - Metric Only -->
+      <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-xl p-6">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="text-3xl font-bold text-emerald-900 mb-2">{formatNumber(overviewStats.postsAnalyzed)}</div>
+        <div class="text-sm font-medium text-emerald-800">Posts Analyzed</div>
+        <div class="text-xs text-emerald-600 mt-2">Total processed content</div>
+      </div>
+
+      <!-- Reports Ready - Clickable -->
+      <button
+        on:click={navigateToReports}
+        class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 text-left hover:shadow-lg transition-all duration-200 hover:scale-105">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+        <div class="text-3xl font-bold text-purple-900 mb-2">{overviewStats.reportsReady}</div>
+        <div class="text-sm font-medium text-purple-800">Reports Ready</div>
+        <div class="text-xs text-purple-600 mt-2">Click to view reporting activity</div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Active Analytics Tools -->
 <section class="py-12 bg-gray-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between mb-8">
-      <h2 class="text-2xl font-bold text-gray-900">Your Analytics Tools</h2>
-      <button 
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">Active Analytics Tools</h2>
+        <p class="text-sm text-gray-600 mt-1">Tools currently active based on your projects in this workspace</p>
+      </div>
+      <button
         on:click={() => goto('/projects/new')}
         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-blue-600 hover:border-blue-700">
         + New Project
@@ -396,23 +505,95 @@
   </div>
 </section>
 
-<!-- Recent Activity & Workspace Overview -->
+<!-- Left Sidebar & Recent Activity -->
 <section class="py-12 bg-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      
-      <!-- Recent Activity -->
+
+      <!-- Left Sidebar - Quick Actions & System Status -->
+      <div class="space-y-6">
+        <!-- Quick Actions -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <div class="space-y-2">
+            <button
+              on:click={() => goto('/projects/new')}
+              class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors hover:border-blue-300">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-900">Create New Project</span>
+              </div>
+            </button>
+
+            <button
+              on:click={() => goto('/data-capture?tab=upload')}
+              class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors hover:border-blue-300">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-emerald-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 711 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-900">Import Data</span>
+              </div>
+            </button>
+
+            <button
+              on:click={navigateToReports}
+              class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors hover:border-blue-300">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-900">View Reports</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- System Status -->
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
+          <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="space-y-3">
+              {#if loading}
+                {#each Array(3) as _, i}
+                  <div class="animate-pulse flex items-center justify-between">
+                    <div class="h-4 bg-gray-300 rounded w-1/3"></div>
+                    <div class="flex items-center">
+                      <div class="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
+                      <div class="h-4 bg-gray-300 rounded w-16"></div>
+                    </div>
+                  </div>
+                {/each}
+              {:else}
+                {#each systemStatus as status}
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{status.displayName}</span>
+                    <div class="flex items-center">
+                      <div class="w-2 h-2 {status.statusColor} rounded-full mr-2 animate-pulse"></div>
+                      <span class="text-sm font-medium {getStatusTextClass(status.status)}">{status.statusDisplay}</span>
+                    </div>
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity (Right Side - Takes 2/3 width) -->
       <div class="lg:col-span-2">
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-xl font-bold text-gray-900">Recent Activity</h2>
           <button class="text-blue-600 hover:text-blue-700 text-sm font-medium">View All</button>
         </div>
-        
+
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="divide-y divide-gray-200">
             {#if loading}
               <!-- Loading activities -->
-              {#each Array(4) as _, i}
+              {#each Array(5) as _, i}
                 <div class="p-4">
                   <div class="animate-pulse flex items-center space-x-3">
                     <div class="w-8 h-8 bg-gray-300 rounded-full"></div>
@@ -424,119 +605,31 @@
                 </div>
               {/each}
             {:else}
-              <!-- Dynamic activities -->
+              <!-- Dynamic activities with clickable actions -->
               {#each recentActivities as activity}
-                <div class="p-4 hover:bg-gray-50 transition-colors">
+                <button
+                  class="w-full p-4 hover:bg-blue-50 transition-colors text-left group"
+                  on:click={() => {
+                    // Navigate based on activity type
+                    if (activity.activityType === 'dashboard_updated') goto('/dashboards');
+                    else if (activity.activityType === 'analysis_completed') goto('/text-analytics');
+                    else if (activity.activityType === 'data_imported') goto('/data-capture');
+                  }}>
                   <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 {getActivityIconBgClass(activity.iconColor)} rounded-full flex items-center justify-center">
+                    <div class="w-8 h-8 {getActivityIconBgClass(activity.iconColor)} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg class="w-4 h-4 {getActivityIconTextClass(activity.iconColor)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{getActivityIcon(activity.activityType)}"/>
                       </svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm text-gray-900">{activity.title}</p>
+                      <p class="text-sm text-gray-900 font-medium group-hover:text-blue-700">{activity.title}</p>
                       <p class="text-xs text-gray-500">{activity.timeAgo}</p>
                     </div>
+                    <svg class="w-5 h-5 text-gray-400 group-hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
                   </div>
-                </div>
-              {/each}
-            {/if}
-          </div>
-        </div>
-      </div>
-      
-      <!-- Quick Actions & Current Workspace -->
-      <div class="space-y-6">
-        <!-- Current Workspace -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Current Workspace</h3>
-          {#if loading}
-            <div class="animate-pulse bg-gray-200 rounded-xl p-4">
-              <div class="h-4 bg-gray-300 rounded mb-3"></div>
-              <div class="h-3 bg-gray-300 rounded mb-3"></div>
-              <div class="h-3 bg-gray-300 rounded w-2/3"></div>
-            </div>
-          {:else if currentWorkspace}
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-              <div class="flex items-center justify-between mb-3">
-                <h4 class="font-medium text-gray-900">{currentWorkspace.name}</h4>
-                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Active</span>
-              </div>
-              <p class="text-sm text-gray-600 mb-3">{currentWorkspace.description}</p>
-              <div class="flex items-center text-sm text-gray-500">
-                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-                {currentWorkspace.activityCount} recent activities
-              </div>
-            </div>
-          {:else}
-            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
-              <p class="text-sm text-gray-500">No active workspace</p>
-            </div>
-          {/if}
-        </div>
-        
-        <!-- Quick Actions -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div class="space-y-2">
-            <button 
-              on:click={() => goto('/projects/new')}
-              class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                <span class="text-sm font-medium text-gray-900">Create New Project</span>
-              </div>
-            </button>
-            
-            <button 
-              on:click={() => goto('/data-capture?tab=upload')}
-              class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 711 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                </svg>
-                <span class="text-sm font-medium text-gray-900">Import Data</span>
-              </div>
-            </button>
-            
-            <button class="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 712-2h2a2 2 0 712 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 712-2h2a2 2 0 712 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-                <span class="text-sm font-medium text-gray-900">View Reports</span>
-              </div>
-            </button>
-          </div>
-        </div>
-        
-        <!-- System Status -->
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">System Status</h3>
-          <div class="space-y-3">
-            {#if loading}
-              {#each Array(3) as _, i}
-                <div class="animate-pulse flex items-center justify-between">
-                  <div class="h-4 bg-gray-300 rounded w-1/3"></div>
-                  <div class="flex items-center">
-                    <div class="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
-                    <div class="h-4 bg-gray-300 rounded w-16"></div>
-                  </div>
-                </div>
-              {/each}
-            {:else}
-              {#each systemStatus as status}
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-gray-600">{status.displayName}</span>
-                  <div class="flex items-center">
-                    <div class="w-2 h-2 {status.statusColor} rounded-full mr-2"></div>
-                    <span class="text-sm {getStatusTextClass(status.status)}">{status.statusDisplay}</span>
-                  </div>
-                </div>
+                </button>
               {/each}
             {/if}
           </div>
