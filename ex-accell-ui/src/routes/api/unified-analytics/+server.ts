@@ -238,9 +238,9 @@ export const GET: RequestHandler = async ({ url }) => {
       try {
         const data = await executeQuery(`
           WITH hours AS (
-            SELECT unnest(generate_series(0, 23)) as hour_of_day
+            SELECT generate_series(0, 23) as hour_of_day
           )
-          SELECT 
+          SELECT
             h.hour_of_day,
             COALESCE(hsp.total_posts_analyzed, 0) as positive,
             COALESCE(CAST(hsp.total_posts_analyzed * hsp.avg_negative_percentage / 100 AS INTEGER), 0) as negative,

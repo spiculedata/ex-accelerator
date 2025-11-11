@@ -1,7 +1,7 @@
 // Hybrid Dapr Workflow Executor
 // Python registers workflows/activities, Node.js manages execution via Dapr JS SDK
 
-import { DaprClient } from '@dapr/dapr';
+import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -9,6 +9,16 @@ import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowServi
 import { pythonDaprWorkflowGenerator, type PythonDaprWorkflow } from './pythonDaprWorkflowGenerator';
 
 const execAsync = promisify(exec);
+
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
 export interface HybridWorkflowDeployment {
   workflowId: string;
@@ -61,7 +71,7 @@ export class HybridDaprWorkflowExecutor {
     this.daprClient = new DaprClient({
       daprHost: 'localhost',
       daprPort: daprPort.toString(),
-      communicationProtocol: 'http'
+      communicationProtocol: CommunicationProtocolEnum.HTTP
     });
 
     // Test connection
@@ -70,7 +80,7 @@ export class HybridDaprWorkflowExecutor {
       console.log(`Successfully connected to Dapr sidecar on port ${this.mainDaprPort}`);
       return this.daprClient;
     } catch (error) {
-      console.error(`Failed to connect to Dapr sidecar:`, error.message);
+      console.error(`Failed to connect to Dapr sidecar:`, getErrorMessage(error));
       
       // Provide more helpful error message
       if (daprHttpPort) {
@@ -128,8 +138,7 @@ export class HybridDaprWorkflowExecutor {
 
         for (const endpoint of endpoints) {
           try {
-            const response = await fetch(endpoint, { 
-              timeout: 2000,
+            const response = await fetch(endpoint, {
               signal: AbortSignal.timeout(2000)
             });
             
@@ -153,23 +162,23 @@ export class HybridDaprWorkflowExecutor {
                 this.daprClient = new DaprClient({
                   daprHost: 'localhost',
                   daprPort: port.toString(),
-                  communicationProtocol: 'http'
+                  communicationProtocol: CommunicationProtocolEnum.HTTP
                 });
               }
               return; // Success!
             }
           } catch (endpointError) {
-            console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+            console.log(`Endpoint ${endpoint} failed:`, getErrorMessage(endpointError));
           }
         }
       } catch (portError) {
         lastError = portError as Error;
-        console.log(`Port ${port} failed:`, portError.message);
+        console.log(`Port ${port} failed:`, getErrorMessage(portError));
       }
     }
 
     // If we get here, all ports failed
-    const errorMsg = `Dapr sidecar not found on any port (${portsToTry.join(', ')}). Last error: ${lastError?.message}`;
+    const errorMsg = `Dapr sidecar not found on any port (${portsToTry.join(', ')}). Last error: ${lastError ? getErrorMessage(lastError) : 'unknown'}`;
     throw new Error(errorMsg);
   }
 
@@ -200,12 +209,12 @@ export class HybridDaprWorkflowExecutor {
       console.error('Hybrid Dapr workflow execution failed:', error);
       
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Hybrid workflow execution failed: ${error.message}`
+        message: `Hybrid workflow execution failed: ${getErrorMessage(error)}`
       });
       throw error;
     }
@@ -252,7 +261,7 @@ export class HybridDaprWorkflowExecutor {
 
       // Get the working Dapr port that was detected during connection test
       await this.initializeDaprClient(); // Ensure we've detected the working port
-      const workingDaprPort = this.mainDaprPort;
+      const workingDaprPort = (this as any).mainDaprPort as number; // May be updated during testDaprConnection
       const workingGrpcPort = workingDaprPort === 3502 ? 50002 : 50001;
       
       execution.logs.push({
@@ -377,7 +386,7 @@ export class HybridDaprWorkflowExecutor {
       return deployment;
 
     } catch (error) {
-      throw new Error(`Failed to deploy and register Python workflow: ${error.message}`);
+      throw new Error(`Failed to deploy and register Python workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -414,7 +423,7 @@ export class HybridDaprWorkflowExecutor {
         });
         
       } catch (statusError) {
-        if (statusError.message === 'Verification timeout') {
+        if (getErrorMessage(statusError) === 'Verification timeout') {
           execution.logs.push({
             timestamp: new Date().toISOString(),
             level: 'warn',
@@ -423,7 +432,7 @@ export class HybridDaprWorkflowExecutor {
           return; // Skip verification and proceed
         }
         
-        const errorMsg = statusError.message.toLowerCase();
+        const errorMsg = getErrorMessage(statusError).toLowerCase();
         
         if (errorMsg.includes('not found') || errorMsg.includes('no workflow')) {
           // Instance not found is expected - this means workflow type is registered
@@ -434,13 +443,13 @@ export class HybridDaprWorkflowExecutor {
           });
         } else if (errorMsg.includes('workflow type') || errorMsg.includes('unknown')) {
           // Workflow type not registered
-          throw new Error(`Workflow ${workflowName} is not registered with Dapr: ${statusError.message}`);
+          throw new Error(`Workflow ${workflowName} is not registered with Dapr: ${getErrorMessage(statusError)}`);
         } else {
           // Some other error - log but don't fail
           execution.logs.push({
             timestamp: new Date().toISOString(),
             level: 'warn',
-            message: `Workflow accessibility check returned: ${statusError.message} - proceeding anyway`
+            message: `Workflow accessibility check returned: ${getErrorMessage(statusError)} - proceeding anyway`
           });
         }
       }
@@ -449,7 +458,7 @@ export class HybridDaprWorkflowExecutor {
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'warn',
-        message: `Workflow verification failed: ${error.message} - proceeding to execution attempt`
+        message: `Workflow verification failed: ${getErrorMessage(error)} - proceeding to execution attempt`
       });
       // Don't throw - just proceed to execution
     }
@@ -486,7 +495,7 @@ export class HybridDaprWorkflowExecutor {
       });
       
       const startPromise = daprClient.workflow.start(deployment.workflowName, input);
-      const instanceId = await Promise.race([startPromise, startTimeoutPromise]);
+      const instanceId = await Promise.race([startPromise, startTimeoutPromise]) as string;
 
       execution.logs.push({
         timestamp: new Date().toISOString(),
@@ -495,29 +504,29 @@ export class HybridDaprWorkflowExecutor {
       });
 
       // Monitor workflow execution
-      await this.monitorWorkflowExecution(workflow, execution, instanceId, deployment);
+      await this.monitorWorkflowExecution(workflow, execution, instanceId as string, deployment);
 
     } catch (error) {
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `JS SDK scheduling failed: ${error.message}`
+        message: `JS SDK scheduling failed: ${getErrorMessage(error)}`
       });
       
       // Log more details about the error
-      if (error.message === 'Workflow start timeout') {
+      if (getErrorMessage(error) === 'Workflow start timeout') {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'error',
           message: `Workflow start call timed out after 30 seconds - this suggests connectivity issues with Dapr sidecar`
         });
-      } else if (error.message.includes('ERR_START_WORKFLOW')) {
+      } else if (getErrorMessage(error).includes('ERR_START_WORKFLOW')) {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'error',
           message: `This suggests the workflow '${deployment.workflowName}' is not properly registered with Dapr`
         });
-      } else if (error.message.includes('fetch failed') || error.message.includes('connection refused')) {
+      } else if (getErrorMessage(error).includes('fetch failed') || getErrorMessage(error).includes('connection refused')) {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'error',
@@ -525,7 +534,7 @@ export class HybridDaprWorkflowExecutor {
         });
       }
       
-      throw new Error(`Failed to schedule workflow execution: ${error.message}`);
+      throw new Error(`Failed to schedule workflow execution: ${getErrorMessage(error)}`);
     }
   }
 
@@ -587,7 +596,7 @@ export class HybridDaprWorkflowExecutor {
           execution.logs.push({
             timestamp: new Date().toISOString(),
             level: 'warn',
-            message: `Status check failed: ${statusError.message}`
+            message: `Status check failed: ${getErrorMessage(statusError)}`
           });
         }
 
@@ -601,13 +610,13 @@ export class HybridDaprWorkflowExecutor {
 
     } catch (error) {
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Workflow monitoring failed: ${error.message}`
+        message: `Workflow monitoring failed: ${getErrorMessage(error)}`
       });
 
       throw error;
@@ -624,7 +633,7 @@ export class HybridDaprWorkflowExecutor {
       console.log(`Hybrid workflow ${instanceId} cancelled`);
     } catch (error) {
       console.error('Failed to cancel hybrid workflow:', error);
-      throw new Error(`Failed to cancel workflow: ${error.message}`);
+      throw new Error(`Failed to cancel workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -638,7 +647,7 @@ export class HybridDaprWorkflowExecutor {
       console.log(`Hybrid workflow ${instanceId} paused`);
     } catch (error) {
       console.error('Failed to pause hybrid workflow:', error);
-      throw new Error(`Failed to pause workflow: ${error.message}`);
+      throw new Error(`Failed to pause workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -652,7 +661,7 @@ export class HybridDaprWorkflowExecutor {
       console.log(`Hybrid workflow ${instanceId} resumed`);
     } catch (error) {
       console.error('Failed to resume hybrid workflow:', error);
-      throw new Error(`Failed to resume workflow: ${error.message}`);
+      throw new Error(`Failed to resume workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -665,7 +674,7 @@ export class HybridDaprWorkflowExecutor {
       return await daprClient.workflow.get(instanceId);
     } catch (error) {
       console.error('Failed to get workflow status:', error);
-      throw new Error(`Failed to get workflow status: ${error.message}`);
+      throw new Error(`Failed to get workflow status: ${getErrorMessage(error)}`);
     }
   }
 
@@ -681,7 +690,7 @@ export class HybridDaprWorkflowExecutor {
         try {
           process.kill(deployment.pythonProcessId, 'SIGTERM');
         } catch (error) {
-          console.warn(`Failed to terminate Python process: ${error.message}`);
+          console.warn(`Failed to terminate Python process: ${getErrorMessage(error)}`);
         }
       }
 
@@ -700,7 +709,7 @@ export class HybridDaprWorkflowExecutor {
       console.log(`Hybrid workflow ${instanceId} purged`);
     } catch (error) {
       console.error('Failed to purge hybrid workflow:', error);
-      throw new Error(`Failed to purge workflow: ${error.message}`);
+      throw new Error(`Failed to purge workflow: ${getErrorMessage(error)}`);
     }
   }
 }

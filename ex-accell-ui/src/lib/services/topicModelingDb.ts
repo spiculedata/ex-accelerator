@@ -1,376 +1,457 @@
-// DuckDB connection and query service for Topic Modeling data
-// Uses the ETL topic modeling database via unified analytics API
+// Database connection and query service for Topic Modeling data
+// Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
-class TopicModelingDatabase {
-  private initialized = false;
+import { BaseDatabaseService } from './baseDatabaseService';
+import type {
+  Topic,
+  TopicKeyword,
+  TopicTrend,
+  TopicRelationship,
+  TopicCategory,
+  FilterOptions,
+  ExportData
+} from './types/databaseTypes';
 
-  async connect() {
-    if (this.initialized) return; // Already connected
-    this.initialized = true;
-    console.log('TopicModelingDatabase connected to ETL database successfully');
+interface TopicStats {
+  totalTopics: number;
+  totalDocuments: number;
+  avgCoherence: number;
+  topicDistribution: Array<{
+    topic: string;
+    count: number;
+    percentage: number;
+  }>;
+}
+
+interface TopicDocument {
+  id: string | number;
+  content: string;
+  topic: string;
+  topicProbability: number;
+  platform: string;
+  timestamp: string;
+  sentiment: string;
+}
+
+interface TreemapNode {
+  name: string;
+  value: number;
+  itemStyle: { color: string };
+  children?: TreemapNode[];
+}
+
+interface TopicCorrelation {
+  topic1: string | number;
+  topic2: string | number;
+  correlation: number;
+  sharedDocuments: number;
+}
+
+/**
+ * Topic Modeling Database Service
+ * Provides topic modeling and analysis data from PostgreSQL with pg_duckdb extension
+ */
+class TopicModelingDatabase extends BaseDatabaseService {
+  constructor() {
+    super({
+      serviceName: 'TopicModeling',
+      apiEndpoint: '/api/unified-analytics',
+      autoConnect: false
+    });
   }
 
-  // Query the unified analytics API directly (server-side handles ETL DB connection)
-  private async queryAPI(endpoint: string, params: any = {}) {
-    const urlParams = new URLSearchParams(params);
-    const response = await fetch(`/api/unified-analytics?type=${endpoint}&${urlParams.toString()}`);
-    const result = await response.json();
-    return result.success ? result.data : [];
-  }
+  /**
+   * Get topic overview statistics
+   */
+  async getTopicStats(): Promise<TopicStats> {
+    const topics = await this.queryAPI<any>({ endpoint: 'topics-overview' });
 
-  // Get topic overview statistics
-  async getTopicStats() {
-    if (!this.initialized) await this.connect();
-
-    try {
-      // Get real topic data from topic modeling database
-      const topics = await this.queryAPI('topics-overview');
-      
-      if (!topics || !Array.isArray(topics)) {
-        return {
-          totalTopics: 0,
-          totalDocuments: 0,
-          avgCoherence: 0,
-          topicDistribution: []
-        };
-      }
-
-      const totalTopics = topics.length;
-      const totalDocuments = topics.reduce((sum, topic) => sum + (topic.size || 0), 0);
-      const avgCoherence = topics.length > 0 ? 
-        topics.reduce((sum, topic) => sum + (topic.coherence_score || 0), 0) / topics.length : 0;
-
-      const topicDistribution = topics.map(topic => ({
-        topic: topic.name,
-        count: topic.size || 0,
-        percentage: totalDocuments > 0 ? Math.round((topic.size / totalDocuments * 100) * 100) / 100 : 0
-      }));
-
-      return {
-        totalTopics,
-        totalDocuments,
-        avgCoherence: Math.round(avgCoherence * 100) / 100,
-        topicDistribution
-      };
-    } catch (error) {
-      console.error('Error getting topic stats from ETL DB:', error);
-      return {
-        totalTopics: 0,
-        totalDocuments: 0,
-        avgCoherence: 0,
-        topicDistribution: []
-      };
+    if (!topics || topics.length === 0) {
+      return this.getDefaultTopicStats();
     }
+
+    return this.safeTransform(
+      [topics],
+      () => this.calculateTopicStats(topics),
+      this.getDefaultTopicStats()
+    )[0];
   }
 
-  // Get topics with filtering  
-  async getTopics(filters: any = {}) {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get topics with optional filtering
+   */
+  async getTopics(filters: FilterOptions = {}): Promise<Topic[]> {
+    const [topics, keywords] = await this.queryMultiple<any>([
+      { endpoint: 'topics-overview' },
+      { endpoint: 'topic-keywords' }
+    ]);
 
-    try {
-      // Get real topics from topic modeling database
-      const topics = await this.queryAPI('topics-overview');
-      const keywords = await this.queryAPI('topic-keywords');
-      
-      if (!topics || !Array.isArray(topics)) {
-        return [];
-      }
+    if (!topics || topics.length === 0) {
+      return [];
+    }
 
-      // Create keyword map for each topic
-      const keywordMap = new Map();
-      if (keywords && Array.isArray(keywords)) {
-        keywords.forEach(kw => {
-          if (!keywordMap.has(kw.topic_id)) {
-            keywordMap.set(kw.topic_id, []);
-          }
-          keywordMap.get(kw.topic_id).push(kw.keyword);
-        });
-      }
-      
-      // Apply filters
-      let filteredTopics = topics;
-      
-      if (filters.category && filters.category !== 'all') {
-        filteredTopics = filteredTopics.filter(topic => 
-          topic.category && topic.category.toLowerCase() === filters.category.toLowerCase()
-        );
-      }
-      
-      if (filters.search) {
-        filteredTopics = filteredTopics.filter(topic => 
-          topic.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-          (keywordMap.get(topic.topic_id) || []).some(keyword => 
-            keyword.toLowerCase().includes(filters.search.toLowerCase())
-          )
-        );
-      }
-      
-      if (filters.minSize) {
-        filteredTopics = filteredTopics.filter(topic => 
-          (topic.size || 0) >= filters.minSize
-        );
-      }
-      
-      // Convert to expected format for dashboard
-      return filteredTopics.map(topic => ({
+    // Create keyword map for each topic
+    const keywordMap = this.createKeywordMap(keywords);
+
+    // Apply filters
+    let filteredTopics = this.applyTopicFilters(topics, keywordMap, filters);
+
+    // Transform to Topic interface
+    return this.safeTransform(
+      filteredTopics,
+      (topic) => ({
         id: topic.topic_id,
         name: topic.name,
         category: topic.category || 'General',
         categoryColor: topic.category_color || '#6b7280',
         size: topic.size || 0,
         weight: topic.coherence_score || 0,
-        keywords: keywordMap.get(topic.topic_id) || []
-      }));
-    } catch (error) {
-      console.error('Error getting topics from ETL DB:', error);
-      return [];
-    }
+        coherenceScore: topic.coherence_score || 0,
+        topWords: keywordMap.get(topic.topic_id) || [],
+        keywords: keywordMap.get(topic.topic_id) || [],
+        created_at: topic.created_at
+      }),
+      []
+    );
   }
 
-  // Get topic categories for filtering
-  async getTopicCategories() {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get topic categories for filtering
+   */
+  async getTopicCategories(): Promise<TopicCategory[]> {
+    const categories = await this.queryAPI<any>({ endpoint: 'topic-categories' });
 
-    try {
-      // Get real topic categories from topic modeling database
-      const categories = await this.queryAPI('topic-categories');
-      
-      if (!categories || !Array.isArray(categories)) {
-        return [];
-      }
-      
-      return categories.map(category => ({
-        name: category.category,
-        count: category.topic_count || 0,
-        size: category.total_size || 0,
-        color: category.category_color || '#6b7280'
-      }));
-    } catch (error) {
-      console.error('Error getting topic categories from ETL DB:', error);
+    if (!categories || categories.length === 0) {
       return [];
     }
+
+    return this.safeTransform(
+      categories,
+      (category) => ({
+        category: category.category,
+        category_color: category.category_color || '#6b7280',
+        topic_count: category.topic_count || 0,
+        total_size: category.total_size || 0,
+        avg_coherence: category.avg_coherence || 0
+      }),
+      []
+    );
   }
 
-  // Get topic relationships for dashboard compatibility
-  async getTopicRelationships(threshold: number = 0.5) {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get topic relationships
+   */
+  async getTopicRelationships(threshold: number = 0.5): Promise<TopicRelationship[]> {
+    const relationships = await this.queryAPI<any>({
+      endpoint: 'topic-relationships',
+      params: { threshold: threshold.toString() }
+    });
 
-    try {
-      // Get real topic relationships from topic modeling database
-      const relationships = await this.queryAPI('topic-relationships', { threshold: threshold.toString() });
-      
-      if (!relationships || !Array.isArray(relationships)) {
-        return [];
-      }
-      
-      // Convert to expected format for dashboard
-      return relationships.map(rel => ({
-        source: rel.topic1_id,
-        target: rel.topic2_id,
-        strength: rel.similarity_score || 0,
-        type: rel.relationship_type || 'similarity'
-      }));
-    } catch (error) {
-      console.error('Error getting topic relationships from ETL DB:', error);
+    if (!relationships || relationships.length === 0) {
       return [];
     }
+
+    return this.safeTransform(
+      relationships,
+      (rel) => ({
+        topic1_id: rel.topic1_id,
+        topic2_id: rel.topic2_id,
+        similarity_score: rel.similarity_score || 0,
+        relationship_type: rel.relationship_type || 'similarity',
+        strength: rel.strength || 0
+      }),
+      []
+    );
   }
 
-  // Get detailed topic analysis (legacy method - now uses real topic data)
-  async getDetailedTopics() {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get detailed topic analysis
+   */
+  async getDetailedTopics(): Promise<Topic[]> {
+    const [topics, keywords] = await this.queryMultiple<any>([
+      { endpoint: 'topics-overview' },
+      { endpoint: 'topic-keywords' }
+    ]);
 
-    try {
-      // Get real topics from topic modeling database
-      const topics = await this.queryAPI('topics-overview');
-      const keywords = await this.queryAPI('topic-keywords');
-      
-      if (!topics || !Array.isArray(topics)) {
-        return [];
-      }
+    if (!topics || topics.length === 0) {
+      return [];
+    }
 
-      // Create keyword map for each topic
-      const keywordMap = new Map();
-      if (keywords && Array.isArray(keywords)) {
-        keywords.forEach(kw => {
-          if (!keywordMap.has(kw.topic_id)) {
-            keywordMap.set(kw.topic_id, []);
-          }
-          keywordMap.get(kw.topic_id).push(kw.keyword);
-        });
-      }
+    const keywordMap = this.createKeywordMap(keywords);
 
-      return topics.map(topic => ({
+    return this.safeTransform(
+      topics,
+      (topic) => ({
         id: topic.topic_id,
         name: topic.name,
         description: `Topic: ${topic.name} (${topic.category || 'General'})`,
-        documentCount: topic.size || 0,
+        category: topic.category || 'General',
+        categoryColor: topic.category_color || '#6b7280',
+        size: topic.size || 0,
+        weight: topic.coherence_score || 0,
         coherenceScore: topic.coherence_score || 0,
         topWords: keywordMap.get(topic.topic_id) || [],
-        color: topic.category_color || '#6b7280'
-      }));
-    } catch (error) {
-      console.error('Error getting detailed topics from ETL DB:', error);
-      return [];
-    }
+        color: topic.category_color || '#6b7280',
+        documentCount: topic.size || 0
+      }),
+      []
+    );
   }
 
-  // Get topic trends over time
-  async getTopicTrends(timeRange: string = '7d') {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get topic trends over time
+   */
+  async getTopicTrends(timeRange: string = '7d'): Promise<TopicTrend[]> {
+    const trends = await this.queryAPI<any>({
+      endpoint: 'topic-trends',
+      params: { timeRange }
+    });
 
-    try {
-      // Get real topic trends from topic modeling database
-      const trends = await this.queryAPI('topic-trends', { timeRange });
-      
-      if (!trends || !Array.isArray(trends)) {
-        return [];
-      }
+    if (!trends || trends.length === 0) {
+      return [];
+    }
 
-      return trends.map(trend => ({
-        date: trend.analysis_date,
+    return this.safeTransform(
+      trends,
+      (trend) => ({
         topic_id: trend.topic_id,
+        analysis_date: trend.analysis_date,
         document_count: trend.document_count || 0,
         average_engagement: trend.average_engagement || 0,
         growth_rate: trend.growth_rate || 0,
         trend_direction: trend.trend_direction || 'stable'
-      }));
-    } catch (error) {
-      console.error('Error getting topic trends from ETL DB:', error);
-      return [];
-    }
+      }),
+      []
+    );
   }
 
-  // Get topic correlations (legacy method - now uses real relationships)
-  async getTopicCorrelations() {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get topic correlations
+   */
+  async getTopicCorrelations(): Promise<TopicCorrelation[]> {
+    const relationships = await this.queryAPI<any>({
+      endpoint: 'topic-relationships',
+      params: { threshold: '0.0' }
+    });
 
-    try {
-      // Get real topic relationships from topic modeling database
-      const relationships = await this.queryAPI('topic-relationships', { threshold: '0.0' });
-      
-      if (!relationships || !Array.isArray(relationships)) {
-        return [];
-      }
-      
-      return relationships.map(rel => ({
+    if (!relationships || relationships.length === 0) {
+      return [];
+    }
+
+    return this.safeTransform(
+      relationships,
+      (rel) => ({
         topic1: rel.topic1_id,
         topic2: rel.topic2_id,
         correlation: rel.similarity_score || 0,
-        sharedDocuments: Math.floor((rel.strength || 0.5) * 100) // Convert strength to document count
-      }));
-    } catch (error) {
-      console.error('Error getting topic correlations from ETL DB:', error);
-      return [];
-    }
+        sharedDocuments: Math.floor((rel.strength || 0.5) * 100)
+      }),
+      []
+    );
   }
 
-  // Get sample documents for a topic
-  async getTopicDocuments(topicId: number, limit: number = 20) {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get sample documents for a topic
+   */
+  async getTopicDocuments(topicId: number, limit: number = 20): Promise<TopicDocument[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'sample-posts',
+      params: { limit: limit.toString() }
+    });
 
-    try {
-      const data = await this.queryAPI('sample-posts', { limit });
-      
-      return data.map(post => ({
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    return this.safeTransform(
+      data,
+      (post) => ({
         id: post.id,
         content: post.text,
         topic: `Topic ${topicId}`,
-        topicProbability: Math.round(Math.random() * 100) / 100,
+        topicProbability: Math.round(Math.random() * 100) / 100, // TODO: Get actual probability from database
         platform: post.platform,
         timestamp: post.timestamp,
         sentiment: post.sentiment
-      }));
-    } catch (error) {
-      console.error('Error getting topic documents from ETL DB:', error);
-      return [];
-    }
+      }),
+      []
+    );
   }
 
-  // Get treemap data for visualization
-  async getTreemapData(filters: any = {}) {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get treemap data for visualization
+   */
+  async getTreemapData(filters: FilterOptions = {}): Promise<TreemapNode[]> {
+    const [topics, categories] = await Promise.all([
+      this.getTopics(filters),
+      this.getTopicCategories()
+    ]);
 
-    try {
-      const topics = await this.getTopics(filters);
-      const categories = await this.getTopicCategories();
-      
-      if (topics.length === 0) {
-        return [];
+    if (topics.length === 0) {
+      return [];
+    }
+
+    return this.safeTransform(
+      [{ topics, categories }],
+      () => this.buildTreemapHierarchy(topics, categories),
+      []
+    )[0];
+  }
+
+  /**
+   * Export topic modeling data
+   */
+  async exportTopicData(filters: FilterOptions = {}): Promise<ExportData<Topic>> {
+    const [topicStats, detailedTopics, trends, correlations] = await Promise.all([
+      this.getTopicStats(),
+      this.getDetailedTopics(),
+      this.getTopicTrends(filters.timeRange || '7d'),
+      this.getTopicCorrelations()
+    ]);
+
+    return {
+      exportDate: new Date().toISOString(),
+      filters,
+      data: detailedTopics,
+      summary: {
+        topicStats,
+        trends,
+        correlations
       }
+    };
+  }
 
-      // Group topics by category for treemap hierarchy
-      const categoryMap = new Map();
-      
-      // Initialize categories
-      categories.forEach(category => {
-        categoryMap.set(category.name, {
-          name: category.name,
+  // ========== Private Helper Methods ==========
+
+  /**
+   * Get default topic statistics
+   */
+  private getDefaultTopicStats(): TopicStats {
+    return {
+      totalTopics: 0,
+      totalDocuments: 0,
+      avgCoherence: 0,
+      topicDistribution: []
+    };
+  }
+
+  /**
+   * Calculate topic statistics from raw data
+   */
+  private calculateTopicStats(topics: any[]): TopicStats {
+    const totalTopics = topics.length;
+    const totalDocuments = topics.reduce((sum, topic) => sum + (topic.size || 0), 0);
+    const avgCoherence = topics.length > 0
+      ? topics.reduce((sum, topic) => sum + (topic.coherence_score || 0), 0) / topics.length
+      : 0;
+
+    const topicDistribution = topics.map(topic => ({
+      topic: topic.name,
+      count: topic.size || 0,
+      percentage: totalDocuments > 0 ? Math.round((topic.size / totalDocuments * 100) * 100) / 100 : 0
+    }));
+
+    return {
+      totalTopics,
+      totalDocuments,
+      avgCoherence: Math.round(avgCoherence * 100) / 100,
+      topicDistribution
+    };
+  }
+
+  /**
+   * Create keyword map from keywords array
+   */
+  private createKeywordMap(keywords: any[]): Map<string | number, string[]> {
+    const keywordMap = new Map<string | number, string[]>();
+
+    if (keywords && Array.isArray(keywords)) {
+      keywords.forEach(kw => {
+        if (!keywordMap.has(kw.topic_id)) {
+          keywordMap.set(kw.topic_id, []);
+        }
+        keywordMap.get(kw.topic_id)!.push(kw.keyword);
+      });
+    }
+
+    return keywordMap;
+  }
+
+  /**
+   * Apply filters to topics
+   */
+  private applyTopicFilters(
+    topics: any[],
+    keywordMap: Map<string | number, string[]>,
+    filters: FilterOptions
+  ): any[] {
+    let filteredTopics = topics;
+
+    if (filters.platform && filters.platform !== 'all') {
+      filteredTopics = filteredTopics.filter(topic =>
+        topic.category && topic.category.toLowerCase() === filters.platform!.toLowerCase()
+      );
+    }
+
+    if (filters.sortBy) {
+      filteredTopics = filteredTopics.filter(topic =>
+        topic.name.toLowerCase().includes(filters.sortBy!.toLowerCase()) ||
+        (keywordMap.get(topic.topic_id) || []).some(keyword =>
+          keyword.toLowerCase().includes(filters.sortBy!.toLowerCase())
+        )
+      );
+    }
+
+    if (filters.limit) {
+      filteredTopics = filteredTopics.filter(topic =>
+        (topic.size || 0) >= filters.limit!
+      );
+    }
+
+    return filteredTopics;
+  }
+
+  /**
+   * Build treemap hierarchy from topics and categories
+   */
+  private buildTreemapHierarchy(topics: Topic[], categories: TopicCategory[]): TreemapNode[] {
+    const categoryMap = new Map<string, TreemapNode>();
+
+    // Initialize categories
+    categories.forEach(category => {
+      categoryMap.set(category.category, {
+        name: category.category,
+        value: 0,
+        itemStyle: { color: category.category_color },
+        children: []
+      });
+    });
+
+    // Add topics to their categories
+    topics.forEach(topic => {
+      const categoryName = topic.category || 'General';
+      if (!categoryMap.has(categoryName)) {
+        categoryMap.set(categoryName, {
+          name: categoryName,
           value: 0,
-          itemStyle: { color: category.color },
+          itemStyle: { color: '#6b7280' },
           children: []
         });
+      }
+
+      const category = categoryMap.get(categoryName)!;
+      category.children!.push({
+        name: topic.name,
+        value: topic.size,
+        itemStyle: { color: topic.categoryColor || '#6b7280' }
       });
+      category.value += topic.size;
+    });
 
-      // Add topics to their categories
-      topics.forEach(topic => {
-        const categoryName = topic.category || 'General';
-        if (!categoryMap.has(categoryName)) {
-          categoryMap.set(categoryName, {
-            name: categoryName,
-            value: 0,
-            itemStyle: { color: '#6b7280' },
-            children: []
-          });
-        }
-        
-        const category = categoryMap.get(categoryName);
-        category.children.push({
-          name: topic.name,
-          value: topic.size,
-          itemStyle: { color: topic.categoryColor || '#6b7280' }
-        });
-        category.value += topic.size;
-      });
-
-      // Convert to array and sort by size
-      const treemapData = Array.from(categoryMap.values())
-        .filter(category => category.children.length > 0)
-        .sort((a, b) => b.value - a.value);
-
-      return treemapData;
-    } catch (error) {
-      console.error('Error getting treemap data from ETL DB:', error);
-      return [];
-    }
-  }
-
-  // Export topic modeling data
-  async exportTopicData(filters: any = {}) {
-    if (!this.initialized) await this.connect();
-
-    try {
-      const topicStats = await this.getTopicStats();
-      const detailedTopics = await this.getDetailedTopics();
-      const trends = await this.getTopicTrends(filters.timeRange || '7d');
-      const correlations = await this.getTopicCorrelations();
-
-      return {
-        exportDate: new Date().toISOString(),
-        summary: topicStats,
-        topics: detailedTopics,
-        trends,
-        correlations,
-        filters
-      };
-    } catch (error) {
-      console.error('Error exporting topic data from ETL DB:', error);
-      throw error;
-    }
-  }
-
-  async close() {
-    this.initialized = false;
+    // Convert to array and sort by size
+    return Array.from(categoryMap.values())
+      .filter(category => category.children && category.children.length > 0)
+      .sort((a, b) => b.value - a.value);
   }
 }
 

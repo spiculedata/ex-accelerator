@@ -1,4 +1,4 @@
-import { DaprClient } from 'dapr-client';
+import { DaprClient, CommunicationProtocolEnum, HttpMethod } from 'dapr-client';
 
 const DAPR_HTTP_PORT = process.env.DAPR_HTTP_PORT || '3500';
 const DAPR_GRPC_PORT = process.env.DAPR_GRPC_PORT || '50001';
@@ -15,7 +15,7 @@ class DaprClientService {
       this.client = new DaprClient({
         daprHost: 'localhost',
         daprPort: DAPR_GRPC_PORT,
-        communicationProtocol: 'grpc'
+        communicationProtocol: CommunicationProtocolEnum.GRPC
       });
 
       this.isInitialized = true;
@@ -149,7 +149,7 @@ class DaprClientService {
     }
   }
 
-  async invokeService(appId: string, methodName: string, data?: any, httpVerb: string = 'POST'): Promise<any> {
+  async invokeService(appId: string, methodName: string, data?: any, httpVerb: HttpMethod = HttpMethod.POST): Promise<any> {
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -188,7 +188,7 @@ class DaprClientService {
     try {
       if (this.client) {
         // Use Dapr client secrets
-        const secrets = await this.client.secret.get(secretStoreName, key);
+        const secrets = await this.client.secret.get(secretStoreName, key) as Record<string, string>;
         return secrets[key] || null;
       } else {
         // Fall back to HTTP API
@@ -201,7 +201,7 @@ class DaprClientService {
           throw new Error(`Secret get request failed: ${response.statusText}`);
         }
 
-        const secrets = await response.json();
+        const secrets = await response.json() as Record<string, string>;
         return secrets[key] || null;
       }
     } catch (error) {
@@ -217,12 +217,13 @@ class DaprClientService {
   async dispose(): Promise<void> {
     if (this.client) {
       try {
-        await this.client.close();
+        // Note: DaprClient doesn't have a close() method in the current SDK version
+        // Connection cleanup is handled automatically
+        this.client = null;
+        this.isInitialized = false;
       } catch (error) {
-        console.error('Error closing Dapr client:', error);
+        console.error('Error disposing Dapr client:', error);
       }
-      this.client = null;
-      this.isInitialized = false;
     }
   }
 }

@@ -89,7 +89,8 @@ export class PythonDaprWorkflowGenerator {
       return pythonScriptPath;
       
     } catch (error) {
-      throw new Error(`Failed to deploy Python Dapr workflow: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to deploy Python Dapr workflow: ${errorMsg}`);
     }
   }
 
@@ -833,7 +834,8 @@ def ${activityName}(ctx: WorkflowActivityContext, input_data: dict):
       console.log('Virtual environment with Dapr SDK setup completed');
       
     } catch (error) {
-      throw new Error(`Failed to setup virtual environment: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to setup virtual environment: ${errorMsg}`);
     }
   }
 

@@ -1,103 +1,179 @@
-// DuckDB connection and query service for Android Research data
-// Uses the ETL android research database via unified analytics API
-class AndroidResearchDatabase {
-  private initialized = false;
+// Database connection and query service for Android Research data
+// Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
-  async connect() {
-    if (this.initialized) return; // Already connected
-    this.initialized = true;
-    console.log('AndroidResearchDatabase connected to ETL database successfully');
+import { BaseDatabaseService } from './baseDatabaseService';
+
+interface TemporalUsagePattern {
+  hour: number;
+  apps: Array<{
+    app: string;
+    hour: number;
+    usage: number;
+    sessions: number;
+    avgDuration: number;
+  }>;
+  totalUsage: number;
+}
+
+interface AppTransition {
+  source: string;
+  target: string;
+  value: number;
+  avgTime?: number;
+}
+
+interface AttentionSpan {
+  app: string;
+  meanDuration: number;
+  sessions: Array<{
+    duration: number;
+    timestamp: number;
+    taskSwitches: number;
+    interruptions: number;
+  }>;
+}
+
+interface ContentEngagement {
+  content: string;
+  engagementScore: number;
+  avgDuration: number;
+  interactionDepth: number;
+  returnRate: number;
+}
+
+interface CognitiveLoad {
+  hour: number;
+  taskSwitches: number;
+  multitaskingIndex: number;
+  attentionFragmentation: number;
+  cognitiveEfficiency: number;
+}
+
+interface BehavioralMetrics {
+  totalDailyUsage: number;
+  peakUsageHour: number;
+  avgSessionLength: number;
+  appSwitchingRate: number;
+  digitalWellbeingScore: number;
+}
+
+interface DigitalPhenotype {
+  behaviorType: string;
+  attentionProfile: string;
+  usagePattern: string;
+  multitaskingIndex: string;
+}
+
+interface ResearchFinding {
+  title: string;
+  finding: string;
+  significance: string;
+  implication: string;
+}
+
+interface NetworkCentrality {
+  app: string;
+  outDegree: number;
+  inDegree: number;
+  centralityScore: number;
+  category: string;
+}
+
+/**
+ * Android Research Database Service
+ * Provides Android research and behavioral analysis data from PostgreSQL with pg_duckdb extension
+ */
+class AndroidResearchDatabase extends BaseDatabaseService {
+  constructor() {
+    super({
+      serviceName: 'AndroidResearch',
+      apiEndpoint: '/api/unified-analytics',
+      autoConnect: false
+    });
   }
 
-  // Query the unified analytics API directly (server-side handles ETL DB connection)
-  private async queryAPI(endpoint: string, params: any = {}) {
-    const urlParams = new URLSearchParams(params);
-    const response = await fetch(`/api/unified-analytics?type=${endpoint}&${urlParams.toString()}`);
-    const result = await response.json();
-    return result.success ? result.data : [];
+  /**
+   * Query Android Research API specifically
+   */
+  private async queryAndroidResearchAPI<T = any>(endpoint: string, params: any = {}): Promise<T[]> {
+    return this.queryAPI<T>({ endpoint, params });
   }
 
-  // Alias for API queries specific to Android research
-  private async queryAndroidResearchAPI(endpoint: string, params: any = {}) {
-    return this.queryAPI(endpoint, params);
-  }
+  /**
+   * Get temporal usage patterns for 24-hour analysis
+   */
+  async getTemporalUsagePatterns(): Promise<TemporalUsagePattern[]> {
+    const results = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
 
-  // Temporal usage patterns for 24-hour analysis
-  async getTemporalUsagePatterns() {
-    if (!this.initialized) await this.connect();
-
-    try {
-      // Generate temporal patterns from hourly patterns data
-      const results = await this.queryAPI('hourly-patterns');
-      
-      if (results && results.length > 0) {
-        const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
-        return results.map(hourData => {
-          const totalActivity = (hourData.positive || 0) + (hourData.negative || 0) + (hourData.neutral || 0);
-          const appUsage = apps.map(app => ({
-            app,
-            hour: hourData.hour_of_day,
-            usage: Math.floor(totalActivity * (0.2 + Math.random() * 0.6)), // Distribute activity
-            sessions: Math.floor(totalActivity * 0.1),
-            avgDuration: Math.floor(Math.random() * 300) + 30
-          }));
-          return {
-            hour: hourData.hour_of_day,
-            apps: appUsage,
-            totalUsage: appUsage.reduce((sum, a) => sum + a.usage, 0)
-          };
-        });
-      }
-      
-      return this.getFallbackTemporalPatterns();
-    } catch (error) {
-      console.error('Failed to get temporal usage patterns from ETL DB:', error);
+    if (!results || results.length === 0) {
       return this.getFallbackTemporalPatterns();
     }
+
+    const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
+
+    return this.safeTransform(
+      results,
+      (hourData) => {
+        const totalActivity = (hourData.positive || 0) + (hourData.negative || 0) + (hourData.neutral || 0);
+        const appUsage = apps.map(app => ({
+          app,
+          hour: hourData.hour_of_day,
+          usage: Math.floor(totalActivity * (0.2 + Math.random() * 0.6)),
+          sessions: Math.floor(totalActivity * 0.1),
+          avgDuration: Math.floor(Math.random() * 300) + 30
+        }));
+
+        return {
+          hour: hourData.hour_of_day,
+          apps: appUsage,
+          totalUsage: appUsage.reduce((sum, a) => sum + a.usage, 0)
+        };
+      },
+      this.getFallbackTemporalPatterns()
+    );
   }
 
-  // App transition network data for network analysis
-  async getAppTransitions() {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get app transition network data
+   */
+  async getAppTransitions(): Promise<AppTransition[]> {
+    const results = await this.queryAPI<any>({ endpoint: 'platform-performance' });
 
-    try {
-      // Generate app transitions from platform performance data
-      const results = await this.queryAPI('platform-performance');
-      
-      if (results && results.length > 1) {
-        const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
-        const transitions = [];
-        
-        for (let i = 0; i < apps.length - 1; i++) {
-          const platformData = results[i % results.length] || { total_posts: 10 };
-          transitions.push({
-            source: apps[i],
-            target: apps[i + 1],
-            value: Math.floor(platformData.total_posts * 0.1), // Scale down to reasonable transition count
-            avgTime: Math.floor(Math.random() * 300) + 60 // 60-360 seconds
-          });
-        }
-        
-        return transitions;
-      }
-      
-      return this.getFallbackAppTransitions();
-    } catch (error) {
-      console.error('Failed to get app transitions from ETL DB:', error);
+    if (!results || results.length < 2) {
       return this.getFallbackAppTransitions();
     }
+
+    const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
+    const transitions: AppTransition[] = [];
+
+    for (let i = 0; i < apps.length - 1; i++) {
+      const platformData = results[i % results.length] || { total_posts: 10 };
+      transitions.push({
+        source: apps[i],
+        target: apps[i + 1],
+        value: Math.floor(platformData.total_posts * 0.1),
+        avgTime: Math.floor(Math.random() * 300) + 60
+      });
+    }
+
+    return transitions;
   }
 
-  // Attention span distribution data for research analysis
-  async getAttentionSpans() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get attention span distribution data
+   */
+  async getAttentionSpans(): Promise<AttentionSpan[]> {
     try {
       const results = await this.queryAndroidResearchAPI('attention-spans');
-      
-      // Group by app and format for dashboard
-      const appGroups = {};
-      results.forEach(r => {
+
+      if (results.length === 0) {
+        return this.getFallbackAttentionSpans();
+      }
+
+      // Group by app
+      const appGroups: Record<string, AttentionSpan> = {};
+
+      results.forEach((r: any) => {
         const appName = r.app_name || r.apk;
         if (!appGroups[appName]) {
           appGroups[appName] = {
@@ -106,7 +182,7 @@ class AndroidResearchDatabase {
             sessions: []
           };
         }
-        
+
         appGroups[appName].sessions.push({
           duration: Math.round((r.attention_duration_ms || 0) / 1000),
           timestamp: r.attention_start_ts || Date.now(),
@@ -114,52 +190,64 @@ class AndroidResearchDatabase {
           interruptions: r.interruption_count || 0
         });
       });
-      
+
       // Calculate mean durations
-      Object.values(appGroups).forEach((group: any) => {
+      Object.values(appGroups).forEach((group) => {
         if (group.sessions.length > 0) {
           group.meanDuration = group.sessions.reduce((sum, s) => sum + s.duration, 0) / group.sessions.length;
         }
       });
-      
+
       return Object.values(appGroups);
     } catch (error) {
-      console.error('Failed to get attention spans:', error);
+      this.log('error', 'Failed to get attention spans');
       return this.getFallbackAttentionSpans();
     }
   }
 
-  // Content engagement analysis data
-  async getContentEngagement() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get content engagement analysis data
+   */
+  async getContentEngagement(): Promise<ContentEngagement[]> {
     try {
       const results = await this.queryAndroidResearchAPI('content-engagement');
-      
-      return results.map(r => ({
-        content: r.content_category || r.content,
-        engagementScore: r.engagement_score || r.avg_engagement_score || 0,
-        avgDuration: Math.round((r.avg_duration_minutes || 0) * 60), // Convert to seconds
-        interactionDepth: r.avg_interaction_depth || r.interaction_depth || 0,
-        returnRate: r.avg_return_visits ? r.avg_return_visits / 100 : 0
-      }));
+
+      if (results.length === 0) {
+        return this.getFallbackContentEngagement();
+      }
+
+      return this.safeTransform(
+        results,
+        (r) => ({
+          content: r.content_category || r.content,
+          engagementScore: r.engagement_score || r.avg_engagement_score || 0,
+          avgDuration: Math.round((r.avg_duration_minutes || 0) * 60),
+          interactionDepth: r.avg_interaction_depth || r.interaction_depth || 0,
+          returnRate: r.avg_return_visits ? r.avg_return_visits / 100 : 0
+        }),
+        this.getFallbackContentEngagement()
+      );
     } catch (error) {
-      console.error('Failed to get content engagement:', error);
+      this.log('error', 'Failed to get content engagement');
       return this.getFallbackContentEngagement();
     }
   }
 
-  // Cognitive load indicators for behavioral analysis
-  async getCognitiveLoadData() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get cognitive load indicators
+   */
+  async getCognitiveLoadData(): Promise<CognitiveLoad[]> {
     try {
       const results = await this.queryAndroidResearchAPI('cognitive-load');
-      
+
+      if (results.length === 0) {
+        return this.getFallbackCognitiveLoad();
+      }
+
       // Group by hour
-      const hourlyData = Array.from({length: 24}, (_, hour) => {
-        const hourData = results.filter(r => r.analysis_hour === hour);
-        
+      const hourlyData = Array.from({ length: 24 }, (_, hour) => {
+        const hourData = results.filter((r: any) => r.analysis_hour === hour);
+
         if (hourData.length === 0) {
           return {
             hour,
@@ -169,71 +257,48 @@ class AndroidResearchDatabase {
             cognitiveEfficiency: 0
           };
         }
-        
-        // Average across users for this hour
+
         return {
           hour,
-          taskSwitches: Math.round(hourData.reduce((sum, r) => sum + (r.task_switching_rate || 0), 0) / hourData.length),
-          multitaskingIndex: hourData.reduce((sum, r) => sum + (r.multitasking_index || 0), 0) / hourData.length,
-          attentionFragmentation: hourData.reduce((sum, r) => sum + (r.attention_fragmentation || 0), 0) / hourData.length,
-          cognitiveEfficiency: hourData.reduce((sum, r) => sum + (r.cognitive_efficiency || 0), 0) / hourData.length
+          taskSwitches: Math.round(hourData.reduce((sum: number, r: any) => sum + (r.task_switching_rate || 0), 0) / hourData.length),
+          multitaskingIndex: hourData.reduce((sum: number, r: any) => sum + (r.multitasking_index || 0), 0) / hourData.length,
+          attentionFragmentation: hourData.reduce((sum: number, r: any) => sum + (r.attention_fragmentation || 0), 0) / hourData.length,
+          cognitiveEfficiency: hourData.reduce((sum: number, r: any) => sum + (r.cognitive_efficiency || 0), 0) / hourData.length
         };
       });
-      
+
       return hourlyData;
     } catch (error) {
-      console.error('Failed to get cognitive load data:', error);
+      this.log('error', 'Failed to get cognitive load data');
       return this.getFallbackCognitiveLoad();
     }
   }
 
-  // Behavioral metrics calculation
-  async getBehavioralMetrics() {
-    if (!this.initialized) await this.connect();
+  /**
+   * Get behavioral metrics calculation
+   */
+  async getBehavioralMetrics(): Promise<BehavioralMetrics> {
+    const results = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+
+    if (!results || results.length === 0) {
+      return this.getFallbackBehavioralMetrics();
+    }
 
     try {
-      // Generate behavioral metrics from cross-platform sentiment data
-      const results = await this.queryAPI('cross-platform-sentiment');
-      
-      if (results && results.length > 0) {
-        const totalPosts = results.reduce((sum, item) => sum + item.post_count, 0);
-        const avgConfidence = results.reduce((sum, item) => sum + (item.avg_confidence || 0.8), 0) / results.length;
-        
-        // Get hourly patterns to find peak usage
-        const hourlyResults = await this.queryAPI('hourly-patterns');
-        let peakHour = 19; // Default
-        if (hourlyResults && hourlyResults.length > 0) {
-          const maxActivity = hourlyResults.reduce((max, current) => {
-            const currentTotal = (current.positive || 0) + (current.negative || 0) + (current.neutral || 0);
-            const maxTotal = (max.positive || 0) + (max.negative || 0) + (max.neutral || 0);
-            return currentTotal > maxTotal ? current : max;
-          });
-          peakHour = maxActivity.hour_of_day || 19;
-        }
-        
-        return {
-          totalDailyUsage: Math.round(totalPosts * 0.5), // Convert posts to minutes
-          peakUsageHour: peakHour,
-          avgSessionLength: Math.round(totalPosts * 0.3), // Session length in seconds
-          appSwitchingRate: Math.round(results.length * 2), // Based on number of platforms
-          digitalWellbeingScore: Math.round(avgConfidence * 100) // Convert confidence to score
-        };
-      }
-      
-      return this.getFallbackBehavioralMetrics();
+      return await this.calculateBehavioralMetrics(results);
     } catch (error) {
-      console.error('Failed to get behavioral metrics from ETL DB:', error);
+      this.log('error', 'Failed to calculate behavioral metrics');
       return this.getFallbackBehavioralMetrics();
     }
   }
 
-  // Digital phenotype classification
-  async getDigitalPhenotype() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get digital phenotype classification
+   */
+  async getDigitalPhenotype(): Promise<DigitalPhenotype> {
     try {
       const results = await this.queryAndroidResearchAPI('digital-phenotype');
-      
+
       if (results.length > 0) {
         const phenotype = results[0];
         return {
@@ -243,80 +308,102 @@ class AndroidResearchDatabase {
           multitaskingIndex: phenotype.multitasking_profile || 'Moderate'
         };
       }
-      
-      return {
-        behaviorType: 'Moderate User',
-        attentionProfile: 'Moderate',
-        usagePattern: 'Evening-Peak',
-        multitaskingIndex: 'Moderate'
-      };
+
+      return this.getFallbackDigitalPhenotype();
     } catch (error) {
-      console.error('Failed to get digital phenotype:', error);
+      this.log('error', 'Failed to get digital phenotype');
       return this.getFallbackDigitalPhenotype();
     }
   }
 
-  // Research findings and insights
-  async getResearchFindings() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get research findings and insights
+   */
+  async getResearchFindings(): Promise<ResearchFinding[]> {
     try {
       const results = await this.queryAndroidResearchAPI('research-findings');
-      
-      return results.map(r => ({
-        title: r.finding_title || r.title,
-        finding: r.finding_description || r.finding,
-        significance: r.research_implications || r.significance,
-        implication: r.behavioral_recommendations || r.implication
-      }));
+
+      if (results.length === 0) {
+        return this.getFallbackResearchFindings();
+      }
+
+      return this.safeTransform(
+        results,
+        (r) => ({
+          title: r.finding_title || r.title,
+          finding: r.finding_description || r.finding,
+          significance: r.research_implications || r.significance,
+          implication: r.behavioral_recommendations || r.implication
+        }),
+        this.getFallbackResearchFindings()
+      );
     } catch (error) {
-      console.error('Failed to get research findings:', error);
+      this.log('error', 'Failed to get research findings');
       return this.getFallbackResearchFindings();
     }
   }
 
-  // Network centrality analysis
-  async getNetworkCentrality() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get network centrality analysis
+   */
+  async getNetworkCentrality(): Promise<NetworkCentrality[]> {
     try {
       const results = await this.queryAndroidResearchAPI('network-centrality');
-      
-      return results.map(r => ({
-        app: r.app_name || r.app,
-        outDegree: r.out_degree || 0,
-        inDegree: r.in_degree || 0,
-        centralityScore: r.total_degree || r.overall_centrality || 0,
-        category: r.app_category || 'Other'
-      })).sort((a, b) => b.centralityScore - a.centralityScore);
+
+      if (results.length === 0) {
+        return this.getFallbackNetworkCentrality();
+      }
+
+      const centrality = this.safeTransform(
+        results,
+        (r) => ({
+          app: r.app_name || r.app,
+          outDegree: r.out_degree || 0,
+          inDegree: r.in_degree || 0,
+          centralityScore: r.total_degree || r.overall_centrality || 0,
+          category: r.app_category || 'Other'
+        }),
+        this.getFallbackNetworkCentrality()
+      );
+
+      return centrality.sort((a, b) => b.centralityScore - a.centralityScore);
     } catch (error) {
-      console.error('Failed to get network centrality:', error);
+      this.log('error', 'Failed to get network centrality');
       return this.getFallbackNetworkCentrality();
     }
   }
 
-  // Transition flow data for Sankey diagram
-  async getTransitionFlow() {
-    if (!this.initialized) await this.connect();
-
+  /**
+   * Get transition flow data for Sankey diagram
+   */
+  async getTransitionFlow(): Promise<AppTransition[]> {
     try {
       const results = await this.queryAndroidResearchAPI('transition-flow');
-      
-      return results.map(r => ({
-        source: r.from_app_name || r.source,
-        target: r.to_app_name || r.target,
-        value: r.transition_count || r.value || 1
-      }));
+
+      if (results.length === 0) {
+        return this.getFallbackTransitionFlow();
+      }
+
+      return this.safeTransform(
+        results,
+        (r) => ({
+          source: r.from_app_name || r.source,
+          target: r.to_app_name || r.target,
+          value: r.transition_count || r.value || 1
+        }),
+        this.getFallbackTransitionFlow()
+      );
     } catch (error) {
-      console.error('Failed to get transition flow:', error);
+      this.log('error', 'Failed to get transition flow');
       return this.getFallbackTransitionFlow();
     }
   }
 
-  // Fallback methods for when API fails
-  private getFallbackTemporalPatterns() {
+  // ========== Fallback Methods ==========
+
+  private getFallbackTemporalPatterns(): TemporalUsagePattern[] {
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
-    return Array.from({length: 24}, (_, hour) => {
+    return Array.from({ length: 24 }, (_, hour) => {
       const baseUsage = Math.max(0, Math.sin((hour - 6) * Math.PI / 12) * 100 + Math.random() * 20);
       const appUsage = apps.map(app => ({
         app,
@@ -329,7 +416,7 @@ class AndroidResearchDatabase {
     });
   }
 
-  private getFallbackAppTransitions() {
+  private getFallbackAppTransitions(): AppTransition[] {
     return [
       { source: 'YouTube', target: 'Chrome', value: 25, avgTime: 120 },
       { source: 'Chrome', target: 'Instagram', value: 18, avgTime: 90 },
@@ -338,12 +425,12 @@ class AndroidResearchDatabase {
     ];
   }
 
-  private getFallbackAttentionSpans() {
+  private getFallbackAttentionSpans(): AttentionSpan[] {
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp'];
     return apps.map(app => ({
       app,
       meanDuration: app === 'YouTube' ? 280 : app === 'Chrome' ? 200 : 120,
-      sessions: Array.from({length: 10}, () => ({
+      sessions: Array.from({ length: 10 }, () => ({
         duration: Math.floor(Math.random() * 300) + 30,
         timestamp: Date.now() - Math.random() * 86400000,
         taskSwitches: Math.floor(Math.random() * 3),
@@ -352,7 +439,7 @@ class AndroidResearchDatabase {
     }));
   }
 
-  private getFallbackContentEngagement() {
+  private getFallbackContentEngagement(): ContentEngagement[] {
     return [
       { content: 'Social Media', engagementScore: 85, avgDuration: 180, interactionDepth: 7.2, returnRate: 0.65 },
       { content: 'Video Content', engagementScore: 92, avgDuration: 320, interactionDepth: 4.1, returnRate: 0.45 },
@@ -360,8 +447,8 @@ class AndroidResearchDatabase {
     ];
   }
 
-  private getFallbackCognitiveLoad() {
-    return Array.from({length: 24}, (_, hour) => ({
+  private getFallbackCognitiveLoad(): CognitiveLoad[] {
+    return Array.from({ length: 24 }, (_, hour) => ({
       hour,
       taskSwitches: Math.floor(Math.random() * 15) + 5,
       multitaskingIndex: Math.random() * 8,
@@ -370,7 +457,7 @@ class AndroidResearchDatabase {
     }));
   }
 
-  private getFallbackBehavioralMetrics() {
+  private getFallbackBehavioralMetrics(): BehavioralMetrics {
     return {
       totalDailyUsage: 240,
       peakUsageHour: 19,
@@ -380,7 +467,7 @@ class AndroidResearchDatabase {
     };
   }
 
-  private getFallbackDigitalPhenotype() {
+  private getFallbackDigitalPhenotype(): DigitalPhenotype {
     return {
       behaviorType: 'Moderate User',
       attentionProfile: 'Moderate',
@@ -389,7 +476,7 @@ class AndroidResearchDatabase {
     };
   }
 
-  private getFallbackResearchFindings() {
+  private getFallbackResearchFindings(): ResearchFinding[] {
     return [
       {
         title: 'Peak Activity Window',
@@ -400,14 +487,14 @@ class AndroidResearchDatabase {
     ];
   }
 
-  private getFallbackNetworkCentrality() {
+  private getFallbackNetworkCentrality(): NetworkCentrality[] {
     return [
       { app: 'YouTube', outDegree: 12, inDegree: 8, centralityScore: 20, category: 'Entertainment' },
       { app: 'Chrome', outDegree: 10, inDegree: 15, centralityScore: 25, category: 'Productivity' }
     ];
   }
 
-  private getFallbackTransitionFlow() {
+  private getFallbackTransitionFlow(): AppTransition[] {
     return [
       { source: 'Launcher', target: 'YouTube', value: 45 },
       { source: 'YouTube', target: 'Chrome', value: 25 },
@@ -415,9 +502,33 @@ class AndroidResearchDatabase {
     ];
   }
 
-  async close() {
-    // In browser environment, no cleanup needed
-    this.initialized = false;
+  /**
+   * Calculate behavioral metrics from raw data
+   */
+  private async calculateBehavioralMetrics(results: any[]): Promise<BehavioralMetrics> {
+    const totalPosts = results.reduce((sum, item) => sum + item.post_count, 0);
+    const avgConfidence = results.reduce((sum, item) => sum + (item.avg_confidence || 0.8), 0) / results.length;
+
+    // Get hourly patterns to find peak usage
+    const hourlyResults = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
+    let peakHour = 19; // Default
+
+    if (hourlyResults && hourlyResults.length > 0) {
+      const maxActivity = hourlyResults.reduce((max, current) => {
+        const currentTotal = (current.positive || 0) + (current.negative || 0) + (current.neutral || 0);
+        const maxTotal = (max.positive || 0) + (max.negative || 0) + (max.neutral || 0);
+        return currentTotal > maxTotal ? current : max;
+      });
+      peakHour = maxActivity.hour_of_day || 19;
+    }
+
+    return {
+      totalDailyUsage: Math.round(totalPosts * 0.5),
+      peakUsageHour: peakHour,
+      avgSessionLength: Math.round(totalPosts * 0.3),
+      appSwitchingRate: Math.round(results.length * 2),
+      digitalWellbeingScore: Math.round(avgConfidence * 100)
+    };
   }
 }
 
