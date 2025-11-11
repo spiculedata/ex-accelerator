@@ -1,5 +1,5 @@
-// DuckDB connection and query service for Sentiment Analysis data
-// Uses the ETL sentiment analysis database via unified analytics API
+// Database connection and query service for Sentiment Analysis data
+// Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
 class SentimentAnalysisDatabase {
   private initialized = false;
@@ -7,10 +7,10 @@ class SentimentAnalysisDatabase {
   async connect() {
     if (this.initialized) return; // Already connected
     this.initialized = true;
-    console.log('SentimentAnalysisDatabase connected to ETL database successfully');
+    console.log('SentimentAnalysisDatabase connected (PostgreSQL with pg_duckdb)');
   }
 
-  // Query the unified analytics API directly (server-side handles ETL DB connection)
+  // Query the unified analytics API (server-side uses PostgreSQL + pg_duckdb)
   private async queryAPI(endpoint: string, params: any = {}) {
     const urlParams = new URLSearchParams(params);
     const response = await fetch(`/api/unified-analytics?type=${endpoint}&${urlParams.toString()}`);
@@ -88,7 +88,7 @@ class SentimentAnalysisDatabase {
         avgConfidence: confidenceCount > 0 ? Math.round((totalConfidence / confidenceCount) * 100) / 100 : 0
       };
     } catch (error) {
-      console.error('Error getting sentiment stats from ETL DB:', error);
+      console.error('Error getting sentiment stats:', error);
       throw error;
     }
   }
@@ -130,7 +130,7 @@ class SentimentAnalysisDatabase {
         percentage: totalPosts > 0 ? Math.round((count / totalPosts * 100) * 100) / 100 : 0
       }));
     } catch (error) {
-      console.error('Error getting detailed sentiments from ETL DB:', error);
+      console.error('Error getting detailed sentiments:', error);
       throw error;
     }
   }
@@ -140,7 +140,7 @@ class SentimentAnalysisDatabase {
     if (!this.initialized) await this.connect();
 
     try {
-      // Query emotion analysis from ETL database
+      // Query emotion analysis from database
       const data = await this.queryAPI('emotion-correlations');
       
       // Define colors for each emotion
@@ -161,7 +161,7 @@ class SentimentAnalysisDatabase {
         color: emotionColors[item.emotion1 || item.emotion] || '#6b7280'
       }));
     } catch (error) {
-      console.error('Error getting emotion stats from ETL DB:', error);
+      console.error('Error getting emotion stats:', error);
       return [];
     }
   }

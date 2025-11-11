@@ -1,30 +1,18 @@
 // Unified Analytics Query API
-// Handles direct SQL queries to the unified DuckDB database
+// Handles direct SQL queries to PostgreSQL with pg_duckdb extension
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { DuckDBInstance } from '@duckdb/node-api';
-import { join } from 'path';
-
-// Initialize DuckDB connection
-let db: DuckDBInstance | null = null;
-
-async function getDb() {
-  if (!db) {
-    const dbPath = join(process.cwd(), '../etl/sentiment_analysis.db');
-    db = await DuckDBInstance.create(dbPath);
-  }
-  return db;
-}
+import { postgresPool } from '$lib/services/postgres';
 
 /**
  * POST /api/unified-analytics/query
- * Execute SQL queries against the unified database
+ * Execute SQL queries against PostgreSQL using DuckDB execution engine
  */
 export const POST: RequestHandler = async ({ request }) => {
   try {
-    const { sql, params = {} } = await request.json();
-    
+    const { sql, params = [] } = await request.json();
+
     if (!sql) {
       return json({
         success: false,
@@ -33,18 +21,12 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     console.log('Executing SQL query:', sql);
-    
-    const database = await getDb();
-    const connection = await database.connect();
-    
-    // Execute the query
-    const result = await connection.runAndReadAll(sql);
-    const rows = result.getRowObjectsJS();
-    
+
+    // Execute query using DuckDB execution engine for analytical queries
+    const rows = await postgresPool.duckdbQuery(sql, params);
+
     console.log(`Query executed successfully, returned ${rows.length} rows`);
-    
-    connection.closeSync();
-    
+
     // Convert BigInts to regular numbers for JSON serialization
     const serializedRows = rows.map(row => {
       const serializedRow: any = {};
@@ -63,10 +45,10 @@ export const POST: RequestHandler = async ({ request }) => {
       data: serializedRows,
       rowCount: serializedRows.length
     });
-    
-  } catch (error) {
+
+  } catch (error: any) {
     console.error('Database query error:', error);
-    
+
     return json({
       success: false,
       error: error.message,

@@ -1,58 +1,19 @@
 // Unified Analytics API
-// Test endpoint for unified DuckDB connection and dataset queries
+// PostgreSQL with pg_duckdb extension for unified database queries
 
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { databaseInit } from '$lib/services/databaseInit';
-import { DuckDBInstance } from '@duckdb/node-api';
-import { join } from 'path';
+import { postgresPool } from '$lib/services/postgres';
 
-// Direct DuckDB connections for ETL databases
-let dbConnections: Map<string, DuckDBInstance> = new Map();
-
-async function getDb(dbType: string = 'sentiment'): Promise<DuckDBInstance> {
-  if (!dbConnections.has(dbType)) {
-    let dbPath: string;
-    
-    // Map database types to ETL database files
-    switch (dbType) {
-      case 'sentiment':
-        dbPath = join(process.cwd(), '../etl/sentiment_analysis.db');
-        break;
-      case 'android':
-        dbPath = join(process.cwd(), '../etl/android_analytics.db');
-        break;
-      case 'research':
-        dbPath = join(process.cwd(), '../etl/android_research.db');
-        break;
-      case 'language':
-        dbPath = join(process.cwd(), '../etl/language_detection.db');
-        break;
-      case 'topic':
-        dbPath = join(process.cwd(), '../etl/topic_modeling.db');
-        break;
-      case 'gdelt':
-        dbPath = join(process.cwd(), '../etl/gdelt.db');
-        break;
-      default:
-        dbPath = join(process.cwd(), '../etl/sentiment_analysis.db');
-    }
-    
-    const db = await DuckDBInstance.create(dbPath);
-    dbConnections.set(dbType, db);
-  }
-  
-  return dbConnections.get(dbType)!;
-}
-
-async function executeQuery(sql: string, dbType: string = 'sentiment'): Promise<any[]> {
+/**
+ * Execute a query using pg_duckdb extension
+ * This leverages DuckDB's analytical engine on PostgreSQL tables
+ */
+async function executeQuery(sql: string): Promise<any[]> {
   try {
-    const database = await getDb(dbType);
-    const connection = await database.connect();
-    const result = await connection.runAndReadAll(sql);
-    const rows = result.getRowObjectsJS();
-    connection.closeSync();
-    
+    // Execute query using DuckDB execution engine for analytical queries
+    const rows = await postgresPool.duckdbQuery(sql);
+
     // Convert BigInts to regular numbers for JSON serialization
     return rows.map(row => {
       const serializedRow: any = {};
@@ -66,7 +27,7 @@ async function executeQuery(sql: string, dbType: string = 'sentiment'): Promise<
       return serializedRow;
     });
   } catch (error) {
-    console.error(`Direct DuckDB query error (${dbType}):`, error);
+    console.error(`PostgreSQL/DuckDB query error:`, error);
     return [];
   }
 }
@@ -80,30 +41,34 @@ export const GET: RequestHandler = async ({ url }) => {
     const type = url.searchParams.get('type');
     
     if (type === 'test') {
-      // Test database connection and check for data
-      const isConnected = await databaseInit.testConnection();
-      
+      // Test PostgreSQL connection with pg_duckdb
+      const isConnected = await postgresPool.healthCheck();
+
       if (isConnected) {
         try {
           // Check if we have data in the database
-          const postCount = await executeQuery('SELECT COUNT(*) as count FROM posts');
+          const postCount = await executeQuery('SELECT COUNT(*) as count FROM sentiment_posts');
           const sentimentCount = await executeQuery('SELECT COUNT(*) as count FROM sentiment_classifications');
-          
+
+          // Get connection pool stats
+          const poolStats = postgresPool.getPoolStats();
+
           return json({
             success: true,
-            message: 'Unified DuckDB Service connected',
+            message: 'PostgreSQL with pg_duckdb extension connected',
             timestamp: new Date().toISOString(),
             dataStatus: {
               posts: postCount[0]?.count || 0,
               sentiments: sentimentCount[0]?.count || 0,
               hasData: (postCount[0]?.count || 0) > 0
-            }
+            },
+            poolStats
           });
         } catch (error) {
           console.warn('Could not check data status:', error);
           return json({
             success: true,
-            message: 'Unified DuckDB Service connected (data status unknown)',
+            message: 'PostgreSQL connected (data status unknown)',
             timestamp: new Date().toISOString(),
             warning: 'Could not verify data availability'
           });
@@ -112,7 +77,7 @@ export const GET: RequestHandler = async ({ url }) => {
         return json({
           success: false,
           error: 'Database connection failed',
-          message: 'Could not connect to unified database'
+          message: 'Could not connect to PostgreSQL'
         });
       }
     }
@@ -120,14 +85,9 @@ export const GET: RequestHandler = async ({ url }) => {
     // Handle sentiment analysis queries
     if (type === 'cross-platform-sentiment') {
       try {
-        const isConnected = await databaseInit.testConnection();
-        if (!isConnected) {
-          throw new Error('Database not available');
-        }
-
-        // Query actual sentiment data from ETL database
+        // Query sentiment data from PostgreSQL tables using DuckDB execution
         const data = await executeQuery(`
-          SELECT 
+          SELECT
             sentiment_category,
             COUNT(*) as post_count,
             AVG(confidence_score) as avg_confidence,
@@ -136,7 +96,7 @@ export const GET: RequestHandler = async ({ url }) => {
           GROUP BY sentiment_category, platform
           ORDER BY post_count DESC
         `);
-        
+
         return json({ success: true, data });
       } catch (error) {
         console.error('Cross-platform sentiment query failed:', error);
@@ -336,7 +296,7 @@ export const GET: RequestHandler = async ({ url }) => {
     if (type === 'topics-overview') {
       try {
         const data = await executeQuery(`
-          SELECT 
+          SELECT
             topic_id,
             name,
             category,
@@ -347,15 +307,15 @@ export const GET: RequestHandler = async ({ url }) => {
             created_at
           FROM topics
           ORDER BY size DESC
-        `, 'topic');
-        
+        `);
+
         return json({ success: true, data: data || [] });
       } catch (error) {
         console.error('Topics overview query failed:', error);
         return json({ success: true, data: [] });
       }
     }
-    
+
     if (type === 'topic-keywords') {
       try {
         const topicId = url.searchParams.get('topicId');
@@ -363,9 +323,9 @@ export const GET: RequestHandler = async ({ url }) => {
         if (topicId) {
           whereClause = `WHERE topic_id = '${topicId}'`;
         }
-        
+
         const data = await executeQuery(`
-          SELECT 
+          SELECT
             topic_id,
             keyword,
             weight,
@@ -373,22 +333,22 @@ export const GET: RequestHandler = async ({ url }) => {
           FROM topic_keywords
           ${whereClause}
           ORDER BY topic_id, rank_position
-        `, 'topic');
-        
+        `);
+
         return json({ success: true, data: data || [] });
       } catch (error) {
         console.error('Topic keywords query failed:', error);
         return json({ success: true, data: [] });
       }
     }
-    
+
     if (type === 'topic-trends') {
       try {
         const timeRange = url.searchParams.get('timeRange') || '30d';
         const days = timeRange === '7d' ? 7 : timeRange === '14d' ? 14 : 30;
-        
+
         const data = await executeQuery(`
-          SELECT 
+          SELECT
             topic_id,
             analysis_date,
             document_count,
@@ -396,23 +356,23 @@ export const GET: RequestHandler = async ({ url }) => {
             growth_rate,
             trend_direction
           FROM topic_trends
-          WHERE analysis_date >= DATE('now', '-${days} days')
+          WHERE analysis_date >= CURRENT_DATE - INTERVAL '${days} days'
           ORDER BY analysis_date DESC, topic_id
-        `, 'topic');
-        
+        `);
+
         return json({ success: true, data: data || [] });
       } catch (error) {
         console.error('Topic trends query failed:', error);
         return json({ success: true, data: [] });
       }
     }
-    
+
     if (type === 'topic-relationships') {
       try {
         const threshold = parseFloat(url.searchParams.get('threshold') || '0.5');
-        
+
         const data = await executeQuery(`
-          SELECT 
+          SELECT
             topic1_id,
             topic2_id,
             similarity_score,
@@ -421,15 +381,15 @@ export const GET: RequestHandler = async ({ url }) => {
           FROM topic_relationships
           WHERE similarity_score >= ${threshold}
           ORDER BY similarity_score DESC
-        `, 'topic');
-        
+        `);
+
         return json({ success: true, data: data || [] });
       } catch (error) {
         console.error('Topic relationships query failed:', error);
         return json({ success: true, data: [] });
       }
     }
-    
+
     if (type === 'topic-categories') {
       try {
         const data = await executeQuery(`
@@ -442,8 +402,8 @@ export const GET: RequestHandler = async ({ url }) => {
           FROM topics
           GROUP BY category, category_color
           ORDER BY total_size DESC
-        `, 'topic');
-        
+        `);
+
         return json({ success: true, data: data || [] });
       } catch (error) {
         console.error('Topic categories query failed:', error);

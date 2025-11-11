@@ -1,5 +1,6 @@
-// Unified DuckDB connection utility
-// This provides a centralized interface for all DuckDB queries across the application
+// Unified Database Connection Utility
+// This provides a centralized interface for all database queries across the application
+// Backend uses PostgreSQL with pg_duckdb extension for analytical performance
 // Uses the unified social analytics database schema for cross-table analysis
 
 interface QueryResult {
@@ -19,8 +20,9 @@ const UNIFIED_DB_CONFIG: DatabaseConfig = {
   apiEndpoint: '/api/unified-analytics'
 };
 
-// Unified DuckDB Service Class
-class UnifiedDuckDBService {
+// Unified Database Service Class
+// Connects to PostgreSQL backend with pg_duckdb extension
+class UnifiedDatabaseService {
   private initialized = false;
   private baseUrl = UNIFIED_DB_CONFIG.apiEndpoint;
 
@@ -28,25 +30,25 @@ class UnifiedDuckDBService {
     if (this.initialized) return;
 
     try {
-      // Test connection to unified analytics API
+      // Test connection to unified analytics API (PostgreSQL + pg_duckdb)
       const response = await fetch(`${this.baseUrl}?type=test`);
       if (!response.ok) {
-        console.warn(`Unified DuckDB API not available: ${response.status}`);
+        console.warn(`Unified Analytics API not available: ${response.status}`);
         // Don't throw error, just mark as not connected for graceful degradation
         return;
       }
 
       const result = await response.json();
       if (!result.success) {
-        console.warn('Unified DuckDB connection test failed:', result.error);
+        console.warn('Database connection test failed:', result.error);
         // Don't throw error, allow graceful degradation
         return;
       }
 
       this.initialized = true;
-      console.log('Unified DuckDB Service connected successfully');
+      console.log('Unified Database Service connected (PostgreSQL with pg_duckdb)');
     } catch (error) {
-      console.warn('Failed to connect to Unified DuckDB Service:', error);
+      console.warn('Failed to connect to Unified Database Service:', error);
       // Don't throw error, allow graceful degradation
     }
   }
@@ -80,7 +82,7 @@ class UnifiedDuckDBService {
 
       return result.data;
     } catch (error) {
-      console.error('Unified DuckDB query error:', error);
+      console.error('Database query error:', error);
       throw error;
     }
   }
@@ -103,7 +105,7 @@ class UnifiedDuckDBService {
 
       return result.data;
     } catch (error) {
-      console.error(`Unified DuckDB query type '${queryType}' error:`, error);
+      console.error(`Database query type '${queryType}' error:`, error);
       throw error;
     }
   }
@@ -143,7 +145,7 @@ class UnifiedDuckDBService {
 }
 
 // Create singleton instance
-export const unifiedDb = new UnifiedDuckDBService();
+export const unifiedDb = new UnifiedDatabaseService();
 
 // Legacy compatibility functions for backward compatibility
 export async function query(sql: string, queryType?: string): Promise<QueryResult[]> {

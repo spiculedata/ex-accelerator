@@ -27,21 +27,29 @@ class AndroidAnalyticsDatabase {
     }
   }
 
+  // Query unified analytics API for shared data types
+  private async queryAPI(endpoint: string, params: any = {}): Promise<any[]> {
+    const urlParams = new URLSearchParams(params);
+    const response = await fetch(`/api/unified-analytics?type=${endpoint}&${urlParams.toString()}`);
+    const result = await response.json();
+    return result.success ? result.data : [];
+  }
+
   private async queryAndroidAnalyticsAPI(queryType: string, params: any = {}): Promise<any[]> {
     try {
       const urlParams = new URLSearchParams();
       urlParams.append('type', queryType);
-      
+
       // Add any additional parameters
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           urlParams.append(key, String(value));
         }
       });
-      
+
       const response = await fetch(`/api/android-analytics?${urlParams.toString()}`);
       const result = await response.json();
-      
+
       if (result.success) {
         return result.data;
       } else {

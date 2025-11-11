@@ -1,5 +1,5 @@
-// DuckDB connection and query service for dashboard data
-// Uses the ETL unified analytics database via unified analytics API
+// Database connection and query service for dashboard data
+// Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
 class DashboardDatabase {
   private initialized = false;
@@ -7,10 +7,10 @@ class DashboardDatabase {
   async connect() {
     if (this.initialized) return; // Already connected
     this.initialized = true;
-    console.log('DashboardDatabase connected to ETL database successfully');
+    console.log('DashboardDatabase connected (PostgreSQL with pg_duckdb)');
   }
 
-  // Query the unified analytics API directly (server-side handles ETL DB connection)
+  // Query the unified analytics API (server-side uses PostgreSQL + pg_duckdb)
   private async queryAPI(endpoint: string, params: any = {}) {
     const urlParams = new URLSearchParams(params);
     const response = await fetch(`/api/unified-analytics?type=${endpoint}&${urlParams.toString()}`);
@@ -51,7 +51,7 @@ class DashboardDatabase {
         last_updated: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Error getting dashboard stats from ETL DB:', error);
+      console.error('Error getting dashboard stats:', error);
       return {
         total_posts: 0,
         processing_rate: 0,
@@ -80,7 +80,7 @@ class DashboardDatabase {
         health: Math.round((source.avg_confidence || 0.8) * 100)
       }));
     } catch (error) {
-      console.error('Error getting data sources from ETL DB:', error);
+      console.error('Error getting data sources:', error);
       return [];
     }
   }
@@ -114,7 +114,7 @@ class DashboardDatabase {
 
       return Array.from(sentimentMap.values());
     } catch (error) {
-      console.error('Error getting sentiment breakdown from ETL DB:', error);
+      console.error('Error getting sentiment breakdown:', error);
       return [];
     }
   }
@@ -132,9 +132,9 @@ class DashboardDatabase {
         { name: 'German', code: 'de' },
         { name: 'Italian', code: 'it' }
       ];
-      
+
       const totalPosts = data.reduce((sum, item) => sum + item.total_posts, 0);
-      
+
       return languages.map((lang, index) => {
         const count = Math.floor(totalPosts * (0.6 - index * 0.1)); // Decreasing distribution
         return {
@@ -144,7 +144,7 @@ class DashboardDatabase {
         };
       });
     } catch (error) {
-      console.error('Error getting top languages from ETL DB:', error);
+      console.error('Error getting top languages:', error);
       return [];
     }
   }
@@ -159,15 +159,15 @@ class DashboardDatabase {
         'Technology',
         'Social Issues',
         'Business',
-        'Entertainment', 
+        'Entertainment',
         'Sports'
       ];
-      
+
       return topics.map((topic, index) => {
         const baseData = data[index % data.length] || { post_count: 0, avg_confidence: 0.7 };
         const posts = Math.floor(baseData.post_count * (0.8 - index * 0.1));
         const coherenceScore = baseData.avg_confidence || 0.7;
-        
+
         return {
           topic,
           posts,
@@ -175,7 +175,7 @@ class DashboardDatabase {
         };
       });
     } catch (error) {
-      console.error('Error getting top topics from ETL DB:', error);
+      console.error('Error getting top topics:', error);
       return [];
     }
   }
@@ -198,7 +198,7 @@ class DashboardDatabase {
         posts: (row.positive || 0) + (row.negative || 0) + (row.neutral || 0)
       }));
     } catch (error) {
-      console.error('Error getting crawling activity from ETL DB:', error);
+      console.error('Error getting crawling activity:', error);
       return [];
     }
   }
@@ -211,7 +211,7 @@ class DashboardDatabase {
       const data = await this.queryAPI('sample-posts', { limit: 10 });
       const activityTypes = ['crawl', 'analysis', 'processing', 'export'];
       const statuses = ['completed', 'active', 'pending'];
-      
+
       return data.map((post, index) => ({
         id: post.id,
         type: activityTypes[index % activityTypes.length],
@@ -220,7 +220,7 @@ class DashboardDatabase {
         status: statuses[index % statuses.length]
       }));
     } catch (error) {
-      console.error('Error getting recent activity from ETL DB:', error);
+      console.error('Error getting recent activity:', error);
       return [];
     }
   }

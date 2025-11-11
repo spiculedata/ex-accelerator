@@ -17,6 +17,11 @@ class AndroidResearchDatabase {
     return result.success ? result.data : [];
   }
 
+  // Alias for API queries specific to Android research
+  private async queryAndroidResearchAPI(endpoint: string, params: any = {}) {
+    return this.queryAPI(endpoint, params);
+  }
+
   // Temporal usage patterns for 24-hour analysis
   async getTemporalUsagePatterns() {
     if (!this.initialized) await this.connect();
