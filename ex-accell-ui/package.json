@@ -21,6 +21,7 @@
 		"test:e2e": "cypress run --e2e",
 		"test:component": "cypress run --component",
 		"test": "npm run cypress:run",
+		"test:full": "npm run check && npm run build && npm run cypress:run",
 		"jupyter:start": "poetry run jupyter lab --port=8888 --no-browser --allow-root",
 		"jupyter:bootstrap": "poetry install && poetry run python scripts/bootstrap_notebooks.py",
 		"dapr:init": "dapr init",

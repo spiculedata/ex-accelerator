@@ -108,9 +108,13 @@ class ProjectsDatabase {
       await this.addProjectMember(project.id, data.created_by, 'owner');
 
       return project;
-    } catch (error) {
+    } catch (error: any) {
+      // Check for unique constraint violation
+      if (error.code === '23505' && error.constraint === 'unique_project_name') {
+        throw new Error(`A project with the name "${data.name}" already exists. Please choose a different name.`);
+      }
       console.error('Error creating project:', error);
-      return null;
+      throw new Error('Failed to create project. Please try again.');
     }
   }
 

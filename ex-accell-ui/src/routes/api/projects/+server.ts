@@ -44,15 +44,14 @@ export const POST: RequestHandler = async ({ request }) => {
       team_members: data.team_members || []
     });
 
-    if (!project) {
-      return json({ success: false, error: 'Failed to create project' }, { status: 500 });
-    }
-
     return json({ success: true, project });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('POST /api/projects error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+
+    // Return 400 for validation errors (like duplicate names), 500 for server errors
+    const statusCode = msg.includes('already exists') ? 400 : 500;
+    return json({ success: false, error: msg }, { status: statusCode });
   }
 };
 

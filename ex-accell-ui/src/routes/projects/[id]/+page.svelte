@@ -161,7 +161,7 @@
         </div>
         <div class="text-right">
           <div class="text-white text-sm">
-            <div class="font-medium">{project?.totalPosts || 0.toLocaleString()} posts</div>
+            <div class="font-medium">{(project?.totalPosts || 0).toLocaleString()} posts</div>
             <div class="text-blue-200">Last updated {formatDate(project.updatedAt)}</div>
           </div>
         </div>
@@ -174,7 +174,7 @@
   <!-- Quick Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-blue-600 mb-1">{project?.totalPosts || 0.toLocaleString()}</div>
+      <div class="text-2xl font-bold text-blue-600 mb-1">{(project?.totalPosts || 0).toLocaleString()}</div>
       <div class="text-sm text-gray-600">Total Posts</div>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">

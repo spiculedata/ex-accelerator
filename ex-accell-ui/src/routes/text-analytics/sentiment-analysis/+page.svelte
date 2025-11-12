@@ -28,16 +28,16 @@
   let totalPosts = 0;
 
   // Detailed sentiment categories
-  let detailedSentiments = [];
+  let detailedSentiments: any[] = [];
 
   // Emotion analysis data
-  let emotionStats = [];
+  let emotionStats: any[] = [];
 
   // Sentiment over time data
-  let sentimentTrends = [];
+  let sentimentTrends: any[] = [];
 
   // Sample posts with sentiment analysis
-  let samplePosts = [];
+  let samplePosts: any[] = [];
 
   // Load sentiment analysis data from database service
   async function loadSentimentData() {

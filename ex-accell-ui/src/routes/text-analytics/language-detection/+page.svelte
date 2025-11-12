@@ -19,12 +19,12 @@
   });
 
   // Language detection data - loaded from database
-  let languageStats = [];
-  let languageAnalysis = [];
+  let languageStats: any[] = [];
+  let languageAnalysis: any[] = [];
   let detectionStats = {};
-  let samplePosts = [];
-  let mixingData = [];
-  let geographicData = [];
+  let samplePosts: any[] = [];
+  let mixingData: any[] = [];
+  let geographicData: any[] = [];
   
   // Load language detection data from database service
   async function loadLanguageDetectionData() {
