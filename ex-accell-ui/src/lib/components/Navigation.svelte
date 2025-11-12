@@ -1,14 +1,24 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { currentProject, availableProjects, setCurrentProject, loadCurrentProject, clearCurrentProject } from '$lib/stores/projectStore';
-  
+  import { currentProject, setCurrentProject, loadCurrentProject, clearCurrentProject } from '$lib/stores/projectStore';
+
   let mobileMenuOpen = false;
   let projectSwitcherOpen = false;
+  let workspaceSwitcherOpen = false;
   let openDropdowns = {}; // Track which dropdowns are open
+  let availableProjects: any[] = [];
+  let availableWorkspaces: any[] = [];
+  let currentWorkspace: any = null;
 
   onMount(() => {
     loadCurrentProject();
+    loadProjects();
+
+    // Load workspaces if project is selected
+    if ($currentProject) {
+      loadWorkspaces($currentProject.id);
+    }
     
     // Click outside handler for project switcher and dropdowns
     const handleClickOutside = (event: MouseEvent) => {
@@ -16,14 +26,52 @@
       if (!target.closest('.project-switcher')) {
         projectSwitcherOpen = false;
       }
+      if (!target.closest('.workspace-switcher')) {
+        workspaceSwitcherOpen = false;
+      }
       if (!target.closest('.nav-dropdown') && !target.closest('.mobile-menu')) {
         openDropdowns = {};
       }
     };
-    
+
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   });
+
+  async function loadProjects() {
+    try {
+      const response = await fetch('/api/projects');
+      const result = await response.json();
+      if (result.success) {
+        availableProjects = result.projects || [];
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    }
+  }
+
+  async function loadWorkspaces(projectId: string) {
+    try {
+      const response = await fetch(`/api/workspaces?project_id=${projectId}`);
+      const result = await response.json();
+      if (result.success) {
+        availableWorkspaces = result.workspaces || [];
+      }
+    } catch (error) {
+      console.error('Error loading workspaces:', error);
+    }
+  }
+
+  function selectWorkspace(workspace: any) {
+    currentWorkspace = workspace;
+    workspaceSwitcherOpen = false;
+    // You can add workspace context to URLs or store it
+  }
+
+  // Reload workspaces when project changes
+  $: if ($currentProject) {
+    loadWorkspaces($currentProject.id);
+  }
   
   const navigationItems = [
     { name: 'Home', href: '/', current: false, requiresProject: false },
@@ -98,17 +146,22 @@
 
       <!-- Center Navigation -->
       <div class="flex items-center justify-center">
-        <!-- Project Switcher -->
-        {#if $currentProject}
+        <!-- Hierarchical Project/Workspace Switcher -->
+        {#if $currentProject || availableProjects.length > 0}
           <div class="mr-6 relative project-switcher">
             <button
               on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
               class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
               <div class="flex items-center">
                 <div class="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center mr-2">
-                  <span class="text-white font-medium text-xs">{$currentProject.name.charAt(0)}</span>
+                  <span class="text-white font-medium text-xs">{$currentProject?.name?.charAt(0) || 'P'}</span>
                 </div>
-                <span class="max-w-32 truncate">{$currentProject.name}</span>
+                <div class="flex flex-col items-start">
+                  <span class="text-xs leading-tight truncate max-w-32">{$currentProject?.name || 'Select Project'}</span>
+                  {#if currentWorkspace}
+                    <span class="text-xs text-gray-500 leading-tight truncate max-w-32">→ {currentWorkspace.name}</span>
+                  {/if}
+                </div>
                 <svg class="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
