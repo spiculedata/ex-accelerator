@@ -563,7 +563,7 @@
   }
 
   // Reactive sorted jobs - this ensures the list re-renders when sorting changes
-  $: sortedJobs = sortJobs(allJobs);
+  $: sortedJobs = sortJobs(allJobs), sortBy, sortDirection;
 
   // User upload state
   let uploadFiles: FileList | null = null;
