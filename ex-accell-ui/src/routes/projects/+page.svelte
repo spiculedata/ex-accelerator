@@ -1,9 +1,30 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
-  import { availableProjects, setCurrentProject } from '$lib/stores/projectStore';
-  
-  // Use projects from store
-  $: projects = availableProjects;
+  import { setCurrentProject } from '$lib/stores/projectStore';
+  import { onMount } from 'svelte';
+
+  let projects: any[] = [];
+  let loading = true;
+
+  onMount(async () => {
+    await loadProjects();
+  });
+
+  async function loadProjects() {
+    loading = true;
+    try {
+      const response = await fetch('/api/projects');
+      const result = await response.json();
+
+      if (result.success) {
+        projects = result.projects || [];
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      loading = false;
+    }
+  }
 
   function getStatusColor(status: string) {
     switch (status) {

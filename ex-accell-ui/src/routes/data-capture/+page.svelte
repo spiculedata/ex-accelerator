@@ -484,8 +484,92 @@
       ]
     }
   ];
-  
-  
+
+  // Sorting state
+  let sortBy: string = 'date';
+  let sortDirection: 'asc' | 'desc' = 'desc';
+  let sortedJobs: any[] = [];
+
+  // Sorting function
+  function sortJobs(jobs: any[]): any[] {
+    const sorted = [...jobs].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'type':
+          // Sort by job type (platform)
+          const typeA = a.type || a.platform || 'unknown';
+          const typeB = b.type || b.platform || 'unknown';
+          comparison = typeA.localeCompare(typeB);
+          break;
+
+        case 'date':
+          // Sort by date scheduled/created
+          const dateA = new Date(a.startTime || a.createdAt || 0).getTime();
+          const dateB = new Date(b.startTime || b.createdAt || 0).getTime();
+          comparison = dateA - dateB;
+          break;
+
+        case 'status':
+          // Sort by status
+          comparison = (a.status || '').localeCompare(b.status || '');
+          break;
+
+        case 'repeat':
+          // Sort by repeat/single (schedule field indicates repeat)
+          const repeatA = a.schedule ? 1 : 0;
+          const repeatB = b.schedule ? 1 : 0;
+          comparison = repeatA - repeatB;
+          break;
+
+        case 'size':
+          // Sort by items collected
+          comparison = (a.itemsCollected || 0) - (b.itemsCollected || 0);
+          break;
+
+        case 'nextRun':
+          // Sort by next run time
+          const nextA = new Date(a.nextRun || a.startTime || 0).getTime();
+          const nextB = new Date(b.nextRun || b.startTime || 0).getTime();
+          comparison = nextA - nextB;
+          break;
+
+        case 'url':
+          // Sort by URL
+          const urlA = a.streamUrl || a.crawlId || a.id || '';
+          const urlB = b.streamUrl || b.crawlId || b.id || '';
+          comparison = urlA.localeCompare(urlB);
+          break;
+
+        default:
+          comparison = 0;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }
+
+  // Handle sort field changes
+  function handleSort(field: string) {
+    if (sortBy === field) {
+      // Toggle direction if clicking the same field
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New field, default to descending
+      sortBy = field;
+      sortDirection = 'desc';
+    }
+  }
+
+  // Reactive statement to update sorted jobs when dependencies change
+  // Explicitly touch sortBy and sortDirection to create dependencies
+  $: {
+    sortBy; sortDirection; // Touch variables to track them
+    sortedJobs = allJobs ? sortJobs(allJobs) : [];
+  }
+
   // User upload state
   let uploadFiles: FileList | null = null;
   let uploadProgress = 0;
@@ -2804,6 +2888,58 @@
               {/if}
             </div>
           </div>
+
+          <!-- Sorting Controls -->
+          {#if allJobs.length > 0}
+          <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center space-x-2 text-sm">
+              <span class="text-gray-600 font-medium mr-2">Sort by:</span>
+              <button
+                on:click={() => handleSort('type')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'type' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Job Type {sortBy === 'type' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('date')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'date' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Date {sortBy === 'date' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('status')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'status' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Status {sortBy === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('repeat')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'repeat' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Repeat/Single {sortBy === 'repeat' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('size')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'size' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Size {sortBy === 'size' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('nextRun')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'nextRun' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Next Run {sortBy === 'nextRun' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('url')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'url' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                URL {sortBy === 'url' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+            </div>
+          </div>
+          {/if}
+
           <div class="divide-y divide-gray-200">
             {#if loadingJobStates}
               <div class="p-6 text-center text-gray-500">
@@ -2822,164 +2958,196 @@
                 <p class="text-sm">Create a new crawl job to get started</p>
               </div>
             {:else}
-              {#each allJobs as job}
-              <div class="p-6" data-job-id="{job.id}" data-job-type="{job.type}">
-                <div class="flex items-center justify-between mb-4">
-                  <div class="flex items-center">
-                    {#if job.type === 'wavepulse'}
-                      <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828a2 2 0 01-1.414-.586l5-5A2 2 0 009 12.172V5L8 4z"></path>
-                      </svg>
-                    {:else if job.type === 'princeton-smart'}
-                      <svg class="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                      </svg>
-                    {:else}
-                      <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0 9c-5 0-9-4-9-9m9 9c5 0 9-4 9-9m0-9v9"></path>
-                      </svg>
-                    {/if}
-                    <h3 class="text-lg font-medium text-gray-900 mr-3">{job.name}</h3>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(job.status)}">
-                      {job.status}
-                    </span>
-                    {#if job.type === 'wavepulse'}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 ml-2">
-                        Radio Stream
-                      </span>
-                    {:else if job.type === 'princeton-smart'}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-2">
-                        SMART Extract
-                      </span>
-                    {/if}
-                  </div>
-                  <div class="flex items-center space-x-2">
-                    {#if job.type === 'wavepulse'}
-                      {#if job.status === 'scheduled' || job.status === 'idle'}
-                        <button 
-                          on:click={handleWavePulseStart}
-                          class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-md transition-colors">
-                          Start Stream
-                        </button>
-                      {:else if job.status === 'running'}
-                        <button 
-                          on:click={handleWavePulseStop}
-                          class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-sm rounded-md transition-colors">
-                          Stop Stream
-                        </button>
-                      {/if}
-                      <button 
-                        on:click={() => activeTab = 'wavepulse'}
-                        class="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
-                        Configure
-                      </button>
-                    {:else if job.type === 'princeton-smart'}
-                      {#if job.status === 'scheduled' || job.status === 'idle' || job.status === 'error'}
-                        <button 
-                          on:click={handlePrincetonSmartImport}
-                          class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md transition-colors">
-                          Run Extract
-                        </button>
-                      {/if}
-                      <button 
-                        on:click={() => activeTab = 'princeton-smart'}
-                        class="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50 transition-colors">
-                        Configure
-                      </button>
-                    {:else}
-                      <div class="flex items-center justify-end gap-1.5 min-w-0">
-                        {#if job.status === 'scheduled' || job.status === 'pending'}
-                          <button 
-                            on:click={() => runCrawl(job.id)}
-                            class="inline-flex items-center justify-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors whitespace-nowrap flex-shrink-0">
-                            Run Now
-                          </button>
-                        {/if}
-                        <button 
-                          on:click={() => editJob(job)}
-                          class="inline-flex items-center justify-center px-2.5 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors whitespace-nowrap flex-shrink-0">
-                          Edit
-                        </button>
-                        <button 
-                          on:click={() => confirmDeleteJob(job)}
-                          class="inline-flex items-center justify-center px-2.5 py-1.5 border border-red-300 text-red-700 text-xs font-medium rounded-md hover:bg-red-50 transition-colors whitespace-nowrap flex-shrink-0">
-                          Delete
-                        </button>
-                        {#if job.logs && job.logs.length > 0}
-                          <button 
-                            on:click={() => openLogViewer(job)}
-                            class="relative inline-flex items-center justify-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors whitespace-nowrap flex-shrink-0">
-                            View Logs
-                            {#if job.hasNewLogs}
-                              <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+              <!-- Table View -->
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Job
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Schedule
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Items
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Time
+                      </th>
+                      <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    {#each sortedJobs as job}
+                      <tr class="hover:bg-gray-50" data-job-id="{job.id}">
+                        <!-- Job Name & Type -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="flex items-center">
+                            {#if job.type === 'wavepulse'}
+                              <svg class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828a2 2 0 01-1.414-.586l5-5A2 2 0 009 12.172V5L8 4z"></path>
+                              </svg>
+                            {:else if job.type === 'princeton-smart'}
+                              <svg class="w-5 h-5 text-purple-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                              </svg>
+                            {:else}
+                              <svg class="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0 9c-5 0-9-4-9-9m9 9c5 0 9-4 9-9m0-9v9"></path>
+                              </svg>
                             {/if}
-                            {#if job.status === 'running'}
-                              <span class="ml-1 inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                            <div class="min-w-0">
+                              <div class="text-sm font-medium text-gray-900 truncate">{job.name}</div>
+                              <div class="text-xs text-gray-500">
+                                {#if job.type === 'wavepulse'}
+                                  Radio Stream
+                                {:else if job.type === 'princeton-smart'}
+                                  SMART Extract
+                                {:else}
+                                  Crawler Job
+                                {/if}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- Status -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(job.status)}">
+                            {job.status}
+                          </span>
+                          {#if job.status === 'running' && job.progress !== undefined}
+                            <div class="mt-1 w-24">
+                              <div class="w-full bg-gray-200 rounded-full h-1">
+                                <div class="bg-blue-600 h-1 rounded-full" style="width: {job.progress}%"></div>
+                              </div>
+                              <div class="text-xs text-gray-500 mt-0.5">{job.progress}%</div>
+                            </div>
+                          {/if}
+                        </td>
+
+                        <!-- Schedule -->
+                        <td class="px-6 py-4">
+                          <div class="text-sm text-gray-900">{job.schedule || '-'}</div>
+                        </td>
+
+                        <!-- Items Collected -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">{(job.itemsCollected || 0).toLocaleString()}</div>
+                          {#if job.totalEstimated}
+                            <div class="text-xs text-gray-500">of {job.totalEstimated.toLocaleString()}</div>
+                          {/if}
+                        </td>
+
+                        <!-- Time -->
+                        <td class="px-6 py-4 whitespace-nowrap">
+                          <div class="text-sm text-gray-900">
+                            {#if job.status === 'scheduled' && job.nextRun}
+                              {formatDateTime(job.nextRun)}
+                            {:else if job.startTime}
+                              {formatDateTime(job.startTime)}
+                            {:else}
+                              -
                             {/if}
-                          </button>
-                        {/if}
-                      </div>
-                    {/if}
-                  </div>
-                </div>
+                          </div>
+                          <div class="text-xs text-gray-500">
+                            {job.status === 'running' ? 'Started' : job.status === 'scheduled' ? 'Next Run' : 'Last Run'}
+                          </div>
+                        </td>
 
-                <div class="grid grid-cols-1 md:grid-cols-{job.type === 'wavepulse' ? '4' : '3'} gap-4 mb-4">
-                  <div>
-                    <div class="text-sm text-gray-500">Schedule</div>
-                    <div class="text-sm font-medium text-gray-900">{job.schedule}</div>
-                  </div>
-                  <div>
-                    <div class="text-sm text-gray-500">{job.type === 'wavepulse' ? 'Audio Segments' : 'Items Collected'}</div>
-                    <div class="text-sm font-medium text-gray-900">{(job.itemsCollected || 0).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div class="text-sm text-gray-500">
-                      {job.status === 'running' ? 'Started' : job.status === 'scheduled' ? 'Next Run' : 'Last Run'}
-                    </div>
-                    <div class="text-sm font-medium text-gray-900">
-                      {#if job.status === 'scheduled' && job.nextRun}
-                        {formatDateTime(job.nextRun)}
-                      {:else if job.startTime}
-                        {formatDateTime(job.startTime)}
-                      {:else}
-                        Never
+                        <!-- Actions -->
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {#if job.type === 'wavepulse'}
+                            <div class="flex items-center justify-end space-x-2">
+                              {#if job.status === 'scheduled' || job.status === 'idle'}
+                                <button
+                                  on:click={handleWavePulseStart}
+                                  class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-md">
+                                  Start
+                                </button>
+                              {:else if job.status === 'running'}
+                                <button
+                                  on:click={handleWavePulseStop}
+                                  class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded-md">
+                                  Stop
+                                </button>
+                              {/if}
+                              <button
+                                on:click={() => activeTab = 'wavepulse'}
+                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
+                                Configure
+                              </button>
+                            </div>
+                          {:else if job.type === 'princeton-smart'}
+                            <div class="flex items-center justify-end space-x-2">
+                              {#if job.status === 'scheduled' || job.status === 'idle' || job.status === 'error'}
+                                <button
+                                  on:click={handlePrincetonSmartImport}
+                                  class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md">
+                                  Run Extract
+                                </button>
+                              {/if}
+                              <button
+                                on:click={() => activeTab = 'princeton-smart'}
+                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
+                                Configure
+                              </button>
+                            </div>
+                          {:else}
+                            <div class="flex items-center justify-end space-x-2">
+                              {#if job.status === 'scheduled' || job.status === 'pending'}
+                                <button
+                                  on:click={() => runCrawl(job.id)}
+                                  class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md">
+                                  Run
+                                </button>
+                              {/if}
+                              <button
+                                on:click={() => editJob(job)}
+                                class="px-2.5 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
+                                Edit
+                              </button>
+                              <button
+                                on:click={() => confirmDeleteJob(job)}
+                                class="px-2.5 py-1 border border-red-300 text-red-700 text-xs rounded-md hover:bg-red-50">
+                                Delete
+                              </button>
+                              {#if job.logs && job.logs.length > 0}
+                                <button
+                                  on:click={() => openLogViewer(job)}
+                                  class="relative px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md">
+                                  Logs
+                                  {#if job.hasNewLogs}
+                                    <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                  {/if}
+                                </button>
+                              {/if}
+                            </div>
+                          {/if}
+                        </td>
+                      </tr>
+                      {#if job.error}
+                        <tr>
+                          <td colspan="6" class="px-6 py-2 bg-red-50">
+                            <div class="flex items-center text-sm text-red-800">
+                              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                              Error: {job.error}
+                            </div>
+                          </td>
+                        </tr>
                       {/if}
-                    </div>
-                  </div>
-                  {#if job.type === 'wavepulse' && job.streamUrl}
-                    <div>
-                      <div class="text-sm text-gray-500">Stream URL</div>
-                      <div class="text-sm font-medium text-gray-900 truncate" title="{job.streamUrl}">
-                        {job.streamUrl || 'Not configured'}
-                      </div>
-                    </div>
-                  {/if}
-                </div>
-
-                {#if job.status === 'running' && job.progress !== undefined}
-                  <div class="mb-4">
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="text-sm font-medium text-gray-700">Progress</span>
-                      <span class="text-sm text-gray-500">{job.progress}%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                      <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {job.progress}%"></div>
-                    </div>
-                  </div>
-                {/if}
-
-                {#if job.error}
-                  <div class="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <div class="flex items-center">
-                      <svg class="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      <span class="text-sm font-medium text-red-800">Error: {job.error}</span>
-                    </div>
-                  </div>
-                {/if}
+                    {/each}
+                  </tbody>
+                </table>
               </div>
-              {/each}
             {/if}
           </div>
         </div>

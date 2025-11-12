@@ -20,10 +20,10 @@
 
   // Engagement analysis data - loaded from database
   let engagementStats = {};
-  let platformEngagement = [];
-  let contentTypes = [];
-  let engagementTrends = [];
-  let topPosts = [];
+  let platformEngagement: any[] = [];
+  let contentTypes: any[] = [];
+  let engagementTrends: any[] = [];
+  let topPosts: any[] = [];
   
   // Load engagement analysis data from database service
   async function loadEngagementAnalysisData() {
