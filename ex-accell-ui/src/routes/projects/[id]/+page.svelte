@@ -6,20 +6,79 @@
   
   // Get project ID from URL
   $: projectId = $page.params.id;
-  
-  // Find project from store
-  $: project = availableProjects.find(p => p.id === projectId);
-  
-  onMount(() => {
-    // Set current project if it exists
-    if (project) {
-      setCurrentProject(project.id);
-    }
+
+  let project: any = null;
+  let workspaces: any[] = [];
+  let loading = true;
+  let showCreateWorkspace = false;
+  let newWorkspaceName = '';
+  let newWorkspaceDescription = '';
+  let newWorkspaceType = 'general';
+
+  onMount(async () => {
+    await loadProject();
   });
-  
-  // If project not found, redirect to projects list
-  $: if (projectId && !project) {
-    window.location.href = '/projects';
+
+  async function loadProject() {
+    loading = true;
+    try {
+      // Load project details
+      const projectResponse = await fetch(`/api/projects?id=${projectId}`);
+      const projectResult = await projectResponse.json();
+
+      if (projectResult.success && projectResult.project) {
+        project = projectResult.project;
+        setCurrentProject(project.id.toString());
+
+        // Load workspaces for this project
+        const workspacesResponse = await fetch(`/api/workspaces?project_id=${projectId}`);
+        const workspacesResult = await workspacesResponse.json();
+
+        if (workspacesResult.success) {
+          workspaces = workspacesResult.workspaces || [];
+        }
+      } else {
+        // Project not found, redirect
+        window.location.href = '/projects';
+      }
+    } catch (error) {
+      console.error('Error loading project:', error);
+      window.location.href = '/projects';
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function createWorkspace() {
+    if (!newWorkspaceName.trim()) return;
+
+    try {
+      const response = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: parseInt(projectId),
+          name: newWorkspaceName,
+          description: newWorkspaceDescription,
+          workspace_type: newWorkspaceType,
+          created_by: 'current_user@example.com' // TODO: Get from auth
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Reload workspaces
+        await loadProject();
+        // Reset form
+        showCreateWorkspace = false;
+        newWorkspaceName = '';
+        newWorkspaceDescription = '';
+        newWorkspaceType = 'general';
+      }
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+    }
   }
 
   // Analytics applications
@@ -162,13 +221,127 @@
     </div>
   </div>
 
+  <!-- Workspaces Section -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">Workspaces</h2>
+        <p class="text-sm text-gray-600 mt-1">Organize your analysis into separate workspaces ({workspaces.length})</p>
+      </div>
+      <button
+        on:click={() => showCreateWorkspace = !showCreateWorkspace}
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        + New Workspace
+      </button>
+    </div>
+
+    <!-- Create Workspace Form -->
+    {#if showCreateWorkspace}
+      <div class="mb-6 p-6 bg-white rounded-xl shadow-sm border border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Create New Workspace</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Workspace Name *</label>
+            <input
+              bind:value={newWorkspaceName}
+              type="text"
+              placeholder="e.g., Twitter Analysis"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Workspace Type</label>
+            <select
+              bind:value={newWorkspaceType}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="general">General</option>
+              <option value="analysis">Analysis</option>
+              <option value="exploration">Exploration</option>
+              <option value="reporting">Reporting</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea
+            bind:value={newWorkspaceDescription}
+            placeholder="Describe the purpose of this workspace..."
+            rows="2"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          ></textarea>
+        </div>
+        <div class="mt-4 flex items-center justify-end space-x-3">
+          <button
+            on:click={() => showCreateWorkspace = false}
+            class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50">
+            Cancel
+          </button>
+          <button
+            on:click={createWorkspace}
+            disabled={!newWorkspaceName.trim()}
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Create Workspace
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Workspaces Grid -->
+    {#if workspaces.length === 0}
+      <div class="bg-white rounded-xl shadow-sm p-8 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+        </svg>
+        <p class="mt-2 text-sm font-medium text-gray-900">No workspaces yet</p>
+        <p class="text-xs text-gray-600 mt-1">Create a workspace to organize your analysis</p>
+      </div>
+    {:else}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {#each workspaces as workspace}
+          <div class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer" on:click={() => window.location.href = `/workspaces/${workspace.id}`}>
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex-1">
+                <h3 class="text-base font-semibold text-gray-900">{workspace.name}</h3>
+                <div class="flex items-center mt-2 space-x-2">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {workspace.workspace_type}
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {workspace.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                    {workspace.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {#if workspace.description}
+              <p class="text-sm text-gray-600 mb-4 line-clamp-2">{workspace.description}</p>
+            {/if}
+            <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div class="flex items-center text-xs text-gray-500">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                </svg>
+                {workspace.data_source_count || 0} sources
+              </div>
+              <div class="flex items-center text-xs text-gray-500">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                {workspace.total_records ? workspace.total_records.toLocaleString() : '0'} records
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+
   <!-- Data Management -->
   <div class="mb-8">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Data Management</h2>
     <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900">Data Sources</h3>
-        <button 
+        <button
           on:click={() => window.location.href='/data-capture'}
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
           Manage Data

@@ -50,18 +50,39 @@
 
   async function createProject() {
     if (!projectName.trim()) return;
-    
+
     isCreating = true;
-    
-    // Simulate project creation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Create new project ID (in real app this would come from API)
-    const newProjectId = Date.now().toString();
-    
-    // Set as current project and redirect to it
-    setCurrentProject('1'); // Using first project as example since we can't dynamically add to store in this demo
-    window.location.href = `/projects/1`;
+
+    try {
+      // Create project via API with database persistence
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projectName,
+          description: projectDescription,
+          project_type: projectType,
+          created_by: 'current_user@example.com', // TODO: Get from auth
+          data_sources: dataSources,
+          team_members: teamMembers
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.project) {
+        // Set as current project and redirect to it
+        setCurrentProject(result.project.id.toString());
+        window.location.href = `/projects/${result.project.id}`;
+      } else {
+        alert('Failed to create project: ' + (result.error || 'Unknown error'));
+        isCreating = false;
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      alert('Failed to create project');
+      isCreating = false;
+    }
   }
 
   function validateForm() {
