@@ -105,7 +105,7 @@
       description: 'Computer vision and image analysis',
       icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
       color: 'from-blue-500 to-blue-600',
-      available: project.totalPosts > 0
+      available: project?.totalPosts > 0
     }
   ];
 
@@ -161,7 +161,7 @@
         </div>
         <div class="text-right">
           <div class="text-white text-sm">
-            <div class="font-medium">{project.totalPosts.toLocaleString()} posts</div>
+            <div class="font-medium">{project?.totalPosts || 0.toLocaleString()} posts</div>
             <div class="text-blue-200">Last updated {formatDate(project.updatedAt)}</div>
           </div>
         </div>
@@ -174,15 +174,15 @@
   <!-- Quick Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-blue-600 mb-1">{project.totalPosts.toLocaleString()}</div>
+      <div class="text-2xl font-bold text-blue-600 mb-1">{project?.totalPosts || 0.toLocaleString()}</div>
       <div class="text-sm text-gray-600">Total Posts</div>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-blue-600 mb-1">{project.dataSources.length}</div>
+      <div class="text-2xl font-bold text-blue-600 mb-1">{project?.dataSources || [].length}</div>
       <div class="text-sm text-gray-600">Data Sources</div>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-blue-600 mb-1">{project.teamMembers.length}</div>
+      <div class="text-2xl font-bold text-blue-600 mb-1">{project?.teamMembers || [].length}</div>
       <div class="text-sm text-gray-600">Team Members</div>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -349,7 +349,7 @@
       </div>
       
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {#each project.dataSources as source}
+        {#each project?.dataSources || [] as source}
           <div class="border border-gray-200 rounded-xl p-4">
             <div class="flex items-center justify-between">
               <h4 class="font-medium text-gray-900 capitalize">{source}</h4>
@@ -383,7 +383,7 @@
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Team Members</h2>
     <div class="bg-white rounded-xl shadow-sm p-6">
       <div class="space-y-4">
-        {#each project.teamMembers as member, i}
+        {#each project?.teamMembers || [] as member, i}
           <div class="flex items-center justify-between py-2">
             <div class="flex items-center">
               <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-3">
