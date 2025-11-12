@@ -484,8 +484,87 @@
       ]
     }
   ];
-  
-  
+
+  // Sorting state
+  let sortBy: string = 'date';
+  let sortDirection: 'asc' | 'desc' = 'desc';
+
+  // Sorting function
+  function sortJobs(jobs: any[]): any[] {
+    const sorted = [...jobs].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'type':
+          // Sort by job type (platform)
+          const typeA = a.type || a.platform || 'unknown';
+          const typeB = b.type || b.platform || 'unknown';
+          comparison = typeA.localeCompare(typeB);
+          break;
+
+        case 'date':
+          // Sort by date scheduled/created
+          const dateA = new Date(a.startTime || a.createdAt || 0).getTime();
+          const dateB = new Date(b.startTime || b.createdAt || 0).getTime();
+          comparison = dateA - dateB;
+          break;
+
+        case 'status':
+          // Sort by status
+          comparison = (a.status || '').localeCompare(b.status || '');
+          break;
+
+        case 'repeat':
+          // Sort by repeat/single (schedule field indicates repeat)
+          const repeatA = a.schedule ? 1 : 0;
+          const repeatB = b.schedule ? 1 : 0;
+          comparison = repeatA - repeatB;
+          break;
+
+        case 'size':
+          // Sort by items collected
+          comparison = (a.itemsCollected || 0) - (b.itemsCollected || 0);
+          break;
+
+        case 'nextRun':
+          // Sort by next run time
+          const nextA = new Date(a.nextRun || a.startTime || 0).getTime();
+          const nextB = new Date(b.nextRun || b.startTime || 0).getTime();
+          comparison = nextA - nextB;
+          break;
+
+        case 'url':
+          // Sort by URL
+          const urlA = a.streamUrl || a.crawlId || a.id || '';
+          const urlB = b.streamUrl || b.crawlId || b.id || '';
+          comparison = urlA.localeCompare(urlB);
+          break;
+
+        default:
+          comparison = 0;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }
+
+  // Handle sort field changes
+  function handleSort(field: string) {
+    if (sortBy === field) {
+      // Toggle direction if clicking the same field
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // New field, default to descending
+      sortBy = field;
+      sortDirection = 'desc';
+    }
+  }
+
+  // Reactive sorted jobs - this ensures the list re-renders when sorting changes
+  $: sortedJobs = sortJobs(allJobs);
+
   // User upload state
   let uploadFiles: FileList | null = null;
   let uploadProgress = 0;
@@ -2804,6 +2883,58 @@
               {/if}
             </div>
           </div>
+
+          <!-- Sorting Controls -->
+          {#if allJobs.length > 0}
+          <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center space-x-2 text-sm">
+              <span class="text-gray-600 font-medium mr-2">Sort by:</span>
+              <button
+                on:click={() => handleSort('type')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'type' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Job Type {sortBy === 'type' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('date')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'date' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Date {sortBy === 'date' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('status')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'status' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Status {sortBy === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('repeat')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'repeat' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Repeat/Single {sortBy === 'repeat' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('size')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'size' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Size {sortBy === 'size' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('nextRun')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'nextRun' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                Next Run {sortBy === 'nextRun' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                on:click={() => handleSort('url')}
+                class="px-3 py-1 rounded-md transition-colors {sortBy === 'url' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+              >
+                URL {sortBy === 'url' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+            </div>
+          </div>
+          {/if}
+
           <div class="divide-y divide-gray-200">
             {#if loadingJobStates}
               <div class="p-6 text-center text-gray-500">
@@ -2822,7 +2953,7 @@
                 <p class="text-sm">Create a new crawl job to get started</p>
               </div>
             {:else}
-              {#each allJobs as job}
+              {#each sortedJobs as job}
               <div class="p-6" data-job-id="{job.id}" data-job-type="{job.type}">
                 <div class="flex items-center justify-between mb-4">
                   <div class="flex items-center">
