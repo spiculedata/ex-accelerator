@@ -564,7 +564,11 @@
   }
 
   // Reactive statement to update sorted jobs when dependencies change
-  $: sortedJobs = allJobs ? sortJobs(allJobs) : [];
+  // Explicitly touch sortBy and sortDirection to create dependencies
+  $: {
+    sortBy; sortDirection; // Touch variables to track them
+    sortedJobs = allJobs ? sortJobs(allJobs) : [];
+  }
 
   // User upload state
   let uploadFiles: FileList | null = null;
