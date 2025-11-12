@@ -92,9 +92,9 @@ SELECT
   p.created_by,
   p.created_at,
   p.updated_at,
-  COUNT(DISTINCT w.id) as workspace_count,
-  COUNT(DISTINCT pm.email) as member_count,
-  COUNT(DISTINCT wds.id) as total_data_sources
+  COUNT(DISTINCT w.id)::integer as workspace_count,
+  COUNT(DISTINCT pm.email)::integer as member_count,
+  COUNT(DISTINCT wds.id)::integer as total_data_sources
 FROM projects p
 LEFT JOIN workspaces w ON p.id = w.project_id
 LEFT JOIN project_members pm ON p.id = pm.project_id
@@ -114,9 +114,9 @@ SELECT
   w.status,
   w.created_by,
   w.created_at,
-  COUNT(DISTINCT wds.id) as data_source_count,
-  COUNT(DISTINCT wm.email) as member_count,
-  SUM(wds.record_count) as total_records
+  COUNT(DISTINCT wds.id)::integer as data_source_count,
+  COUNT(DISTINCT wm.email)::integer as member_count,
+  COALESCE(SUM(wds.record_count), 0)::integer as total_records
 FROM workspaces w
 JOIN projects p ON w.project_id = p.id
 LEFT JOIN workspace_data_sources wds ON w.id = wds.workspace_id
