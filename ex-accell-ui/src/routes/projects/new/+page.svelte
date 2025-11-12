@@ -5,8 +5,8 @@
   let projectName = '';
   let projectDescription = '';
   let projectType = 'social-media';
-  let dataSources = [];
-  let teamMembers = [];
+  let dataSources: any[] = [];
+  let teamMembers: any[] = [];
   let newMemberEmail = '';
   let isCreating = false;
 

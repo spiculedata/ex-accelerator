@@ -4,9 +4,9 @@
   import { androidAnalyticsDb } from '$lib/services/androidAnalyticsDb';
 
   // Data from the Princeton SMART / Screenlake research kit
-  let appAccessibilityData = [];
-  let appSegmentData = [];
-  let screenshotData = [];
+  let appAccessibilityData: any[] = [];
+  let appSegmentData: any[] = [];
+  let screenshotData: any[] = [];
   let loading = true;
 
   // Analytics calculations
@@ -14,9 +14,9 @@
   let totalScreenshots = 0;
   let uniqueApps = new Set();
   let sessionDuration = 0;
-  let topApps = [];
-  let appUsageTimeline = [];
-  let userBehaviorPatterns = [];
+  let topApps: any[] = [];
+  let appUsageTimeline: any[] = [];
+  let userBehaviorPatterns: any[] = [];
 
   onMount(async () => {
     // Load data from database service

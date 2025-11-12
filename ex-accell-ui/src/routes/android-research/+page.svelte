@@ -37,7 +37,7 @@
   };
 
   // Research Insights
-  let keyFindings = [];
+  let keyFindings: any[] = [];
   let behavioralMetrics = {};
   let digitalPhenotype = {};
 

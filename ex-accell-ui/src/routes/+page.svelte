@@ -13,9 +13,9 @@
     reportsReady: 0,
     todaysActivities: 0
   };
-  let appModules = [];
-  let recentActivities = [];
-  let systemStatus = [];
+  let appModules: any[] = [];
+  let recentActivities: any[] = [];
+  let systemStatus: any[] = [];
   let currentWorkspace = null;
   
   onMount(async () => {

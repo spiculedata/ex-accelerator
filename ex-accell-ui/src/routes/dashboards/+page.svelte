@@ -35,10 +35,10 @@
   };
 
   // Data source breakdown
-  let dataSources = [];
+  let dataSources: any[] = [];
 
   // Text analytics summary
-  let textAnalytics = {
+  let textAnalytics: any = {
     sentimentBreakdown: {
       positive: { count: 0, percentage: 0 },
       negative: { count: 0, percentage: 0 },
@@ -49,10 +49,10 @@
   };
 
   // Crawling activity data
-  let crawlingActivity = [];
+  let crawlingActivity: any[] = [];
 
   // Recent activity feed
-  let recentActivity = [];
+  let recentActivity: any[] = [];
 
   // Load all dashboard data from database
   async function loadDashboardData() {
