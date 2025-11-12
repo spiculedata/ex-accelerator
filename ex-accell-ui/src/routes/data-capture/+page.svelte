@@ -446,24 +446,24 @@
     // Add Princeton SMART extract job (always show at least a sample)
     {
       id: 'princeton-smart-extract',
-      name: princetonSmartConfig.datasetId 
+      name: princetonSmartConfig.datasetId
         ? `Princeton SMART: ${princetonSmartConfig.datasetId}`
         : 'Princeton SMART: twitter-election-2024 (Sample)',
       type: 'princeton-smart',
-      status: princetonSmartConfig.datasetId 
+      status: princetonSmartConfig.datasetId
         ? (princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'running' : princetonSmartStatus === 'completed' ? 'completed' : princetonSmartStatus === 'error' ? 'failed' : 'scheduled')
         : 'scheduled',
       progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
       startTime: princetonSmartResults?.startTime || null,
       nextRun: princetonSmartConfig.datasetId ? null : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now for demo
-      schedule: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end 
-            ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}` 
+      schedule: princetonSmartConfig.datasetId
+        ? (princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end
+            ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}`
             : 'Date range not configured')
         : '2024-01-01 to 2024-12-31',
       itemsCollected: princetonSmartResults?.recordCount || (princetonSmartConfig.datasetId ? 0 : 12547), // Sample data for demo
       totalEstimated: princetonSmartConfig.maxRecords || 50000,
-      query: princetonSmartConfig.datasetId 
+      query: princetonSmartConfig.datasetId
         ? (princetonSmartConfig.query || 'No query specified')
         : '#election2024 OR #vote2024',
       apiEndpoint: princetonSmartConfig.apiEndpoint,
@@ -484,6 +484,95 @@
       ]
     }
   ];
+
+  // Sorting state
+  let sortBy: string = 'date';
+  let sortDirection: 'asc' | 'desc' = 'desc';
+
+  // Sorting function
+  function sortJobs(jobs: any[]) {
+    const sorted = [...jobs];
+
+    sorted.sort((a, b) => {
+      let compareA: any;
+      let compareB: any;
+
+      switch (sortBy) {
+        case 'type':
+          // Sort by job type (platform)
+          compareA = (a.type || a.platform || 'unknown').toLowerCase();
+          compareB = (b.type || b.platform || 'unknown').toLowerCase();
+          break;
+
+        case 'date':
+          // Sort by date scheduled (startTime or createdAt)
+          compareA = new Date(a.startTime || a.createdAt || 0).getTime();
+          compareB = new Date(b.startTime || b.createdAt || 0).getTime();
+          break;
+
+        case 'status':
+          // Sort by status
+          compareA = (a.status || '').toLowerCase();
+          compareB = (b.status || '').toLowerCase();
+          break;
+
+        case 'repeatType':
+          // Sort by repeat vs single (check if job has repeat/recurring info)
+          // For crawler jobs, check if they have a repeat schedule
+          compareA = (a.stateData?.jobData?.repeat || a.repeat) ? 'repeat' : 'single';
+          compareB = (b.stateData?.jobData?.repeat || b.repeat) ? 'repeat' : 'single';
+          break;
+
+        case 'size':
+          // Sort by items collected
+          compareA = a.itemsCollected || 0;
+          compareB = b.itemsCollected || 0;
+          break;
+
+        case 'nextRun':
+          // Sort by next run time
+          compareA = new Date(a.nextRun || a.scheduledFor || '9999-12-31').getTime();
+          compareB = new Date(b.nextRun || b.scheduledFor || '9999-12-31').getTime();
+          break;
+
+        case 'url':
+          // Sort by URL (streamUrl, crawlId, or any URL field)
+          compareA = (a.streamUrl || a.crawlId || a.url || '').toLowerCase();
+          compareB = (b.streamUrl || b.crawlId || b.url || '').toLowerCase();
+          break;
+
+        default:
+          return 0;
+      }
+
+      // Handle numeric comparisons
+      if (typeof compareA === 'number' && typeof compareB === 'number') {
+        return sortDirection === 'asc' ? compareA - compareB : compareB - compareA;
+      }
+
+      // Handle string comparisons
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }
+
+  // Toggle sort direction or change sort field
+  function handleSort(field: string) {
+    if (sortBy === field) {
+      // Toggle direction if same field
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      // Change field and reset to descending
+      sortBy = field;
+      sortDirection = 'desc';
+    }
+  }
+
+  // Sorted jobs (reactive)
+  $: sortedJobs = sortJobs(allJobs);
   
   
   // User upload state
@@ -2804,6 +2893,58 @@
               {/if}
             </div>
           </div>
+
+          <!-- Sorting Controls -->
+          {#if !loadingJobStates && allJobs.length > 0}
+            <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
+                <button
+                  on:click={() => handleSort('type')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'type' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Job Type {sortBy === 'type' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('date')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'date' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Date Scheduled {sortBy === 'date' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('status')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'status' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Status {sortBy === 'status' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('repeatType')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'repeatType' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Repeat/Single {sortBy === 'repeatType' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('size')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'size' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Size Collected {sortBy === 'size' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('nextRun')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'nextRun' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  Next Run {sortBy === 'nextRun' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+                <button
+                  on:click={() => handleSort('url')}
+                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors {sortBy === 'url' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}"
+                >
+                  URL {sortBy === 'url' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                </button>
+              </div>
+            </div>
+          {/if}
+
           <div class="divide-y divide-gray-200">
             {#if loadingJobStates}
               <div class="p-6 text-center text-gray-500">
@@ -2822,7 +2963,7 @@
                 <p class="text-sm">Create a new crawl job to get started</p>
               </div>
             {:else}
-              {#each allJobs as job}
+              {#each sortedJobs as job}
               <div class="p-6" data-job-id="{job.id}" data-job-type="{job.type}">
                 <div class="flex items-center justify-between mb-4">
                   <div class="flex items-center">
