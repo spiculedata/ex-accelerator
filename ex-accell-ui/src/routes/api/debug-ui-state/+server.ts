@@ -72,7 +72,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
   } catch (error) {
     console.error('Debug UI state error:', error);
-    return json({ error: error.message }, { status: 500 });
+    return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 };
 
@@ -102,6 +102,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
   } catch (error) {
     console.error('Debug UI state POST error:', error);
-    return json({ error: error.message }, { status: 500 });
+    return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 };

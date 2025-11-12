@@ -290,7 +290,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 		
 		// Check if this is a fetch error indicating Dapr isn't running
-		if (err.message && err.message.includes('fetch failed')) {
+		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
 			return error(503, {
 				message: 'Job scheduling service unavailable',
 				details: 'Cannot connect to Dapr job scheduler. Please ensure the unified deployment is running.',
@@ -415,7 +415,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	} catch (err) {
 		console.error('Job retrieval error:', err);
 		// Check if this is a fetch error indicating services aren't running
-		if (err.message && err.message.includes('fetch failed')) {
+		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
 			return error(503, {
 				message: 'Job services unavailable',
 				details: 'Cannot connect to job services. Please ensure the unified deployment is running.',
@@ -517,7 +517,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 	} catch (err) {
 		console.error('Job deletion error:', err);
 		// Check if this is a fetch error indicating Dapr isn't running
-		if (err.message && err.message.includes('fetch failed')) {
+		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
 			return error(503, {
 				message: 'Job deletion service unavailable',
 				details: 'Cannot connect to job services. Please ensure the unified deployment is running.',

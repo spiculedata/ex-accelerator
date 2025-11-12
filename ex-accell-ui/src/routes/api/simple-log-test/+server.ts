@@ -49,7 +49,7 @@ export const POST: RequestHandler = async ({ request }) => {
         }
       } catch (error) {
         console.error('Error updating job:', error);
-        results.error = error.message;
+        results.error = error instanceof Error ? error.message : String(error);
       }
     }
     
@@ -57,6 +57,6 @@ export const POST: RequestHandler = async ({ request }) => {
     
   } catch (error) {
     console.error('Simple log test error:', error);
-    return json({ error: error.message }, { status: 500 });
+    return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 };

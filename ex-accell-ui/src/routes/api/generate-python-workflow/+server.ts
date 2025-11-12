@@ -32,6 +32,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
   } catch (err) {
     console.error('Error generating Python workflow:', err);
-    return error(500, `Failed to generate Python workflow: ${err.message}`);
+    return error(500, `Failed to generate Python workflow: ${err instanceof Error ? err.message : String(err)}`);
   }
 };

@@ -61,6 +61,6 @@ export const GET: RequestHandler = async () => {
 		
 	} catch (err) {
 		console.error('❌ JOB MONITOR ERROR:', err);
-		return json({ error: err.message }, { status: 500 });
+		return json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
 	}
 };

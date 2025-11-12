@@ -32,7 +32,7 @@ export const GET: RequestHandler = async () => {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       service: 'ex-accell-ui',
-      error: error.message
+      error: error instanceof Error ? error.message : String(error)
     }, {
       status: 503
     });

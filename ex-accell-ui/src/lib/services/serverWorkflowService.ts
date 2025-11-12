@@ -6,6 +6,16 @@ import { daprWorkflowExecutor } from './daprWorkflowExecutor';
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
 import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 export interface PublishedWorkflow {
   id: string;
   name: string;
@@ -106,7 +116,7 @@ class ServerWorkflowService {
       return publishedWorkflow;
     } catch (error) {
       console.error('Error publishing workflow:', error);
-      throw new Error(`Failed to publish workflow: ${error.message}`);
+      throw new Error(`Failed to publish workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -252,11 +262,11 @@ class ServerWorkflowService {
         // Still mark as cancelled locally
         execution.status = 'cancelled';
         execution.completedAt = new Date().toISOString();
-        execution.error = `Cancellation error: ${error.message}`;
+        execution.error = `Cancellation error: ${getErrorMessage(error)}`;
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'warn',
-          message: `Workflow marked as cancelled locally, Dapr cancellation failed: ${error.message}`
+          message: `Workflow marked as cancelled locally, Dapr cancellation failed: ${getErrorMessage(error)}`
         });
         this.executions.set(executionId, execution);
       }
@@ -287,12 +297,12 @@ class ServerWorkflowService {
     } catch (error) {
       console.error(`Hybrid workflow execution ${execution.id} failed:`, error);
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Hybrid workflow execution failed: ${error.message}`
+        message: `Hybrid workflow execution failed: ${getErrorMessage(error)}`
       });
       this.executions.set(execution.id, execution);
     }
@@ -326,14 +336,14 @@ class ServerWorkflowService {
   }
 
   private extractDatasetRequirements(workflowDefinition: any): string[] {
-    const requirements = [];
-    
-    workflowDefinition.steps.forEach(step => {
+    const requirements: string[] = [];
+
+    workflowDefinition.steps.forEach((step: any) => {
       if (step.type === 'dataset_input' && step.config.dataset_id) {
         requirements.push(step.config.dataset_id);
       }
     });
-    
+
     return requirements;
   }
 }

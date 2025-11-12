@@ -77,6 +77,6 @@ export const GET: RequestHandler = async () => {
 
   } catch (err) {
     console.error('Error testing Dapr connection:', err);
-    return error(500, `Failed to test Dapr connection: ${err.message}`);
+    return error(500, `Failed to test Dapr connection: ${err instanceof Error ? err.message : String(err)}`);
   }
 };

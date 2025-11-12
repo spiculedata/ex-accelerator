@@ -1,4 +1,14 @@
 // Real Dapr Workflow Execution Service
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
+
 // Handles actual workflow execution using Dapr workflow runtime
 
 import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowService';
@@ -8,7 +18,7 @@ import { join } from 'path';
 import { constants } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { DaprClient } from '@dapr/dapr';
+import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
 
 export interface DaprWorkflowInstance {
   instanceId: string;
@@ -28,14 +38,16 @@ export interface DaprWorkflowResponse {
 class DaprWorkflowExecutor {
   private daprClient: DaprClient;
   private daprHttpPort = 3500; // From dapr.yaml config
+  private baseUrl: string; // Dapr HTTP API base URL
 
   constructor() {
     // Initialize Dapr client with proper configuration
     this.daprClient = new DaprClient({
       daprHost: 'localhost',
       daprPort: this.daprHttpPort.toString(),
-      communicationProtocol: 'http'
+      communicationProtocol: CommunicationProtocolEnum.HTTP
     });
+    this.baseUrl = `http://localhost:${this.daprHttpPort}`;
   }
 
   /**
@@ -69,12 +81,12 @@ class DaprWorkflowExecutor {
     } catch (error) {
       console.error('Real workflow execution failed:', error);
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Workflow execution failed: ${error.message}`
+        message: `Workflow execution failed: ${getErrorMessage(error)}`
       });
       throw error;
     }
@@ -115,7 +127,7 @@ class DaprWorkflowExecutor {
       console.log(`Workflow ${workflow.name} deployed successfully to ${workflowFile}`);
     } catch (error) {
       console.error('Workflow deployment failed:', error);
-      throw new Error(`Workflow deployment failed: ${error.message}`);
+      throw new Error(`Workflow deployment failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -242,7 +254,7 @@ class DaprWorkflowExecutor {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'warn',
-          message: `Monitoring error: ${error.message}`
+          message: `Monitoring error: ${getErrorMessage(error)}`
         });
       }
     }, 2000); // Poll every 2 seconds
@@ -346,7 +358,7 @@ class DaprWorkflowExecutor {
 
     } catch (error) {
       console.error('Failed to start Dapr workflow via SDK:', error);
-      throw new Error(`Failed to start Dapr workflow: ${error.message}`);
+      throw new Error(`Failed to start Dapr workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -371,41 +383,43 @@ class DaprWorkflowExecutor {
         const status = await this.daprClient.workflow.get(instanceId);
         
         // Update execution based on Dapr workflow status
+        const statusData = status as any; // Type assertion for extended workflow status properties
+
         switch (status.runtimeStatus) {
           case 'Running':
             execution.status = 'running';
             execution.progress = this.estimateProgressFromStatus(status);
-            execution.currentStep = status.customStatus || 'Processing';
+            execution.currentStep = statusData.customStatus || 'Processing';
             break;
-          
+
           case 'Completed':
             execution.status = 'completed';
             execution.progress = 100;
             execution.currentStep = 'Completed';
             execution.completedAt = new Date().toISOString();
             execution.duration = new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime();
-            
+
             // Get workflow output from Dapr
-            execution.output = status.output || {
+            execution.output = statusData.output || {
               processedRecords: 0,
               resultDataset: `result_${instanceId}`,
               summary: 'Workflow completed via Dapr SDK'
             };
-            
+
             execution.logs.push({
               timestamp: new Date().toISOString(),
               level: 'info',
               message: 'Dapr workflow completed successfully',
               data: execution.output
             });
-            
+
             clearInterval(pollInterval);
             break;
-          
+
           case 'Failed':
             execution.status = 'failed';
             execution.completedAt = new Date().toISOString();
-            execution.error = status.failureDetails?.errorMessage || 'Workflow failed';
+            execution.error = statusData.failureDetails?.errorMessage || 'Workflow failed';
             
             execution.logs.push({
               timestamp: new Date().toISOString(),
@@ -435,7 +449,7 @@ class DaprWorkflowExecutor {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'warn',
-          message: `Dapr monitoring error: ${error.message}`
+          message: `Dapr monitoring error: ${getErrorMessage(error)}`
         });
         
         // If we can't monitor, fall back to graceful degradation
@@ -637,13 +651,13 @@ class DaprWorkflowExecutor {
 
     } catch (error) {
       execution.status = 'failed';
-      execution.error = `Direct execution failed: ${error.message}`;
+      execution.error = `Direct execution failed: ${getErrorMessage(error)}`;
       execution.completedAt = new Date().toISOString();
       
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Direct Python execution failed: ${error.message}`
+        message: `Direct Python execution failed: ${getErrorMessage(error)}`
       });
     }
   }
@@ -658,7 +672,7 @@ class DaprWorkflowExecutor {
       console.log(`Dapr workflow ${instanceId} cancelled via SDK`);
     } catch (error) {
       console.error('Failed to cancel Dapr workflow via SDK:', error);
-      throw new Error(`Failed to cancel workflow: ${error.message}`);
+      throw new Error(`Failed to cancel workflow: ${getErrorMessage(error)}`);
     }
   }
 

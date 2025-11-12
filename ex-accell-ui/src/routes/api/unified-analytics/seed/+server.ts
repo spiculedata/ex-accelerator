@@ -146,7 +146,7 @@ export const POST: RequestHandler = async () => {
     console.error('Database seeding failed:', error);
     return json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       message: 'Failed to seed database'
     }, { status: 500 });
   }

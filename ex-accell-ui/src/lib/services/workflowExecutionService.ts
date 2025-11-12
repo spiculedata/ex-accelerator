@@ -2,10 +2,28 @@
 // Handles publishing, running, and monitoring workflows within the webapp
 // Integrates with Dapr workflow runtime and unified database
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
 import { unifiedDb } from './duckdb';
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
 import { databaseInit } from './databaseInit';
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
 export interface PublishedWorkflow {
   id: string;
   name: string;
@@ -146,7 +164,7 @@ class WorkflowExecutionService {
       return publishedWorkflow;
     } catch (error) {
       console.error('Error publishing workflow:', error);
-      throw new Error(`Failed to publish workflow: ${error.message}`);
+      throw new Error(`Failed to publish workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -197,7 +215,7 @@ class WorkflowExecutionService {
       return execution;
     } catch (error) {
       console.error('Error executing workflow:', error);
-      throw new Error(`Failed to execute workflow: ${error.message}`);
+      throw new Error(`Failed to execute workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -394,7 +412,7 @@ class WorkflowExecutionService {
       // 2. Register the workflow and activities
       // 3. Start the workflow runtime
     } catch (error) {
-      console.warn('Could not register workflow with Dapr:', error.message);
+      console.warn('Could not register workflow with Dapr:', getErrorMessage(error));
     }
   }
 
@@ -410,7 +428,7 @@ class WorkflowExecutionService {
       await this.simulateWorkflowExecution(execution, workflow);
     } catch (error) {
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       await this.saveWorkflowExecution(execution);
       throw error;
@@ -504,7 +522,7 @@ class WorkflowExecutionService {
       // This would cancel the workflow in Dapr
       console.log(`Cancelling Dapr workflow execution: ${executionId}`);
     } catch (error) {
-      console.warn('Could not cancel Dapr workflow:', error.message);
+      console.warn('Could not cancel Dapr workflow:', getErrorMessage(error));
     }
   }
 
@@ -537,14 +555,14 @@ class WorkflowExecutionService {
   }
 
   private extractDatasetRequirements(workflowDefinition: any): string[] {
-    const requirements = [];
-    
-    workflowDefinition.steps.forEach(step => {
+    const requirements: string[] = [];
+
+    workflowDefinition.steps.forEach((step: any) => {
       if (step.type === 'dataset_input' && step.config.dataset_id) {
         requirements.push(step.config.dataset_id);
       }
     });
-    
+
     return requirements;
   }
 }

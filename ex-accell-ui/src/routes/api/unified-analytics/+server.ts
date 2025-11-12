@@ -443,7 +443,7 @@ export const GET: RequestHandler = async ({ url }) => {
     console.error('Unified analytics API error:', err);
     return json({
       success: false,
-      error: err.message,
+      error: err instanceof Error ? err.message : String(err),
       message: 'Failed to process unified analytics request'
     });
   }

@@ -51,6 +51,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
   } catch (err) {
     console.error('Error deploying workflow:', err);
-    return error(500, `Failed to deploy workflow: ${err.message}`);
+    return error(500, `Failed to deploy workflow: ${err instanceof Error ? err.message : String(err)}`);
   }
 };

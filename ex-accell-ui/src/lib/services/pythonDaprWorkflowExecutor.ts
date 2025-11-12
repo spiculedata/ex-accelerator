@@ -1,6 +1,15 @@
 // Python-based Dapr Workflow Execution Service
 // Manages execution of Python workflows through Dapr runtime
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
 import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowService';
 import { pythonDaprWorkflowGenerator, type PythonDaprWorkflow } from './pythonDaprWorkflowGenerator';
 import { DaprClient } from '@dapr/dapr';
@@ -10,8 +19,26 @@ import { join } from 'path';
 import { access, writeFile } from 'fs/promises';
 import { constants } from 'fs';
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
 const execAsync = promisify(exec);
 
+/**
+ * Helper function to safely extract error messages
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return getErrorMessage(error);
+  }
+  return String(error);
+}
 export interface PythonWorkflowDeployment {
   workflowId: string;
   pythonScriptPath: string;
@@ -56,12 +83,12 @@ export class PythonDaprWorkflowExecutor {
     } catch (error) {
       console.error('Python Dapr workflow execution failed:', error);
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Python workflow execution failed: ${error.message}`
+        message: `Python workflow execution failed: ${getErrorMessage(error)}`
       });
       throw error;
     }
@@ -116,7 +143,7 @@ export class PythonDaprWorkflowExecutor {
       return deployment;
 
     } catch (error) {
-      throw new Error(`Failed to deploy Python workflow: ${error.message}`);
+      throw new Error(`Failed to deploy Python workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -146,7 +173,7 @@ export class PythonDaprWorkflowExecutor {
       await this.executePurePythonDaprWorkflow(workflow, execution, input, deployment);
 
     } catch (error) {
-      throw new Error(`Failed to start Python Dapr workflow: ${error.message}`);
+      throw new Error(`Failed to start Python Dapr workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -250,16 +277,16 @@ export class PythonDaprWorkflowExecutor {
     } catch (error) {
       // Handle execution failure
       execution.status = 'failed';
-      execution.error = error.message;
+      execution.error = getErrorMessage(error);
       execution.completedAt = new Date().toISOString();
       
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'error',
-        message: `Pure Python Dapr workflow execution failed: ${error.message}`
+        message: `Pure Python Dapr workflow execution failed: ${getErrorMessage(error)}`
       });
 
-      throw new Error(`Failed to execute pure Python Dapr workflow: ${error.message}`);
+      throw new Error(`Failed to execute pure Python Dapr workflow: ${getErrorMessage(error)}`);
     }
   }
 
@@ -275,7 +302,7 @@ export class PythonDaprWorkflowExecutor {
       console.log(`Python Dapr workflow ${instanceId} cancelled`);
     } catch (error) {
       console.error('Failed to cancel Python Dapr workflow:', error);
-      throw new Error(`Failed to cancel workflow: ${error.message}`);
+      throw new Error(`Failed to cancel workflow: ${getErrorMessage(error)}`);
     }
   }
 

@@ -399,7 +399,7 @@ export const GET: RequestHandler = async ({ url }) => {
     console.error('Hashtag Analysis query error:', error);
     return json({ 
       success: false, 
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       data: [] 
     }, { status: 500 });
   }

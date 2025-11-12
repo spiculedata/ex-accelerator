@@ -61,6 +61,6 @@ export const POST: RequestHandler = async ({ request }) => {
     });
   } catch (err) {
     console.error('Error publishing workflow:', err);
-    return error(500, `Failed to publish workflow: ${err.message}`);
+    return error(500, `Failed to publish workflow: ${err instanceof Error ? err.message : String(err)}`);
   }
 };

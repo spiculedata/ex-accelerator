@@ -172,7 +172,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   } catch (err) {
     console.error('Error testing Python-based workflow execution:', err);
-    return error(500, `Failed to test Python workflow execution: ${err.message}`);
+    return error(500, `Failed to test Python workflow execution: ${err instanceof Error ? err.message : String(err)}`);
   }
 };
 
@@ -214,6 +214,6 @@ export const GET: RequestHandler = async () => {
 
   } catch (err) {
     console.error('Error getting Python workflow status:', err);
-    return error(500, `Failed to get Python workflow status: ${err.message}`);
+    return error(500, `Failed to get Python workflow status: ${err instanceof Error ? err.message : String(err)}`);
   }
 };

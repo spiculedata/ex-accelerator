@@ -1,7 +1,7 @@
 // Hybrid Dapr Workflow Executor
 // Python registers workflows/activities, Node.js manages execution via Dapr JS SDK
 
-import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
+import { DaprClient, CommunicationProtocolEnum, WorkflowRuntimeStatus } from '@dapr/dapr';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -569,13 +569,14 @@ export class HybridDaprWorkflowExecutor {
             message: `Workflow status: ${status.runtimeStatus} (attempt ${attempts + 1})`
           });
 
-          if (status.runtimeStatus === 'COMPLETED') {
+          if (status.runtimeStatus === WorkflowRuntimeStatus.COMPLETED) {
             execution.status = 'completed';
             execution.completedAt = new Date().toISOString();
+            const statusData = status as any; // Type assertion for workflow output access
             execution.output = {
               success: true,
               instanceId,
-              workflowResult: status.output,
+              workflowResult: statusData.output,
               message: 'Hybrid workflow execution completed successfully'
             };
 
@@ -586,9 +587,10 @@ export class HybridDaprWorkflowExecutor {
             });
 
             break;
-          } else if (status.runtimeStatus === 'FAILED') {
-            throw new Error(`Workflow failed: ${status.output || 'Unknown error'}`);
-          } else if (status.runtimeStatus === 'TERMINATED') {
+          } else if (status.runtimeStatus === WorkflowRuntimeStatus.FAILED) {
+            const statusData = status as any;
+            throw new Error(`Workflow failed: ${statusData.output || 'Unknown error'}`);
+          } else if (status.runtimeStatus === WorkflowRuntimeStatus.TERMINATED) {
             throw new Error('Workflow was terminated');
           }
 
