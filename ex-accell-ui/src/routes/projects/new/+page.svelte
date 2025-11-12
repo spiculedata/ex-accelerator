@@ -71,8 +71,7 @@
       const result = await response.json();
 
       if (result.success && result.project) {
-        // Set as current project and redirect to it
-        setCurrentProject(result.project.id.toString());
+        // Redirect to the new project (it will load from database)
         window.location.href = `/projects/${result.project.id}`;
       } else {
         alert('Failed to create project: ' + (result.error || 'Unknown error'));
