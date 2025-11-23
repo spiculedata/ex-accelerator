@@ -1,19 +1,47 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject } from '$lib/stores/projectStore';
+  import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { dashboardDb } from '$lib/services/dashboardDb';
-  
-  // Redirect to projects if no current project
+
+  // Get workspace ID from URL query parameter
+  $: workspaceId = $page.url.searchParams.get('workspace');
+
+  let loading = true;
+  let workspace: any = null;
+
+  // Load workspace data and set project context if needed
   onMount(async () => {
-    if (!$currentProject) {
+    // If workspace ID provided, load workspace and set project
+    if (workspaceId) {
+      try {
+        const response = await fetch(`/api/workspaces?id=${workspaceId}`);
+        const result = await response.json();
+
+        if (result.success && result.workspace) {
+          workspace = result.workspace;
+
+          // If no current project, load the workspace's project
+          if (!$currentProject && workspace.project_id) {
+            const { setCurrentProject } = await import('$lib/stores/projectStore');
+            await setCurrentProject(workspace.project_id.toString());
+          }
+        }
+      } catch (error) {
+        console.error('Error loading workspace:', error);
+      }
+    }
+
+    // If still no project, redirect to projects page
+    if (!$currentProject && !workspaceId) {
       window.location.href = '/projects';
       return;
     }
-    
-    // Load data from database
+
+    // Load data from database (workspace-scoped if workspaceId provided)
     await loadDashboardData();
-    
+
     // Auto refresh setup
     if (autoRefresh) {
       const interval = setInterval(() => {
@@ -409,15 +437,27 @@
           </div>
           <div>
             <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Interactive Dashboards</h1>
-            <p class="text-slate-300 text-lg font-medium">Comprehensive analytics and insights across all your social media data sources</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
+            <p class="text-slate-300 text-lg font-medium">
+              {workspaceId ? 'Workspace-scoped analytics and insights' : 'Comprehensive analytics and insights across all your social media data sources'}
+            </p>
+            <div class="flex items-center mt-3 space-x-3">
+              {#if $currentProject}
+                <div class="flex items-center">
+                  <span class="text-sm text-slate-400">Project:</span>
+                  <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
+                    {$currentProject.name}
+                  </span>
+                </div>
+              {/if}
+              {#if workspaceId && workspace}
+                <div class="flex items-center">
+                  <span class="text-sm text-slate-400">Workspace:</span>
+                  <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 backdrop-blur-sm">
+                    {workspace.name}
+                  </span>
+                </div>
+              {/if}
+            </div>
           </div>
         </div>
         

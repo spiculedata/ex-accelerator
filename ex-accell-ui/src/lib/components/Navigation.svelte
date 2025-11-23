@@ -19,7 +19,23 @@
     if ($currentProject) {
       loadWorkspaces($currentProject.id);
     }
-    
+
+    // Load current workspace from localStorage
+    if (typeof window !== 'undefined') {
+      const savedWorkspaceId = localStorage.getItem('currentWorkspace');
+      if (savedWorkspaceId) {
+        // Load workspace details
+        fetch(`/api/workspaces?id=${savedWorkspaceId}`)
+          .then(response => response.json())
+          .then(result => {
+            if (result.success && result.workspace) {
+              currentWorkspace = result.workspace;
+            }
+          })
+          .catch(error => console.error('Error loading workspace:', error));
+      }
+    }
+
     // Click outside handler for project switcher and dropdowns
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -65,7 +81,14 @@
   function selectWorkspace(workspace: any) {
     currentWorkspace = workspace;
     workspaceSwitcherOpen = false;
-    // You can add workspace context to URLs or store it
+
+    // Persist to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('currentWorkspace', workspace.id.toString());
+    }
+
+    // Navigate to the workspace detail page
+    window.location.href = `/workspaces/${workspace.id}`;
   }
 
   // Reload workspaces when project changes
@@ -82,7 +105,8 @@
       requiresProject: true,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Overview', href: '/dashboards', requiresProject: true },
+        { name: 'Overview', href: '/workspaces', requiresProject: true, requiresWorkspace: true, useWorkspace: true },
+        { name: 'Analytics Dashboard', href: '/dashboards', requiresProject: true, useWorkspace: true },
         { name: 'GDELT Events', href: '/gdelt', requiresProject: false },
         { name: 'Android Analytics', href: '/android-analytics', requiresProject: false }
       ]
@@ -112,13 +136,28 @@
 
   function navigateToApp(item: any, event: Event) {
     event.preventDefault();
-    
+
     if (item.requiresProject && !$currentProject) {
       // If app requires project but none selected, go to project selection
       window.location.href = '/projects';
+    } else if (item.requiresWorkspace && !currentWorkspace) {
+      // If app requires workspace but none selected, stay on current page or show message
+      return;
     } else {
-      // Otherwise go directly to the app
-      window.location.href = item.href;
+      // Build URL with workspace context if needed
+      let url = item.href;
+
+      if (item.useWorkspace && currentWorkspace) {
+        // For workspace overview, go directly to the workspace page
+        if (item.href === '/workspaces') {
+          url = `/workspaces/${currentWorkspace.id}`;
+        } else {
+          // For other pages, add workspace as query parameter
+          url = `${item.href}?workspace=${currentWorkspace.id}`;
+        }
+      }
+
+      window.location.href = url;
     }
   }
   
@@ -148,77 +187,143 @@
       <div class="flex items-center justify-center">
         <!-- Hierarchical Project/Workspace Switcher -->
         {#if $currentProject || availableProjects.length > 0}
-          <div class="mr-6 relative project-switcher">
-            <button
-              on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
-              class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
-              <div class="flex items-center">
-                <div class="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center mr-2">
-                  <span class="text-white font-medium text-xs">{$currentProject?.name?.charAt(0) || 'P'}</span>
-                </div>
-                <div class="flex flex-col items-start">
+          <div class="flex items-center space-x-2 mr-6">
+            <!-- Project Switcher -->
+            <div class="relative project-switcher">
+              <button
+                on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
+                class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
+                <div class="flex items-center">
+                  <div class="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center mr-2">
+                    <span class="text-white font-medium text-xs">{$currentProject?.name?.charAt(0) || 'P'}</span>
+                  </div>
                   <span class="text-xs leading-tight truncate max-w-32">{$currentProject?.name || 'Select Project'}</span>
-                  {#if currentWorkspace}
-                    <span class="text-xs text-gray-500 leading-tight truncate max-w-32">→ {currentWorkspace.name}</span>
-                  {/if}
+                  <svg class="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
                 </div>
-                <svg class="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
-            </button>
+              </button>
 
-            <!-- Project Dropdown -->
-            {#if projectSwitcherOpen}
-              <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-[100]">
-                <div class="p-4 border-b border-gray-200">
-                  <h3 class="text-sm font-medium text-gray-900">Switch Project</h3>
-                </div>
-                <div class="max-h-64 overflow-y-auto">
-                  {#each availableProjects as project}
-                    <button
-                      on:click={() => {
-                        setCurrentProject(project.id);
-                        projectSwitcherOpen = false;
-                      }}
-                      class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {$currentProject?.id === project.id ? 'bg-blue-50' : ''}">
-                      <div class="flex items-center">
-                        <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mr-3">
-                          <span class="text-white font-medium text-sm">{project.name.charAt(0)}</span>
+              <!-- Project Dropdown -->
+              {#if projectSwitcherOpen}
+                <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-[100]">
+                  <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-900">Switch Project</h3>
+                  </div>
+                  <div class="max-h-64 overflow-y-auto">
+                    {#each availableProjects as project}
+                      <button
+                        on:click={async () => {
+                          projectSwitcherOpen = false;
+                          // Wait for project to load before redirecting
+                          const success = await setCurrentProject(project.id);
+                          if (success) {
+                            // Redirect to project detail page to see workspaces
+                            window.location.href = `/projects/${project.id}`;
+                          }
+                        }}
+                        class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {$currentProject?.id === project.id ? 'bg-blue-50' : ''}">
+                        <div class="flex items-center">
+                          <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mr-3">
+                            <span class="text-white font-medium text-sm">{project.name.charAt(0)}</span>
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-gray-900 truncate">{project.name}</div>
+                            <div class="text-xs text-gray-500 truncate">{project.description}</div>
+                          </div>
+                          {#if $currentProject?.id === project.id}
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          {/if}
                         </div>
-                        <div class="flex-1 min-w-0">
-                          <div class="text-sm font-medium text-gray-900 truncate">{project.name}</div>
-                          <div class="text-xs text-gray-500 truncate">{project.description}</div>
-                        </div>
-                        {#if $currentProject?.id === project.id}
-                          <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                          </svg>
-                        {/if}
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-                <div class="p-4 border-t border-gray-200">
-                  <div class="flex justify-between">
-                    <button
-                      on:click={() => {
-                        clearCurrentProject();
-                        projectSwitcherOpen = false;
-                      }}
-                      class="text-sm text-gray-600 hover:text-gray-900">
-                      Clear Project
-                    </button>
-                    <button
-                      on:click={() => {
-                        window.location.href = '/projects';
-                        projectSwitcherOpen = false;
-                      }}
-                      class="text-sm text-blue-600 hover:text-blue-800">
-                      Manage Projects
-                    </button>
+                      </button>
+                    {/each}
+                  </div>
+                  <div class="p-4 border-t border-gray-200">
+                    <div class="flex justify-between">
+                      <button
+                        on:click={() => {
+                          clearCurrentProject();
+                          projectSwitcherOpen = false;
+                          window.location.href = '/';
+                        }}
+                        class="text-sm text-gray-600 hover:text-gray-900">
+                        Clear Project
+                      </button>
+                      <button
+                        on:click={() => {
+                          window.location.href = '/projects';
+                          projectSwitcherOpen = false;
+                        }}
+                        class="text-sm text-blue-600 hover:text-blue-800">
+                        Manage Projects
+                      </button>
+                    </div>
                   </div>
                 </div>
+              {/if}
+            </div>
+
+            <!-- Workspace Switcher -->
+            {#if $currentProject && availableWorkspaces.length > 0}
+              <div class="relative workspace-switcher">
+                <button
+                  on:click={() => workspaceSwitcherOpen = !workspaceSwitcherOpen}
+                  class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
+                  <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <span class="text-xs leading-tight truncate max-w-32">
+                      {currentWorkspace?.name || `${availableWorkspaces.length} Workspaces`}
+                    </span>
+                    <svg class="ml-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                </button>
+
+                <!-- Workspace Dropdown -->
+                {#if workspaceSwitcherOpen}
+                  <div class="absolute top-full right-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-[100]">
+                    <div class="p-4 border-b border-gray-200">
+                      <h3 class="text-sm font-medium text-gray-900">Switch Workspace</h3>
+                    </div>
+                    <div class="max-h-64 overflow-y-auto">
+                      {#each availableWorkspaces as workspace}
+                        <button
+                          on:click={() => selectWorkspace(workspace)}
+                          class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {currentWorkspace?.id === workspace.id ? 'bg-indigo-50' : ''}">
+                          <div class="flex items-center">
+                            <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center mr-3">
+                              <span class="text-white font-medium text-sm">{workspace.name.charAt(0)}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <div class="text-sm font-medium text-gray-900 truncate">{workspace.name}</div>
+                              <div class="text-xs text-gray-500 truncate">{workspace.workspace_type}</div>
+                            </div>
+                            {#if currentWorkspace?.id === workspace.id}
+                              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                              </svg>
+                            {/if}
+                          </div>
+                        </button>
+                      {/each}
+                    </div>
+                    <div class="p-4 border-t border-gray-200">
+                      <button
+                        on:click={() => {
+                          window.location.href = `/projects/${$currentProject.id}`;
+                          workspaceSwitcherOpen = false;
+                        }}
+                        class="text-sm text-indigo-600 hover:text-indigo-800 w-full text-right">
+                        Manage Workspaces
+                      </button>
+                    </div>
+                  </div>
+                {/if}
               </div>
             {/if}
           </div>
@@ -259,19 +364,29 @@
                 </button>
                 
                 {#if openDropdowns[item.name]}
-                  <div class="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
+                  <div class="absolute top-full left-0 mt-1 w-64 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
                     {#each item.dropdownItems as dropdownItem}
                       <a
                         href={dropdownItem.href}
                         on:click={(e) => navigateToApp(dropdownItem, e)}
-                        class="block px-4 py-2 text-sm transition-colors duration-200 {dropdownItem.requiresProject && !$currentProject 
-                          ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
-                          : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'}"
+                        class="block px-4 py-2 text-sm transition-colors duration-200 {
+                          (dropdownItem.requiresProject && !$currentProject) || (dropdownItem.requiresWorkspace && !currentWorkspace)
+                          ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
+                          : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                        }"
                       >
-                        {dropdownItem.name}
-                        {#if dropdownItem.requiresProject && !$currentProject}
-                          <span class="ml-1 text-xs text-gray-400">*</span>
-                        {/if}
+                        <div class="flex items-center justify-between">
+                          <span>{dropdownItem.name}</span>
+                          {#if dropdownItem.useWorkspace && currentWorkspace}
+                            <span class="text-xs text-emerald-600 font-medium">
+                              {currentWorkspace.name.substring(0, 12)}{currentWorkspace.name.length > 12 ? '...' : ''}
+                            </span>
+                          {:else if dropdownItem.requiresWorkspace && !currentWorkspace}
+                            <span class="ml-1 text-xs text-amber-500">↻</span>
+                          {:else if dropdownItem.requiresProject && !$currentProject}
+                            <span class="ml-1 text-xs text-gray-400">*</span>
+                          {/if}
+                        </div>
                       </a>
                     {/each}
                   </div>

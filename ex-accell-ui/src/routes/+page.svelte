@@ -17,10 +17,19 @@
   let recentActivities: any[] = [];
   let systemStatus: any[] = [];
   let currentWorkspace = null;
-  
+  let recentProjects: any[] = [];
+
   onMount(async () => {
     loadCurrentProject();
+
+    // If a project is already selected, redirect to dashboards
+    if ($currentProject) {
+      window.location.href = '/dashboards';
+      return;
+    }
+
     await loadOverviewData();
+    await loadRecentProjects();
   });
 
   async function loadOverviewData() {
@@ -268,6 +277,19 @@
     };
     return colorMap[iconColor] || 'from-gray-500 to-gray-600';
   }
+
+  async function loadRecentProjects() {
+    try {
+      const response = await fetch('/api/projects');
+      const result = await response.json();
+      if (result.success) {
+        // Get the 3 most recent projects
+        recentProjects = (result.projects || []).slice(0, 3);
+      }
+    } catch (error) {
+      console.error('Error loading recent projects:', error);
+    }
+  }
 </script>
 
 <Navigation />
@@ -396,8 +418,107 @@
   </div>
 </section>
 
+<!-- Projects & Workspaces -->
+<section class="py-12 bg-white border-t border-gray-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+      <!-- Recent Projects -->
+      <div>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Projects</h2>
+          <button
+            on:click={() => goto('/projects')}
+            class="text-blue-600 hover:text-blue-700 text-sm font-medium">
+            View All
+          </button>
+        </div>
+
+        {#if loading}
+          <!-- Loading state -->
+          <div class="space-y-3">
+            {#each Array(3) as _, i}
+              <div class="bg-gray-50 rounded-xl p-4 animate-pulse">
+                <div class="h-4 bg-gray-300 rounded mb-2 w-3/4"></div>
+                <div class="h-3 bg-gray-300 rounded w-1/2"></div>
+              </div>
+            {/each}
+          </div>
+        {:else if recentProjects.length === 0}
+          <!-- Empty state -->
+          <div class="bg-gray-50 rounded-xl p-8 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            <p class="mt-2 text-sm font-medium text-gray-900">No projects yet</p>
+            <p class="text-xs text-gray-500 mt-1">Create your first project to get started</p>
+            <button
+              on:click={() => goto('/projects/new')}
+              class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+              Create Project
+            </button>
+          </div>
+        {:else}
+          <!-- Projects list -->
+          <div class="space-y-3">
+            {#each recentProjects as project}
+              <div
+                class="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer"
+                on:click={() => goto(`/projects/${project.id}`)}>
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900 truncate">{project.name}</h3>
+                    <p class="text-sm text-gray-600 mt-1 line-clamp-1">{project.description}</p>
+                    <div class="flex items-center mt-2 space-x-3 text-xs text-gray-500">
+                      <span>{project.totalPosts?.toLocaleString() || 0} posts</span>
+                      <span>•</span>
+                      <span>{project.dataSources?.length || 0} sources</span>
+                    </div>
+                  </div>
+                  <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Getting Started -->
+      <div>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-gray-900">Getting Started</h2>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-8 text-center border border-blue-200">
+          <svg class="mx-auto h-16 w-16 text-blue-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Ready to Dive In?</h3>
+          <p class="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+            Select a project from the list to access powerful analytics, insights, and data visualization tools.
+          </p>
+          <div class="flex items-center justify-center space-x-3">
+            <button
+              on:click={() => goto('/projects')}
+              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors">
+              Browse All Projects
+            </button>
+            <button
+              on:click={() => goto('/projects/new')}
+              class="bg-white hover:bg-gray-50 text-blue-600 border border-blue-600 px-6 py-2 rounded-md text-sm font-medium transition-colors">
+              Create New Project
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Recent Activity & Workspace Overview -->
-<section class="py-12 bg-white">
+<section class="py-12 bg-gray-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       

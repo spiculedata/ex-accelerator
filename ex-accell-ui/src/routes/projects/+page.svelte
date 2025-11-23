@@ -37,12 +37,14 @@
   }
 
   function getTypeLabel(type: string) {
+    if (!type) return 'General';
+
     switch (type) {
       case 'social-media': return 'Social Media';
       case 'market-research': return 'Market Research';
       case 'customer-feedback': return 'Customer Feedback';
       case 'content-analysis': return 'Content Analysis';
-      default: return type;
+      default: return type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
   }
 
@@ -50,10 +52,12 @@
     return new Date(dateString).toLocaleDateString();
   }
 
-  function openProject(projectId: string) {
+  async function openProject(projectId: string) {
     // Set the current project context and redirect to project view
-    setCurrentProject(projectId);
-    window.location.href = `/projects/${projectId}`;
+    const success = await setCurrentProject(projectId);
+    if (success) {
+      window.location.href = `/projects/${projectId}`;
+    }
   }
 </script>
 
@@ -109,7 +113,7 @@
             <div class="flex items-start justify-between mb-4">
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-medium text-gray-900 truncate">{project.name}</h3>
-                <p class="text-sm text-gray-500 mt-1">{getTypeLabel(project.type)}</p>
+                <p class="text-sm text-gray-500 mt-1">{getTypeLabel(project.project_type)}</p>
               </div>
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(project.status)} ml-2">
                 {project.status}
@@ -120,41 +124,28 @@
             <p class="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
 
             <!-- Project Stats -->
-            <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-3 gap-4 mb-4">
               <div>
-                <div class="text-lg font-semibold text-gray-900">{project.totalPosts.toLocaleString()}</div>
-                <div class="text-xs text-gray-500">Posts Analyzed</div>
+                <div class="text-lg font-semibold text-gray-900">{project.workspace_count || 0}</div>
+                <div class="text-xs text-gray-500">Workspaces</div>
               </div>
               <div>
-                <div class="text-lg font-semibold text-gray-900">{project.teamMembers}</div>
-                <div class="text-xs text-gray-500">Team Members</div>
+                <div class="text-lg font-semibold text-gray-900">{project.member_count || 0}</div>
+                <div class="text-xs text-gray-500">Members</div>
               </div>
-            </div>
-
-            <!-- Data Sources -->
-            <div class="mb-4">
-              <div class="text-xs text-gray-500 mb-2">Data Sources</div>
-              <div class="flex flex-wrap gap-1">
-                {#each project.dataSources.slice(0, 3) as source}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                    {source}
-                  </span>
-                {/each}
-                {#if project.dataSources.length > 3}
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    +{project.dataSources.length - 3} more
-                  </span>
-                {/if}
+              <div>
+                <div class="text-lg font-semibold text-gray-900">{project.total_data_sources || 0}</div>
+                <div class="text-xs text-gray-500">Data Sources</div>
               </div>
             </div>
 
             <!-- Project Footer -->
             <div class="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-200">
               <div>
-                <span>Owner: {project.owner}</span>
+                <span>Created by: {project.created_by}</span>
               </div>
               <div>
-                <span>Updated {formatDate(project.updatedAt)}</span>
+                <span>Updated {formatDate(project.updated_at)}</span>
               </div>
             </div>
           </div>
