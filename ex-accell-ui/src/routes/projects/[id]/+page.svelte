@@ -14,6 +14,9 @@
   let newWorkspaceName = '';
   let newWorkspaceDescription = '';
   let newWorkspaceType = 'general';
+  let availableDatasets: any[] = [];
+  let selectedDatasets: number[] = [];
+  let loadingDatasets = false;
 
   onMount(async () => {
     await loadProject();
@@ -28,7 +31,7 @@
 
       if (projectResult.success && projectResult.project) {
         project = projectResult.project;
-        setCurrentProject(project.id.toString());
+        await setCurrentProject(project.id.toString());
 
         // Load workspaces for this project
         const workspacesResponse = await fetch(`/api/workspaces?project_id=${projectId}`);
@@ -49,10 +52,34 @@
     }
   }
 
+  async function loadDatasets() {
+    loadingDatasets = true;
+    try {
+      const response = await fetch('/api/datasets?status=available');
+      const result = await response.json();
+      if (result.success) {
+        availableDatasets = result.datasets || [];
+      }
+    } catch (error) {
+      console.error('Error loading datasets:', error);
+    } finally {
+      loadingDatasets = false;
+    }
+  }
+
+  async function toggleDatasetSelection(datasetId: number) {
+    if (selectedDatasets.includes(datasetId)) {
+      selectedDatasets = selectedDatasets.filter(id => id !== datasetId);
+    } else {
+      selectedDatasets = [...selectedDatasets, datasetId];
+    }
+  }
+
   async function createWorkspace() {
     if (!newWorkspaceName.trim()) return;
 
     try {
+      // Create workspace
       const response = await fetch('/api/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,7 +94,29 @@
 
       const result = await response.json();
 
-      if (result.success) {
+      if (result.success && result.workspace) {
+        const workspaceId = result.workspace.id;
+
+        // Link selected datasets to the workspace
+        if (selectedDatasets.length > 0) {
+          for (const datasetId of selectedDatasets) {
+            try {
+              await fetch('/api/datasets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'link',
+                  workspace_id: workspaceId,
+                  dataset_id: datasetId,
+                  added_by: 'current_user@example.com' // TODO: Get from auth
+                })
+              });
+            } catch (error) {
+              console.error(`Error linking dataset ${datasetId}:`, error);
+            }
+          }
+        }
+
         // Reload workspaces
         await loadProject();
         // Reset form
@@ -75,10 +124,16 @@
         newWorkspaceName = '';
         newWorkspaceDescription = '';
         newWorkspaceType = 'general';
+        selectedDatasets = [];
       }
     } catch (error) {
       console.error('Error creating workspace:', error);
     }
+  }
+
+  // Load datasets when create workspace form is shown
+  $: if (showCreateWorkspace && availableDatasets.length === 0) {
+    loadDatasets();
   }
 
   // Analytics applications
@@ -270,6 +325,70 @@
             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           ></textarea>
         </div>
+
+        <!-- Dataset Selection -->
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Select Datasets (Optional)
+            <span class="text-xs text-gray-500 font-normal">Choose datasets to include in this workspace</span>
+          </label>
+
+          {#if loadingDatasets}
+            <div class="text-center py-4">
+              <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <p class="text-sm text-gray-600 mt-2">Loading datasets...</p>
+            </div>
+          {:else if availableDatasets.length === 0}
+            <div class="bg-gray-50 rounded-md p-4 text-center">
+              <p class="text-sm text-gray-600">No datasets available. Please run the ETL pipeline to ingest data.</p>
+            </div>
+          {:else}
+            <div class="border border-gray-300 rounded-md max-h-64 overflow-y-auto">
+              {#each availableDatasets as dataset}
+                <div
+                  class="p-3 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors"
+                  on:click={() => toggleDatasetSelection(dataset.id)}>
+                  <div class="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={selectedDatasets.includes(dataset.id)}
+                      on:click|stopPropagation={() => toggleDatasetSelection(dataset.id)}
+                      class="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <div class="ml-3 flex-1">
+                      <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-medium text-gray-900">{dataset.name}</h4>
+                        <div class="flex items-center space-x-2">
+                          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {dataset.dataset_type}
+                          </span>
+                          {#if dataset.source_platform}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                              {dataset.source_platform}
+                            </span>
+                          {/if}
+                        </div>
+                      </div>
+                      {#if dataset.description}
+                        <p class="text-xs text-gray-600 mt-1">{dataset.description}</p>
+                      {/if}
+                      <div class="flex items-center mt-1 space-x-3 text-xs text-gray-500">
+                        <span>{dataset.record_count?.toLocaleString() || 0} records</span>
+                        {#if dataset.date_range_start && dataset.date_range_end}
+                          <span>• {new Date(dataset.date_range_start).toLocaleDateString()} - {new Date(dataset.date_range_end).toLocaleDateString()}</span>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+            {#if selectedDatasets.length > 0}
+              <p class="text-xs text-gray-600 mt-2">{selectedDatasets.length} dataset{selectedDatasets.length === 1 ? '' : 's'} selected</p>
+            {/if}
+          {/if}
+        </div>
+
         <div class="mt-4 flex items-center justify-end space-x-3">
           <button
             on:click={() => showCreateWorkspace = false}

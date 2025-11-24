@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+polars/
+venv/
+env/
+ENV/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+duckdatabase
+
+# Data directories
+data/
+projects/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Logs
+*.log
+gdelt_pipeline.log
+
+# Build artifacts
+pg_duckdb/
+*.txt
+!requirements.txt
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

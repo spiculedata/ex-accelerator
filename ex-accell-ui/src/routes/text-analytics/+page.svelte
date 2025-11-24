@@ -1,10 +1,13 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
-  import { currentProject } from '$lib/stores/projectStore';
+  import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
-  
-  // Redirect to projects if no current project
-  onMount(() => {
+
+  // Load current project and check if exists
+  onMount(async () => {
+    await loadCurrentProject();
+
+    // Only redirect after we've tried to load the project
     if (!$currentProject) {
       window.location.href = '/projects';
     }
