@@ -10,6 +10,8 @@
   let availableProjects: any[] = [];
   let availableWorkspaces: any[] = [];
   let currentWorkspace: any = null;
+  let workspaceDataSummary: any = null;
+  let workspaceSummaries: Record<string, any> = {}; // Cache summaries for all workspaces
 
   onMount(() => {
     loadCurrentProject();
@@ -24,12 +26,13 @@
     if (typeof window !== 'undefined') {
       const savedWorkspaceId = localStorage.getItem('currentWorkspace');
       if (savedWorkspaceId) {
-        // Load workspace details
+        // Load workspace details and dataset summary
         fetch(`/api/workspaces?id=${savedWorkspaceId}`)
           .then(response => response.json())
           .then(result => {
             if (result.success && result.workspace) {
               currentWorkspace = result.workspace;
+              loadWorkspaceDatasets(savedWorkspaceId);
             }
           })
           .catch(error => console.error('Error loading workspace:', error));
@@ -72,9 +75,43 @@
       const result = await response.json();
       if (result.success) {
         availableWorkspaces = result.workspaces || [];
+
+        // Load dataset summaries for all workspaces
+        await loadAllWorkspaceSummaries();
       }
     } catch (error) {
       console.error('Error loading workspaces:', error);
+    }
+  }
+
+  async function loadAllWorkspaceSummaries() {
+    // Load summaries for all available workspaces in parallel
+    const summaryPromises = availableWorkspaces.map(async (workspace) => {
+      try {
+        const response = await fetch(`/api/workspaces/${workspace.id}/dataset-summary`);
+        const result = await response.json();
+        if (result.success) {
+          workspaceSummaries[workspace.id] = result.summary;
+        }
+      } catch (error) {
+        console.error(`Error loading summary for workspace ${workspace.id}:`, error);
+      }
+    });
+
+    await Promise.all(summaryPromises);
+    // Trigger reactivity
+    workspaceSummaries = { ...workspaceSummaries };
+  }
+
+  async function loadWorkspaceDatasets(workspaceId: string) {
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/dataset-summary`);
+      const result = await response.json();
+      if (result.success) {
+        workspaceDataSummary = result.summary;
+      }
+    } catch (error) {
+      console.error('Error loading workspace datasets:', error);
     }
   }
 
@@ -87,6 +124,9 @@
       localStorage.setItem('currentWorkspace', workspace.id.toString());
     }
 
+    // Load dataset summary for this workspace
+    loadWorkspaceDatasets(workspace.id.toString());
+
     // Navigate to the workspace detail page
     window.location.href = `/workspaces/${workspace.id}`;
   }
@@ -94,6 +134,40 @@
   // Reload workspaces when project changes
   $: if ($currentProject) {
     loadWorkspaces($currentProject.id);
+  }
+
+  // Helper functions to check data availability
+  $: hasGdeltData = workspaceDataSummary?.types?.includes('gdelt_events') || false;
+  $: hasAndroidData = workspaceDataSummary?.types?.includes('android') || false;
+  $: hasSocialMediaData = workspaceDataSummary?.platforms?.some((p: string) =>
+    ['twitter', 'facebook', 'instagram', 'telegram', 'youtube', 'linkedin', 'reddit', 'tiktok'].includes(p)
+  ) || false;
+
+  function getDatasetTypeBadges(summary: any): { label: string; color: string }[] {
+    if (!summary || !summary.types || summary.types.length === 0) {
+      return [];
+    }
+
+    const badgeMap: Record<string, { label: string; color: string }> = {
+      'social_media': { label: 'Social', color: 'blue' },
+      'gdelt_events': { label: 'GDELT', color: 'amber' },
+      'android': { label: 'Android', color: 'purple' },
+      'telegram': { label: 'Telegram', color: 'sky' },
+      'youtube': { label: 'YouTube', color: 'red' }
+    };
+
+    return summary.types
+      .map((type: string) => badgeMap[type] || { label: type, color: 'gray' })
+      .slice(0, 3); // Limit to 3 badges
+  }
+
+  function formatRecordCount(count: number): string {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K`;
+    }
+    return count.toString();
   }
   
   const navigationItems = [
@@ -107,11 +181,11 @@
       dropdownItems: [
         { name: 'Overview', href: '/workspaces', requiresProject: true, requiresWorkspace: true, useWorkspace: true },
         { name: 'Analytics Dashboard', href: '/dashboards', requiresProject: true, useWorkspace: true },
-        { name: 'GDELT Events', href: '/gdelt', requiresProject: false },
-        { name: 'Android Analytics', href: '/android-analytics', requiresProject: false }
+        { name: 'Brand Sentiment', href: '/text-analytics/sentiment-analysis', requiresProject: true, requiresDataType: 'social', useWorkspace: true },
+        { name: 'GDELT Events', href: '/gdelt', requiresProject: true, requiresDataType: 'gdelt' },
+        { name: 'Android Analytics', href: '/android-analytics', requiresProject: true, requiresDataType: 'android' }
       ]
     },
-    { name: 'Brand Sentiment', href: '/text-analytics/sentiment-analysis', current: false, requiresProject: true },
     { name: 'Research Investigation', href: '/text-analytics/research-investigation', current: false, requiresProject: true },
     {
       name: 'Tools',
@@ -134,6 +208,46 @@
     };
   }
 
+  function hasRequiredData(item: any): boolean {
+    if (!item.requiresDataType || !currentWorkspace) {
+      return true; // No data requirement or no workspace selected
+    }
+
+    switch (item.requiresDataType) {
+      case 'gdelt':
+        return hasGdeltData;
+      case 'android':
+        return hasAndroidData;
+      case 'social':
+        return hasSocialMediaData;
+      default:
+        return true;
+    }
+  }
+
+  function getDataAvailabilityIcon(item: any): string {
+    if (!item.requiresDataType || !currentWorkspace) {
+      return ''; // No icon if no data requirement or no workspace
+    }
+
+    return hasRequiredData(item) ? '✓' : '⚠';
+  }
+
+  function getDataAvailabilityTooltip(item: any): string {
+    if (!item.requiresDataType || !currentWorkspace) {
+      return '';
+    }
+
+    if (hasRequiredData(item)) {
+      return `${item.name} data available`;
+    } else {
+      const dataTypeName = item.requiresDataType === 'gdelt' ? 'GDELT' :
+                           item.requiresDataType === 'android' ? 'Android' :
+                           item.requiresDataType === 'social' ? 'Social Media' : 'required';
+      return `No ${dataTypeName} datasets in this workspace`;
+    }
+  }
+
   function navigateToApp(item: any, event: Event) {
     event.preventDefault();
 
@@ -142,6 +256,10 @@
       window.location.href = '/projects';
     } else if (item.requiresWorkspace && !currentWorkspace) {
       // If app requires workspace but none selected, stay on current page or show message
+      return;
+    } else if (item.requiresDataType && !hasRequiredData(item)) {
+      // Item requires specific data type that's not available
+      // Don't navigate, the visual indicator shows it's disabled
       return;
     } else {
       // Build URL with workspace context if needed
@@ -292,22 +410,46 @@
                     </div>
                     <div class="max-h-64 overflow-y-auto">
                       {#each availableWorkspaces as workspace}
+                        {@const summary = workspaceSummaries[workspace.id]}
+                        {@const badges = summary ? getDatasetTypeBadges(summary) : []}
                         <button
                           on:click={() => selectWorkspace(workspace)}
                           class="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors {currentWorkspace?.id === workspace.id ? 'bg-indigo-50' : ''}">
-                          <div class="flex items-center">
-                            <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center mr-3">
+                          <div class="flex items-start">
+                            <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-xl flex items-center justify-center mr-3 flex-shrink-0">
                               <span class="text-white font-medium text-sm">{workspace.name.charAt(0)}</span>
                             </div>
                             <div class="flex-1 min-w-0">
-                              <div class="text-sm font-medium text-gray-900 truncate">{workspace.name}</div>
-                              <div class="text-xs text-gray-500 truncate">{workspace.workspace_type}</div>
+                              <div class="flex items-center justify-between mb-1">
+                                <div class="text-sm font-medium text-gray-900 truncate">{workspace.name}</div>
+                                {#if currentWorkspace?.id === workspace.id}
+                                  <svg class="w-4 h-4 text-indigo-600 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                  </svg>
+                                {/if}
+                              </div>
+                              <div class="flex items-center space-x-2 mb-1">
+                                <span class="text-xs text-gray-500">{workspace.workspace_type}</span>
+                                {#if summary && summary.datasetCount > 0}
+                                  <span class="text-xs text-gray-400">•</span>
+                                  <span class="text-xs text-gray-600 font-medium">{formatRecordCount(summary.recordCount)} posts</span>
+                                {/if}
+                              </div>
+                              {#if badges.length > 0}
+                                <div class="flex items-center space-x-1 mt-1.5">
+                                  {#each badges as badge}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{badge.color}-100 text-{badge.color}-800">
+                                      {badge.label}
+                                    </span>
+                                  {/each}
+                                  {#if summary?.lastSync}
+                                    <span class="text-xs text-gray-500 ml-1">• {summary.lastSync}</span>
+                                  {/if}
+                                </div>
+                              {:else if summary}
+                                <div class="text-xs text-gray-400 italic mt-1">No datasets</div>
+                              {/if}
                             </div>
-                            {#if currentWorkspace?.id === workspace.id}
-                              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                              </svg>
-                            {/if}
                           </div>
                         </button>
                       {/each}
@@ -370,22 +512,32 @@
                         href={dropdownItem.href}
                         on:click={(e) => navigateToApp(dropdownItem, e)}
                         class="block px-4 py-2 text-sm transition-colors duration-200 {
-                          (dropdownItem.requiresProject && !$currentProject) || (dropdownItem.requiresWorkspace && !currentWorkspace)
+                          (dropdownItem.requiresProject && !$currentProject) ||
+                          (dropdownItem.requiresWorkspace && !currentWorkspace) ||
+                          (dropdownItem.requiresDataType && !hasRequiredData(dropdownItem))
                           ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                           : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                         }"
+                        title={getDataAvailabilityTooltip(dropdownItem)}
                       >
                         <div class="flex items-center justify-between">
                           <span>{dropdownItem.name}</span>
-                          {#if dropdownItem.useWorkspace && currentWorkspace}
-                            <span class="text-xs text-emerald-600 font-medium">
-                              {currentWorkspace.name.substring(0, 12)}{currentWorkspace.name.length > 12 ? '...' : ''}
-                            </span>
-                          {:else if dropdownItem.requiresWorkspace && !currentWorkspace}
-                            <span class="ml-1 text-xs text-amber-500">↻</span>
-                          {:else if dropdownItem.requiresProject && !$currentProject}
-                            <span class="ml-1 text-xs text-gray-400">*</span>
-                          {/if}
+                          <div class="flex items-center space-x-1">
+                            {#if dropdownItem.requiresDataType && currentWorkspace}
+                              <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-amber-500'}">
+                                {getDataAvailabilityIcon(dropdownItem)}
+                              </span>
+                            {/if}
+                            {#if dropdownItem.useWorkspace && currentWorkspace}
+                              <span class="text-xs text-emerald-600 font-medium">
+                                {currentWorkspace.name.substring(0, 12)}{currentWorkspace.name.length > 12 ? '...' : ''}
+                              </span>
+                            {:else if dropdownItem.requiresWorkspace && !currentWorkspace}
+                              <span class="ml-1 text-xs text-amber-500">↻</span>
+                            {:else if dropdownItem.requiresProject && !$currentProject}
+                              <span class="ml-1 text-xs text-gray-400">*</span>
+                            {/if}
+                          </div>
                         </div>
                       </a>
                     {/each}
@@ -397,14 +549,19 @@
               <a
                 href={item.href}
                 on:click={(e) => navigateToApp(item, e)}
-                class="px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : item.requiresProject && !$currentProject 
-                    ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                class="flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current
+                  ? 'bg-blue-100 text-blue-700'
+                  : (item.requiresProject && !$currentProject) || (item.requiresDataType && !hasRequiredData(item))
+                    ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+                title={getDataAvailabilityTooltip(item)}
               >
-                {item.name}
-                {#if item.requiresProject && !$currentProject}
+                <span>{item.name}</span>
+                {#if item.requiresDataType && currentWorkspace}
+                  <span class="ml-1 text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-amber-500'}">
+                    {getDataAvailabilityIcon(item)}
+                  </span>
+                {:else if item.requiresProject && !$currentProject}
                   <span class="ml-1 text-xs text-gray-400">*</span>
                 {/if}
               </a>
@@ -494,14 +651,27 @@
                         mobileMenuOpen = false;
                         openDropdowns = {};
                       }}
-                      class="block px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {dropdownItem.requiresProject && !$currentProject 
-                        ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                      class="flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {
+                        (dropdownItem.requiresProject && !$currentProject) ||
+                        (dropdownItem.requiresWorkspace && !currentWorkspace) ||
+                        (dropdownItem.requiresDataType && !hasRequiredData(dropdownItem))
+                        ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+                      title={getDataAvailabilityTooltip(dropdownItem)}
                     >
-                      {dropdownItem.name}
-                      {#if dropdownItem.requiresProject && !$currentProject}
-                        <span class="ml-1 text-xs text-gray-400">*</span>
-                      {/if}
+                      <span>{dropdownItem.name}</span>
+                      <div class="flex items-center space-x-1">
+                        {#if dropdownItem.requiresDataType && currentWorkspace}
+                          <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-amber-500'}">
+                            {getDataAvailabilityIcon(dropdownItem)}
+                          </span>
+                        {/if}
+                        {#if dropdownItem.requiresWorkspace && !currentWorkspace}
+                          <span class="text-xs text-amber-500">↻</span>
+                        {:else if dropdownItem.requiresProject && !$currentProject}
+                          <span class="text-xs text-gray-400">*</span>
+                        {/if}
+                      </div>
                     </a>
                   {/each}
                 </div>
@@ -515,16 +685,23 @@
                 navigateToApp(item, e);
                 mobileMenuOpen = false;
               }}
-              class="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current 
-                ? 'bg-blue-100 text-blue-700' 
-                : item.requiresProject && !$currentProject 
-                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+              class="flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current
+                ? 'bg-blue-100 text-blue-700'
+                : (item.requiresProject && !$currentProject) || (item.requiresDataType && !hasRequiredData(item))
+                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+              title={getDataAvailabilityTooltip(item)}
             >
-              {item.name}
-              {#if item.requiresProject && !$currentProject}
-                <span class="ml-1 text-xs text-gray-400">*</span>
-              {/if}
+              <span>{item.name}</span>
+              <div class="flex items-center space-x-1">
+                {#if item.requiresDataType && currentWorkspace}
+                  <span class="text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-amber-500'}">
+                    {getDataAvailabilityIcon(item)}
+                  </span>
+                {:else if item.requiresProject && !$currentProject}
+                  <span class="text-xs text-gray-400">*</span>
+                {/if}
+              </div>
             </a>
           {/if}
         {/each}

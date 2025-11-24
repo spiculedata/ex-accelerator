@@ -6,8 +6,8 @@ import { BaseDatabaseService } from './baseDatabaseService';
 interface OverviewStats {
   activeProjects: number;
   postsAnalyzed: number;
-  reportsReady: number;
-  todaysActivities: number;
+  totalWorkspaces: number;
+  activeDatasets: number;
 }
 
 interface AppModule {
@@ -86,17 +86,33 @@ class OverviewDatabase extends BaseDatabaseService {
    * Get overview dashboard statistics
    */
   async getOverviewStats(): Promise<OverviewStats> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+    try {
+      // Fetch real data from projects and datasets APIs
+      const [projectsResponse, datasetsResponse] = await Promise.all([
+        fetch('/api/projects'),
+        fetch('/api/datasets')
+      ]);
 
-    if (!data || data.length === 0) {
+      const projectsResult = await projectsResponse.json();
+      const datasetsResult = await datasetsResponse.json();
+
+      // Get analytics data for posts count
+      const analyticsData = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+
+      const totalPosts = analyticsData && analyticsData.length > 0
+        ? analyticsData.reduce((sum: number, item: any) => sum + (item.post_count || 0), 0)
+        : 0;
+
+      return {
+        activeProjects: projectsResult.success ? (projectsResult.projects || []).filter((p: any) => p.status === 'active').length : 0,
+        postsAnalyzed: totalPosts,
+        totalWorkspaces: projectsResult.success ? (projectsResult.projects || []).reduce((sum: number, p: any) => sum + (p.workspace_count || 0), 0) : 0,
+        activeDatasets: datasetsResult.success ? (datasetsResult.datasets || []).filter((d: any) => d.status === 'active').length : 0
+      };
+    } catch (error) {
+      console.error('Error fetching overview stats:', error);
       return this.getDefaultOverviewStats();
     }
-
-    return this.safeTransform(
-      [data],
-      () => this.calculateOverviewStats(data),
-      this.getDefaultOverviewStats()
-    )[0];
   }
 
   /**
@@ -293,25 +309,11 @@ class OverviewDatabase extends BaseDatabaseService {
     return {
       activeProjects: 0,
       postsAnalyzed: 0,
-      reportsReady: 0,
-      todaysActivities: 0
+      totalWorkspaces: 0,
+      activeDatasets: 0
     };
   }
 
-  /**
-   * Calculate overview statistics from raw data
-   */
-  private calculateOverviewStats(data: any[]): OverviewStats {
-    const totalPosts = data.reduce((sum, item) => sum + item.post_count, 0);
-    const uniquePlatforms = new Set(data.map(item => item.platform)).size;
-
-    return {
-      activeProjects: uniquePlatforms,
-      postsAnalyzed: totalPosts,
-      reportsReady: Math.floor(totalPosts * 0.1),
-      todaysActivities: Math.floor(totalPosts * 0.05)
-    };
-  }
 
   /**
    * Calculate system status from raw data

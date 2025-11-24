@@ -10,27 +10,50 @@
   let overviewStats = {
     activeProjects: 0,
     postsAnalyzed: 0,
-    reportsReady: 0,
-    todaysActivities: 0
+    totalWorkspaces: 0,
+    activeDatasets: 0
   };
   let appModules: any[] = [];
   let recentActivities: any[] = [];
   let systemStatus: any[] = [];
   let currentWorkspace = null;
   let recentProjects: any[] = [];
+  let workspaceDataSummary: any = null;
 
   onMount(async () => {
     loadCurrentProject();
 
-    // If a project is already selected, redirect to dashboards
-    if ($currentProject) {
-      window.location.href = '/dashboards';
-      return;
+    // Load current workspace from localStorage
+    if (typeof window !== 'undefined') {
+      const savedWorkspaceId = localStorage.getItem('currentWorkspace');
+      if (savedWorkspaceId) {
+        await loadWorkspaceContext(savedWorkspaceId);
+      }
     }
 
     await loadOverviewData();
     await loadRecentProjects();
   });
+
+  async function loadWorkspaceContext(workspaceId: string) {
+    try {
+      // Load workspace details
+      const workspaceResponse = await fetch(`/api/workspaces?id=${workspaceId}`);
+      const workspaceResult = await workspaceResponse.json();
+      if (workspaceResult.success && workspaceResult.workspace) {
+        currentWorkspace = workspaceResult.workspace;
+
+        // Load dataset summary
+        const summaryResponse = await fetch(`/api/workspaces/${workspaceId}/dataset-summary`);
+        const summaryResult = await summaryResponse.json();
+        if (summaryResult.success) {
+          workspaceDataSummary = summaryResult.summary;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading workspace context:', error);
+    }
+  }
 
   async function loadOverviewData() {
     try {
@@ -157,8 +180,12 @@
   }
 
   function navigateToApp(appPath: string) {
-    if ($currentProject) {
-      // If project is selected, go directly to the app with project context
+    // Build URL with workspace context if available
+    if (currentWorkspace) {
+      // Navigate with workspace context
+      goto(`${appPath}?workspace=${currentWorkspace.id}`);
+    } else if ($currentProject) {
+      // If project is selected but no workspace, go with project context
       goto(`${appPath}?project=${$currentProject.id}`);
     } else {
       // Navigate directly to the app - project selection is optional
@@ -278,6 +305,76 @@
     return colorMap[iconColor] || 'from-gray-500 to-gray-600';
   }
 
+  function isModuleAvailable(moduleName: string): boolean {
+    if (!currentWorkspace || !workspaceDataSummary) {
+      return true; // Show all modules if no workspace selected
+    }
+
+    const types = workspaceDataSummary.types || [];
+    const platforms = workspaceDataSummary.platforms || [];
+
+    switch (moduleName) {
+      case 'dashboards':
+      case 'data_capture':
+      case 'image_processing':
+        return true; // Always available
+      case 'text_analytics':
+        // Available if any social media data
+        return platforms.some((p: string) =>
+          ['twitter', 'facebook', 'instagram', 'telegram', 'youtube', 'linkedin', 'reddit', 'tiktok'].includes(p)
+        );
+      case 'android_analytics':
+      case 'android_research':
+        return types.includes('android');
+      default:
+        return true;
+    }
+  }
+
+  function getModuleAvailabilityMessage(moduleName: string): string {
+    if (!currentWorkspace) {
+      return '';
+    }
+
+    if (isModuleAvailable(moduleName)) {
+      return '';
+    }
+
+    switch (moduleName) {
+      case 'text_analytics':
+        return 'No social media datasets';
+      case 'android_analytics':
+      case 'android_research':
+        return 'No Android datasets';
+      default:
+        return 'Data not available';
+    }
+  }
+
+  function getModuleRecordCount(moduleName: string): number {
+    if (!workspaceDataSummary) {
+      return 0;
+    }
+
+    // Return total record count for applicable modules
+    if (isModuleAvailable(moduleName)) {
+      return workspaceDataSummary.recordCount || 0;
+    }
+
+    return 0;
+  }
+
+  function formatRecordCount(count: number): string {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M records`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}K records`;
+    } else if (count > 0) {
+      return `${count} records`;
+    }
+    return 'No data';
+  }
+
   async function loadRecentProjects() {
     try {
       const response = await fetch('/api/projects');
@@ -345,8 +442,12 @@
             <div class="text-gray-200 text-sm font-medium">Posts Analyzed</div>
           </div>
           <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
-            <div class="text-2xl font-bold text-white">{overviewStats.reportsReady}</div>
-            <div class="text-gray-200 text-sm font-medium">Reports Ready</div>
+            <div class="text-2xl font-bold text-white">{overviewStats.totalWorkspaces}</div>
+            <div class="text-gray-200 text-sm font-medium">Workspaces</div>
+          </div>
+          <div class="bg-gray-900 bg-opacity-60 backdrop-blur-sm rounded-xl p-4 text-center border border-gray-600">
+            <div class="text-2xl font-bold text-white">{overviewStats.activeDatasets}</div>
+            <div class="text-gray-200 text-sm font-medium">Data Sources</div>
           </div>
         {/if}
       </div>
@@ -362,8 +463,20 @@
 <section class="py-12 bg-gray-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between mb-8">
-      <h2 class="text-2xl font-bold text-gray-900">Your Analytics Tools</h2>
-      <button 
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">
+          {currentWorkspace ? `Analytics for ${currentWorkspace.name}` : 'Your Analytics Tools'}
+        </h2>
+        {#if currentWorkspace && workspaceDataSummary}
+          <p class="text-sm text-gray-600 mt-1">
+            {workspaceDataSummary.datasetCount || 0} datasets • {formatRecordCount(workspaceDataSummary.recordCount || 0)}
+            {#if workspaceDataSummary.lastSync}
+              • Last sync: {workspaceDataSummary.lastSync}
+            {/if}
+          </p>
+        {/if}
+      </div>
+      <button
         on:click={() => goto('/projects/new')}
         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-blue-600 hover:border-blue-700">
         + New Project
@@ -387,24 +500,51 @@
           </div>  
         {/each}
       {:else}
-        <!-- Dynamic app modules -->  
+        <!-- Dynamic app modules -->
         {#each appModules as module}
-          <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 cursor-pointer" 
-               on:click={() => navigateToApp(getModuleRoute(module.name))}>
+          {@const available = isModuleAvailable(module.name)}
+          {@const unavailableMsg = getModuleAvailabilityMessage(module.name)}
+          {@const recordCount = getModuleRecordCount(module.name)}
+          <div class="bg-white rounded-xl shadow-lg transition-all duration-300 p-6 {available ? 'hover:shadow-xl cursor-pointer' : 'opacity-60 cursor-not-allowed'}"
+               on:click={() => available && navigateToApp(getModuleRoute(module.name))}>
             <div class="flex items-center justify-between mb-4">
-              <div class="w-12 h-12 bg-gradient-to-br {getGradientClass(module.iconColor)} rounded-xl flex items-center justify-center">
+              <div class="w-12 h-12 bg-gradient-to-br {getGradientClass(module.iconColor)} rounded-xl flex items-center justify-center {!available ? 'opacity-50' : ''}">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{getModuleIcon(module.name)}"/>
                 </svg>
               </div>
-              <span class="text-xs px-2 py-1 rounded-full {getStatusBadgeClass(module.iconColor)}">
-                {module.statusDisplay}
-              </span>
+              {#if available}
+                <span class="text-xs px-2 py-1 rounded-full {getStatusBadgeClass(module.iconColor)}">
+                  {module.statusDisplay}
+                </span>
+              {:else}
+                <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                  </svg>
+                  Unavailable
+                </span>
+              {/if}
             </div>
             <h3 class="text-lg font-semibold text-gray-900 mb-1">{module.displayName}</h3>
             <p class="text-gray-600 text-sm mb-3">
               {getModuleDescription(module.name)}
             </p>
+            {#if available && currentWorkspace && recordCount > 0}
+              <div class="flex items-center text-sm text-emerald-600 font-medium mb-2">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                {formatRecordCount(recordCount)}
+              </div>
+            {:else if !available && unavailableMsg}
+              <div class="flex items-center text-sm text-amber-600 mb-2">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                {unavailableMsg}
+              </div>
+            {/if}
             <div class="flex items-center text-sm text-gray-500">
               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
