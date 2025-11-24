@@ -72,12 +72,22 @@ CREATE TABLE workspace_members (
 );
 
 -- Create indexes for performance
+-- Basic indexes
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_created_by ON projects(created_by);
 CREATE INDEX idx_workspaces_project_id ON workspaces(project_id);
 CREATE INDEX idx_workspaces_status ON workspaces(status);
 CREATE INDEX idx_workspace_data_sources_workspace_id ON workspace_data_sources(workspace_id);
 CREATE INDEX idx_workspace_data_sources_status ON workspace_data_sources(status);
+
+-- Performance indexes for sorting and filtering (added for query optimization)
+CREATE INDEX idx_projects_created_at_desc ON projects(created_at DESC);
+CREATE INDEX idx_projects_updated_at_desc ON projects(updated_at DESC);
+CREATE INDEX idx_workspaces_created_at_desc ON workspaces(created_at DESC);
+CREATE INDEX idx_workspaces_updated_at_desc ON workspaces(updated_at DESC);
+CREATE INDEX idx_workspaces_project_id_created_at ON workspaces(project_id, created_at DESC);
+CREATE INDEX idx_workspace_data_sources_created_at_desc ON workspace_data_sources(created_at DESC);
+CREATE INDEX idx_project_members_project_id_added_at ON project_members(project_id, added_at ASC);
 
 -- Create views for common queries
 
