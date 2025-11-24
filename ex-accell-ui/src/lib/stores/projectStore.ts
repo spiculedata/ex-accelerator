@@ -59,13 +59,14 @@ export async function setCurrentProject(projectId: string): Promise<boolean> {
 }
 
 // Function to load project from localStorage on app init
-export function loadCurrentProject() {
+export async function loadCurrentProject(): Promise<boolean> {
   if (typeof window !== 'undefined') {
     const savedProjectId = localStorage.getItem('currentProject');
     if (savedProjectId) {
-      setCurrentProject(savedProjectId);
+      return await setCurrentProject(savedProjectId);
     }
   }
+  return false;
 }
 
 // Function to clear current project

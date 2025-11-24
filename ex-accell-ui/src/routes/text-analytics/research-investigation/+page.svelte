@@ -1,10 +1,13 @@
 <script lang="ts">
   import Navigation from '$lib/components/Navigation.svelte';
-  import { currentProject } from '$lib/stores/projectStore';
+  import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
-  
-  // Redirect to projects if no current project
-  onMount(() => {
+
+  // Load current project and check if exists
+  onMount(async () => {
+    await loadCurrentProject();
+
+    // Only redirect after we've tried to load the project
     if (!$currentProject) {
       window.location.href = '/projects';
     }
@@ -70,15 +73,10 @@
   let selectedTemplate = notebookTemplates[0];
 
   function startJupyter() {
-    // Start JupyterLab server
-    const command = 'poetry run jupyter lab --port=8888 --no-browser --allow-root';
-    
-    // In a real implementation, this would be handled by the backend
-    // For now, we'll show instructions to the user
-    showJupyterInstructions = true;
+    // Open JupyterLab in a new tab
+    window.open(jupyterUrl, '_blank');
   }
 
-  let showJupyterInstructions = false;
   let showEmbeddedNotebook = false;
 
   function createNotebook() {
@@ -93,10 +91,13 @@
     window.open(url, '_blank');
   }
 
-  function checkJupyterStatus() {
-    // In a real implementation, this would ping the Jupyter server
-    // For demo purposes, we'll assume it's running after instructions are shown
-    isJupyterRunning = showJupyterInstructions;
+  async function checkJupyterStatus() {
+    try {
+      const response = await fetch(`${jupyterUrl}/api`, { method: 'GET' });
+      isJupyterRunning = response.ok;
+    } catch (error) {
+      isJupyterRunning = false;
+    }
   }
 
   // Check Jupyter status periodically
@@ -304,20 +305,17 @@
                   {isJupyterRunning ? 'Running' : 'Stopped'}
                 </span>
               </div>
-              
-              {#if !showJupyterInstructions}
-                <button 
+
+              {#if !isJupyterRunning}
+                <button
                   on:click={startJupyter}
                   class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                   Start JupyterLab
                 </button>
               {:else}
-                <div class="bg-gray-50 rounded-xl p-4 text-sm">
-                  <p class="font-medium text-gray-900 mb-2">Run this command in your terminal:</p>
-                  <code class="block bg-gray-900 text-green-400 p-3 rounded text-xs font-mono mb-3">
-                    cd /Users/tombarber/Projects/ex-accelerator/ex-accell-ui && poetry run jupyter lab --port=8888 --no-browser --allow-root
-                  </code>
-                  <p class="text-gray-600">JupyterLab will start at <a href="http://localhost:8888" target="_blank" class="text-blue-600 hover:underline">http://localhost:8888</a></p>
+                <div class="bg-green-50 rounded-xl p-4 text-sm">
+                  <p class="font-medium text-green-900 mb-2">✓ JupyterLab is running</p>
+                  <p class="text-green-700">Server available at <a href="http://localhost:8888" target="_blank" class="text-blue-600 hover:underline font-medium">http://localhost:8888</a></p>
                 </div>
               {/if}
             </div>
