@@ -1,188 +1,277 @@
-# Ex-Accell UI
+# Social Explorer (Ex-Accell UI)
 
-A modern, unified Dapr deployment combining SvelteKit frontend with telegram-scraper job scheduling for the Ex-Accelerator platform.
+A powerful social media analytics platform for collecting, analyzing, and visualizing data from multiple platforms. Built with SvelteKit, Dapr, and DuckDB for high-performance unified analytics.
 
-## 🚀 Quick Start
+## What is Social Explorer?
+
+Social Explorer helps researchers and analysts:
+
+- **Collect data** from social media platforms (Telegram, YouTube) via automated crawlers
+- **Analyze text** with sentiment analysis, topic modeling, language detection, and engagement metrics
+- **Visualize insights** through interactive dashboards with cross-platform comparisons
+- **Organize work** with projects and workspaces to manage multiple research initiatives
+
+## Key Features
+
+### Analytics Modules
+
+| Module | Description |
+|--------|-------------|
+| **Dashboards** | Real-time analytics and custom visualizations |
+| **Sentiment Analysis** | NLP-powered sentiment and emotion detection |
+| **Topic Modeling** | Discover themes and trends across your data |
+| **Language Detection** | Multi-language text analysis and patterns |
+| **Engagement Analysis** | Performance metrics and content effectiveness |
+| **GDELT Events** | Global event data analysis |
+| **Android Analytics** | Mobile device interaction analysis |
+
+### Data Collection
+
+- **Web Crawlers** - Schedule automated data collection from Telegram and YouTube
+- **Job Scheduling** - Create one-time or recurring crawl jobs via web interface
+- **Real-time Monitoring** - Track job progress and execution logs
+
+### Research Organization
+
+- **Projects** - Group related research initiatives together
+- **Workspaces** - Organize datasets within projects with isolated analytics
+- **Cross-platform Analysis** - Compare insights across different social media platforms
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- Go 1.21+ (for telegram-scraper)
-- Docker (for Redis)
-- Dapr CLI
 
-### Get Started in 2 Steps
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Node.js | 18+ | Runtime environment |
+| Go | 1.21+ | Telegram scraper service |
+| Docker | Latest | Redis container |
+| Dapr CLI | Latest | Service orchestration |
+
+### First-Time Setup
+
+1. **Install Dapr CLI** (if not already installed):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/dapr/cli/master/install/install.sh | /bin/bash
+   dapr init
+   ```
+
+2. **Install dependencies and configure services**:
+   ```bash
+   npm install
+   npm run dapr:setup
+   ```
+
+3. **Start the application**:
+   ```bash
+   npm run dev:dapr
+   ```
+
+4. **Open your browser** at [http://localhost:5173](http://localhost:5173)
+
+### Development Modes
 
 ```bash
-# 1. Install dependencies and setup deployment
-npm install
-npm run dapr:setup
-
-# 2. Start unified deployment (UI + telegram-scraper)
+# Full deployment with Dapr (recommended for most development)
 npm run dev:dapr
+
+# Standard development server (no Dapr services)
+npm run dev
+
+# Development with Jupyter Lab integration
+npm run dev:jupyter
 ```
 
-Visit [http://localhost:5173](http://localhost:5173) to see your app! 🎉  
-Access job scheduling at [http://localhost:5173/data-capture](http://localhost:5173/data-capture) 📋
+## Project Structure
 
-## 📋 What You Need
-
-### First Time Setup
-```bash
-# Install Dapr CLI (if not already installed)
-curl -fsSL https://raw.githubusercontent.com/dapr/cli/master/install/install.sh | /bin/bash
-
-# Initialize Dapr
-dapr init
+```
+ex-accell-ui/
+├── src/
+│   ├── routes/              # SvelteKit pages and API endpoints
+│   │   ├── api/             # REST API endpoints
+│   │   ├── dashboards/      # Dashboard pages
+│   │   ├── projects/        # Project management
+│   │   ├── text-analytics/  # Analytics modules
+│   │   └── workspaces/      # Workspace management
+│   └── lib/
+│       ├── components/      # Reusable UI components
+│       ├── services/        # Database and API services
+│       └── stores/          # Svelte stores for state management
+├── components/              # Dapr component configurations
+├── notebooks/               # Jupyter notebook templates
+├── cypress/                 # E2E and component tests
+└── sql/                     # Database schemas
 ```
 
-## 🛠 Available Commands
+## Architecture
 
-### Development
-```bash
-npm run dev             # Standard development server
-npm run dev:dapr        # Unified deployment (UI + telegram-scraper)
+### System Overview
+
+```
+                           ┌────────────────────────────────────┐
+                           │         Social Explorer UI         │
+                           │         (SvelteKit + Dapr)         │
+                           └───────────────┬────────────────────┘
+                                           │
+              ┌────────────────────────────┼────────────────────────────┐
+              │                            │                            │
+              ▼                            ▼                            ▼
+    ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+    │   Analytics     │         │  Data Capture   │         │   Job Queue     │
+    │   (DuckDB)      │         │  (Crawlers)     │         │   (Dapr Jobs)   │
+    └─────────────────┘         └─────────────────┘         └─────────────────┘
+              │                            │                            │
+              │                            ▼                            │
+              │                 ┌─────────────────┐                     │
+              └────────────────►│ Telegram Scraper│◄────────────────────┘
+                                │   (Go Service)  │
+                                └─────────────────┘
 ```
 
-### Deployment Management
-```bash
-npm run dapr:setup      # Setup dependencies (Redis, telegram-scraper)
-npm run dapr:stop       # Stop all Dapr services and cleanup processes
-npm run dapr:logs       # View deployment logs
-```
+### Technology Stack
 
-### Building & Testing
-```bash
-npm run build           # Build for production
-npm run preview         # Preview production build
-npm run check           # Type checking
-npm run test:integration # Test job scheduling integration
-```
-
-## 🏗 What's Inside
-
-This is a **unified Dapr deployment** combining multiple services:
-
-- ⚡ **SvelteKit 2.x** - Modern web framework with TypeScript
-- 🔧 **Dapr Multi-App** - Unified microservices deployment
-- 📋 **Telegram Scraper** - Go-based job scheduling integration
-- 🚀 **Job Scheduling** - Web-based crawler job management
-- 🐳 **Docker** - Redis and containerization support
-
-## 🌟 Key Features
-
-### Unified DuckDB Analytics
-- **Cross-Table Analysis** - Single database for all analytics modules
-- **Multi-Platform Insights** - Compare sentiment, topics, and engagement across platforms
-- **Advanced Correlations** - Language-sentiment relationships and topic performance analysis
-- **Real-Time Dashboards** - Comprehensive analytics from unified data source
-
-### Telegram Scraper Integration
-- **Job Scheduling** - Web-based crawler job creation and management
-- **Multi-App Deployment** - Single command starts UI and scraper services
-- **Real-time Monitoring** - Live job execution logs and status
-- **Platform Support** - Telegram and YouTube content crawling
-
-### Dapr Integration
-- **Unified Deployment** - Multi-app configuration in single dapr.yaml
-- **State Management** - Redis-backed persistent state
-- **Job Store** - Etcd-based job scheduling and execution
-- **Service Discovery** - Microservices connectivity
-
-### Modern Development
-- **Hot Reload** - Instant feedback during development
-- **TypeScript** - Enhanced developer experience
-- **Component-Based** - Modular, reusable UI components
-- **Server-Side Rendering** - Fast initial page loads
-
-## 🔧 Configuration
+- **Frontend**: SvelteKit 2.x, Svelte 5, TypeScript, Tailwind CSS
+- **Backend**: Node.js, DuckDB, PostgreSQL
+- **Services**: Dapr (state, pub/sub, jobs), Redis
+- **Crawlers**: Go-based Telegram/YouTube scraper
+- **Analytics**: ECharts, Leaflet (maps)
 
 ### Database Architecture
 
-The application uses a **unified DuckDB database** for all analytics:
+Social Explorer uses a **unified DuckDB database** for high-performance analytics:
 
-- **Single Database**: `unified_social_analytics.db` - Contains all analytics modules
-- **Cross-Platform Analysis**: Sentiment, topics, language detection, and engagement in one place
-- **Advanced Views**: Pre-built analytical views for complex cross-table queries
-- **Schema**: `unified_social_analytics_schema.sql` - Complete database structure
+- **Single source of truth**: `unified_social_analytics.db`
+- **Cross-module analysis**: Query across sentiment, topics, language, and engagement
+- **Pre-built views**: Optimized for common analytical queries
+- **Schema**: See `sql/unified_social_analytics_schema.sql`
+
+## Available Commands
+
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run dev:dapr` | Start with Dapr services (recommended) |
+| `npm run dev:jupyter` | Start with Jupyter Lab |
+| `npm run build` | Build for production |
+| `npm run preview` | Preview production build |
+
+### Dapr Services
+
+| Command | Description |
+|---------|-------------|
+| `npm run dapr:init` | Initialize Dapr (first-time only) |
+| `npm run dapr:setup` | Setup dependencies (Redis, scraper) |
+| `npm run dapr:stop` | Stop all Dapr services |
+| `npm run dapr:logs` | View service logs |
+
+### Testing
+
+| Command | Description |
+|---------|-------------|
+| `npm run test` | Run all tests |
+| `npm run test:e2e` | Run E2E tests only |
+| `npm run test:component` | Run component tests only |
+| `npm run cypress:open` | Open Cypress UI |
+| `npm run check` | TypeScript type checking |
+
+## Configuration
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
+```
 
 ### Dapr Components
 
-- **State Store**: Redis (`components/statestore.yaml`)
-- **Pub/Sub**: Redis messaging (`components/pubsub.yaml`) 
-- **Secrets**: File-based secrets (`components/secretstore.yaml`)
-- **Job Store**: Etcd-based job scheduling (`components/jobstore.yaml`)
-- **Telegram Scraper**: Service binding (`components/telegram-scraper-app.yaml`)
+Located in `components/` directory:
 
-## 📚 Documentation
+| Component | File | Purpose |
+|-----------|------|---------|
+| State Store | `statestore.yaml` | Redis-backed state |
+| Pub/Sub | `pubsub.yaml` | Event messaging |
+| Secrets | `secretstore.yaml` | Secure configuration |
+| Job Store | `jobstore.yaml` | Job scheduling |
 
-- **[Developer Guide](./DEVELOPER_GUIDE.md)** - Comprehensive development documentation
-- **[CLAUDE.md](./CLAUDE.md)** - AI assistant context and commands
+## API Endpoints
 
-## 🌐 System Integration
+### Projects & Workspaces
 
-This UI is part of the larger Ex-Accelerator ecosystem:
+- `GET/POST /api/projects` - Manage projects
+- `GET/POST /api/workspaces` - Manage workspaces
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Ex-Accell │    │ Telegram    │    │     ETL     │
-│      UI     │◄──►│  Scraper    │◄──►│   Pipeline  │
-│  (Frontend) │    │ (Job Mode)  │    │             │
-└─────────────┘    └─────────────┘    └─────────────┘
-       │                                      │
-       ▼                                      ▼
-┌─────────────┐                      ┌─────────────┐
-│  Job Queue  │                      │  Superset   │
-│ (Dapr Jobs) │                      │ Analytics   │
-└─────────────┘                      └─────────────┘
-```
+### Analytics
 
-## 🚨 Troubleshooting
+- `GET /api/sentiment-analysis` - Sentiment data
+- `GET /api/topic-modeling` - Topic analysis
+- `GET /api/language-detection` - Language stats
+- `GET /api/engagement-analysis` - Engagement metrics
 
-### Common Issues
+### Jobs
 
-**Port already in use?**
+- `POST /api/jobs` - Schedule crawler job
+- `GET /api/jobs` - List scheduled jobs
+- `DELETE /api/jobs?name={name}` - Delete job
+
+## Troubleshooting
+
+### Port already in use
+
 ```bash
-lsof -i :5173  # Check what's using the port
-npm run dev -- --port 5174  # Use different port
+lsof -i :5173
+npm run dev -- --port 5174
 ```
 
-**Redis connection failed?**
+### Redis not running
+
 ```bash
-docker ps | grep redis  # Check if Redis is running
-docker start redis-dapr  # Start Redis if stopped
+docker ps | grep redis
+docker start redis-dapr
 ```
 
-**Dapr not working?**
+### Dapr issues
+
 ```bash
-dapr --version       # Check Dapr installation
-dapr list            # See running Dapr apps
-npm run dapr:logs    # View deployment logs
+dapr --version
+dapr list
+npm run dapr:logs
 ```
 
-**Telegram scraper issues?**
+### Database connection issues
+
 ```bash
-npm run dapr:setup   # Re-run setup to check dependencies
-ls -la /Users/tombarber/Projects/telegram-scraper/telegram-scraper  # Check binary exists
+# Check if DuckDB database exists
+ls -la unified_social_analytics.db
+
+# Reinitialize database
+npm run build  # Database initializes on build
 ```
 
-## 🤝 Contributing
+## Documentation
+
+- **[CLAUDE.md](./CLAUDE.md)** - AI assistant context and development guidelines
+- **[ARCHITECTURE_SUMMARY.txt](./ARCHITECTURE_SUMMARY.txt)** - Detailed architecture overview
+- **[docs/](./docs/)** - Additional documentation
+
+## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes following the code style in `CLAUDE.md`
+4. Write tests for new functionality
+5. Run `npm run check && npm run test` to verify
+6. Commit: `git commit -m 'Add your feature'`
+7. Push: `git push origin feature/your-feature`
+8. Open a Pull Request
 
-## 📝 Need Help?
-
-- 📖 Check the [Developer Guide](./DEVELOPER_GUIDE.md) for detailed information
-- 🐛 Found a bug? Open an issue
-- 💡 Have a suggestion? We'd love to hear it!
-
-## 📄 License
+## License
 
 This project is part of the Ex-Accelerator platform.
 
 ---
 
-**Happy coding!** 🎯
+Built with SvelteKit, Dapr, and DuckDB
