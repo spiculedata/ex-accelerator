@@ -2,7 +2,7 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/improvenav]
   workflow_dispatch:
 
 env:
