@@ -11,9 +11,10 @@ import { serverWorkflowService } from '$lib/services/serverWorkflowService';
  * Manage workflow execution (pause, resume, purge)
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+  let body: any;
   try {
     const { id } = params;
-    const body = await request.json();
+    body = await request.json();
     const { action } = body;
 
     const execution = await serverWorkflowService.getWorkflowExecution(id);
@@ -55,7 +56,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       ...result
     });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error(`Error performing ${body?.action || 'unknown'} action on workflow execution:`, err);
     return error(500, `Failed to ${body?.action || 'manage'} workflow: ${err.message}`);
   }
@@ -88,7 +89,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
       daprStatus: status
     });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error getting workflow execution status:', err);
     return error(500, `Failed to get workflow status: ${err.message}`);
   }

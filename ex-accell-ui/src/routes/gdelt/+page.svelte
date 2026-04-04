@@ -26,7 +26,7 @@
 	let filteredCountries: string[] = [];
 	let dateRange = ['', '']; // [startDate, endDate] in YYYY-MM-DD format
 	let availableDateRange = ['', '']; // Auto-detected from data
-	let dateRefreshTimeout: number;
+	let dateRefreshTimeout: ReturnType<typeof setTimeout>;
 	
 	// Mentions functionality
 	let selectedEventId: number | null = null;
@@ -99,9 +99,9 @@
 	}
 	
 	// Get Global South country codes that are available in our data
-	$: globalSouthCountryCodes = globalSouthCountries
+	$: globalSouthCountryCodes = (globalSouthCountries
 		.map(name => getCountryCodeByName(name))
-		.filter(code => code && availableCountries.includes(code));
+		.filter(code => code && availableCountries.includes(code as string)) as string[]);
 	
 	// Mention type mapping
 	function getMentionTypeLabel(mentionType: number): string {
@@ -181,8 +181,8 @@
 	});
 
 	// Function to get currently visible events based on all filters
-	function getVisibleEvents(eventsArray, eventTypes, goldstein, tone, countries, dateRangeFilter) {
-		const filtered = eventsArray.filter(event => {
+	function getVisibleEvents(eventsArray: any, eventTypes: any, goldstein: any, tone: any, countries: any, dateRangeFilter: any) {
+		const filtered = eventsArray.filter((event: any) => {
 			// Check event type
 			const eventType = getEventType(event.eventCode);
 			const typeMatch = eventTypes.has('all') || eventTypes.has(eventType);
@@ -214,8 +214,8 @@
 	}
 
 	// Function to get events excluding country filter (for country counts)
-	function getEventsExcludingCountryFilter(eventsArray, eventTypes, goldstein, tone, dateRangeFilter) {
-		return eventsArray.filter(event => {
+	function getEventsExcludingCountryFilter(eventsArray: any, eventTypes: any, goldstein: any, tone: any, dateRangeFilter: any) {
+		return eventsArray.filter((event: any) => {
 			// Check event type
 			const eventType = getEventType(event.eventCode);
 			const typeMatch = eventTypes.has('all') || eventTypes.has(eventType);
@@ -248,7 +248,7 @@
 	
 
 	// GDELT Event Type Mappings (based on CAMEO codes)
-	const eventTypes = {
+	const eventTypes: Record<string, any> = {
 		'verbal_cooperation': { 
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'],
 			label: 'Verbal Cooperation',
@@ -325,7 +325,7 @@
 
 	function getEventType(eventCode: string): string {
 		for (const [type, config] of Object.entries(eventTypes)) {
-			if (config.codes.some(code => eventCode.startsWith(code))) {
+			if (config.codes.some((code: string) => eventCode.startsWith(code))) {
 				return type;
 			}
 		}
@@ -370,7 +370,7 @@
 		let visibleCount = 0;
 		const startTime = performance.now();
 		
-		Object.entries(markers).forEach(([eventId, marker]) => {
+		Object.entries(markers as Record<string, any>).forEach(([eventId, marker]) => {
 			const event = events.find(e => e.id.toString() === eventId);
 			if (event) {
 				// Check event type
@@ -429,8 +429,8 @@
 		goldsteinMax = goldsteinRange[1];
 		
 		// Debounce the filter update
-		clearTimeout(window.goldsteinTimeout);
-		window.goldsteinTimeout = setTimeout(() => {
+		clearTimeout((window as any).goldsteinTimeout);
+		(window as any).goldsteinTimeout = setTimeout(() => {
 			updateMarkerVisibility();
 		}, 200);
 	}
@@ -466,8 +466,8 @@
 		toneMax = toneRange[1];
 		
 		// Debounce the filter update
-		clearTimeout(window.toneTimeout);
-		window.toneTimeout = setTimeout(() => {
+		clearTimeout((window as any).toneTimeout);
+		(window as any).toneTimeout = setTimeout(() => {
 			updateMarkerVisibility();
 		}, 200);
 	}
@@ -780,7 +780,7 @@
 		}
 	}
 
-	async function fetchMentionsBatch(eventIds) {
+	async function fetchMentionsBatch(eventIds: any) {
 		const response = await fetch('/api/gdelt/mentions', {
 			method: 'POST',
 			headers: {
@@ -819,7 +819,7 @@
 			currentPage = 1;
 			itemsPerPage = 100;
 			
-			const allEventIds = visibleEvents.map(e => e.id);
+			const allEventIds = visibleEvents.map((e: any) => e.id);
 			console.log(`Starting batch mentions fetch for ${allEventIds.length} events...`);
 			
 			if (allEventIds.length <= 1000) {
@@ -841,7 +841,7 @@
 				
 				console.log(`Large dataset: processing ${allEventIds.length} events in ${totalBatches} batches of ${batchSize}`);
 				
-				let allMentions = [];
+				let allMentions: any[] = [];
 				
 				for (let i = 0; i < totalBatches; i++) {
 					const start = i * batchSize;
@@ -891,7 +891,7 @@
 			console.log(`Refreshing data due to ${reason}:`, { goldsteinRange, dateRange });
 			
 			// Clear existing markers
-			Object.values(markers).forEach(marker => marker.remove());
+			Object.values(markers as Record<string, any>).forEach((marker: any) => marker.remove());
 			markers = {};
 			
 			// Properly remove existing map
@@ -932,7 +932,7 @@
 			}
 			
 			console.log('Data refresh completed successfully');
-		} catch (err) {
+		} catch (err: any) {
 			console.error('Error refreshing data:', err);
 			console.error('Error details:', err.message, err.stack);
 			error = `Failed to refresh GDELT data: ${err.message}`;
@@ -948,14 +948,14 @@
 
 	// Global function for popup buttons
 	if (browser) {
-		window.filterByCountry = (countryCode: string) => {
-			const newSelectedCountries = new Set();
+		(window as any).filterByCountry = (countryCode: string) => {
+			const newSelectedCountries = new Set<string>();
 			newSelectedCountries.add(countryCode);
 			selectedCountries = newSelectedCountries;
 			updateMarkerVisibility();
 		};
-		
-		window.showEventMentions = (eventId: number) => {
+
+		(window as any).showEventMentions = (eventId: number) => {
 			fetchMentions(eventId);
 		};
 	}
@@ -964,6 +964,7 @@
 		if (browser) {
 			try {
 				// Import Leaflet dynamically
+				// @ts-ignore - leaflet types not installed
 				leaflet = await import('leaflet');
 				
 				// Fetch data from API endpoint with Goldstein filter
@@ -1038,11 +1039,11 @@
 				markers[event.id] = marker;
 				
 				// Add click handler for country selection
-				marker.on('click', (e) => {
+				marker.on('click', (e: any) => {
 					e.originalEvent.stopPropagation(); // Prevent map click
-					
+
 					// Select this country and deselect 'all'
-					const newSelectedCountries = new Set();
+					const newSelectedCountries = new Set<string>();
 					newSelectedCountries.add(event.country);
 					selectedCountries = newSelectedCountries;
 					
@@ -1343,8 +1344,8 @@
 							<!-- Individual Event Types -->
 							<div class="space-y-2 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
 							{#each Object.entries(eventTypes) as [key, eventType]}
-								{@const eventCount = visibleEvents.filter(e => getEventType(e.eventCode) === key).length}
-								{@const totalEventCount = events.filter(e => getEventType(e.eventCode) === key).length}
+								{@const eventCount = visibleEvents.filter((e: any) => getEventType(e.eventCode) === key).length}
+								{@const totalEventCount = events.filter((e: any) => getEventType(e.eventCode) === key).length}
 								{#if totalEventCount > 0}
 									<button
 										on:click={() => toggleEventType(key)}
@@ -1610,14 +1611,14 @@
 										{/if}
 									</div>
 									<span class="text-xs font-medium text-gray-900">All Countries</span>
-									<span class="ml-auto text-xs text-gray-600">{new Set(eventsForCountryCounts.map(e => e.country)).size}</span>
+									<span class="ml-auto text-xs text-gray-600">{new Set(eventsForCountryCounts.map((e: any) => e.country)).size}</span>
 								</button>
-								
+
 								<!-- Individual Countries -->
 								<div class="max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
 									{#each filteredCountries as country}
-										{@const countryEventCount = eventsForCountryCounts.filter(e => e.country === country).length}
-										{@const totalEventCount = events.filter(e => e.country === country).length}
+										{@const countryEventCount = eventsForCountryCounts.filter((e: any) => e.country === country).length}
+										{@const totalEventCount = events.filter((e: any) => e.country === country).length}
 										{@const countryName = getCountryNameWithFallback(country, `Unknown (${country})`)}
 										{#if totalEventCount > 0}
 											<button
@@ -1700,7 +1701,7 @@
 									<div class="animate-spin rounded-full h-3 w-3 border border-emerald-200 border-t-emerald-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-emerald-600 mb-1 xl:mb-2">{new Set(visibleEvents.map(e => e.country)).size}</div>
+							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-emerald-600 mb-1 xl:mb-2">{new Set(visibleEvents.map((e: any) => e.country)).size}</div>
 							<div class="text-sm xl:text-base text-gray-600">Countries</div>
 						</div>
 						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
@@ -1709,7 +1710,7 @@
 									<div class="animate-spin rounded-full h-3 w-3 border border-amber-200 border-t-amber-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-amber-600 mb-1 xl:mb-2">{Object.keys(eventTypes).filter(k => visibleEvents.some(e => getEventType(e.eventCode) === k)).length}</div>
+							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-amber-600 mb-1 xl:mb-2">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
 							<div class="text-sm xl:text-base text-gray-600">Event Types</div>
 						</div>
 						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
@@ -1719,7 +1720,7 @@
 								</div>
 							{/if}
 							{#if true}
-								{@const avgTone = visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc, e) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}
+								{@const avgTone = visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc: number, e: any) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}
 								<div class="text-xl xl:text-2xl 2xl:text-3xl font-bold text-blue-600 mb-1">{getToneDescription(avgTone)}</div>
 								<div class="text-lg xl:text-xl 2xl:text-2xl font-semibold text-blue-500 mb-1">{avgTone}</div>
 								<div class="text-sm xl:text-base text-gray-600">Avg Tone</div>

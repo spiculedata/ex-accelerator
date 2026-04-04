@@ -78,7 +78,7 @@ async function executeDuckDBQuery(sql: string): Promise<any[]> {
 
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',');
-          const row = {};
+          const row: Record<string, any> = {};
           
           headers.forEach((header, index) => {
             const value = values[index]?.trim();

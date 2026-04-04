@@ -50,7 +50,7 @@
         minSize: minTopicSize
       };
       
-      topicsData = await topicModelingDb.getTopics(filters);
+      topicsData = (await topicModelingDb.getTopics(filters as any)) as Topic[];
       topicCategories = await topicModelingDb.getTopicCategories();
       topicRelationships = await topicModelingDb.getTopicRelationships(0.5);
       topicStats = await topicModelingDb.getTopicStats();
@@ -93,8 +93,8 @@
         search: searchQuery,
         minSize: minTopicSize
       };
-      topicsData = await topicModelingDb.getTopics(filters);
-      
+      topicsData = (await topicModelingDb.getTopics(filters as any)) as Topic[];
+
       // Update charts with new data
       if (typeof window !== 'undefined' && (window as any).echarts) {
         setTimeout(async () => {
@@ -197,7 +197,7 @@
       },
       tooltip: {
         trigger: 'item',
-        formatter: function(params) {
+        formatter: function(params: any) {
           if (params.dataType === 'node') {
             return `<strong>${params.data.name}</strong><br/>Posts: ${params.data.value.toLocaleString()}<br/>Category: ${params.data.category}`;
           } else if (params.dataType === 'edge') {
@@ -282,7 +282,7 @@
         minSize: minTopicSize
       };
       
-      const treemapData = await topicModelingDb.getTreemapData(filters);
+      const treemapData = await topicModelingDb.getTreemapData(filters as any);
 
       console.log('Treemap data:', treemapData);
 
@@ -456,7 +456,7 @@
   }
 
   function getCategoryColor(category: string): string {
-    const colors = {
+    const colors: Record<string, string> = {
       'Technology': '#3b82f6',
       'Health': '#10b981',
       'Business': '#f59e0b',
@@ -519,10 +519,10 @@
         minSize: minTopicSize
       };
       
-      const exportData = await topicModelingDb.exportTopicData(filters);
-      
+      const exportData = await topicModelingDb.exportTopicData(filters as any);
+
       // Create CSV from the exported data
-      const csvData = exportData.topics.map(topic => 
+      const csvData = (exportData as any).topics.map((topic: any) =>
         `"${topic.name}",${topic.category},${topic.size},${topic.weight},"${topic.keywords.join(';')}"`
       ).join('\n');
       

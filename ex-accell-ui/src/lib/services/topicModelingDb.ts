@@ -73,7 +73,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [topics],
       () => this.calculateTopicStats(topics),
-      this.getDefaultTopicStats()
+      [this.getDefaultTopicStats()]
     )[0];
   }
 

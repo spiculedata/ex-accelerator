@@ -111,7 +111,7 @@
   $: filteredPosts = samplePosts;
 
   function getSentimentColor(sentiment: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'Very Positive': '#06d6a0',
       'Positive': '#26d0ce',
       'Neutral': '#8b5cf6',
@@ -122,7 +122,7 @@
   }
 
   function getSentimentIcon(sentiment: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'Very Positive': '😊',
       'Positive': '🙂',
       'Neutral': '😐',
@@ -148,7 +148,7 @@
       const exportData = await sentimentAnalysisDb.exportSentimentData(filters);
       
       // Create CSV from the exported data
-      const csvData = exportData.posts.map(post => 
+      const csvData = (exportData as any).posts.map((post: any) =>
         `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
       ).join('\n');
       
@@ -169,9 +169,9 @@
   }
 
   // Chart initialization
-  let sentimentChart = null;
-  let emotionChart = null;
-  let trendChart = null;
+  let sentimentChart: any = null;
+  let emotionChart: any = null;
+  let trendChart: any = null;
 
   // Load ECharts from CDN if not already loaded
   async function loadECharts() {
@@ -334,7 +334,7 @@
         type: 'category',
         data: dates,
         axisLabel: {
-          formatter: function(value) {
+          formatter: function(value: any) {
             return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           }
         }

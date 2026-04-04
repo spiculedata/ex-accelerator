@@ -100,7 +100,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'link',
-            workspace_id: parseInt(workspaceId),
+            workspace_id: parseInt(workspaceId ?? '0'),
             dataset_id: datasetId,
             added_by: 'current_user@example.com' // TODO: Get from auth
           })

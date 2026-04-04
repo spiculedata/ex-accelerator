@@ -71,7 +71,7 @@ class DaprWorkflowExecutor {
         execution.logs.push({
           timestamp: new Date().toISOString(),
           level: 'warn',
-          message: `Dapr workflow failed (${daprError.message}), falling back to direct Python execution`
+          message: `Dapr workflow failed (${(daprError as any).message}), falling back to direct Python execution`
         });
         
         // Fall back to direct Python execution
@@ -489,7 +489,7 @@ class DaprWorkflowExecutor {
       'data_transformation': 1500
     };
     
-    const baseTime = baseTimes[stepType] || 2000;
+    const baseTime = (baseTimes as Record<string, number>)[stepType] || 2000;
     return baseTime + Math.random() * 1000; // Add some variance
   }
 
@@ -498,12 +498,12 @@ class DaprWorkflowExecutor {
    */
   private generateRealisticOutput(workflow: PublishedWorkflow, input: any): any {
     const steps = workflow.definition.steps;
-    const hasTextProcessing = steps.some(s => s.type === 'text_preprocessing');
-    const hasSentiment = steps.some(s => s.type === 'sentiment_analysis');
-    const hasTopicModeling = steps.some(s => s.type === 'topic_modeling');
-    const hasClustering = steps.some(s => s.type === 'clustering');
+    const hasTextProcessing = steps.some((s: any) => s.type === 'text_preprocessing');
+    const hasSentiment = steps.some((s: any) => s.type === 'sentiment_analysis');
+    const hasTopicModeling = steps.some((s: any) => s.type === 'topic_modeling');
+    const hasClustering = steps.some((s: any) => s.type === 'clustering');
 
-    let output = {
+    let output: any = {
       workflowName: workflow.name,
       executionId: workflow.id,
       processedRecords: Math.floor(Math.random() * 5000) + 1000,
@@ -808,8 +808,8 @@ async def main(input_data):
    */
   private extractDatasetRequirements(workflow: PublishedWorkflow): string[] {
     return workflow.definition.steps
-      .filter(step => step.type === 'dataset_input')
-      .map(step => step.config?.dataset_id || 'default')
+      .filter((step: any) => step.type === 'dataset_input')
+      .map((step: any) => step.config?.dataset_id || 'default')
       .filter(Boolean);
   }
 }

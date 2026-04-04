@@ -1,18 +1,9 @@
 // Python-based Dapr Workflow Execution Service
 // Manages execution of Python workflows through Dapr runtime
 
-/**
- * Helper function to safely extract error messages
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return getErrorMessage(error);
-  }
-  return String(error);
-}
 import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowService';
 import { pythonDaprWorkflowGenerator, type PythonDaprWorkflow } from './pythonDaprWorkflowGenerator';
-import { DaprClient } from '@dapr/dapr';
+import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -24,21 +15,12 @@ import { constants } from 'fs';
  */
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return getErrorMessage(error);
+    return error.message;
   }
   return String(error);
 }
-const execAsync = promisify(exec);
 
-/**
- * Helper function to safely extract error messages
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return getErrorMessage(error);
-  }
-  return String(error);
-}
+const execAsync = promisify(exec);
 export interface PythonWorkflowDeployment {
   workflowId: string;
   pythonScriptPath: string;
@@ -55,7 +37,7 @@ export class PythonDaprWorkflowExecutor {
     this.daprClient = new DaprClient({
       daprHost: 'localhost',
       daprPort: this.daprHttpPort.toString(),
-      communicationProtocol: 'http'
+      communicationProtocol: CommunicationProtocolEnum.HTTP
     });
   }
 

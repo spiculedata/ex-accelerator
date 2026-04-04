@@ -101,9 +101,9 @@
     averageProcessingTime: '15m 23s'
   };
 
-  let selectedDataset = null;
+  let selectedDataset: any = null;
 
-  function selectDataset(dataset) {
+  function selectDataset(dataset: any) {
     selectedDataset = dataset;
   }
 
@@ -117,9 +117,9 @@
   }
 
   function getStatusColor(status: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'ready': 'bg-blue-100 text-blue-800',
-      'processing': 'bg-yellow-100 text-yellow-800', 
+      'processing': 'bg-yellow-100 text-yellow-800',
       'completed': 'bg-blue-100 text-blue-800',
       'running': 'bg-blue-100 text-blue-800',
       'draft': 'bg-gray-100 text-gray-800',
@@ -129,11 +129,11 @@
   }
 
   function getStatusIcon(status: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'ready': '✅',
       'processing': '⏳',
       'completed': '🎉',
-      'running': '🔄', 
+      'running': '🔄',
       'draft': '📝',
       'error': '❌'
     };

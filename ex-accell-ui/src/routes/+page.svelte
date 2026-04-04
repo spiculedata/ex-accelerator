@@ -16,7 +16,7 @@
   let appModules: any[] = [];
   let recentActivities: any[] = [];
   let systemStatus: any[] = [];
-  let currentWorkspace = null;
+  let currentWorkspace: any = null;
   let recentProjects: any[] = [];
   let workspaceDataSummary: any = null;
 
@@ -209,7 +209,7 @@
       'dashboard_updated': 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 712 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 712-2h2a2 2 0 712 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
       'job_started': 'M12 6v6m0 0v6m0-6h6m-6 0H6'
     };
-    return icons[activityType] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+    return (icons as Record<string, string>)[activityType] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
   }
 
   function getModuleIcon(moduleName: string) {
@@ -221,11 +221,11 @@
       'android_analytics': 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
       'android_research': 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z'
     };
-    return icons[moduleName] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
+    return (icons as Record<string, string>)[moduleName] || 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z';
   }
 
   function getModuleRoute(moduleName: string) {
-    const routes = {
+    const routes: Record<string, string> = {
       'dashboards': '/dashboards',
       'text_analytics': '/text-analytics',
       'image_processing': '/image-processing',
@@ -237,7 +237,7 @@
   }
 
   function getModuleDescription(moduleName: string) {
-    const descriptions = {
+    const descriptions: Record<string, string> = {
       'dashboards': 'Real-time analytics and custom visualizations',
       'text_analytics': 'NLP processing and sentiment analysis',
       'image_processing': 'Computer vision and image analysis',
@@ -249,7 +249,7 @@
   }
 
   function getStatusBadgeClass(iconColor: string) {
-    const colorMap = {
+    const colorMap: Record<string, string> = {
       'blue': 'bg-blue-100 text-blue-800',
       'emerald': 'bg-emerald-100 text-emerald-800',
       'indigo': 'bg-indigo-100 text-indigo-800',
@@ -261,7 +261,7 @@
   }
 
   function getActivityIconBgClass(iconColor: string) {
-    const colorMap = {
+    const colorMap: Record<string, string> = {
       'blue': 'bg-blue-100',
       'emerald': 'bg-emerald-100',
       'indigo': 'bg-indigo-100',
@@ -273,7 +273,7 @@
   }
 
   function getActivityIconTextClass(iconColor: string) {
-    const colorMap = {
+    const colorMap: Record<string, string> = {
       'blue': 'text-blue-600',
       'emerald': 'text-emerald-600',
       'indigo': 'text-indigo-600',
@@ -285,7 +285,7 @@
   }
 
   function getStatusTextClass(status: string) {
-    const colorMap = {
+    const colorMap: Record<string, string> = {
       'healthy': 'text-blue-600',
       'warning': 'text-yellow-600',
       'error': 'text-red-600'
@@ -294,7 +294,7 @@
   }
 
   function getGradientClass(iconColor: string) {
-    const colorMap = {
+    const colorMap: Record<string, string> = {
       'blue': 'from-blue-500 to-blue-600',
       'emerald': 'from-emerald-500 to-emerald-600',
       'indigo': 'from-indigo-500 to-indigo-600',

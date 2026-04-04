@@ -85,7 +85,7 @@ class HashtagAnalysisDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [data],
       () => this.calculateHashtagStats(data),
-      this.getDefaultHashtagStats()
+      [this.getDefaultHashtagStats()]
     )[0];
   }
 

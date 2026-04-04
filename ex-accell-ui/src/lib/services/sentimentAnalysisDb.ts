@@ -42,7 +42,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [data],
       () => this.aggregateSentimentStats(data),
-      this.getDefaultSentimentStats()
+      [this.getDefaultSentimentStats()]
     )[0];
   }
 

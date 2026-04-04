@@ -27,7 +27,14 @@
   let heatmapChartInstance: echarts.ECharts;
 
   // Research Data - Loaded from database service
-  let researchData = {
+  let researchData: {
+    temporalUsage: any[];
+    appTransitions: any[];
+    attentionSpans: any[];
+    contentEngagement: any[];
+    cognitiveLoad: any[];
+    userSessions: any[];
+  } = {
     temporalUsage: [],
     appTransitions: [],
     attentionSpans: [],
@@ -38,8 +45,8 @@
 
   // Research Insights
   let keyFindings: any[] = [];
-  let behavioralMetrics = {};
-  let digitalPhenotype = {};
+  let behavioralMetrics: any = {};
+  let digitalPhenotype: any = {};
 
   onMount(async () => {
     try {
@@ -156,7 +163,7 @@
   }
 
   function getAppPopularityMultiplier(app: string, hour: number): number {
-    const patterns = {
+    const patterns: Record<string, number> = {
       'YouTube': Math.max(0.3, Math.sin((hour - 20) * Math.PI / 8) * 0.7 + 0.5), // Peak evening
       'Instagram': Math.max(0.2, Math.sin((hour - 21) * Math.PI / 6) * 0.8 + 0.4), // Peak late evening
       'WhatsApp': Math.max(0.4, 1 - Math.abs(hour - 12) / 24), // Peak midday
@@ -167,7 +174,7 @@
   }
 
   function getTransitionProbability(from: string, to: string): number {
-    const transitions = {
+    const transitions: Record<string, Record<string, number>> = {
       'YouTube': { 'Chrome': 0.3, 'Instagram': 0.4, 'WhatsApp': 0.2 },
       'Instagram': { 'WhatsApp': 0.5, 'Chrome': 0.3, 'Camera': 0.4 },
       'Chrome': { 'YouTube': 0.4, 'Gmail': 0.3, 'Maps': 0.2 },
@@ -177,7 +184,7 @@
   }
 
   function getAppMeanDuration(app: string): number {
-    const durations = {
+    const durations: Record<string, number> = {
       'YouTube': 280, 'Instagram': 180, 'WhatsApp': 90, 'Chrome': 200,
       'Gmail': 60, 'Maps': 45, 'Camera': 30, 'Settings': 40, 'Launcher': 15
     };
@@ -276,7 +283,7 @@
       type: 'line',
       smooth: true,
       data: researchData.temporalUsage.map(d => {
-        const appData = d.apps.find(a => a.app === app);
+        const appData = d.apps.find((a: any) => a.app === app);
         return [d.hour, appData ? appData.usage : 0];
       }),
       areaStyle: { opacity: 0.1 },
@@ -292,9 +299,9 @@
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' },
-        formatter: function(params) {
+        formatter: function(params: any) {
           let result = `<strong>Hour: ${params[0].value[0]}:00</strong><br/>`;
-          params.forEach(param => {
+          params.forEach((param: any) => {
             result += `${param.seriesName}: ${param.value[1].toFixed(1)} min<br/>`;
           });
           return result;
@@ -345,7 +352,7 @@
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
-        formatter: function(params) {
+        formatter: function(params: any) {
           if (params.dataType === 'edge') {
             return `${params.data.source} → ${params.data.target}<br/>Transitions: ${params.data.value}`;
           } else {
@@ -388,7 +395,7 @@
   }
 
   function getCategoryIndex(app: string): number {
-    const categories = {
+    const categories: Record<string, number> = {
       'Instagram': 0, 'YouTube': 2, 'Chrome': 1, 'Gmail': 1,
       'WhatsApp': 3, 'Maps': 4, 'Camera': 4, 'Settings': 4, 'Launcher': 4
     };

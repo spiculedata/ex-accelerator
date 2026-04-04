@@ -119,7 +119,7 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [data],
       () => this.calculateEngagementStats(data),
-      this.getDefaultEngagementStats()
+      [this.getDefaultEngagementStats()]
     )[0];
   }
 

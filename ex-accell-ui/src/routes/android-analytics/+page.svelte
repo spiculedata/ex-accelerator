@@ -175,15 +175,15 @@
     sessionDuration = Math.round(appSegmentData.reduce((sum, segment) => sum + segment.duration_segment_ms, 0) / 60000);
     
     // Calculate top apps by usage time
-    const appUsage = {};
+    const appUsage: Record<string, number> = {};
     appSegmentData.forEach(segment => {
       const appName = getAppDisplayName(segment.apk);
       appUsage[appName] = (appUsage[appName] || 0) + segment.duration_segment_ms;
     });
-    
+
     topApps = Object.entries(appUsage)
-      .map(([app, duration]) => ({ 
-        app, 
+      .map(([app, duration]) => ({
+        app,
         duration: Math.round(duration / 60000), // Convert to minutes
         percentage: Math.round((duration / appSegmentData.reduce((sum, s) => sum + s.duration_segment_ms, 0)) * 100)
       }))
@@ -202,10 +202,10 @@
     userBehaviorPatterns = analyzeUserPatterns();
   }
 
-  function getAppDisplayName(apk) {
-    const appMap = {
+  function getAppDisplayName(apk: string) {
+    const appMap: Record<string, string> = {
       'com.google.android.youtube': 'YouTube',
-      'com.android.chrome': 'Chrome Browser', 
+      'com.android.chrome': 'Chrome Browser',
       'com.google.android.apps.nexuslauncher': 'Launcher',
       'com.screenlake': 'Screenlake Research',
       'com.android.systemui': 'System UI',
@@ -266,7 +266,7 @@
     return patterns;
   }
 
-  function formatTimestamp(timestamp) {
+  function formatTimestamp(timestamp: any) {
     return new Date(timestamp).toLocaleString();
   }
 

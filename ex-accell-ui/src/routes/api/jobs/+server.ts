@@ -1,7 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jobStateStore } from '$lib/services/jobStateStore.js';
-import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
+import { DaprClient, CommunicationProtocolEnum, HttpMethod } from '@dapr/dapr';
 
 const TELEGRAM_SCRAPER_APP_ID = 'telegram-scraper';
 
@@ -146,15 +146,11 @@ export const POST: RequestHandler = async ({ request }) => {
 			await jobStateStore.saveJobState(jobState);
 			jobStateSaved = true;
 			console.log('✅ JOB STATE SAVED SUCCESSFULLY');
-		} catch (stateError) {
+		} catch (stateError: any) {
 			console.error('❌ FAILED TO SAVE JOB STATE:', stateError.message);
 			// Check if this is a Dapr connection error and provide helpful message
 			if (stateError.name === 'DaprConnectionError') {
-				return error(503, {
-					message: 'Job scheduling service unavailable',
-					details: stateError.message,
-					action: 'Please start the unified deployment with: npm run dev:dapr'
-				});
+				return error(503, `Job scheduling service unavailable: ${stateError.message}. Please start the unified deployment with: npm run dev:dapr`);
 			}
 		}
 
@@ -221,14 +217,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			const result = await daprClient.invoker.invoke(
 				TELEGRAM_SCRAPER_APP_ID,
 				'scheduleJob',
-				'POST',
+				HttpMethod.POST,
 				jobData
 			);
 
 			console.log('✅ JOB SCHEDULED VIA DAPR SDK:', result);
-		} catch (daprError) {
+		} catch (daprError: any) {
 			console.error('❌ DAPR SDK SCHEDULING ERROR:', daprError);
-			
+
 			// If scheduling fails, try to update job state to failed (if we could save it initially)
 			if (jobStateSaved) {
 				try {
@@ -290,12 +286,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 		
 		// Check if this is a fetch error indicating Dapr isn't running
-		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
-			return error(503, {
-				message: 'Job scheduling service unavailable',
-				details: 'Cannot connect to Dapr job scheduler. Please ensure the unified deployment is running.',
-				action: 'Run: npm run dev:dapr'
-			});
+		const errMsg = err instanceof Error ? err.message : String(err);
+		if (errMsg.includes('fetch failed')) {
+			return error(503, 'Job scheduling service unavailable. Cannot connect to Dapr job scheduler. Please ensure the unified deployment is running. Run: npm run dev:dapr');
 		}
 		return error(500, 'Internal server error while scheduling job');
 	}
@@ -323,19 +316,16 @@ export const GET: RequestHandler = async ({ url }) => {
 					return json(allJobStates);
 				}
 			} catch (stateError) {
-				if (stateError.name === 'DaprConnectionError') {
-					return error(503, {
-						message: 'Job state service unavailable',
-						details: stateError.message,
-						action: 'Please start the unified deployment with: npm run dev:dapr'
-					});
+				const stateErr = stateError as any;
+				if (stateErr?.name === 'DaprConnectionError') {
+					return error(503, `Job state service unavailable: ${stateErr?.message}. Please start the unified deployment with: npm run dev:dapr`);
 				}
 				throw stateError;
 			}
 		}
 
 		let daprJobs = null;
-		let jobStates = [];
+		let jobStates: any[] = [];
 
 		// Try to get from Dapr service using SDK
 		try {
@@ -352,8 +342,8 @@ export const GET: RequestHandler = async ({ url }) => {
 				daprJobs = await daprClient.invoker.invoke(
 					TELEGRAM_SCRAPER_APP_ID,
 					'getJob',
-					'POST',
-					jobName
+					HttpMethod.POST,
+					{ jobName }
 				);
 			} else {
 				// For getting all jobs, we'll still use HTTP API as it's more appropriate
@@ -368,7 +358,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				data: daprJobs
 			});
 		} catch (daprError) {
-			console.error('❌ FAILED TO QUERY JOBS VIA DAPR SDK:', daprError.message);
+			console.error('❌ FAILED TO QUERY JOBS VIA DAPR SDK:', (daprError as any)?.message);
 		}
 
 		// Try to get job states from state store
@@ -384,14 +374,11 @@ export const GET: RequestHandler = async ({ url }) => {
 				}))
 			});
 		} catch (stateError) {
-			console.error('❌ FAILED TO GET JOB STATES:', stateError.message);
-			if (stateError.name === 'DaprConnectionError' && !daprJobs) {
+			const stateErr = stateError as any;
+			console.error('❌ FAILED TO GET JOB STATES:', stateErr?.message);
+			if (stateErr?.name === 'DaprConnectionError' && !daprJobs) {
 				// If both services are unavailable, return helpful error
-				return error(503, {
-					message: 'Job services unavailable',
-					details: stateError.message,
-					action: 'Please start the unified deployment with: npm run dev:dapr'
-				});
+				return error(503, `Job services unavailable: ${stateErr?.message}. Please start the unified deployment with: npm run dev:dapr`);
 			}
 		}
 
@@ -414,13 +401,9 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 	} catch (err) {
 		console.error('Job retrieval error:', err);
-		// Check if this is a fetch error indicating services aren't running
-		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
-			return error(503, {
-				message: 'Job services unavailable',
-				details: 'Cannot connect to job services. Please ensure the unified deployment is running.',
-				action: 'Run: npm run dev:dapr'
-			});
+		const errMsg = err instanceof Error ? err.message : String(err);
+		if (errMsg.includes('fetch failed')) {
+			return error(503, 'Job services unavailable. Cannot connect to job services. Please ensure the unified deployment is running: npm run dev:dapr');
 		}
 		return error(500, 'Internal server error while retrieving job(s)');
 	}
@@ -455,7 +438,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 					console.warn('⚠️ DAPR JOBS API DELETE ERROR:', errorText);
 				}
 			} catch (daprError) {
-				console.warn('❌ Could not delete from Dapr (may not be running):', daprError.message);
+				console.warn('❌ Could not delete from Dapr (may not be running):', (daprError as any)?.message);
 				// Don't fail the whole operation if Dapr is down
 			}
 		}
@@ -467,14 +450,11 @@ export const DELETE: RequestHandler = async ({ url }) => {
 				await jobStateStore.deleteJobState(jobId);
 				stateDeleted = true;
 			} catch (stateError) {
-				console.warn('Could not delete job state:', stateError.message);
+				const stateErr = stateError as any;
+				console.warn('Could not delete job state:', stateErr?.message);
 				// Check if this is a Dapr connection error
-				if (stateError.name === 'DaprConnectionError') {
-					return error(503, {
-						message: 'Job state service unavailable',
-						details: stateError.message,
-						action: 'Please start the unified deployment with: npm run dev:dapr'
-					});
+				if (stateErr?.name === 'DaprConnectionError') {
+					return error(503, `Job state service unavailable: ${stateErr?.message}. Please start the unified deployment with: npm run dev:dapr`);
 				}
 			}
 		} else if (jobName) {
@@ -490,14 +470,11 @@ export const DELETE: RequestHandler = async ({ url }) => {
 					console.warn(`Job state not found for job name: ${jobName}`);
 				}
 			} catch (stateError) {
-				console.warn('Could not delete job state:', stateError.message);
+				const stateErr = stateError as any;
+				console.warn('Could not delete job state:', stateErr?.message);
 				// Check if this is a Dapr connection error
-				if (stateError.name === 'DaprConnectionError') {
-					return error(503, {
-						message: 'Job state service unavailable',
-						details: stateError.message,
-						action: 'Please start the unified deployment with: npm run dev:dapr'
-					});
+				if (stateErr?.name === 'DaprConnectionError') {
+					return error(503, `Job state service unavailable: ${stateErr?.message}. Please start the unified deployment with: npm run dev:dapr`);
 				}
 			}
 		}
@@ -516,13 +493,9 @@ export const DELETE: RequestHandler = async ({ url }) => {
 		});
 	} catch (err) {
 		console.error('Job deletion error:', err);
-		// Check if this is a fetch error indicating Dapr isn't running
-		if (err instanceof Error ? err.message : String(err) && err instanceof Error ? err.message : String(err).includes('fetch failed')) {
-			return error(503, {
-				message: 'Job deletion service unavailable',
-				details: 'Cannot connect to job services. Please ensure the unified deployment is running.',
-				action: 'Run: npm run dev:dapr'
-			});
+		const errMsg = err instanceof Error ? err.message : String(err);
+		if (errMsg.includes('fetch failed')) {
+			return error(503, 'Job deletion service unavailable. Cannot connect to job services. Please ensure the unified deployment is running: npm run dev:dapr');
 		}
 		return error(500, 'Internal server error while deleting job');
 	}
