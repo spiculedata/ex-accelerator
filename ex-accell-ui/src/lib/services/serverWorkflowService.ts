@@ -312,7 +312,7 @@ class ServerWorkflowService {
     const steps = workflowDefinition.steps;
     let estimatedSeconds = 0;
     
-    steps.forEach(step => {
+    steps.forEach((step: any) => {
       switch (step.type) {
         case 'dataset_input':
         case 'dataset_output':

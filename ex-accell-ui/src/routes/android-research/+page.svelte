@@ -27,7 +27,14 @@
   let heatmapChartInstance: echarts.ECharts;
 
   // Research Data - Loaded from database service
-  let researchData = {
+  let researchData: {
+    temporalUsage: any[];
+    appTransitions: any[];
+    attentionSpans: any[];
+    contentEngagement: any[];
+    cognitiveLoad: any[];
+    userSessions: any[];
+  } = {
     temporalUsage: [],
     appTransitions: [],
     attentionSpans: [],
@@ -38,8 +45,8 @@
 
   // Research Insights
   let keyFindings: any[] = [];
-  let behavioralMetrics = {};
-  let digitalPhenotype = {};
+  let behavioralMetrics: any = {};
+  let digitalPhenotype: any = {};
 
   onMount(async () => {
     try {
@@ -156,7 +163,7 @@
   }
 
   function getAppPopularityMultiplier(app: string, hour: number): number {
-    const patterns = {
+    const patterns: Record<string, number> = {
       'YouTube': Math.max(0.3, Math.sin((hour - 20) * Math.PI / 8) * 0.7 + 0.5), // Peak evening
       'Instagram': Math.max(0.2, Math.sin((hour - 21) * Math.PI / 6) * 0.8 + 0.4), // Peak late evening
       'WhatsApp': Math.max(0.4, 1 - Math.abs(hour - 12) / 24), // Peak midday
@@ -167,7 +174,7 @@
   }
 
   function getTransitionProbability(from: string, to: string): number {
-    const transitions = {
+    const transitions: Record<string, Record<string, number>> = {
       'YouTube': { 'Chrome': 0.3, 'Instagram': 0.4, 'WhatsApp': 0.2 },
       'Instagram': { 'WhatsApp': 0.5, 'Chrome': 0.3, 'Camera': 0.4 },
       'Chrome': { 'YouTube': 0.4, 'Gmail': 0.3, 'Maps': 0.2 },
@@ -177,7 +184,7 @@
   }
 
   function getAppMeanDuration(app: string): number {
-    const durations = {
+    const durations: Record<string, number> = {
       'YouTube': 280, 'Instagram': 180, 'WhatsApp': 90, 'Chrome': 200,
       'Gmail': 60, 'Maps': 45, 'Camera': 30, 'Settings': 40, 'Launcher': 15
     };
@@ -276,7 +283,7 @@
       type: 'line',
       smooth: true,
       data: researchData.temporalUsage.map(d => {
-        const appData = d.apps.find(a => a.app === app);
+        const appData = d.apps.find((a: any) => a.app === app);
         return [d.hour, appData ? appData.usage : 0];
       }),
       areaStyle: { opacity: 0.1 },
@@ -292,9 +299,9 @@
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' },
-        formatter: function(params) {
+        formatter: function(params: any) {
           let result = `<strong>Hour: ${params[0].value[0]}:00</strong><br/>`;
-          params.forEach(param => {
+          params.forEach((param: any) => {
             result += `${param.seriesName}: ${param.value[1].toFixed(1)} min<br/>`;
           });
           return result;
@@ -345,7 +352,7 @@
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
-        formatter: function(params) {
+        formatter: function(params: any) {
           if (params.dataType === 'edge') {
             return `${params.data.source} → ${params.data.target}<br/>Transitions: ${params.data.value}`;
           } else {
@@ -388,7 +395,7 @@
   }
 
   function getCategoryIndex(app: string): number {
-    const categories = {
+    const categories: Record<string, number> = {
       'Instagram': 0, 'YouTube': 2, 'Chrome': 1, 'Gmail': 1,
       'WhatsApp': 3, 'Maps': 4, 'Camera': 4, 'Settings': 4, 'Launcher': 4
     };
@@ -400,7 +407,7 @@
       name: app.app,
       value: [
         app.meanDuration,
-        app.sessions.reduce((sum, s) => sum + s.duration, 0) / app.sessions.length,
+        app.sessions.reduce((sum: any, s: any) => sum + s.duration, 0) / app.sessions.length,
         app.sessions.length,
         app.app
       ]
@@ -413,7 +420,7 @@
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
-        formatter: function(params) {
+        formatter: function(params: any) {
           return `${params.data.value[3]}<br/>
                   Mean Duration: ${params.data.value[0].toFixed(1)}s<br/>
                   Actual Avg: ${params.data.value[1].toFixed(1)}s<br/>
@@ -432,11 +439,11 @@
       },
       series: [{
         type: 'scatter',
-        symbolSize: function(data) {
+        symbolSize: function(data: any) {
           return Math.sqrt(data[2]) * 3;
         },
         itemStyle: {
-          color: function(params) {
+          color: function(params: any) {
             const ratio = params.data.value[1] / params.data.value[0];
             return ratio > 1.2 ? '#52c41a' : ratio < 0.8 ? '#ff4d4f' : '#1890ff';
           },
@@ -544,7 +551,7 @@
       tooltip: {
         trigger: 'item',
         triggerOn: 'mousemove',
-        formatter: function(params) {
+        formatter: function(params: any) {
           if (params.dataType === 'edge') {
             return `${params.data.source} → ${params.data.target}<br/>Transitions: ${params.data.value}`;
           }
@@ -582,11 +589,11 @@
   function getHeatmapOption() {
     const hours = Array.from({length: 24}, (_, i) => i);
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
-    const data = [];
-    
+    const data: any[] = [];
+
     apps.forEach((app, appIndex) => {
       hours.forEach(hour => {
-        const usage = researchData.temporalUsage[hour]?.apps.find(a => a.app === app)?.usage || 0;
+        const usage = researchData.temporalUsage[hour]?.apps.find((a: any) => a.app === app)?.usage || 0;
         data.push([hour, appIndex, Math.round(usage)]);
       });
     });
@@ -599,7 +606,7 @@
       },
       tooltip: {
         position: 'top',
-        formatter: function(params) {
+        formatter: function(params: any) {
           return `${apps[params.data[1]]} at ${params.data[0]}:00<br/>Usage: ${params.data[2]} minutes`;
         }
       },
@@ -654,7 +661,7 @@
     const totalUsage = researchData.temporalUsage.reduce((sum, h) => sum + h.totalUsage, 0);
     const peakHour = researchData.temporalUsage.reduce((max, h) => h.totalUsage > max.totalUsage ? h : max);
     const avgSessionLength = researchData.attentionSpans.reduce((sum, app) => {
-      return sum + app.sessions.reduce((s, session) => s + session.duration, 0) / app.sessions.length;
+      return sum + app.sessions.reduce((s: any, session: any) => s + session.duration, 0) / app.sessions.length;
     }, 0) / researchData.attentionSpans.length;
 
     behavioralMetrics = {

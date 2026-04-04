@@ -162,9 +162,9 @@
   let minEngagement = 0;
 
   // Charts
-  let trendChart = null;
-  let engagementChart = null;
-  let reachChart = null;
+  let trendChart: any = null;
+  let engagementChart: any = null;
+  let reachChart: any = null;
 
   // Filtered hashtags
   $: filteredHashtags = trendingHashtags.filter(hashtag => {
@@ -176,7 +176,7 @@
   });
 
   function getSentimentColor(sentiment: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'positive': 'bg-blue-100 text-blue-800',
       'negative': 'bg-red-100 text-red-800',
       'neutral': 'bg-gray-100 text-gray-800',
@@ -186,7 +186,7 @@
   }
 
   function getTrendIcon(trend: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'up': '📈',
       'down': '📉',
       'stable': '➡️'
@@ -195,7 +195,7 @@
   }
 
   function getTrendColor(trend: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'up': 'text-blue-600',
       'down': 'text-red-600',
       'stable': 'text-gray-600'
@@ -204,7 +204,7 @@
   }
 
   function getPlatformIcon(platform: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'twitter': '🐦',
       'facebook': '📘',
       'instagram': '📷',

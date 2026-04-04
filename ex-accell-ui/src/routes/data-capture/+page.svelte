@@ -58,7 +58,7 @@
   }
 
   // Load job states for a specific job (for real-time updates)
-  async function refreshJobState(jobId) {
+  async function refreshJobState(jobId: any) {
     try {
       const response = await fetch(`/api/job-state?jobId=${jobId}`);
       if (response.ok) {
@@ -357,7 +357,7 @@
   let showEditModal = false;
   
   // Delete functionality state
-  let jobToDelete = null;
+  let jobToDelete: any = null;
   let showDeleteConfirmation = false;
   
   // Error modal state
@@ -406,7 +406,7 @@
   }
   
   // Global job monitoring
-  let globalJobPollingInterval = null;
+  let globalJobPollingInterval: any = null;
   let isGlobalPollingActive = false;
   
   // Crawl jobs loaded from state store
@@ -600,7 +600,7 @@
   
   let princetonSmartStatus = 'idle'; // idle, connecting, fetching, completed, error
   let princetonSmartProgress = 0;
-  let princetonSmartResults = null;
+  let princetonSmartResults: any = null;
 
   // WavePulse configuration state
   let wavePulseConfig = {
@@ -662,14 +662,14 @@
   
   let wavePulseStatus = 'idle'; // idle, starting, running, stopping, error
   let wavePulseProgress = 0;
-  let wavePulseResults = null;
+  let wavePulseResults: any = null;
 
   // Log viewer state
   let showLogViewer = false;
-  let currentLogJob = null;
-  let logUpdateInterval = null;
-  let logContainer = null;
-  let logScrollAnchor = null;
+  let currentLogJob: any = null;
+  let logUpdateInterval: any = null;
+  let logContainer: any = null;
+  let logScrollAnchor: any = null;
   
   // Princeton SMART functions
   function resetPrincetonSmartForm() {
@@ -1239,7 +1239,7 @@
             // If we have an object but can't find message, stringify for debugging
             console.log('No message field found, full error data:', JSON.stringify(errorData, null, 2));
           }
-        } catch (jsonError) {
+        } catch (jsonError: any) {
           console.log('Failed to parse JSON, trying text response:', jsonError.message);
           // If we can't parse JSON, try to get text response
           try {
@@ -1250,12 +1250,12 @@
             if (errorText.trim()) {
               errorMessage = errorText;
             }
-          } catch (textError) {
+          } catch (textError: any) {
             console.log('Failed to get text response:', textError.message);
             errorMessage = `Failed to submit job: ${response.status} ${response.statusText}`;
           }
         }
-        
+
         console.log('Final error message being thrown:', errorMessage);
         throw new Error(errorMessage);
       }
@@ -1264,22 +1264,22 @@
       console.log('Job submitted successfully:', result);
 
       // Update job status to indicate submission succeeded
-      crawlJobs = crawlJobs.map(j => 
-        j.id === jobId 
+      crawlJobs = crawlJobs.map(j =>
+        j.id === jobId
           ? { ...j, status: 'running', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Job execution started via Run Now`] }
           : j
       );
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run job:', error);
-      
+
       // Show error modal instead of alert
       errorModalMessage = error.message;
       showErrorModal = true;
-      
+
       // Revert status on error
-      crawlJobs = crawlJobs.map(j => 
-        j.id === jobId 
+      crawlJobs = crawlJobs.map(j =>
+        j.id === jobId
           ? { ...j, status: 'scheduled', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Failed to start execution: ${error.message}`] }
           : j
       );
@@ -1322,7 +1322,7 @@
     return new Date(dateString).toLocaleString();
   }
 
-  function openLogViewer(job) {
+  function openLogViewer(job: any) {
     currentLogJob = job;
     showLogViewer = true;
     
@@ -1353,7 +1353,7 @@
   }
 
   // Real-time log update functions
-  function startRealTimeLogUpdates(jobId) {
+  function startRealTimeLogUpdates(jobId: any) {
     if (logUpdateInterval) {
       clearInterval(logUpdateInterval);
     }
@@ -2876,8 +2876,8 @@
                   Loading jobs...
                 </div>
               {:else}
-                <button 
-                  on:click={loadJobStates}
+                <button
+                  on:click={() => loadJobStates()}
                   class="flex items-center text-sm text-blue-600 hover:text-blue-800"
                 >
                   <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3669,7 +3669,7 @@
                       {/if}
                       {#if job.status === 'running'}
                         <button 
-                          on:click={() => viewLogs(job)}
+                          on:click={() => openLogViewer(job)}
                           class="text-green-600 hover:text-green-900 transition-colors">
                           Logs
                         </button>

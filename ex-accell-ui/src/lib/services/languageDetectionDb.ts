@@ -307,7 +307,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [data],
       () => this.calculateDetectionStats(data),
-      this.getDefaultDetectionStats()
+      [this.getDefaultDetectionStats()]
     )[0];
   }
 

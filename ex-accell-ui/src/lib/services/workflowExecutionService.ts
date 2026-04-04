@@ -2,15 +2,6 @@
 // Handles publishing, running, and monitoring workflows within the webapp
 // Integrates with Dapr workflow runtime and unified database
 
-/**
- * Helper function to safely extract error messages
- */
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return getErrorMessage(error);
-  }
-  return String(error);
-}
 import { unifiedDb } from './duckdb';
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
 import { databaseInit } from './databaseInit';
@@ -20,7 +11,7 @@ import { databaseInit } from './databaseInit';
  */
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return getErrorMessage(error);
+    return error.message;
   }
   return String(error);
 }
@@ -259,7 +250,7 @@ class WorkflowExecutionService {
         generatedCode: JSON.parse(row.generated_code),
         tags: JSON.parse(row.tags),
         metadata: JSON.parse(row.metadata)
-      }));
+      })) as PublishedWorkflow[];
     } catch (error) {
       console.error('Error getting published workflows:', error);
       return [];
@@ -286,7 +277,7 @@ class WorkflowExecutionService {
         generatedCode: JSON.parse(row.generated_code),
         tags: JSON.parse(row.tags),
         metadata: JSON.parse(row.metadata)
-      };
+      } as PublishedWorkflow;
     } catch (error) {
       console.error('Error getting workflow:', error);
       return null;
@@ -332,7 +323,7 @@ class WorkflowExecutionService {
         output: row.output ? JSON.parse(row.output) : undefined,
         logs: JSON.parse(row.logs || '[]'),
         metadata: JSON.parse(row.metadata)
-      }));
+      })) as WorkflowExecution[];
     } catch (error) {
       console.error('Error getting workflow executions:', error);
       return [];
@@ -439,7 +430,7 @@ class WorkflowExecutionService {
     // This simulates workflow execution for demo purposes
     // In production, this would interface with the actual Dapr workflow runtime
     
-    const steps = workflow.definition.steps.filter(s => s.type !== 'dataset_input' && s.type !== 'dataset_output');
+    const steps = workflow.definition.steps.filter((s: any) => s.type !== 'dataset_input' && s.type !== 'dataset_output');
     const totalSteps = steps.length;
     
     for (let i = 0; i < totalSteps; i++) {
@@ -531,7 +522,7 @@ class WorkflowExecutionService {
     const steps = workflowDefinition.steps;
     let estimatedSeconds = 0;
     
-    steps.forEach(step => {
+    steps.forEach((step: any) => {
       switch (step.type) {
         case 'dataset_input':
         case 'dataset_output':

@@ -1,31 +1,26 @@
-FROM node:18-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 RUN npm ci
 
-# Copy source code
 COPY . .
-
-# Build the application
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine AS runner
+# Prune dev dependencies
+RUN npm ci --omit=dev
+
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install serve for production
-RUN npm install -g serve
-
-# Copy built application
 COPY --from=builder /app/build ./build
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
-# Expose the port that SvelteKit will run on
 EXPOSE 3000
+ENV PORT=3000
+ENV HOST=0.0.0.0
 
-# Start the application
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["node", "build"]

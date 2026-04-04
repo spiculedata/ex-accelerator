@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       success: true,
       execution
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error executing workflow:', err);
     return error(500, `Failed to execute workflow: ${err.message}`);
   }

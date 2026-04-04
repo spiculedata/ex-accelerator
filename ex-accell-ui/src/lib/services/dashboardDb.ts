@@ -43,7 +43,7 @@ class DashboardDatabase extends BaseDatabaseService {
     return this.safeTransform(
       [data],
       () => this.calculateDashboardStats(data),
-      this.getDefaultDashboardStats()
+      [this.getDefaultDashboardStats()]
     )[0];
   }
 

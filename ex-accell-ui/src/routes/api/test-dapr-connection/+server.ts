@@ -55,7 +55,7 @@ export const GET: RequestHandler = async () => {
           if (response.ok) {
             console.log(`✓ Dapr sidecar found at ${endpoint}`);
           }
-        } catch (fetchError) {
+        } catch (fetchError: any) {
           results.tests.push({
             endpoint,
             error: fetchError.message,

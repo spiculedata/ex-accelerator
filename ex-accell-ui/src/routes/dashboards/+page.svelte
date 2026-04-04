@@ -48,7 +48,8 @@
         loadDashboardData();
       }, refreshInterval * 1000);
 
-      return () => clearInterval(interval);
+      // Return cleanup function (assigned to avoid TypeScript async return type mismatch)
+      return (() => clearInterval(interval)) as any;
     }
   });
 
@@ -145,17 +146,17 @@
   let refreshInterval = 30; // seconds
 
   // Chart variables
-  let sentimentChart = null;
-  let sourceChart = null;
-  let activityChart = null;
-  let topicsChart = null;
+  let sentimentChart: any = null;
+  let sourceChart: any = null;
+  let activityChart: any = null;
+  let topicsChart: any = null;
 
   function formatTimestamp(timestamp: string) {
     return new Date(timestamp).toLocaleString();
   }
 
   function getStatusColor(status: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'active': 'bg-blue-100 text-blue-800',
       'paused': 'bg-yellow-100 text-yellow-800',
       'error': 'bg-red-100 text-red-800',
@@ -167,7 +168,7 @@
   }
 
   function getStatusIcon(status: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'active': '🟢',
       'paused': '🟡',
       'error': '🔴',
@@ -179,7 +180,7 @@
   }
 
   function getTrendIcon(trend: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'up': '📈',
       'down': '📉',
       'stable': '➡️'
@@ -292,7 +293,7 @@
         type: 'value',
         name: 'Posts (K)',
         axisLabel: {
-          formatter: function(value) {
+          formatter: function(value: any) {
             return (value / 1000).toFixed(0) + 'K';
           }
         }
@@ -382,12 +383,12 @@
       },
       yAxis: {
         type: 'category',
-        data: textAnalytics.topTopics.map(t => t.topic),
+        data: textAnalytics.topTopics.map((t: any) => t.topic),
         axisLabel: { fontSize: 10 }
       },
       series: [{
         type: 'bar',
-        data: textAnalytics.topTopics.map(t => ({
+        data: textAnalytics.topTopics.map((t: any) => ({
           value: t.posts,
           itemStyle: {
             color: t.trend === 'up' ? '#06d6a0' : t.trend === 'down' ? '#f72585' : '#8b5cf6'

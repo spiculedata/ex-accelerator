@@ -19,7 +19,7 @@
   });
 
   // Engagement analysis data - loaded from database
-  let engagementStats = {};
+  let engagementStats: any = {};
   let platformEngagement: any[] = [];
   let contentTypes: any[] = [];
   let engagementTrends: any[] = [];
@@ -117,9 +117,9 @@
   let minEngagementRate = 0;
 
   // Charts
-  let platformChart = null;
-  let contentChart = null;
-  let trendsChart = null;
+  let platformChart: any = null;
+  let contentChart: any = null;
+  let trendsChart: any = null;
 
   // Filtered data
   $: filteredPlatforms = platformEngagement.filter(platform => {
@@ -133,7 +133,7 @@
   });
 
   function getPlatformIcon(platform: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'Instagram': '📷',
       'TikTok': '🎵',
       'Twitter': '🐦',
@@ -145,7 +145,7 @@
   }
 
   function getContentTypeIcon(type: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'Video': '🎥',
       'Image': '🖼️',
       'Carousel': '🎠',

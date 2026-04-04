@@ -21,7 +21,7 @@
   // Language detection data - loaded from database
   let languageStats: any[] = [];
   let languageAnalysis: any[] = [];
-  let detectionStats = {};
+  let detectionStats: any = {};
   let samplePosts: any[] = [];
   let mixingData: any[] = [];
   let geographicData: any[] = [];
@@ -129,7 +129,7 @@
       const exportData = await languageDetectionDb.exportLanguageData(filters);
       
       // Create CSV from the exported data
-      const csvData = exportData.languages.map(lang => 
+      const csvData = (exportData as any).languages.map((lang: any) =>
         `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
       ).join('\n');
       

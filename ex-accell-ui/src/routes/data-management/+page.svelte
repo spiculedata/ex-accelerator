@@ -163,11 +163,11 @@
     lastCaptureUpdate: '2025-01-27T15:30:00Z'
   };
 
-  let selectedDataset = null;
-  let selectedWorkflow = null;
+  let selectedDataset: any = null;
+  let selectedWorkflow: any = null;
 
   function getStatusColor(status: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'connected': 'bg-blue-100 text-blue-800',
       'paused': 'bg-yellow-100 text-yellow-800',
       'disconnected': 'bg-gray-100 text-gray-800',
@@ -182,7 +182,7 @@
   }
 
   function getStatusIcon(status: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'connected': '🟢',
       'paused': '🟡', 
       'disconnected': '⚫',
@@ -210,12 +210,12 @@
     });
   }
 
-  function createWorkflowFromDataset(dataset) {
+  function createWorkflowFromDataset(dataset: any) {
     selectedDataset = dataset;
     window.location.href = `/data-management/workflow-builder?dataset=${dataset.id}`;
   }
 
-  function editWorkflow(workflow) {
+  function editWorkflow(workflow: any) {
     window.location.href = `/data-management/workflow-builder?workflow=${workflow.id}`;
   }
 </script>

@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request }) => {
       urlDetected: /url\d+/i
     };
     
-    const results = {
+    const results: { line: any; matches: Record<string, boolean>; action: string | null; updatedJob?: string; error?: string } = {
       line: logLine,
       matches: {},
       action: null

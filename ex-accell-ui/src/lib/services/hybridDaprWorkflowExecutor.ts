@@ -569,7 +569,7 @@ export class HybridDaprWorkflowExecutor {
             message: `Workflow status: ${status.runtimeStatus} (attempt ${attempts + 1})`
           });
 
-          if (status.runtimeStatus === WorkflowRuntimeStatus.COMPLETED) {
+          if ((status.runtimeStatus as string) === (WorkflowRuntimeStatus.COMPLETED as unknown as string)) {
             execution.status = 'completed';
             execution.completedAt = new Date().toISOString();
             const statusData = status as any; // Type assertion for workflow output access
@@ -587,10 +587,10 @@ export class HybridDaprWorkflowExecutor {
             });
 
             break;
-          } else if (status.runtimeStatus === WorkflowRuntimeStatus.FAILED) {
+          } else if ((status.runtimeStatus as string) === (WorkflowRuntimeStatus.FAILED as unknown as string)) {
             const statusData = status as any;
             throw new Error(`Workflow failed: ${statusData.output || 'Unknown error'}`);
-          } else if (status.runtimeStatus === WorkflowRuntimeStatus.TERMINATED) {
+          } else if ((status.runtimeStatus as string) === (WorkflowRuntimeStatus.TERMINATED as unknown as string)) {
             throw new Error('Workflow was terminated');
           }
 

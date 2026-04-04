@@ -83,7 +83,7 @@
   }
 
   function getTrendIcon(trend: string) {
-    const icons = {
+    const icons: Record<string, string> = {
       'up': 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
       'down': 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6',
       'stable': 'M20 12H4'
@@ -92,7 +92,7 @@
   }
 
   function getTrendColor(trend: string) {
-    const colors = {
+    const colors: Record<string, string> = {
       'up': 'text-green-600',
       'down': 'text-red-600',
       'stable': 'text-gray-500'

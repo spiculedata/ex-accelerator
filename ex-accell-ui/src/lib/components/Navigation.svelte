@@ -3,10 +3,29 @@
   import { onMount } from 'svelte';
   import { currentProject, setCurrentProject, loadCurrentProject, clearCurrentProject } from '$lib/stores/projectStore';
 
+  interface DropdownItem {
+    name: string;
+    href: string;
+    requiresProject: boolean;
+    requiresWorkspace?: boolean;
+    useWorkspace?: boolean;
+    requiresDataType?: string;
+  }
+
+  interface NavItem {
+    name: string;
+    href: string;
+    current: boolean;
+    requiresProject: boolean;
+    requiresDataType?: string;
+    hasDropdown?: boolean;
+    dropdownItems?: DropdownItem[];
+  }
+
   let mobileMenuOpen = false;
   let projectSwitcherOpen = false;
   let workspaceSwitcherOpen = false;
-  let openDropdowns = {}; // Track which dropdowns are open
+  let openDropdowns: Record<string, boolean> = {}; // Track which dropdowns are open
   let availableProjects: any[] = [];
   let availableWorkspaces: any[] = [];
   let currentWorkspace: any = null;
@@ -170,7 +189,7 @@
     return count.toString();
   }
   
-  const navigationItems = [
+  const navigationItems: NavItem[] = [
     { name: 'Home', href: '/', current: false, requiresProject: false },
     {
       name: 'Dashboards',
@@ -507,14 +526,14 @@
                 
                 {#if openDropdowns[item.name]}
                   <div class="absolute top-full left-0 mt-1 w-64 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
-                    {#each item.dropdownItems as dropdownItem}
+                    {#each (item.dropdownItems ?? []) as dropdownItem}
                       <a
                         href={dropdownItem.href}
                         on:click={(e) => navigateToApp(dropdownItem, e)}
                         class="block px-4 py-2 text-sm transition-colors duration-200 {
                           (dropdownItem.requiresProject && !$currentProject) ||
-                          (dropdownItem.requiresWorkspace && !currentWorkspace) ||
-                          (dropdownItem.requiresDataType && !hasRequiredData(dropdownItem))
+                          (dropdownItem?.requiresWorkspace && !currentWorkspace) ||
+                          (dropdownItem?.requiresDataType && !hasRequiredData(dropdownItem))
                           ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                           : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                         }"
@@ -523,16 +542,16 @@
                         <div class="flex items-center justify-between">
                           <span>{dropdownItem.name}</span>
                           <div class="flex items-center space-x-1">
-                            {#if dropdownItem.requiresDataType && currentWorkspace}
+                            {#if dropdownItem?.requiresDataType && currentWorkspace}
                               <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-amber-500'}">
                                 {getDataAvailabilityIcon(dropdownItem)}
                               </span>
                             {/if}
-                            {#if dropdownItem.useWorkspace && currentWorkspace}
+                            {#if dropdownItem?.useWorkspace && currentWorkspace}
                               <span class="text-xs text-emerald-600 font-medium">
                                 {currentWorkspace.name.substring(0, 12)}{currentWorkspace.name.length > 12 ? '...' : ''}
                               </span>
-                            {:else if dropdownItem.requiresWorkspace && !currentWorkspace}
+                            {:else if dropdownItem?.requiresWorkspace && !currentWorkspace}
                               <span class="ml-1 text-xs text-amber-500">↻</span>
                             {:else if dropdownItem.requiresProject && !$currentProject}
                               <span class="ml-1 text-xs text-gray-400">*</span>
@@ -551,13 +570,13 @@
                 on:click={(e) => navigateToApp(item, e)}
                 class="flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 {item.current
                   ? 'bg-blue-100 text-blue-700'
-                  : (item.requiresProject && !$currentProject) || (item.requiresDataType && !hasRequiredData(item))
+                  : (item.requiresProject && !$currentProject) || (item?.requiresDataType && !hasRequiredData(item))
                     ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                 title={getDataAvailabilityTooltip(item)}
               >
                 <span>{item.name}</span>
-                {#if item.requiresDataType && currentWorkspace}
+                {#if item?.requiresDataType && currentWorkspace}
                   <span class="ml-1 text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-amber-500'}">
                     {getDataAvailabilityIcon(item)}
                   </span>
@@ -643,7 +662,7 @@
               
               {#if openDropdowns[item.name]}
                 <div class="pl-6 space-y-1">
-                  {#each item.dropdownItems as dropdownItem}
+                  {#each (item.dropdownItems ?? []) as dropdownItem}
                     <a
                       href={dropdownItem.href}
                       on:click={(e) => {
@@ -653,20 +672,20 @@
                       }}
                       class="flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {
                         (dropdownItem.requiresProject && !$currentProject) ||
-                        (dropdownItem.requiresWorkspace && !currentWorkspace) ||
-                        (dropdownItem.requiresDataType && !hasRequiredData(dropdownItem))
+                        (dropdownItem?.requiresWorkspace && !currentWorkspace) ||
+                        (dropdownItem?.requiresDataType && !hasRequiredData(dropdownItem))
                         ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                       title={getDataAvailabilityTooltip(dropdownItem)}
                     >
                       <span>{dropdownItem.name}</span>
                       <div class="flex items-center space-x-1">
-                        {#if dropdownItem.requiresDataType && currentWorkspace}
+                        {#if dropdownItem?.requiresDataType && currentWorkspace}
                           <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-amber-500'}">
                             {getDataAvailabilityIcon(dropdownItem)}
                           </span>
                         {/if}
-                        {#if dropdownItem.requiresWorkspace && !currentWorkspace}
+                        {#if dropdownItem?.requiresWorkspace && !currentWorkspace}
                           <span class="text-xs text-amber-500">↻</span>
                         {:else if dropdownItem.requiresProject && !$currentProject}
                           <span class="text-xs text-gray-400">*</span>
@@ -687,14 +706,14 @@
               }}
               class="flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current
                 ? 'bg-blue-100 text-blue-700'
-                : (item.requiresProject && !$currentProject) || (item.requiresDataType && !hasRequiredData(item))
+                : (item.requiresProject && !$currentProject) || (item?.requiresDataType && !hasRequiredData(item))
                   ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
               title={getDataAvailabilityTooltip(item)}
             >
               <span>{item.name}</span>
               <div class="flex items-center space-x-1">
-                {#if item.requiresDataType && currentWorkspace}
+                {#if item?.requiresDataType && currentWorkspace}
                   <span class="text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-amber-500'}">
                     {getDataAvailabilityIcon(item)}
                   </span>

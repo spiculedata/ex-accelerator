@@ -43,6 +43,7 @@ gdelt_pipeline.log
 pg_duckdb/
 *.txt
 !requirements.txt
+!requirements-etl.txt
 
 # Temporary files
 *.tmp
