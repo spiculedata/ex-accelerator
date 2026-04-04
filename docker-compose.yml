@@ -1,0 +1,128 @@
+services:
+
+  # ─── Database ────────────────────────────────────────────────────────────────
+  postgres:
+    image: pgduckdb/pgduckdb:17-main
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-analytics}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis (Dapr state store + pub/sub) ──────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Dapr placement service ───────────────────────────────────────────────────
+  dapr-placement:
+    image: daprio/dapr:1.14.4
+    command: ["./placement", "-port", "50006", "-log-level", "warn"]
+    ports:
+      - "50006:50006"
+    restart: unless-stopped
+
+  # ─── SvelteKit UI ─────────────────────────────────────────────────────────────
+  ui:
+    image: ${REGISTRY:-local}/ex-accell-ui:${TAG:-latest}
+    build:
+      context: ./ex-accell-ui
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
+      DAPR_HTTP_PORT: "3500"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Dapr sidecar for UI — shares network namespace with ui container
+  ui-dapr:
+    image: daprio/daprd:1.14.4
+    command: [
+      "./daprd",
+      "--app-id", "ex-accell-ui",
+      "--app-port", "3000",
+      "--dapr-http-port", "3500",
+      "--dapr-grpc-port", "50001",
+      "--placement-host-address", "dapr-placement:50006",
+      "--resources-path", "/components",
+      "--log-level", "warn"
+    ]
+    volumes:
+      - ./deploy/components:/components:ro
+    network_mode: "service:ui"
+    depends_on:
+      - ui
+      - dapr-placement
+      - redis
+    restart: unless-stopped
+
+  # ─── ETL ──────────────────────────────────────────────────────────────────────
+  etl:
+    image: ${REGISTRY:-local}/etl:${TAG:-latest}
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - etl  # only starts when: docker compose --profile etl up
+    restart: "no"
+
+  # ─── Telegram scraper (external image — built from its own repo) ───────────────
+  # telegram-scraper:
+  #   image: ${REGISTRY}/telegram-scraper:${TAG:-latest}
+  #   environment:
+  #     DAPR_GRPC_PORT: "6481"
+  #   depends_on:
+  #     - dapr-placement
+  #     - redis
+  #   restart: unless-stopped
+  #
+  # telegram-scraper-dapr:
+  #   image: daprio/daprd:1.14.4
+  #   command: [
+  #     "./daprd",
+  #     "--app-id", "telegram-scraper",
+  #     "--app-port", "6481",
+  #     "--app-protocol", "grpc",
+  #     "--dapr-http-port", "3502",
+  #     "--dapr-grpc-port", "50002",
+  #     "--placement-host-address", "dapr-placement:50006",
+  #     "--resources-path", "/components"
+  #   ]
+  #   volumes:
+  #     - ./deploy/components:/components:ro
+  #   network_mode: "service:telegram-scraper"
+  #   depends_on:
+  #     - telegram-scraper
+
+volumes:
+  pgdata:
+  redisdata:
