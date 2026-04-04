@@ -407,7 +407,7 @@
       name: app.app,
       value: [
         app.meanDuration,
-        app.sessions.reduce((sum, s) => sum + s.duration, 0) / app.sessions.length,
+        app.sessions.reduce((sum: any, s: any) => sum + s.duration, 0) / app.sessions.length,
         app.sessions.length,
         app.app
       ]
@@ -420,7 +420,7 @@
         textStyle: { fontSize: 18, fontWeight: 'bold' }
       },
       tooltip: {
-        formatter: function(params) {
+        formatter: function(params: any) {
           return `${params.data.value[3]}<br/>
                   Mean Duration: ${params.data.value[0].toFixed(1)}s<br/>
                   Actual Avg: ${params.data.value[1].toFixed(1)}s<br/>
@@ -439,11 +439,11 @@
       },
       series: [{
         type: 'scatter',
-        symbolSize: function(data) {
+        symbolSize: function(data: any) {
           return Math.sqrt(data[2]) * 3;
         },
         itemStyle: {
-          color: function(params) {
+          color: function(params: any) {
             const ratio = params.data.value[1] / params.data.value[0];
             return ratio > 1.2 ? '#52c41a' : ratio < 0.8 ? '#ff4d4f' : '#1890ff';
           },
@@ -551,7 +551,7 @@
       tooltip: {
         trigger: 'item',
         triggerOn: 'mousemove',
-        formatter: function(params) {
+        formatter: function(params: any) {
           if (params.dataType === 'edge') {
             return `${params.data.source} → ${params.data.target}<br/>Transitions: ${params.data.value}`;
           }
@@ -589,11 +589,11 @@
   function getHeatmapOption() {
     const hours = Array.from({length: 24}, (_, i) => i);
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
-    const data = [];
-    
+    const data: any[] = [];
+
     apps.forEach((app, appIndex) => {
       hours.forEach(hour => {
-        const usage = researchData.temporalUsage[hour]?.apps.find(a => a.app === app)?.usage || 0;
+        const usage = researchData.temporalUsage[hour]?.apps.find((a: any) => a.app === app)?.usage || 0;
         data.push([hour, appIndex, Math.round(usage)]);
       });
     });
@@ -606,7 +606,7 @@
       },
       tooltip: {
         position: 'top',
-        formatter: function(params) {
+        formatter: function(params: any) {
           return `${apps[params.data[1]]} at ${params.data[0]}:00<br/>Usage: ${params.data[2]} minutes`;
         }
       },
@@ -661,7 +661,7 @@
     const totalUsage = researchData.temporalUsage.reduce((sum, h) => sum + h.totalUsage, 0);
     const peakHour = researchData.temporalUsage.reduce((max, h) => h.totalUsage > max.totalUsage ? h : max);
     const avgSessionLength = researchData.attentionSpans.reduce((sum, app) => {
-      return sum + app.sessions.reduce((s, session) => s + session.duration, 0) / app.sessions.length;
+      return sum + app.sessions.reduce((s: any, session: any) => s + session.duration, 0) / app.sessions.length;
     }, 0) / researchData.attentionSpans.length;
 
     behavioralMetrics = {

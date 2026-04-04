@@ -19,7 +19,7 @@
   });
 
   // Comprehensive sentiment analysis data - loaded from database
-  let sentimentStats = {
+  let sentimentStats: any = {
     positive: { count: 0, percentage: 0, confidence: 0 },
     negative: { count: 0, percentage: 0, confidence: 0 },
     neutral: { count: 0, percentage: 0, confidence: 0 }

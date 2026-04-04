@@ -177,7 +177,7 @@
     // Calculate top apps by usage time
     const appUsage: Record<string, number> = {};
     appSegmentData.forEach(segment => {
-      const appName = getAppDisplayName(segment.apk);
+      const appName = getAppDisplayName(segment.apk) ?? segment.apk;
       appUsage[appName] = (appUsage[appName] || 0) + segment.duration_segment_ms;
     });
 

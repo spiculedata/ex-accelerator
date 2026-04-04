@@ -1239,7 +1239,7 @@
             // If we have an object but can't find message, stringify for debugging
             console.log('No message field found, full error data:', JSON.stringify(errorData, null, 2));
           }
-        } catch (jsonError) {
+        } catch (jsonError: any) {
           console.log('Failed to parse JSON, trying text response:', jsonError.message);
           // If we can't parse JSON, try to get text response
           try {
@@ -1250,12 +1250,12 @@
             if (errorText.trim()) {
               errorMessage = errorText;
             }
-          } catch (textError) {
+          } catch (textError: any) {
             console.log('Failed to get text response:', textError.message);
             errorMessage = `Failed to submit job: ${response.status} ${response.statusText}`;
           }
         }
-        
+
         console.log('Final error message being thrown:', errorMessage);
         throw new Error(errorMessage);
       }
@@ -1264,22 +1264,22 @@
       console.log('Job submitted successfully:', result);
 
       // Update job status to indicate submission succeeded
-      crawlJobs = crawlJobs.map(j => 
-        j.id === jobId 
+      crawlJobs = crawlJobs.map(j =>
+        j.id === jobId
           ? { ...j, status: 'running', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Job execution started via Run Now`] }
           : j
       );
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run job:', error);
-      
+
       // Show error modal instead of alert
       errorModalMessage = error.message;
       showErrorModal = true;
-      
+
       // Revert status on error
-      crawlJobs = crawlJobs.map(j => 
-        j.id === jobId 
+      crawlJobs = crawlJobs.map(j =>
+        j.id === jobId
           ? { ...j, status: 'scheduled', executionLog: [...(j.executionLog || []), `${new Date().toISOString()}: Failed to start execution: ${error.message}`] }
           : j
       );
@@ -3669,7 +3669,7 @@
                       {/if}
                       {#if job.status === 'running'}
                         <button 
-                          on:click={() => viewLogs(job)}
+                          on:click={() => openLogViewer(job)}
                           class="text-green-600 hover:text-green-900 transition-colors">
                           Logs
                         </button>
