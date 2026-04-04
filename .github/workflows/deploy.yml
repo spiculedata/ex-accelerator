@@ -68,8 +68,10 @@ jobs:
             set -e
             cd /opt/ex-accelerator
 
-            # Pull latest compose file and deploy configs
-            git pull origin main
+            # Pull latest compose file and deploy configs from the deployed branch
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
 
             # Log in to Scaleway registry
             echo "${{ secrets.SCW_SECRET_KEY }}" | \
