@@ -427,53 +427,57 @@ class WorkflowExecutionService {
   }
 
   private async simulateWorkflowExecution(execution: WorkflowExecution, workflow: PublishedWorkflow): Promise<void> {
-    // This simulates workflow execution for demo purposes
-    // In production, this would interface with the actual Dapr workflow runtime
-    
+    // NOTE: This is a simulation of workflow execution.
+    // Production integration would use the Dapr workflow runtime via registerWorkflowWithDapr().
+    // The simulation walks through each step with realistic timing to demonstrate the UI.
+
     const steps = workflow.definition.steps.filter((s: any) => s.type !== 'dataset_input' && s.type !== 'dataset_output');
     const totalSteps = steps.length;
-    
+
+    execution.logs.push({
+      timestamp: new Date().toISOString(),
+      level: 'warn',
+      message: 'Running in simulation mode — Dapr workflow runtime not connected'
+    });
+
     for (let i = 0; i < totalSteps; i++) {
       const step = steps[i];
-      
-      // Update progress
+
       execution.currentStep = step.name;
       execution.progress = Math.round(((i + 1) / totalSteps) * 100);
-      
-      // Add log entry
+
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'info',
-        message: `Executing step: ${step.name}`,
+        message: `[Simulated] Executing step: ${step.name}`,
         stepId: step.id,
         stepName: step.name
       });
-      
+
       await this.saveWorkflowExecution(execution);
-      
-      // Simulate processing time (deterministic per step based on index)
+
+      // Step processing delay (deterministic per step)
       await new Promise(resolve => setTimeout(resolve, 1500 + (i % 3) * 500));
     }
-    
-    // Complete execution
+
     execution.status = 'completed';
     execution.progress = 100;
     execution.currentStep = 'Completed';
     execution.completedAt = new Date().toISOString();
     execution.duration = new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime();
     execution.output = {
-      processedRecords: totalSteps * 500,
-      resultDataset: `result_${execution.id}`,
-      summary: `Workflow ${workflow.name} completed successfully`
+      mode: 'simulation',
+      steps_executed: totalSteps,
+      summary: `[Simulated] Workflow "${workflow.name}" completed ${totalSteps} steps in ${Math.round(execution.duration / 1000)}s`
     };
-    
+
     execution.logs.push({
       timestamp: new Date().toISOString(),
       level: 'info',
-      message: 'Workflow completed successfully',
+      message: `Workflow completed (simulation mode, ${totalSteps} steps)`,
       data: execution.output
     });
-    
+
     await this.saveWorkflowExecution(execution);
   }
 

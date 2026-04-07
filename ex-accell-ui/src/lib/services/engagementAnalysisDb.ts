@@ -309,32 +309,25 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
    */
   async getHashtagPerformance(limit: number = 20, workspaceId?: string): Promise<HashtagPerformance[]> {
     const data = await this.queryAPI<any>({
-      endpoint: 'platform-performance',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      endpoint: 'hashtag-analysis',
+      params: {
+        limit: String(limit),
+        ...(workspaceId ? { workspace_id: workspaceId } : {})
+      }
     });
 
-    if (!data || data.length === 0) {
+    const hashtags = data?.hashtags || [];
+    if (hashtags.length === 0) {
       return [];
     }
 
-    // TODO: Get actual hashtag data from database
-    const hashtags = [
-      '#social', '#media', '#content', '#engagement', '#marketing',
-      '#digital', '#brand', '#community', '#viral', '#trending',
-      '#analytics', '#growth', '#strategy', '#influence', '#reach',
-      '#impression', '#conversion', '#roi', '#kpi', '#metrics'
-    ];
-
-    return hashtags.slice(0, limit).map((hashtag, index) => {
-      const platformData = data[index % data.length] || { total_posts: 0, positive_ratio: 0.3 };
-      return {
-        hashtag,
-        usage_count: Math.floor(platformData.total_posts * (0.8 - index * 0.03)),
-        avg_boost: Math.round((1.2 + (index % 10) * 0.08) * 100) / 100,
-        avg_engagement_rate: Math.round((platformData.positive_ratio || 0.3) * 8 * 100) / 100,
-        impact_score: Math.round((platformData.positive_ratio || 0.3) * 10 * 100) / 100
-      };
-    });
+    return hashtags.map((h: any) => ({
+      hashtag: '#' + h.hashtag,
+      usage_count: parseInt(h.count) || 0,
+      avg_boost: 1.0,
+      avg_engagement_rate: parseInt(h.post_count) > 0 ? Math.round((parseInt(h.count) / parseInt(h.post_count)) * 100) / 100 : 0,
+      impact_score: Math.min(Math.round(Math.log2(parseInt(h.count) + 1) * 10) / 10, 10)
+    }));
   }
 
   /**

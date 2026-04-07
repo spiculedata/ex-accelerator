@@ -218,14 +218,19 @@ class TrigramsDatabase {
         { up: 0, stable: 0, down: 0 }
       );
 
-      // Mock top categories (would be calculated from actual data)
-      const topCategories = [
-        { category: 'Marketing & Social', percentage: 23 },
-        { category: 'Technology & AI', percentage: 19 },
-        { category: 'Business & Products', percentage: 16 },
-        { category: 'Environment & Climate', percentage: 12 },
-        { category: 'Other Topics', percentage: 30 }
-      ];
+      // Calculate category distribution from actual trigram data
+      const categoryMap: Record<string, number> = {};
+      trigramData.forEach(t => {
+        const cat = t.category || 'Uncategorized';
+        categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+      });
+      const topCategories = Object.entries(categoryMap)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([category, count]) => ({
+          category,
+          percentage: uniqueTrigrams > 0 ? Math.round((count / uniqueTrigrams) * 100) : 0
+        }));
 
       return {
         totalTrigrams,
@@ -260,39 +265,42 @@ class TrigramsDatabase {
         return;
       }
 
-      const sampleTrigrams = [
-        { trigram: 'social media marketing', frequency: 1247, sentiment: 0.72, platforms: '["twitter", "facebook"]', trend: 'up' },
-        { trigram: 'artificial intelligence technology', frequency: 892, sentiment: 0.65, platforms: '["twitter", "linkedin"]', trend: 'up' },
-        { trigram: 'climate change impact', frequency: 734, sentiment: -0.23, platforms: '["twitter", "instagram"]', trend: 'stable' },
-        { trigram: 'new product launch', frequency: 623, sentiment: 0.81, platforms: '["facebook", "instagram"]', trend: 'up' },
-        { trigram: 'customer service experience', frequency: 567, sentiment: -0.15, platforms: '["twitter", "facebook"]', trend: 'down' },
-        { trigram: 'machine learning algorithms', frequency: 489, sentiment: 0.58, platforms: '["linkedin", "twitter"]', trend: 'up' },
-        { trigram: 'data privacy concerns', frequency: 445, sentiment: -0.34, platforms: '["twitter", "linkedin"]', trend: 'stable' },
-        { trigram: 'mobile app development', frequency: 398, sentiment: 0.44, platforms: '["linkedin", "instagram"]', trend: 'up' },
-        { trigram: 'brand awareness campaign', frequency: 367, sentiment: 0.67, platforms: '["instagram", "facebook"]', trend: 'stable' },
-        { trigram: 'user experience design', frequency: 334, sentiment: 0.52, platforms: '["linkedin", "twitter"]', trend: 'up' },
-        { trigram: 'financial market analysis', frequency: 298, sentiment: 0.12, platforms: '["twitter", "linkedin"]', trend: 'down' },
-        { trigram: 'sustainable energy solutions', frequency: 276, sentiment: 0.78, platforms: '["linkedin", "facebook"]', trend: 'up' },
-        { trigram: 'remote work productivity', frequency: 245, sentiment: 0.34, platforms: '["linkedin", "twitter"]', trend: 'stable' },
-        { trigram: 'e commerce growth', frequency: 234, sentiment: 0.59, platforms: '["facebook", "instagram"]', trend: 'up' },
-        { trigram: 'digital transformation strategy', frequency: 212, sentiment: 0.43, platforms: '["linkedin", "twitter"]', trend: 'up' }
-      ];
+      // Extract real trigrams from social posts via the unified analytics API
+      // This generates trigrams from actual post content rather than hardcoded data
+      console.log('Seeding trigrams from real post data...');
 
-      for (const trigram of sampleTrigrams) {
-        await unifiedDb.query(`
-          INSERT INTO trigrams (trigram, frequency, sentiment, platforms, trend, average_engagement)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [
-          trigram.trigram,
-          trigram.frequency,
-          trigram.sentiment,
-          trigram.platforms,
-          trigram.trend,
-          Math.round(((trigram.frequency / 1247) * 4 + Math.abs(trigram.sentiment)) * 100) / 100 // Deterministic engagement derived from frequency and sentiment
-        ]);
+      try {
+        const response = await fetch('/api/unified-analytics?type=sample-posts&limit=500');
+        const result = await response.json();
+        if (result.success && result.data?.length > 0) {
+          const wordFreq: Record<string, number> = {};
+          for (const post of result.data) {
+            const text = (post.text || post.content || '').toLowerCase().replace(/[^a-z\s]/g, '');
+            const words = text.split(/\s+/).filter((w: string) => w.length > 3);
+            for (let i = 0; i < words.length - 2; i++) {
+              const trigram = `${words[i]} ${words[i+1]} ${words[i+2]}`;
+              wordFreq[trigram] = (wordFreq[trigram] || 0) + 1;
+            }
+          }
+
+          const topTrigrams = Object.entries(wordFreq)
+            .filter(([, count]) => count >= 2)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 30);
+
+          for (const [trigram, frequency] of topTrigrams) {
+            await unifiedDb.query(`
+              INSERT INTO trigrams (trigram, frequency, sentiment, platforms, trend, average_engagement)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `, [trigram, frequency, 0, '["bluesky"]', 'stable', 0]);
+          }
+          console.log(`Seeded ${topTrigrams.length} real trigrams from post data`);
+        } else {
+          console.log('No post data available for trigram extraction');
+        }
+      } catch {
+        console.log('Could not extract trigrams from posts — API not available during seed');
       }
-
-      console.log('Sample trigrams data seeded successfully');
     } catch (error) {
       console.error('Error seeding trigrams data:', error);
     }
