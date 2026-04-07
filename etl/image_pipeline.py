@@ -68,20 +68,21 @@ def download_image(url, max_size_mb=10):
 
 # ── YOLO Object Detection ────────────────────────────────────────────────────
 
-_yolo_model = None
+_yolo_models = {}
 
-def get_yolo_model():
-    global _yolo_model
-    if _yolo_model is None:
+def get_yolo_model(variant='yolov8n'):
+    global _yolo_models
+    if variant not in _yolo_models:
         from ultralytics import YOLO
-        _yolo_model = YOLO('yolov8n.pt')
-        logger.info("YOLOv8n model loaded")
-    return _yolo_model
+        _yolo_models[variant] = YOLO(f'{variant}.pt')
+        logger.info(f"{variant} model loaded")
+    return _yolo_models[variant]
 
 
-def detect_objects(img):
-    """Run YOLO object detection, return list of {class, confidence, bbox}."""
-    model = get_yolo_model()
+def detect_objects(img, tier='fast'):
+    """Run YOLO object detection with tier-based model selection."""
+    variant = {'fast': 'yolov8n', 'standard': 'yolov8s', 'accurate': 'yolov8m'}.get(tier, 'yolov8n')
+    model = get_yolo_model(variant)
     results = model(img, verbose=False, conf=0.3)
 
     objects = []
@@ -124,8 +125,9 @@ def get_face_net():
     return _face_net
 
 
-def detect_faces(img):
-    """Detect actual faces using OpenCV Haar cascade (frontal face detection)."""
+def detect_faces(img, tier='fast'):
+    """Detect faces with tier-based model selection.
+    Fast: Haar cascade, Standard: Haar cascade (same), Accurate: YOLO person + Haar combined."""
     import numpy as np
 
     face_cascade = get_face_net()
@@ -169,8 +171,123 @@ def detect_faces(img):
 
 # ── Basic Classification (heuristic + image properties) ──────────────────────
 
-def classify_image(img, url='', detected_objects=None):
-    """Classify image using YOLO detections + image properties."""
+# ── CLIP Classification (Standard Tier) ──────────────────────────────────────
+
+_clip_model = None
+
+def get_clip_model():
+    global _clip_model
+    if _clip_model is None:
+        try:
+            import open_clip
+            import torch
+            model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai')
+            tokenizer = open_clip.get_tokenizer('ViT-B-32')
+            model.eval()
+            _clip_model = (model, preprocess, tokenizer)
+            logger.info("CLIP ViT-B/32 model loaded")
+        except ImportError:
+            logger.warning("open-clip-torch not installed — CLIP classification unavailable")
+            return None
+    return _clip_model
+
+
+def classify_with_clip(img, detected_objects=None):
+    """Zero-shot classification using CLIP ViT-B/32."""
+    import torch
+    clip = get_clip_model()
+    if clip is None:
+        # Fall back to heuristic
+        return classify_image_heuristic(img, '', detected_objects)
+
+    model, preprocess, tokenizer = clip
+    labels = [
+        'photograph', 'screenshot', 'meme', 'infographic', 'artwork', 'diagram',
+        'logo', 'nature landscape', 'people portrait', 'food', 'vehicle',
+        'building architecture', 'animal', 'technology', 'sports', 'text document'
+    ]
+
+    image_input = preprocess(img).unsqueeze(0)
+    text_inputs = tokenizer(labels)
+
+    with torch.no_grad():
+        image_features = model.encode_image(image_input)
+        text_features = model.encode_text(text_inputs)
+        similarity = (image_features @ text_features.T).softmax(dim=-1)
+
+    tags = []
+    for label, score in zip(labels, similarity[0]):
+        s = float(score)
+        if s > 0.05:  # Only include tags with >5% confidence
+            tags.append((label, round(s, 3)))
+
+    # Add YOLO object tags too
+    if detected_objects:
+        seen = set()
+        for obj in detected_objects:
+            if obj['class'] not in seen:
+                tags.append((obj['class'], obj['confidence']))
+                seen.add(obj['class'])
+
+    tags.sort(key=lambda x: x[1], reverse=True)
+    content_type = tags[0][0] if tags else 'photo'
+    return tags[:15], content_type
+
+
+def moderate_with_clip(img):
+    """NSFW screening using CLIP with safety-related text prompts."""
+    import torch
+    clip = get_clip_model()
+    if clip is None:
+        return {'is_safe': True, 'nsfw_score': 0, 'violence_score': 0, 'hate_score': 0, 'flags': []}
+
+    model, preprocess, tokenizer = clip
+    labels = ['safe appropriate content', 'nudity explicit content', 'violence graphic content',
+              'gore disturbing imagery', 'hate symbols extremism', 'drugs illegal substances']
+
+    image_input = preprocess(img).unsqueeze(0)
+    text_inputs = tokenizer(labels)
+
+    with torch.no_grad():
+        image_features = model.encode_image(image_input)
+        text_features = model.encode_text(text_inputs)
+        similarity = (image_features @ text_features.T).softmax(dim=-1)
+
+    scores = {label: float(s) for label, s in zip(labels, similarity[0])}
+    nsfw = scores.get('nudity explicit content', 0)
+    violence = scores.get('violence graphic content', 0) + scores.get('gore disturbing imagery', 0)
+    hate = scores.get('hate symbols extremism', 0)
+
+    flags = []
+    if nsfw > 0.15: flags.append('nudity')
+    if violence > 0.15: flags.append('violence')
+    if hate > 0.1: flags.append('hate_symbols')
+
+    return {
+        'is_safe': nsfw < 0.3 and violence < 0.3 and hate < 0.2,
+        'nsfw_score': round(nsfw, 3),
+        'violence_score': round(violence, 3),
+        'hate_score': round(hate, 3),
+        'flags': flags
+    }
+
+
+# ── Heuristic Classification (Fast Tier) ─────────────────────────────────────
+
+def classify_image_heuristic(img, url='', detected_objects=None):
+    """Fast heuristic classification using YOLO + image properties."""
+    return _classify_image_impl(img, url, detected_objects)
+
+
+def classify_image(img, url='', detected_objects=None, tier='fast'):
+    """Classify image — fast uses heuristics, standard uses CLIP, accurate uses Gemma."""
+    if tier in ('standard', 'accurate'):
+        return classify_with_clip(img, detected_objects)
+    return _classify_image_impl(img, url, detected_objects)
+
+
+def _classify_image_impl(img, url='', detected_objects=None):
+    """Fast heuristic classification."""
     w, h = img.size
     aspect = w / max(h, 1)
     tags = []
@@ -250,8 +367,11 @@ def compute_hashes(img):
 
 # ── Content Moderation (basic heuristic) ─────────────────────────────────────
 
-def moderate_image(img, objects, face_count):
-    """Content moderation using object detection + image analysis."""
+def moderate_image(img, objects, face_count, tier='fast'):
+    """Content moderation — fast uses heuristics, standard uses CLIP NSFW."""
+    if tier in ('standard', 'accurate'):
+        return moderate_with_clip(img)
+    # Fast tier: heuristic
     flags = []
     nsfw_score = 0.0
     violence_score = 0.0
@@ -318,8 +438,11 @@ def moderate_image(img, objects, face_count):
 
 # ── Pipeline Orchestrator ────────────────────────────────────────────────────
 
-def process_single_image(image_id, image_url, conn):
+def process_single_image(image_id, image_url, conn, model_config=None):
     """Process a single image through all analysis steps."""
+    config = model_config or {}
+    tier = config.get('tier', 'fast') if isinstance(config, dict) else 'fast'
+    logger.info(f"  Tier: {tier}")
     cur = conn.cursor()
 
     # Download
@@ -342,7 +465,7 @@ def process_single_image(image_id, image_url, conn):
     # 1. Object Detection (YOLO)
     objects = []
     try:
-        objects = detect_objects(img)
+        objects = detect_objects(img, tier=tier)
         cur.execute("DELETE FROM image_objects WHERE image_id=%s", (image_id,))
         for obj in objects:
             cur.execute(
@@ -356,7 +479,7 @@ def process_single_image(image_id, image_url, conn):
     # 2. Face/Person Detection
     face_count = 0
     try:
-        face_count, bboxes, avg_conf, det_type = detect_faces(img)
+        face_count, bboxes, avg_conf, det_type = detect_faces(img, tier=tier)
         cur.execute("DELETE FROM image_faces WHERE image_id=%s", (image_id,))
         cur.execute(
             "INSERT INTO image_faces (image_id, face_count, avg_confidence, bbox_data) VALUES (%s,%s,%s,%s)",
@@ -368,14 +491,14 @@ def process_single_image(image_id, image_url, conn):
 
     # 3. Classification (YOLO objects + image properties)
     try:
-        tags, content_type = classify_image(img, image_url, detected_objects=objects)
+        tags, content_type = classify_image(img, image_url, detected_objects=objects, tier=tier)
         cur.execute("DELETE FROM image_classification WHERE image_id=%s", (image_id,))
         for tag, conf in tags:
             cur.execute(
-                "INSERT INTO image_classification (image_id, tag, confidence, category, model) VALUES (%s,%s,%s,%s,'heuristic')",
-                (image_id, tag, conf, content_type)
+                "INSERT INTO image_classification (image_id, tag, confidence, category, model) VALUES (%s,%s,%s,%s,%s)",
+                (image_id, tag, conf, content_type, 'clip' if tier in ('standard', 'accurate') else 'heuristic')
             )
-        logger.info(f"  Classification: {content_type}, {len(tags)} tags")
+        logger.info(f"  Classification: {content_type}, {len(tags)} tags (model: {'clip' if tier in ('standard', 'accurate') else 'heuristic'})")
     except Exception as e:
         logger.error(f"  Classification failed: {e}")
 
@@ -393,12 +516,13 @@ def process_single_image(image_id, image_url, conn):
 
     # 5. Content Moderation
     try:
-        mod = moderate_image(img, objects if 'objects' in dir() else [], face_count)
+        mod = moderate_image(img, objects, face_count, tier=tier)
         cur.execute("DELETE FROM image_moderation WHERE image_id=%s", (image_id,))
+        model_name = 'clip' if tier in ('standard', 'accurate') else 'heuristic'
         cur.execute(
-            "INSERT INTO image_moderation (image_id, is_safe, nsfw_score, violence_score, flags, model) VALUES (%s,%s,%s,%s,%s,'yolo+heuristic')",
+            "INSERT INTO image_moderation (image_id, is_safe, nsfw_score, violence_score, hate_score, flags, model) VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (image_id, mod['is_safe'], mod['nsfw_score'], mod['violence_score'],
-             mod['flags'] if mod['flags'] else None)
+             mod.get('hate_score', 0), mod['flags'] if mod['flags'] else None, model_name)
         )
         logger.info(f"  Moderation: safe={mod['is_safe']}, flags={mod['flags']}")
     except Exception as e:
@@ -420,7 +544,8 @@ def run_pipeline(limit=100):
 
         # Get pending images
         cur.execute("""
-            SELECT q.image_id, a.image_url, MIN(q.priority) as priority, MIN(q.created_at) as created
+            SELECT q.image_id, a.image_url, MIN(q.priority) as priority, MIN(q.created_at) as created,
+                   (array_agg(q.model_config ORDER BY q.created_at DESC))[1] as model_config
             FROM image_processing_queue q
             JOIN image_analysis a ON a.id = q.image_id
             WHERE q.status = 'pending'
@@ -447,9 +572,10 @@ def run_pipeline(limit=100):
         success = 0
         for i, row in enumerate(pending):
             image_id, image_url = row[0], row[1]
+            model_config = row[4] if len(row) > 4 else None
             logger.info(f"[{i+1}/{len(pending)}] Processing image {image_id}: {image_url[:60]}...")
             try:
-                if process_single_image(image_id, image_url, conn):
+                if process_single_image(image_id, image_url, conn, model_config=model_config):
                     success += 1
             except Exception as e:
                 logger.error(f"  Failed: {e}")

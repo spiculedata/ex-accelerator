@@ -5,6 +5,9 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import ModelTierSelector from '$lib/components/ui/ModelTierSelector.svelte';
+
+  let selectedTier = 'fast';
 
   let loading = true;
   let errorMessage = '';
@@ -38,7 +41,7 @@
     try {
       const res = await fetch('/api/image-processing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze', image_url: imageUrl.trim() })
+        body: JSON.stringify({ action: 'analyze', image_url: imageUrl.trim(), tier: selectedTier })
       });
       const data = await res.json();
       if (data.success) singleResult = data.data;
@@ -89,7 +92,10 @@
 
   <!-- Classify Panel -->
   <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Classify Image</h2>
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Classify Image</h2>
+    <div class="mb-3">
+      <ModelTierSelector bind:selectedTier disabled={analyzing} />
+    </div>
     <div class="flex gap-3 mb-4">
       <input type="text" bind:value={imageUrl} placeholder="Paste image URL..." disabled={analyzing}
         class="flex-1 px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:opacity-50" />

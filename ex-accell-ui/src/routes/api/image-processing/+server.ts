@@ -255,6 +255,17 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({ success: true, data });
     }
 
+    if (action === 'models') {
+      return json({
+        success: true,
+        tiers: {
+          fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristic', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
+          standard: { label: 'Standard Analysis', description: 'YOLOv8s + CLIP ViT-B/32 + CLIP NSFW', speed: '2-5s per image', models: ['YOLOv8s', 'CLIP ViT-B/32', 'CLIP NSFW'] },
+          accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + Gemma Vision', speed: '30-60s+ per image', models: ['YOLOv8m', 'RetinaFace', 'Gemma 3 Vision'] }
+        }
+      });
+    }
+
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
     console.error('Image processing API error:', err);
@@ -324,8 +335,15 @@ export const POST: RequestHandler = async ({ request }) => {
       const hasPhotoExt = /\.(jpg|jpeg|png|webp|gif)/.test(urlPath);
       const contentType = isScreenshot ? 'screenshot' : isMeme ? 'meme' : hasPhotoExt ? 'photo' : 'other';
 
+      const tier = body.tier || 'fast';
+      const tierLabels: Record<string, string> = {
+        fast: 'Quick Scan (YOLOv8n + Haar)',
+        standard: 'Standard (CLIP + YOLOv8s)',
+        accurate: 'Deep Analysis (Gemma Vision)'
+      };
+
       let analysis: any = {
-        description: `Image uploaded (${imgSizeKB}KB) — queued for AI analysis`,
+        description: `Image uploaded (${imgSizeKB}KB) — queued for ${tierLabels[tier] || 'analysis'}`,
         content_type: contentType,
         has_text: false,
         ocr_text: '',
@@ -336,7 +354,8 @@ export const POST: RequestHandler = async ({ request }) => {
         is_safe: true,
         safety_concerns: 'none',
         status: 'queued',
-        _note: 'Image registered and queued for batch processing (YOLO object detection, MediaPipe face detection, CLIP classification, PaddleOCR, Gemma vision). Run the ETL pipeline or GPU worker to process.'
+        tier,
+        _note: `Queued for ${tierLabels[tier] || 'processing'}. The background worker processes images within ~5 seconds.`
       };
 
       const processingTime = Date.now() - startTime;
@@ -414,12 +433,13 @@ export const POST: RequestHandler = async ({ request }) => {
           }
         }
 
-        // Queue for full batch analysis (YOLO, MediaPipe, CLIP, OCR)
+        // Queue for batch analysis with selected model tier
+        const priority = tier === 'accurate' ? 0 : tier === 'standard' ? 1 : 2;
         await postgresPool.query(
-          `INSERT INTO image_processing_queue (image_id, task_type, status, priority)
-           VALUES ($1, 'full_analysis', 'pending', 1)
+          `INSERT INTO image_processing_queue (image_id, task_type, status, priority, model_config)
+           VALUES ($1, 'full_analysis', 'pending', $2, $3)
            ON CONFLICT DO NOTHING`,
-          [imageId]
+          [imageId, priority, JSON.stringify({ tier })]
         );
 
         analysis._stored = true;

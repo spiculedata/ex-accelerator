@@ -5,7 +5,9 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import ModelTierSelector from '$lib/components/ui/ModelTierSelector.svelte';
 
+  let selectedTier = 'fast';
   let loading = true;
   let errorMessage = '';
   let stats: { topClasses: any[]; cooccurrence: any[] } = { topClasses: [], cooccurrence: [] };
@@ -63,7 +65,7 @@
       const res = await fetch('/api/image-processing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze', image_url: imageUrl })
+        body: JSON.stringify({ action: 'analyze', image_url: imageUrl, tier: selectedTier })
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -142,6 +144,9 @@
         class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         on:keydown={(e) => e.key === 'Enter' && analyzeImage()}
       />
+      </div>
+      <div class="mb-3">
+        <ModelTierSelector bind:selectedTier disabled={analyzing} />
       <button
         on:click={analyzeImage}
         disabled={analyzing || !imageUrl.trim()}

@@ -17,3 +17,4 @@ ultralytics>=8.0.0
 mediapipe>=0.10.0
 pillow>=10.0.0
 imagehash>=4.3.0
+open-clip-torch>=2.24.0

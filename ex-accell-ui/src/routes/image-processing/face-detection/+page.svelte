@@ -5,6 +5,9 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import ModelTierSelector from '$lib/components/ui/ModelTierSelector.svelte';
+
+  let selectedTier = 'fast';
 
   // State
   let loading = true;
@@ -77,7 +80,7 @@
       const res = await fetch('/api/image-processing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze', image_url: imageUrl })
+        body: JSON.stringify({ action: 'analyze', image_url: imageUrl, tier: selectedTier })
       });
 
       if (!res.ok) throw new Error(`Analysis failed: ${res.statusText}`);
@@ -218,7 +221,10 @@
 
     <!-- Analyze Panel -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Analyze an Image</h2>
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Analyze an Image</h2>
+      <div class="mb-3">
+        <ModelTierSelector bind:selectedTier disabled={analyzing} />
+      </div>
       <div class="flex flex-col sm:flex-row gap-3">
         <input
           type="url"
