@@ -99,17 +99,28 @@
 
   $: filteredSources = dataSources;
 
+  // Current filter state from FilterBar
+  let currentFilterParams: Record<string, string> = {};
+
   function handleFilterChange(event: CustomEvent) {
-    // Reload dashboard data when filters change
-    // The filter params will be read by the API from the FilterBar
+    const detail = event.detail || {};
+    currentFilterParams = {};
+    if (detail.workspaceId) currentFilterParams.workspace_id = detail.workspaceId;
+    // Always send platforms param — empty string = nothing selected
+    currentFilterParams.platforms = (detail.platforms || []).join(',');
+    if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
+    if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
     loadDashboardData();
   }
 
   // Load all dashboard data from database
   async function loadDashboardData() {
     try {
+      // Build filter params — workspace + any active filters
+      const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
+
       // Load dashboard stats
-      const stats = await dashboardDb.getDashboardStats(workspaceId || undefined);
+      const stats = await dashboardDb.getDashboardStats(workspaceId || undefined, fp);
       dashboardStats = {
         totalPosts: stats.total_posts,
         totalSources: stats.total_sources,
@@ -122,12 +133,8 @@
       // Load data sources
       dataSources = await dashboardDb.getDataSources(workspaceId || undefined);
 
-      // Build platform filter from loaded sources
-      availablePlatforms = dataSources.map(s => s.name);
-      activePlatforms = new Set(availablePlatforms.map(p => p.toLowerCase()));
-
       // Load sentiment breakdown
-      const sentimentData = await dashboardDb.getSentimentBreakdown(workspaceId || undefined);
+      const sentimentData = await dashboardDb.getSentimentBreakdown(workspaceId || undefined, fp);
       sentimentData.forEach(item => {
         if (item.sentiment === 'positive') {
           textAnalytics.sentimentBreakdown.positive = { count: item.count, percentage: item.percentage };
@@ -139,13 +146,13 @@
       });
 
       // Load top languages
-      textAnalytics.topLanguages = await dashboardDb.getTopLanguages(workspaceId || undefined);
+      textAnalytics.topLanguages = await dashboardDb.getTopLanguages(workspaceId || undefined, fp);
 
       // Load top topics
-      textAnalytics.topTopics = await dashboardDb.getTopTopics(workspaceId || undefined);
+      textAnalytics.topTopics = await dashboardDb.getTopTopics(workspaceId || undefined, fp);
 
       // Load crawling activity
-      crawlingActivity = await dashboardDb.getCrawlingActivity(workspaceId || undefined);
+      crawlingActivity = await dashboardDb.getCrawlingActivity(workspaceId || undefined, fp);
 
       // Load recent activity
       recentActivity = await dashboardDb.getRecentActivity(workspaceId || undefined);

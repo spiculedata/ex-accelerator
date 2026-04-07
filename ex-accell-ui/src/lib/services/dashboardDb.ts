@@ -33,10 +33,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get comprehensive dashboard statistics
    */
-  async getDashboardStats(workspaceId?: string): Promise<DashboardStats> {
+  async getDashboardStats(workspaceId?: string, extraParams?: Record<string, string>): Promise<DashboardStats> {
     const data = await this.queryAPI<any>({
       endpoint: 'cross-platform-sentiment',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -57,7 +57,7 @@ class DashboardDatabase extends BaseDatabaseService {
     // Get platform performance stats
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -105,10 +105,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get sentiment breakdown across all platforms
    */
-  async getSentimentBreakdown(workspaceId?: string): Promise<SentimentBreakdown[]> {
+  async getSentimentBreakdown(workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentBreakdown[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'cross-platform-sentiment',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -125,10 +125,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get top languages from platform data
    */
-  async getTopLanguages(workspaceId?: string): Promise<TopLanguage[]> {
+  async getTopLanguages(workspaceId?: string, extraParams?: Record<string, string>): Promise<TopLanguage[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -147,10 +147,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get top topics from the topics table
    */
-  async getTopTopics(workspaceId?: string): Promise<TopTopic[]> {
+  async getTopTopics(workspaceId?: string, extraParams?: Record<string, string>): Promise<TopTopic[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'topics-overview',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -175,10 +175,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get crawling activity by hour
    */
-  async getCrawlingActivity(workspaceId?: string): Promise<CrawlingActivity[]> {
+  async getCrawlingActivity(workspaceId?: string, extraParams?: Record<string, string>): Promise<CrawlingActivity[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'hourly-patterns',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -201,7 +201,7 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get recent activity feed
    */
-  async getRecentActivity(workspaceId?: string): Promise<RecentActivity[]> {
+  async getRecentActivity(workspaceId?: string, extraParams?: Record<string, string>): Promise<RecentActivity[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sample-posts',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), limit: 10 }

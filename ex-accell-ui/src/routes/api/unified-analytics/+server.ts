@@ -122,11 +122,39 @@ export const GET: RequestHandler = async ({ url }) => {
         const params: any[] = [];
         let paramIndex = 1;
 
-        const platformFilter = buildPlatformFilter(scope, paramIndex);
-        if (platformFilter) {
-          conditions.push(platformFilter.clause);
-          params.push(...platformFilter.params);
-          paramIndex = platformFilter.nextIndex;
+        // Explicit platform filter from FilterBar (overrides workspace scope)
+        const explicitPlatforms = url.searchParams.get('platforms');
+        if (explicitPlatforms !== null) {
+          const platformList = explicitPlatforms.split(',').filter(p => p.trim());
+          if (platformList.length === 0) {
+            // All platforms disabled — return empty data
+            return json({ success: true, data: [] });
+          }
+          conditions.push(`LOWER(platform) = ANY($${paramIndex})`);
+          params.push(platformList.map(p => p.toLowerCase()));
+          paramIndex++;
+        } else {
+          // Fall back to workspace scope filter
+          const platformFilter = buildPlatformFilter(scope, paramIndex);
+          if (platformFilter) {
+            conditions.push(platformFilter.clause);
+            params.push(...platformFilter.params);
+            paramIndex = platformFilter.nextIndex;
+          }
+        }
+
+        // Date range filter
+        const dateStart = url.searchParams.get('date_start');
+        const dateEnd = url.searchParams.get('date_end');
+        if (dateStart) {
+          conditions.push(`timestamp >= $${paramIndex}`);
+          params.push(dateStart);
+          paramIndex++;
+        }
+        if (dateEnd) {
+          conditions.push(`timestamp <= $${paramIndex}`);
+          params.push(dateEnd);
+          paramIndex++;
         }
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
