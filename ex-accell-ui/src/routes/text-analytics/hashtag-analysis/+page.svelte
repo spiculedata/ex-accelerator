@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
