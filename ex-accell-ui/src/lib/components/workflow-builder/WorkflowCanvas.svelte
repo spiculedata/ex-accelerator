@@ -8,6 +8,7 @@
 
   import { workflowBuilder, type WorkflowStep, type WorkflowConnection } from '$lib/stores/workflowBuilderStore';
   import { stepColorClasses, getStepColorClasses } from './stepLibraryData';
+  import { getStatusColor } from '$lib/utils/colorUtils';
 
   // Props
   let { canvasElement = $bindable(null) }: { canvasElement?: HTMLDivElement | null } = $props();
@@ -153,16 +154,6 @@
     workflowBuilder.deleteConnection(connectionId);
   }
 
-  // Status color mapping
-  function getStatusColor(status: string): string {
-    const colors: Record<string, string> = {
-      configured: 'bg-gray-100 text-gray-800',
-      running: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      error: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || colors.configured;
-  }
 </script>
 
 <!-- Canvas Area -->

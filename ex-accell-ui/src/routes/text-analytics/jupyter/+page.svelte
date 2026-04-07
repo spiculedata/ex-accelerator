@@ -1,16 +1,16 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   
   // Redirect to projects if no current project
   onMount(() => {
     if (!$currentProject) {
-      window.location.href = '/projects';
+      goto('/projects');
     }
   });
 
-  let jupyterUrl = 'http://localhost:8888';
+  let jupyterUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8888` : 'http://localhost:8888';
   let isJupyterRunning = false;
   let showFullScreen = false;
   
@@ -45,10 +45,6 @@
   <meta name="description" content="Jupyter Lab interface for interactive text analytics research" />
 </svelte:head>
 
-{#if !showFullScreen}
-  <Navigation />
-{/if}
-
 <div class="min-h-screen bg-gray-50 {showFullScreen ? 'fixed inset-0 z-50' : ''}">
   {#if !showFullScreen}
     <!-- Page Header -->
@@ -60,7 +56,7 @@
         <div class="flex items-center justify-between">
           <div class="flex items-center">
             <button 
-              on:click={() => window.location.href='/text-analytics'}
+              on:click={() => goto('/text-analytics')}
               class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm"
               aria-label="Go back to Text Analytics">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

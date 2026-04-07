@@ -1,7 +1,10 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { androidAnalyticsDb } from '$lib/services/androidAnalyticsDb';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+
+  let errorMessage = '';
 
   // Data from the Princeton SMART / Screenlake research kit
   let appAccessibilityData: any[] = [];
@@ -52,6 +55,7 @@
       loading = false;
     } catch (error) {
       console.error('Error loading Android analytics data:', error);
+      errorMessage = 'Failed to load Android analytics data. Showing sample data instead.';
       // Fallback to sample data if database fails
       loadFallbackData();
     }
@@ -299,8 +303,6 @@
   <meta name="description" content="Analyze Android mobile device user interactions and app usage patterns" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
   <div class="relative bg-gradient-to-br from-blue-900 via-purple-900 to-blue-900 overflow-hidden">
@@ -331,7 +333,7 @@
         
         <div class="flex items-center space-x-3">
           <button 
-            on:click={() => window.location.href='/android-research'}
+            on:click={() => goto('/android-research')}
             class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -350,7 +352,19 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+      <div class="flex items-center">
+        <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <p class="text-sm font-medium text-amber-800">Demo Mode</p>
+          <p class="text-xs text-amber-700">Android analytics data is not connected yet. Showing sample visualizations of the interface capabilities.</p>
+        </div>
+      </div>
+    </div>
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>

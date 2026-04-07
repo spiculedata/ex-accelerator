@@ -1,12 +1,14 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { jobSchedulerService } from '$lib/services/jobSchedulerService';
   import type { JobScheduleRequest } from '$lib/services/jobSchedulerService';
   import type { JobState } from '$lib/services/jobStateStore';
+  import { getStatusColor } from '$lib/utils/colorUtils';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
   
   let activeTab = 'schedule';
+  let errorMessage = '';
   
   // Load job states from state store
   async function loadJobStates(forceRefresh = false) {
@@ -49,9 +51,11 @@
         }
       } else {
         console.error('Failed to load job states:', response.status, response.statusText);
+        errorMessage = 'Failed to load job states. Please try again.';
       }
     } catch (error) {
       console.error('Failed to load job states:', error);
+      errorMessage = 'Failed to load job states. Please try again.';
     } finally {
       loadingJobStates = false;
     }
@@ -105,6 +109,7 @@
       }
     } catch (error) {
       console.error('Failed to refresh job state:', error);
+      errorMessage = 'Failed to refresh job state. Please try again.';
     }
   }
 
@@ -732,6 +737,7 @@
       
     } catch (error) {
       console.error('Princeton SMART import error:', error);
+      errorMessage = 'Failed to import Princeton SMART data. Please check your configuration and try again.';
       princetonSmartStatus = 'error';
     }
   }
@@ -844,6 +850,7 @@
       
     } catch (error) {
       console.error('WavePulse startup error:', error);
+      errorMessage = 'Failed to start WavePulse. Please try again.';
       wavePulseStatus = 'error';
     }
   }
@@ -860,6 +867,7 @@
       
     } catch (error) {
       console.error('WavePulse stop error:', error);
+      errorMessage = 'Failed to stop WavePulse. Please try again.';
       wavePulseStatus = 'error';
     }
   }
@@ -950,9 +958,11 @@
         console.log('Job deleted successfully');
       } else {
         console.error('Failed to delete job:', response.status, response.statusText);
+        errorMessage = 'Failed to delete job. Please try again.';
       }
     } catch (error) {
       console.error('Error deleting job:', error);
+      errorMessage = 'Failed to delete job. Please try again.';
     } finally {
       jobToDelete = null;
       showDeleteConfirmation = false;
@@ -1115,6 +1125,7 @@
     } catch (error) {
       console.error('Failed to schedule crawler job:', error);
       schedulingError = error instanceof Error ? error.message : 'Failed to schedule job';
+      errorMessage = 'Failed to schedule crawler job. Please check your configuration and try again.';
     } finally {
       isSchedulingJob = false;
     }
@@ -1272,6 +1283,7 @@
 
     } catch (error: any) {
       console.error('Failed to run job:', error);
+      errorMessage = 'Failed to run job. Please try again.';
 
       // Show error modal instead of alert
       errorModalMessage = error.message;
@@ -1305,17 +1317,6 @@
         }, 2000);
       }
     }, 200);
-  }
-  
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'running': return 'text-blue-600 bg-blue-100';
-      case 'completed': return 'text-blue-600 bg-blue-100';
-      case 'scheduled': return 'text-blue-600 bg-blue-100';
-      case 'failed': return 'text-red-600 bg-red-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
   }
   
   function formatDateTime(dateString: string) {
@@ -1453,8 +1454,6 @@
   <meta name="description" content="Data collection and capture tools for social media platforms" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
   <div class="relative bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 overflow-hidden">
@@ -1557,7 +1556,8 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     <!-- Web Crawler Tab -->
     {#if activeTab === 'crawler'}
       <div class="max-w-6xl mx-auto">

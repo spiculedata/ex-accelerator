@@ -1,9 +1,14 @@
+<svelte:head>
+  <title>Social Explorer - Analytics Dashboard</title>
+  <meta name="description" content="Comprehensive social media analytics platform with sentiment analysis, topic modeling, and GDELT event tracking" />
+</svelte:head>
+
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { overviewDb } from '$lib/services/overviewDb';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { formatNumber as fmtNumber, formatRelativeTime } from '$lib/utils/formatUtils';
   
   // Overview dashboard data
   let loading = true;
@@ -194,12 +199,7 @@
   }
 
   function formatNumber(num: number): string {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
+    return fmtNumber(num);
   }
 
   function getActivityIcon(activityType: string) {
@@ -389,8 +389,6 @@
   }
 </script>
 
-<Navigation />
-
 <!-- Dashboard Header -->
 <section class="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
   <div class="absolute inset-0 bg-black opacity-10"></div>
@@ -400,11 +398,11 @@
       <div class="mb-6 lg:mb-0">
         <div class="flex items-center mb-2">
           <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
-            <span class="text-white font-bold text-lg">JD</span>
+            <span class="text-white font-bold text-lg">SE</span>
           </div>
           <div>
             <h1 class="text-2xl sm:text-3xl font-bold text-white">
-              Welcome back, John
+              Welcome back, there
             </h1>
             <p class="text-blue-100">Ready to explore your social data?</p>
           </div>
@@ -696,7 +694,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                       <p class="text-sm text-gray-900">{activity.title}</p>
-                      <p class="text-xs text-gray-500">{activity.timeAgo}</p>
+                      <p class="text-xs text-gray-500">{activity.timeAgo && !activity.timeAgo.includes('NaN') ? activity.timeAgo : formatRelativeTime(activity.timestamp || null)}</p>
                     </div>
                   </div>
                 </div>

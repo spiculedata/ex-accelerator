@@ -1,12 +1,16 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { availableProjects, setCurrentProject, currentProject } from '$lib/stores/projectStore';
-  
+  import { getStatusColor } from '$lib/utils/colorUtils';
+  import { formatDate, formatNumber } from '$lib/utils/formatUtils';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+
   // Get project ID from URL
   $: projectId = $page.params.id;
 
+  let errorMessage = '';
   let project: any = null;
   let workspaces: any[] = [];
   let loading = true;
@@ -42,11 +46,12 @@
         }
       } else {
         // Project not found, redirect
-        window.location.href = '/projects';
+        goto('/projects');
       }
     } catch (error) {
       console.error('Error loading project:', error);
-      window.location.href = '/projects';
+      errorMessage = 'Failed to load project details. Redirecting to projects list.';
+      goto('/projects');
     } finally {
       loading = false;
     }
@@ -62,6 +67,7 @@
       }
     } catch (error) {
       console.error('Error loading datasets:', error);
+      errorMessage = 'Failed to load datasets. Please try again.';
     } finally {
       loadingDatasets = false;
     }
@@ -113,6 +119,7 @@
               });
             } catch (error) {
               console.error(`Error linking dataset ${datasetId}:`, error);
+              errorMessage = 'Failed to link one or more datasets to the workspace.';
             }
           }
         }
@@ -128,6 +135,7 @@
       }
     } catch (error) {
       console.error('Error creating workspace:', error);
+      errorMessage = 'Failed to create workspace. Please try again.';
     }
   }
 
@@ -166,30 +174,16 @@
 
   function openApplication(appId: string) {
     // Pass project context to the application
-    window.location.href = `/${appId}?project=${projectId}`;
+    goto(`/${appId}?project=${projectId}`);
   }
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'active': return 'bg-blue-100 text-blue-800';
-      case 'paused': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'archived': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  }
-
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString();
-  }
+  // formatDate imported from $lib/utils/formatUtils
 </script>
 
 <svelte:head>
   <title>{project?.name || 'Project'} - Social Explorer</title>
   <meta name="description" content="Project workspace for {project?.name || 'project'}" />
 </svelte:head>
-
-<Navigation />
 
 {#if project}
   <!-- Project Header -->
@@ -198,7 +192,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
-            on:click={() => window.location.href='/projects'}
+            on:click={() => goto('/projects')}
             class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -216,8 +210,8 @@
         </div>
         <div class="text-right">
           <div class="text-white text-sm">
-            <div class="font-medium">{(project?.totalPosts || 0).toLocaleString()} posts</div>
-            <div class="text-blue-200">Last updated {formatDate(project.updatedAt)}</div>
+            <div class="font-medium">{formatNumber(project?.totalPosts || project?.total_posts || 0)} posts</div>
+            <div class="text-blue-200">Last updated {formatDate(project.updatedAt || project.updated_at)}</div>
           </div>
         </div>
       </div>
@@ -226,10 +220,11 @@
 
 <!-- Project Content -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
   <!-- Quick Stats -->
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-      <div class="text-2xl font-bold text-blue-600 mb-1">{(project?.totalPosts || 0).toLocaleString()}</div>
+      <div class="text-2xl font-bold text-blue-600 mb-1">{formatNumber(project?.totalPosts || project?.total_posts || 0)}</div>
       <div class="text-sm text-gray-600">Total Posts</div>
     </div>
     <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -417,7 +412,7 @@
     {:else}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {#each workspaces as workspace}
-          <div class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer" on:click={() => window.location.href = `/workspaces/${workspace.id}`}>
+          <div class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer" on:click={() => goto(`/workspaces/${workspace.id}`)}>
             <div class="flex items-start justify-between mb-3">
               <div class="flex-1">
                 <h3 class="text-base font-semibold text-gray-900">{workspace.name}</h3>
@@ -461,7 +456,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900">Data Sources</h3>
         <button
-          on:click={() => window.location.href='/data-capture'}
+          on:click={() => goto('/data-capture')}
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
           Manage Data
         </button>
@@ -485,7 +480,7 @@
         
         <!-- Add Data Source -->
         <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 flex items-center justify-center hover:border-gray-400 transition-colors cursor-pointer"
-             on:click={() => window.location.href='/data-capture'}>
+             on:click={() => goto('/data-capture')}>
           <div class="text-center">
             <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -525,7 +520,7 @@
     <h2 class="text-2xl font-bold text-gray-900 mb-4">Project Not Found</h2>
     <p class="text-gray-600 mb-8">The project you're looking for doesn't exist or you don't have access to it.</p>
     <button 
-      on:click={() => window.location.href='/projects'}
+      on:click={() => goto('/projects')}
       class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition-colors">
       Back to Projects
     </button>

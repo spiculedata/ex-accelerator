@@ -109,8 +109,11 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get engagement overview statistics
    */
-  async getEngagementStats(): Promise<EngagementStats> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getEngagementStats(workspaceId?: string): Promise<EngagementStats> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return this.getDefaultEngagementStats();
@@ -126,8 +129,11 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get platform engagement breakdown
    */
-  async getPlatformEngagement(filters: FilterOptions = {}): Promise<PlatformEngagementData[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getPlatformEngagement(filters: FilterOptions = {}, workspaceId?: string): Promise<PlatformEngagementData[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -146,13 +152,13 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
       data,
       (row) => ({
         platform: row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
-        engagementRate: Math.round((row.positive_ratio || 0.3) * 10 * 100) / 100,
-        totalEngagements: Math.floor(row.total_posts * 2.5),
-        posts: row.total_posts,
-        avgLikes: Math.round(row.total_posts * 0.8),
-        avgComments: Math.round(row.total_posts * 0.2),
-        avgShares: Math.round(row.total_posts * 0.1),
-        totalReach: Math.floor(row.total_posts * 15),
+        engagementRate: Math.round((row.positive_ratio || 0) * 100) / 100,
+        totalEngagements: row.total_posts || 0,
+        posts: row.total_posts || 0,
+        avgLikes: row.avg_likes || 0,
+        avgComments: row.avg_comments || 0,
+        avgShares: row.avg_shares || 0,
+        totalReach: row.total_reach || row.total_posts || 0,
         color: platformColors[row.platform] || '#6b7280'
       }),
       []
@@ -162,8 +168,11 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get content type performance data
    */
-  async getContentTypePerformance(filters: FilterOptions = {}): Promise<ContentTypePerformance[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getContentTypePerformance(filters: FilterOptions = {}, workspaceId?: string): Promise<ContentTypePerformance[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -172,20 +181,20 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
     const contentTypes = ['Text Post', 'Image', 'Video', 'Story', 'Reel'];
 
     return contentTypes.map((type, index) => {
-      const baseData = data[index % data.length] || { post_count: 0, avg_confidence: 0.7 };
-      const posts = Math.floor(baseData.post_count * (0.8 - index * 0.1));
-      const engagementRate = Math.round((baseData.avg_confidence || 0.7) * 7 * 100) / 100;
+      const baseData = data[index % data.length] || { post_count: 0, avg_confidence: 0 };
+      const posts = baseData.post_count || 0;
+      const confidence = baseData.avg_confidence || 0;
 
       return {
         type,
-        engagementRate,
+        engagementRate: Math.round(confidence * 100) / 100,
         posts,
-        reach: Math.floor(posts * 12),
-        avgLikes: Math.round(posts * 0.6),
-        avgComments: Math.round(posts * 0.15),
-        avgShares: Math.round(posts * 0.08),
-        sentiment: engagementRate >= 4.5 ? 'positive' :
-                  engagementRate >= 2.5 ? 'mixed' : 'neutral'
+        reach: baseData.total_reach || posts,
+        avgLikes: baseData.avg_likes || 0,
+        avgComments: baseData.avg_comments || 0,
+        avgShares: baseData.avg_shares || 0,
+        sentiment: confidence >= 0.65 ? 'positive' :
+                  confidence >= 0.35 ? 'mixed' : 'neutral'
       };
     });
   }
@@ -193,10 +202,10 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get engagement trends over time
    */
-  async getEngagementTrends(timeRange: string = '7d'): Promise<EngagementTrend[]> {
+  async getEngagementTrends(timeRange: string = '7d', workspaceId?: string): Promise<EngagementTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
-      params: { timeRange }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange }
     });
 
     if (!data || data.length === 0) {
@@ -209,13 +218,13 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
         const totalSentiment = (row.positive || 0) + (row.negative || 0) + (row.neutral || 0);
         return {
           date: row.date,
-          likes: Math.floor(totalSentiment * 2.2),
-          comments: Math.floor(totalSentiment * 0.5),
-          shares: Math.floor(totalSentiment * 0.3),
-          saves: Math.floor(totalSentiment * 0.8),
-          views: Math.floor(totalSentiment * 8),
-          reach: Math.floor(totalSentiment * 12),
-          engagementRate: totalSentiment > 0 ? Math.round((totalSentiment * 0.04) * 100) / 100 : 0
+          likes: row.likes || 0,
+          comments: row.comments || 0,
+          shares: row.shares || 0,
+          saves: row.saves || 0,
+          views: row.views || 0,
+          reach: row.reach || totalSentiment,
+          engagementRate: row.engagement_rate || (totalSentiment > 0 ? Math.round((row.positive || 0) / totalSentiment * 100) / 100 : 0)
         };
       },
       []
@@ -225,10 +234,10 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get top performing posts
    */
-  async getTopPerformingPosts(filters: FilterOptions = {}, limit: number = 10): Promise<TopPerformingPost[]> {
+  async getTopPerformingPosts(filters: FilterOptions = {}, limit: number = 10, workspaceId?: string): Promise<TopPerformingPost[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sample-posts',
-      params: { limit: limit.toString() }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), limit: limit.toString() }
     });
 
     if (!data || data.length === 0) {
@@ -246,14 +255,14 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
         platform: row.platform,
         contentType: contentTypes[index % contentTypes.length],
         engagement: {
-          likes: Math.floor((row.confidence || 0.8) * 100),
-          comments: Math.floor((row.confidence || 0.8) * 25),
-          shares: Math.floor((row.confidence || 0.8) * 15),
-          saves: Math.floor((row.confidence || 0.8) * 30),
-          rate: Math.round((row.confidence || 0.8) * 5 * 100) / 100
+          likes: row.likes || 0,
+          comments: row.comments || 0,
+          shares: row.shares || 0,
+          saves: row.saves || 0,
+          rate: row.engagement_rate || Math.round((row.confidence || 0) * 100) / 100
         },
-        reach: Math.floor((row.confidence || 0.8) * 500),
-        views: Math.floor((row.confidence || 0.8) * 1200),
+        reach: row.reach || 0,
+        views: row.views || 0,
         timestamp: row.timestamp || new Date().toISOString(),
         performance_rank: index + 1
       }),
@@ -266,8 +275,11 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get engagement timing analysis
    */
-  async getEngagementTiming(): Promise<EngagementTiming[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
+  async getEngagementTiming(workspaceId?: string): Promise<EngagementTiming[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'hourly-patterns',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -283,9 +295,9 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
           hour_of_day: row.hour_of_day,
           day_of_week: row.hour_of_day % 7,
           day_name: dayNames[row.hour_of_day % 7],
-          avg_engagement_rate: totalActivity > 0 ? Math.round((totalActivity * 0.05) * 100) / 100 : 0,
+          avg_engagement_rate: row.avg_engagement_rate || (totalActivity > 0 ? Math.round((row.positive || 0) / totalActivity * 100) / 100 : 0),
           total_posts: totalActivity,
-          total_engagements: Math.floor(totalActivity * 2.5)
+          total_engagements: row.total_engagements || totalActivity
         };
       },
       []
@@ -295,8 +307,11 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get hashtag performance analysis
    */
-  async getHashtagPerformance(limit: number = 20): Promise<HashtagPerformance[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getHashtagPerformance(limit: number = 20, workspaceId?: string): Promise<HashtagPerformance[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -315,7 +330,7 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
       return {
         hashtag,
         usage_count: Math.floor(platformData.total_posts * (0.8 - index * 0.03)),
-        avg_boost: Math.round((1.2 + Math.random() * 0.8) * 100) / 100,
+        avg_boost: Math.round((1.2 + (index % 10) * 0.08) * 100) / 100,
         avg_engagement_rate: Math.round((platformData.positive_ratio || 0.3) * 8 * 100) / 100,
         impact_score: Math.round((platformData.positive_ratio || 0.3) * 10 * 100) / 100
       };
@@ -325,15 +340,15 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   /**
    * Export engagement analysis data
    */
-  async exportEngagementData(filters: FilterOptions = {}): Promise<ExportData<TopPerformingPost>> {
+  async exportEngagementData(filters: FilterOptions = {}, workspaceId?: string): Promise<ExportData<TopPerformingPost>> {
     const [stats, platforms, contentTypes, trends, topPosts, timing, hashtags] = await Promise.all([
-      this.getEngagementStats(),
-      this.getPlatformEngagement(filters),
-      this.getContentTypePerformance(filters),
-      this.getEngagementTrends(filters.timeRange || '7d'),
-      this.getTopPerformingPosts(filters, 50),
-      this.getEngagementTiming(),
-      this.getHashtagPerformance(50)
+      this.getEngagementStats(workspaceId),
+      this.getPlatformEngagement(filters, workspaceId),
+      this.getContentTypePerformance(filters, workspaceId),
+      this.getEngagementTrends(filters.timeRange || '7d', workspaceId),
+      this.getTopPerformingPosts(filters, 50, workspaceId),
+      this.getEngagementTiming(workspaceId),
+      this.getHashtagPerformance(50, workspaceId)
     ]);
 
     return {
@@ -374,19 +389,24 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
    * Calculate engagement statistics from raw data
    */
   private calculateEngagementStats(data: any[]): EngagementStats {
-    const totalPosts = data.reduce((sum, item) => sum + item.post_count, 0);
-    const avgConfidence = data.reduce((sum, item) => sum + (item.avg_confidence || 0.8), 0) / data.length;
+    const totalPosts = data.reduce((sum, item) => sum + (item.post_count || 0), 0);
+    const avgConfidence = data.reduce((sum, item) => sum + (item.avg_confidence || 0), 0) / (data.length || 1);
+    const totalEngagements = data.reduce((sum, item) => sum + (item.total_engagements || item.post_count || 0), 0);
+    const totalReach = data.reduce((sum, item) => sum + (item.total_reach || item.post_count || 0), 0);
+    const totalLikes = data.reduce((sum, item) => sum + (item.avg_likes || 0), 0);
+    const totalComments = data.reduce((sum, item) => sum + (item.avg_comments || 0), 0);
+    const totalShares = data.reduce((sum, item) => sum + (item.avg_shares || 0), 0);
 
     return {
-      totalEngagements: Math.floor(totalPosts * 2.5),
-      averageRate: Math.round(avgConfidence * 5 * 100) / 100,
-      totalReach: Math.floor(totalPosts * 15),
-      bestPerformingPost: Math.max(...data.map(item => item.post_count)),
+      totalEngagements,
+      averageRate: Math.round(avgConfidence * 100) / 100,
+      totalReach,
+      bestPerformingPost: Math.max(...data.map(item => item.post_count || 0)),
       totalPosts,
-      totalImpressions: Math.floor(totalPosts * 25),
-      avgLikes: Math.round(totalPosts * 0.8 / data.length),
-      avgComments: Math.round(totalPosts * 0.2 / data.length),
-      avgShares: Math.round(totalPosts * 0.1 / data.length)
+      totalImpressions: data.reduce((sum, item) => sum + (item.total_impressions || item.post_count || 0), 0),
+      avgLikes: data.length > 0 ? Math.round(totalLikes / data.length) : 0,
+      avgComments: data.length > 0 ? Math.round(totalComments / data.length) : 0,
+      avgShares: data.length > 0 ? Math.round(totalShares / data.length) : 0
     };
   }
 }

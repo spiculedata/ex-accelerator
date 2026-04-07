@@ -1,14 +1,18 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { onMount, afterUpdate, tick } from 'svelte';
   import { androidResearchDb } from '$lib/services/androidResearchDb';
   import * as echarts from 'echarts';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+
+  let errorMessage = '';
 
   // Research Analysis State
   let activeAnalysis = 'temporal-patterns';
   let loading = true;
   let selectedTimeRange = '24h';
   let selectedUser = '7324';
+  let isDemo = false;
   
   // Chart containers
   let temporalChart: HTMLDivElement;
@@ -64,8 +68,10 @@
       }, 200);
     } catch (error) {
       console.error('Error in onMount:', error);
+      errorMessage = 'Failed to load research data. Showing generated sample data instead.';
       // Fallback to generated data if database fails
       generateAdvancedResearchData();
+      isDemo = true;
       performBehavioralAnalysis();
       loading = false;
       await tick();
@@ -79,15 +85,25 @@
   async function loadResearchData() {
     try {
       // Load all research data from database service
-      researchData.temporalUsage = await androidResearchDb.getTemporalUsagePatterns();
-      researchData.appTransitions = await androidResearchDb.getAppTransitions();
-      researchData.attentionSpans = await androidResearchDb.getAttentionSpans();
-      researchData.contentEngagement = await androidResearchDb.getContentEngagement();
-      researchData.cognitiveLoad = await androidResearchDb.getCognitiveLoadData();
-      
-      console.log('Research data loaded successfully from database');
+      const temporalResult = await androidResearchDb.getTemporalUsagePatterns();
+      const transitionsResult = await androidResearchDb.getAppTransitions();
+      const attentionResult = await androidResearchDb.getAttentionSpans();
+      const engagementResult = await androidResearchDb.getContentEngagement();
+      const cognitiveResult = await androidResearchDb.getCognitiveLoadData();
+
+      researchData.temporalUsage = temporalResult.data;
+      researchData.appTransitions = transitionsResult.data;
+      researchData.attentionSpans = attentionResult.data;
+      researchData.contentEngagement = engagementResult.data;
+      researchData.cognitiveLoad = cognitiveResult.data;
+
+      // Flag as demo if any result is demo data
+      isDemo = temporalResult.isDemo || transitionsResult.isDemo || attentionResult.isDemo || engagementResult.isDemo || cognitiveResult.isDemo;
+
+      console.log('Research data loaded successfully from database', isDemo ? '(demo mode)' : '');
     } catch (error) {
       console.error('Error loading research data:', error);
+      errorMessage = 'Failed to load research data from the database.';
       throw error;
     }
   }
@@ -273,6 +289,7 @@
       console.log('Charts initialization completed');
     } catch (error) {
       console.error('Error initializing charts:', error);
+      errorMessage = 'Failed to initialize charts. Please refresh the page.';
     }
   }
 
@@ -519,9 +536,12 @@
     // Get transition flow data from database service
     let flowData;
     try {
-      flowData = await androidResearchDb.getTransitionFlow();
+      const flowResult = await androidResearchDb.getTransitionFlow();
+      flowData = flowResult.data;
+      if (flowResult.isDemo) isDemo = true;
     } catch (error) {
       console.error('Error loading transition flow data:', error);
+      errorMessage = 'Failed to load transition flow data. Using fallback data.';
       // Fallback data
       flowData = [
         { source: 'Launcher', target: 'YouTube', value: 45 },
@@ -644,13 +664,20 @@
   async function performBehavioralAnalysis() {
     try {
       // Load behavioral metrics and insights from database service
-      behavioralMetrics = await androidResearchDb.getBehavioralMetrics();
-      digitalPhenotype = await androidResearchDb.getDigitalPhenotype();
-      keyFindings = await androidResearchDb.getResearchFindings();
+      const metricsResult = await androidResearchDb.getBehavioralMetrics();
+      const phenotypeResult = await androidResearchDb.getDigitalPhenotype();
+      const findingsResult = await androidResearchDb.getResearchFindings();
+      behavioralMetrics = metricsResult.data;
+      digitalPhenotype = phenotypeResult.data;
+      keyFindings = findingsResult.data;
+      if (metricsResult.isDemo || phenotypeResult.isDemo || findingsResult.isDemo) {
+        isDemo = true;
+      }
       
       console.log('Behavioral analysis completed using database service');
     } catch (error) {
       console.error('Error performing behavioral analysis:', error);
+      errorMessage = 'Failed to perform behavioral analysis. Using local calculations.';
       // Fallback to local calculation if database fails
       performLocalBehavioralAnalysis();
     }
@@ -756,9 +783,20 @@
   <meta name="description" content="Advanced research dashboard for Android mobile behavior analysis using Princeton SMART data" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
+  {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
+    {#if isDemo && !loading}
+      <div class="mb-6 bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-center">
+        <svg class="w-5 h-5 text-amber-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <span class="font-semibold text-amber-800">Demo Data</span>
+          <span class="text-amber-700 text-sm ml-2">No real Android device tables are available. The data shown below is derived from social analytics or generated for demonstration purposes.</span>
+        </div>
+      </div>
+    {/if}
   <!-- Research Header -->
   <div class="relative bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 overflow-hidden">
     <div class="absolute inset-0 bg-gradient-to-br from-purple-900/20 to-pink-900/20 opacity-60"></div>
@@ -799,7 +837,7 @@
         <!-- Navigation Actions -->
         <div class="flex items-center gap-3">
           <button 
-            on:click={() => window.location.href='/android-analytics'}
+            on:click={() => goto('/android-analytics')}
             class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors">
             <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -857,7 +895,18 @@
   {:else}
     <!-- Research Findings Summary -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <div>
+            <p class="text-sm font-medium text-amber-800">Demo Mode</p>
+            <p class="text-xs text-amber-700">Android research data is not connected yet. Showing sample visualizations of the interface capabilities.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Behavioral Metrics Overview -->
       <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">

@@ -1,19 +1,21 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
   import { sentimentAnalysisDb } from '$lib/services/sentimentAnalysisDb';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
+  import { getSentimentColor, getSentimentIcon } from '$lib/utils/colorUtils';
+  import { formatTimestamp } from '$lib/utils/formatUtils';
+  import { waitForEcharts, initChart } from '$lib/utils/echarts';
+
+  $: workspaceId = $page.url.searchParams.get('workspace');
   
   // Loading state
   let loading = true;
   
-  // Redirect to projects if no current project
   onMount(async () => {
-    if (!$currentProject) {
-      window.location.href = '/projects';
-      return;
-    }
-    
     // Load sentiment analysis data from database
     await loadSentimentData();
   });
@@ -43,13 +45,13 @@
   async function loadSentimentData() {
     try {
       // Load all sentiment data from database service
-      const stats = await sentimentAnalysisDb.getSentimentStats();
+      const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined);
       sentimentStats = stats;
       totalPosts = stats.total;
-      
-      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments();
-      emotionStats = await sentimentAnalysisDb.getEmotionStats();
-      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange);
+
+      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined);
+      emotionStats = await sentimentAnalysisDb.getEmotionStats(workspaceId || undefined);
+      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined);
       
       // Load posts with current filters
       await loadFilteredPosts();
@@ -58,10 +60,11 @@
       loading = false;
       
       // Initialize charts after data is loaded
-      if (typeof window !== 'undefined' && (window as any).echarts) {
-        setTimeout(() => {
-          initializeCharts();
-        }, 100);
+      try {
+        await waitForEcharts();
+        initializeCharts();
+      } catch (e) {
+        console.error('Charts unavailable:', e);
       }
     } catch (error) {
       console.error('Error loading sentiment data:', error);
@@ -79,7 +82,7 @@
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters);
+      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
     } catch (error) {
       console.error('Error loading filtered posts:', error);
     }
@@ -99,7 +102,7 @@
       loadFilteredPosts();
       // Also reload trends if time range changed
       if (timeRange) {
-        sentimentAnalysisDb.getSentimentTrends(timeRange).then(trends => {
+        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined).then(trends => {
           sentimentTrends = trends;
           updateTrendChart();
         });
@@ -110,31 +113,6 @@
   // Filtered posts (for display purposes, actual filtering happens in database)
   $: filteredPosts = samplePosts;
 
-  function getSentimentColor(sentiment: string) {
-    const colors: Record<string, string> = {
-      'Very Positive': '#06d6a0',
-      'Positive': '#26d0ce',
-      'Neutral': '#8b5cf6',
-      'Negative': '#ff6b9d',
-      'Very Negative': '#f72585'
-    };
-    return colors[sentiment] || '#8b5cf6';
-  }
-
-  function getSentimentIcon(sentiment: string) {
-    const icons: Record<string, string> = {
-      'Very Positive': '😊',
-      'Positive': '🙂',
-      'Neutral': '😐',
-      'Negative': '🙁',
-      'Very Negative': '😡'
-    };
-    return icons[sentiment] || '😐';
-  }
-
-  function formatTimestamp(timestamp: string) {
-    return new Date(timestamp).toLocaleString();
-  }
 
   async function exportSentimentData() {
     try {
@@ -145,7 +123,7 @@
         timeRange: timeRange
       };
       
-      const exportData = await sentimentAnalysisDb.exportSentimentData(filters);
+      const exportData = await sentimentAnalysisDb.exportSentimentData(filters, workspaceId || undefined);
       
       // Create CSV from the exported data
       const csvData = (exportData as any).posts.map((post: any) =>
@@ -173,31 +151,18 @@
   let emotionChart: any = null;
   let trendChart: any = null;
 
-  // Load ECharts from CDN if not already loaded
-  async function loadECharts() {
-    if (typeof window !== 'undefined' && !(window as any).echarts) {
-      return new Promise((resolve) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
-        script.onload = () => resolve(true);
-        document.head.appendChild(script);
-      });
-    }
-  }
-
   function initializeCharts() {
-    if (typeof window !== 'undefined' && (window as any).echarts) {
-      initSentimentChart();
-      initEmotionChart();
-      initTrendChart();
-    }
+    initSentimentChart();
+    initEmotionChart();
+    initTrendChart();
   }
 
   function initSentimentChart() {
     const container = document.getElementById('sentiment-chart');
     if (!container) return;
 
-    sentimentChart = (window as any).echarts.init(container);
+    sentimentChart = initChart(container);
+    if (!sentimentChart) return;
     updateSentimentChart();
   }
 
@@ -205,7 +170,8 @@
     const container = document.getElementById('emotion-chart');
     if (!container) return;
 
-    emotionChart = (window as any).echarts.init(container);
+    emotionChart = initChart(container);
+    if (!emotionChart) return;
     updateEmotionChart();
   }
 
@@ -213,7 +179,8 @@
     const container = document.getElementById('trend-chart');
     if (!container) return;
 
-    trendChart = (window as any).echarts.init(container);
+    trendChart = initChart(container);
+    if (!trendChart) return;
     updateTrendChart();
   }
 
@@ -385,64 +352,40 @@
   <meta name="description" content="AI-powered sentiment analysis and emotional tone classification for social media content" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <button 
-            on:click={() => window.location.href='/text-analytics'}
-            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Sentiment Analysis</h1>
-            <p class="text-slate-300 text-lg font-medium">Analyze emotional tone and sentiment across social media posts with AI-powered classification</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <button 
-            on:click={exportSentimentData}
-            class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
-            Export Analysis
-          </button>
-        </div>
+  <PageHeader
+    title="Sentiment Analysis"
+    subtitle="Analyze emotional tone and sentiment across social media posts with AI-powered classification"
+    accentColor="emerald"
+    backHref="/text-analytics">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <button
+        on:click={exportSentimentData}
+        class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
+        Export Analysis
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
         <span class="ml-4 text-lg text-gray-600">Loading sentiment analysis from database...</span>
       </div>
     {:else}
-    
+
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">

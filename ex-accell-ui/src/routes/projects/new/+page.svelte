@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { setCurrentProject } from '$lib/stores/projectStore';
   
   let projectName = '';
@@ -72,7 +72,7 @@
 
       if (result.success && result.project) {
         // Redirect to the new project (it will load from database)
-        window.location.href = `/projects/${result.project.id}`;
+        goto(`/projects/${result.project.id}`);
       } else {
         alert('Failed to create project: ' + (result.error || 'Unknown error'));
         isCreating = false;
@@ -93,8 +93,6 @@
   <title>Create New Project - Social Explorer</title>
   <meta name="description" content="Create a new data analysis project" />
 </svelte:head>
-
-<Navigation />
 
 <!-- Header -->
 <div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">

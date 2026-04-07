@@ -28,6 +28,10 @@
     onExecute: () => void;
   } = $props();
 
+  import { onDestroy } from 'svelte';
+
+  let modalElement: HTMLElement;
+
   const inputPlaceholder = '{\n  "dataset_id": "example_dataset",\n  "parameters": {}\n}';
 
   // JSON validation
@@ -57,21 +61,48 @@
     onExecute();
   }
 
-  // Handle Enter key (Ctrl+Enter to execute)
+  // Handle keydown for Escape, focus trap, and Ctrl+Enter
   function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      onClose();
+      return;
+    }
+    if (event.key === 'Tab' && modalElement) {
+      const focusable = modalElement.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
     if (event.key === 'Enter' && event.ctrlKey && !jsonError) {
       handleExecute();
     }
   }
+
+  $effect(() => {
+    if (show) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  });
 </script>
 
 {#if show}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="execute-workflow-title"
-    onkeydown={handleKeyDown}>
+    onkeydown={handleKeyDown}
+    bind:this={modalElement}>
 
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
       <div class="p-6">

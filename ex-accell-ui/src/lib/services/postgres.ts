@@ -19,19 +19,40 @@ interface QueryOptions {
   params?: any[];
 }
 
+/**
+ * Parse DATABASE_URL into individual connection parameters
+ */
+function parseDatabaseUrl(url: string): Partial<PostgresConfig> {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port || '5432'),
+      database: parsed.pathname.replace(/^\//, ''),
+      user: parsed.username,
+      password: decodeURIComponent(parsed.password)
+    };
+  } catch {
+    return {};
+  }
+}
+
 class PostgresConnectionPool {
   private pool: Pool | null = null;
   private config: PostgresConfig;
   private initialized = false;
 
   constructor(config?: Partial<PostgresConfig>) {
-    // Default configuration with environment variable overrides
+    // Parse DATABASE_URL if available
+    const urlConfig = process.env.DATABASE_URL ? parseDatabaseUrl(process.env.DATABASE_URL) : {};
+
+    // Default configuration: DATABASE_URL > explicit config > individual env vars > defaults
     this.config = {
-      host: config?.host || process.env.POSTGRES_HOST || 'localhost',
-      port: config?.port || parseInt(process.env.POSTGRES_PORT || '5432'),
-      database: config?.database || process.env.POSTGRES_DB || 'postgres',
-      user: config?.user || process.env.POSTGRES_USER || process.env.USER || 'postgres',
-      password: config?.password || process.env.POSTGRES_PASSWORD || '',
+      host: config?.host || urlConfig.host || process.env.POSTGRES_HOST || 'localhost',
+      port: config?.port || urlConfig.port || parseInt(process.env.POSTGRES_PORT || '5432'),
+      database: config?.database || urlConfig.database || process.env.POSTGRES_DB || 'postgres',
+      user: config?.user || urlConfig.user || process.env.POSTGRES_USER || process.env.USER || 'postgres',
+      password: config?.password || urlConfig.password || process.env.POSTGRES_PASSWORD || '',
       max: config?.max || parseInt(process.env.POSTGRES_POOL_MAX || '20'),
       idleTimeoutMillis: config?.idleTimeoutMillis || 30000,
       connectionTimeoutMillis: config?.connectionTimeoutMillis || 5000
@@ -121,18 +142,12 @@ class PostgresConnectionPool {
     const client = await this.pool!.connect();
 
     try {
-      // If using DuckDB execution engine, set the execution engine
-      if (options.useDuckDB) {
-        await client.query("SET duckdb.execution TO 'on'");
-      }
+      // pg_duckdb: For heap table queries, native PostgreSQL is faster.
+      // DuckDB execution is only beneficial for Parquet/external data or specific analytical patterns.
+      // Skip SET duckdb.force_execution — let PostgreSQL handle standard queries natively.
 
       // Execute the query
       const result: QueryResult = await client.query(sql, params || []);
-
-      // Reset execution engine if it was changed
-      if (options.useDuckDB) {
-        await client.query("SET duckdb.execution TO 'off'");
-      }
 
       return result.rows as T[];
     } catch (error) {
@@ -203,6 +218,15 @@ class PostgresConnectionPool {
   ): Promise<void> {
     if (!this.initialized || !this.pool) {
       await this.connect();
+    }
+
+    // Validate alias: alphanumeric and underscores only to prevent SQL injection
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(alias)) {
+      throw new Error(`Invalid DuckDB alias '${alias}': must be alphanumeric (with underscores) only`);
+    }
+    // Validate filePath: reject characters that could enable SQL injection
+    if (/[';\\]/.test(filePath)) {
+      throw new Error(`Invalid DuckDB file path '${filePath}': contains disallowed characters`);
     }
 
     const client = await this.pool!.connect();

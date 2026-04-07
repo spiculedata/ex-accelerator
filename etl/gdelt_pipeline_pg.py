@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-GDELT 2025 Data Processing Pipeline (PostgreSQL Edition)
+GDELT 2025-2026 Data Processing Pipeline (PostgreSQL Edition)
 
-This script downloads all GDELT files from 2025 and processes them into a PostgreSQL database
+This script downloads all GDELT files from 2025-2026 and processes them into a PostgreSQL database
 using Polars streaming for efficient memory usage.
 """
 
@@ -14,6 +14,7 @@ from typing import Optional
 
 from gdelt_downloader import GDELTDownloader
 from gdelt_processor_pg import GDELTProcessor
+from db_config import get_connection_context
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,7 +70,9 @@ class GDELTPipeline:
             raise
 
     def process_downloaded_files(self):
-        """Process all downloaded ZIP files"""
+        """Process all downloaded ZIP files using parallel workers"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         zip_files = list(self.download_dir.glob("*.zip"))
         logger.info(f"Found {len(zip_files)} ZIP files to process")
 
@@ -78,20 +81,57 @@ class GDELTPipeline:
             return
 
         processed_count = 0
-        for zip_file in zip_files:
-            try:
-                self.processor.process_zip_file(zip_file)
-                processed_count += 1
+        failed_count = 0
 
-                if processed_count % 100 == 0:
-                    logger.info(f"Processed {processed_count}/{len(zip_files)} files")
-                    self.report_statistics()
+        def process_single(zip_file):
+            """Process a single zip file (thread-safe — each call gets its own DB connection)"""
+            processor = GDELTProcessor()
+            processor.process_zip_file(zip_file)
 
-            except Exception as e:
-                logger.error(f"Failed to process {zip_file}: {e}")
-                continue
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {executor.submit(process_single, zf): zf for zf in zip_files}
 
-        logger.info(f"Successfully processed {processed_count}/{len(zip_files)} files")
+            for future in as_completed(futures):
+                zip_file = futures[future]
+                try:
+                    future.result()
+                    processed_count += 1
+
+                    if processed_count % 100 == 0:
+                        logger.info(f"Processed {processed_count}/{len(zip_files)} files")
+                        self.report_statistics()
+
+                except Exception as e:
+                    failed_count += 1
+                    logger.error(f"Failed to process {zip_file}: {e}")
+
+        logger.info(f"Successfully processed {processed_count}/{len(zip_files)} files ({failed_count} failures)")
+
+        # Refresh materialized views after loading new data
+        self.refresh_materialized_views()
+
+    def refresh_materialized_views(self):
+        """Refresh all GDELT materialized views for fast analytics queries"""
+        views = [
+            'gdelt_summary_monthly',
+            'gdelt_country_monthly',
+            'gdelt_eventtype_monthly',
+            'gdelt_actors_monthly',
+            'gdelt_daily_stats',
+        ]
+        logger.info("Refreshing materialized views...")
+        with get_connection_context() as conn:
+            cur = conn.cursor()
+            for view in views:
+                try:
+                    cur.execute(f"REFRESH MATERIALIZED VIEW {view}")
+                    conn.commit()
+                    logger.info(f"  Refreshed {view}")
+                except Exception as e:
+                    conn.rollback()
+                    logger.warning(f"  Failed to refresh {view}: {e}")
+            cur.close()
+        logger.info("Materialized view refresh complete")
 
     def report_statistics(self):
         """Report current database statistics"""

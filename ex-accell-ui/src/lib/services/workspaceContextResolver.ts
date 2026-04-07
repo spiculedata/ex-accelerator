@@ -1,0 +1,159 @@
+// Workspace Context Resolver
+// Resolves a workspace ID into a data scope for filtering analytics queries
+
+import { postgresPool } from './postgres';
+
+export interface WorkspaceDataScope {
+  workspaceId: number;
+  workspaceName: string;
+  datasets: Array<{
+    id: number;
+    name: string;
+    dataset_type: string;
+    source_platform: string | null;
+    table_name: string | null;
+    schema_name: string | null;
+    date_range_start: string | null;
+    date_range_end: string | null;
+  }>;
+  // Derived convenience flags
+  hasSocialMedia: boolean;
+  hasGdeltEvents: boolean;
+  hasGdeltGkg: boolean;
+  // Derived filter values
+  socialPlatforms: string[];
+  datasetTypes: string[];
+  gdeltDateRange: { start: number; end: number } | null; // YYYYMMDD integers
+}
+
+/**
+ * Resolve workspace scope from a URL's workspace_id param.
+ * Returns null if no workspace_id param (= global/unfiltered view).
+ */
+export async function resolveWorkspaceScope(url: URL): Promise<WorkspaceDataScope | null> {
+  const wsId = url.searchParams.get('workspace_id');
+  if (!wsId) return null;
+
+  const workspaceId = parseInt(wsId);
+  if (isNaN(workspaceId)) return null;
+
+  return resolveWorkspaceScopeById(workspaceId);
+}
+
+/**
+ * Resolve workspace scope by ID.
+ */
+export async function resolveWorkspaceScopeById(workspaceId: number): Promise<WorkspaceDataScope | null> {
+  try {
+    // Get workspace name
+    const wsRows = await postgresPool.query<{ name: string }>(
+      'SELECT name FROM workspaces WHERE id = $1',
+      [workspaceId]
+    );
+    if (wsRows.length === 0) return null;
+
+    // Get linked datasets with full metadata
+    const datasets = await postgresPool.query<any>(
+      `SELECT d.id, d.name, d.dataset_type, d.source_platform, d.table_name, d.schema_name,
+              d.date_range_start, d.date_range_end
+       FROM datasets d
+       JOIN workspace_datasets wd ON d.id = wd.dataset_id
+       WHERE wd.workspace_id = $1 AND wd.status = 'active'`,
+      [workspaceId]
+    );
+
+    const socialPlatforms = [
+      ...new Set(
+        datasets
+          .filter(d => d.dataset_type === 'social_media' && d.source_platform)
+          .map(d => d.source_platform.toLowerCase())
+      )
+    ];
+
+    const gdeltDatasets = datasets.filter(d =>
+      d.dataset_type === 'gdelt_events' || d.dataset_type === 'gdelt_gkg'
+    );
+
+    let gdeltDateRange: { start: number; end: number } | null = null;
+    if (gdeltDatasets.length > 0) {
+      const starts = gdeltDatasets
+        .filter(d => d.date_range_start)
+        .map(d => parseInt(new Date(d.date_range_start).toISOString().slice(0, 10).replace(/-/g, '')));
+      const ends = gdeltDatasets
+        .filter(d => d.date_range_end)
+        .map(d => parseInt(new Date(d.date_range_end).toISOString().slice(0, 10).replace(/-/g, '')));
+
+      if (starts.length > 0 && ends.length > 0) {
+        gdeltDateRange = {
+          start: Math.min(...starts),
+          end: Math.max(...ends)
+        };
+      }
+    }
+
+    return {
+      workspaceId,
+      workspaceName: wsRows[0].name,
+      datasets,
+      hasSocialMedia: socialPlatforms.length > 0,
+      hasGdeltEvents: gdeltDatasets.some(d => d.dataset_type === 'gdelt_events'),
+      hasGdeltGkg: gdeltDatasets.some(d => d.dataset_type === 'gdelt_gkg'),
+      socialPlatforms,
+      datasetTypes: [...new Set(datasets.map(d => d.dataset_type))],
+      gdeltDateRange
+    };
+  } catch (error) {
+    console.error('Failed to resolve workspace scope:', error);
+    return null;
+  }
+}
+
+// ─── SQL Filter Builders ─────────────────────────────────────────────────────
+
+/**
+ * Build a platform filter for social media queries.
+ * Returns { clause, params, nextIndex } or null if no filter needed.
+ */
+export function buildPlatformFilter(
+  scope: WorkspaceDataScope | null,
+  paramIndex: number
+): { clause: string; params: any[]; nextIndex: number } | null {
+  if (!scope || !scope.hasSocialMedia || scope.socialPlatforms.length === 0) {
+    return null;
+  }
+
+  const placeholders = scope.socialPlatforms.map((_, i) => `$${paramIndex + i}`).join(', ');
+  return {
+    clause: `LOWER(platform) IN (${placeholders})`,
+    params: scope.socialPlatforms,
+    nextIndex: paramIndex + scope.socialPlatforms.length
+  };
+}
+
+/**
+ * Build a GDELT date filter from workspace scope.
+ * Returns { clause, params, nextIndex } or null if no filter needed.
+ */
+export function buildGdeltDateFilter(
+  scope: WorkspaceDataScope | null,
+  paramIndex: number
+): { clause: string; params: any[]; nextIndex: number } | null {
+  if (!scope || !scope.gdeltDateRange) {
+    return null;
+  }
+
+  return {
+    clause: `sqldate BETWEEN $${paramIndex} AND $${paramIndex + 1}`,
+    params: [scope.gdeltDateRange.start, scope.gdeltDateRange.end],
+    nextIndex: paramIndex + 2
+  };
+}
+
+/**
+ * Check if workspace has any datasets of the given type.
+ * If scope is null (global view), returns true (show everything).
+ */
+export function hasDataType(scope: WorkspaceDataScope | null, type: string): boolean {
+  if (!scope) return true; // Global view
+  return scope.datasetTypes.includes(type);
+}

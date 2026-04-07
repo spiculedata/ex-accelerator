@@ -85,7 +85,7 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Get overview dashboard statistics
    */
-  async getOverviewStats(): Promise<OverviewStats> {
+  async getOverviewStats(workspaceId?: string): Promise<OverviewStats> {
     try {
       // Fetch real data from projects and datasets APIs
       const [projectsResponse, datasetsResponse] = await Promise.all([
@@ -97,7 +97,10 @@ class OverviewDatabase extends BaseDatabaseService {
       const datasetsResult = await datasetsResponse.json();
 
       // Get analytics data for posts count
-      const analyticsData = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+      const analyticsData = await this.queryAPI<any>({
+        endpoint: 'cross-platform-sentiment',
+        params: workspaceId ? { workspace_id: workspaceId } : {}
+      });
 
       const totalPosts = analyticsData && analyticsData.length > 0
         ? analyticsData.reduce((sum: number, item: any) => sum + (item.post_count || 0), 0)
@@ -116,69 +119,86 @@ class OverviewDatabase extends BaseDatabaseService {
   }
 
   /**
-   * Get app modules status
+   * Get app modules status based on real platform data
    */
-  async getAppModulesStatus(): Promise<AppModule[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    const modules = [
-      { name: 'sentiment-analysis', displayName: 'Sentiment Analysis', color: '#10b981' },
-      { name: 'topic-modeling', displayName: 'Topic Modeling', color: '#3b82f6' },
-      { name: 'language-detection', displayName: 'Language Detection', color: '#8b5cf6' },
-      { name: 'engagement-analysis', displayName: 'Engagement Analysis', color: '#f59e0b' }
-    ];
-
-    return modules.map((module, index) => {
-      const platformData = data[index % data.length] || { total_posts: 0, avg_confidence: 0.8 };
-      const isActive = platformData.total_posts > 0;
-
-      return {
-        name: module.name,
-        displayName: module.displayName,
-        status: isActive ? 'running' : 'idle',
-        activeJobs: Math.floor(platformData.total_posts * 0.02),
-        totalProcessed: platformData.total_posts,
-        statusDisplay: isActive ? 'Active' : 'Idle',
-        activityDisplay: `${platformData.total_posts} processed`,
-        iconColor: module.color
-      };
-    });
-  }
-
-  /**
-   * Get recent system activities
-   */
-  async getRecentActivities(limit: number = 10): Promise<SystemActivity[]> {
+  async getAppModulesStatus(workspaceId?: string): Promise<AppModule[]> {
     const data = await this.queryAPI<any>({
-      endpoint: 'sample-posts',
-      params: { limit: limit.toString() }
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
     });
 
     if (!data || data.length === 0) {
       return [];
     }
 
-    const activityTypes = ['analysis', 'processing', 'export', 'crawl'];
-    const modules = ['sentiment-analysis', 'topic-modeling', 'language-detection', 'engagement-analysis'];
-    const statuses = ['completed', 'running', 'pending'];
-    const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
+    const platformColors: Record<string, string> = {
+      twitter: '#1da1f2',
+      facebook: '#1877f2',
+      instagram: '#e4405f',
+      youtube: '#ff0000',
+      telegram: '#0088cc',
+      reddit: '#ff4500'
+    };
 
     return this.safeTransform(
       data,
-      (post, index) => ({
-        id: post.id,
-        activityType: activityTypes[index % activityTypes.length],
-        title: `${modules[index % modules.length].replace('-', ' ')} completed`,
-        description: `Processed ${post.platform} content with ${Math.round((post.confidence || 0.8) * 100)}% confidence`,
-        module: modules[index % modules.length],
-        status: statuses[index % statuses.length],
-        timeAgo: this.getTimeAgo(new Date(post.timestamp)),
-        iconColor: colors[index % colors.length]
-      }),
+      (platform) => {
+        const name = platform.platform.toLowerCase();
+        const isActive = platform.total_posts > 0;
+
+        return {
+          name: name,
+          displayName: platform.platform.charAt(0).toUpperCase() + platform.platform.slice(1),
+          status: isActive ? 'running' : 'idle',
+          activeJobs: 0,
+          totalProcessed: platform.total_posts,
+          statusDisplay: isActive ? 'Active' : 'Idle',
+          activityDisplay: `${platform.total_posts} posts analyzed`,
+          iconColor: platformColors[name] || '#6b7280'
+        };
+      },
+      []
+    );
+  }
+
+  /**
+   * Get recent system activities from actual post data
+   */
+  async getRecentActivities(limit: number = 10, workspaceId?: string): Promise<SystemActivity[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'sample-posts',
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), limit: limit.toString() }
+    });
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    const sentimentColors: Record<string, string> = {
+      positive: '#10b981',
+      negative: '#ef4444',
+      neutral: '#6b7280'
+    };
+
+    return this.safeTransform(
+      data,
+      (post) => {
+        const sentiment = (post.sentiment || '').toLowerCase();
+        const sentimentKey = sentiment.includes('positive') ? 'positive' :
+                            sentiment.includes('negative') ? 'negative' : 'neutral';
+        const confidence = post.confidence ? Math.round(post.confidence * 100) : 0;
+
+        return {
+          id: post.id,
+          activityType: 'analysis',
+          title: `${post.platform} post analyzed`,
+          description: `Sentiment: ${sentimentKey} (${confidence}% confidence) - "${(post.text || '').substring(0, 80)}${(post.text || '').length > 80 ? '...' : ''}"`,
+          module: 'sentiment-analysis',
+          status: 'completed',
+          timeAgo: this.getTimeAgo(new Date(post.timestamp)),
+          iconColor: sentimentColors[sentimentKey] || '#6b7280'
+        };
+      },
       []
     );
   }
@@ -186,8 +206,11 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Get system status metrics
    */
-  async getSystemStatus(): Promise<SystemStatus[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getSystemStatus(workspaceId?: string): Promise<SystemStatus[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -203,8 +226,11 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Get active projects
    */
-  async getActiveProjects(limit: number = 10): Promise<Project[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getActiveProjects(limit: number = 10, workspaceId?: string): Promise<Project[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -229,8 +255,11 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Get current workspace (most active project)
    */
-  async getCurrentWorkspace(): Promise<Workspace | null> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getCurrentWorkspace(workspaceId?: string): Promise<Workspace | null> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return null;
@@ -254,8 +283,11 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Get data processing statistics
    */
-  async getDataProcessingStats(): Promise<DataProcessingStats[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getDataProcessingStats(workspaceId?: string): Promise<DataProcessingStats[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -277,15 +309,15 @@ class OverviewDatabase extends BaseDatabaseService {
   /**
    * Export all overview data
    */
-  async exportOverviewData(): Promise<any> {
+  async exportOverviewData(workspaceId?: string): Promise<any> {
     const [stats, modules, activities, systemStatus, projects, workspace, dataProcessing] = await Promise.all([
-      this.getOverviewStats(),
-      this.getAppModulesStatus(),
-      this.getRecentActivities(20),
-      this.getSystemStatus(),
-      this.getActiveProjects(20),
-      this.getCurrentWorkspace(),
-      this.getDataProcessingStats()
+      this.getOverviewStats(workspaceId),
+      this.getAppModulesStatus(workspaceId),
+      this.getRecentActivities(20, workspaceId),
+      this.getSystemStatus(workspaceId),
+      this.getActiveProjects(20, workspaceId),
+      this.getCurrentWorkspace(workspaceId),
+      this.getDataProcessingStats(workspaceId)
     ]);
 
     return {
@@ -358,6 +390,7 @@ class OverviewDatabase extends BaseDatabaseService {
    * Calculate time ago from date
    */
   private getTimeAgo(date: Date): string {
+    if (!date || isNaN(date.getTime())) return '—';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);

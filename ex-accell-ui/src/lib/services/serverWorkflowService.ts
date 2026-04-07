@@ -1,10 +1,11 @@
 // Server-side Workflow Service
-// Handles workflow operations on the server without fetch dependencies
+// Handles workflow operations on the server with PostgreSQL persistence
 
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
 import { daprWorkflowExecutor } from './daprWorkflowExecutor';
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
 import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
+import { postgresPool } from './postgres';
 
 /**
  * Helper function to safely extract error messages
@@ -66,10 +67,72 @@ export interface WorkflowExecution {
 }
 
 class ServerWorkflowService {
-  // In-memory storage for demo purposes
-  // In production, this would use a proper database
-  private workflows = new Map<string, PublishedWorkflow>();
-  private executions = new Map<string, WorkflowExecution>();
+
+  /**
+   * Map a database row from published_workflows to a PublishedWorkflow object
+   */
+  private mapRowToWorkflow(row: any): PublishedWorkflow {
+    const definition = typeof row.workflow_definition === 'string'
+      ? JSON.parse(row.workflow_definition)
+      : row.workflow_definition;
+    const generatedCode = typeof row.generated_code === 'string'
+      ? JSON.parse(row.generated_code)
+      : row.generated_code;
+    const metadata = typeof row.metadata === 'string'
+      ? JSON.parse(row.metadata)
+      : row.metadata;
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description || '',
+      version: row.version || '1.0.0',
+      status: row.status || 'published',
+      pattern: generatedCode?.workflowPattern || '',
+      definition,
+      generatedCode,
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+      createdBy: row.created_by || '',
+      tags: metadata?.tags || [],
+      metadata: {
+        stepCount: metadata?.stepCount || 0,
+        estimatedDuration: metadata?.estimatedDuration || 0,
+        datasetRequirements: metadata?.datasetRequirements || []
+      }
+    };
+  }
+
+  /**
+   * Map a database row from workflow_executions to a WorkflowExecution object
+   */
+  private mapRowToExecution(row: any): WorkflowExecution {
+    const input = typeof row.input === 'string' ? JSON.parse(row.input) : row.input;
+    const output = typeof row.output === 'string' ? JSON.parse(row.output) : row.output;
+    const logs = typeof row.logs === 'string' ? JSON.parse(row.logs) : row.logs;
+
+    return {
+      id: row.id,
+      workflowId: row.workflow_id,
+      workflowName: row.workflow_name || '',
+      status: row.status || 'queued',
+      progress: row.progress || 0,
+      currentStep: row.current_step || '',
+      startedAt: row.started_at instanceof Date ? row.started_at.toISOString() : (row.started_at || row.created_at),
+      completedAt: row.completed_at instanceof Date ? row.completed_at.toISOString() : row.completed_at,
+      duration: row.duration,
+      input: input || {},
+      output: output || undefined,
+      error: row.error || undefined,
+      logs: logs || [],
+      metadata: {
+        triggeredBy: row.triggered_by || 'manual',
+        priority: row.priority || 'medium',
+        retryCount: row.retry_count || 0,
+        maxRetries: row.max_retries || 3
+      }
+    };
+  }
 
   /**
    * Publish a workflow
@@ -87,30 +150,56 @@ class ServerWorkflowService {
     try {
       // Generate Dapr workflow code
       const generatedCode = daprWorkflowGenerator.generateWorkflowCode(workflowDefinition);
-      
-      // Create published workflow record
+
+      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date().toISOString();
+      const version = metadata.version || '1.0.0';
+      const tags = metadata.tags || [];
+      const workflowMetadata = {
+        stepCount: workflowDefinition.steps.length,
+        estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
+        datasetRequirements: this.extractDatasetRequirements(workflowDefinition),
+        tags
+      };
+
+      await postgresPool.query(
+        `INSERT INTO published_workflows
+          (id, name, description, version, status, workflow_definition, generated_code, metadata, created_by, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          id,
+          metadata.name,
+          metadata.description,
+          version,
+          'published',
+          JSON.stringify(workflowDefinition),
+          JSON.stringify(generatedCode),
+          JSON.stringify(workflowMetadata),
+          metadata.createdBy,
+          now,
+          now
+        ]
+      );
+
       const publishedWorkflow: PublishedWorkflow = {
-        id: `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id,
         name: metadata.name,
         description: metadata.description,
-        version: metadata.version || '1.0.0',
+        version,
         status: 'published',
         pattern: generatedCode.workflowPattern,
         definition: workflowDefinition,
         generatedCode,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
         createdBy: metadata.createdBy,
-        tags: metadata.tags || [],
+        tags,
         metadata: {
-          stepCount: workflowDefinition.steps.length,
-          estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
-          datasetRequirements: this.extractDatasetRequirements(workflowDefinition)
+          stepCount: workflowMetadata.stepCount,
+          estimatedDuration: workflowMetadata.estimatedDuration,
+          datasetRequirements: workflowMetadata.datasetRequirements
         }
       };
-
-      // Store in memory
-      this.workflows.set(publishedWorkflow.id, publishedWorkflow);
 
       console.log(`Workflow "${publishedWorkflow.name}" published with ID: ${publishedWorkflow.id}`);
       return publishedWorkflow;
@@ -128,34 +217,136 @@ class ServerWorkflowService {
     pattern?: string;
     search?: string;
   } = {}): Promise<PublishedWorkflow[]> {
-    let workflows = Array.from(this.workflows.values());
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
 
-    if (filters.status) {
-      workflows = workflows.filter(w => w.status === filters.status);
+      if (filters.status) {
+        conditions.push(`status = $${paramIndex++}`);
+        params.push(filters.status);
+      }
+
+      if (filters.search) {
+        conditions.push(`(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`);
+        params.push(`%${filters.search.toLowerCase()}%`);
+        paramIndex++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const sql = `SELECT * FROM published_workflows ${whereClause} ORDER BY updated_at DESC`;
+
+      const rows = await postgresPool.query(sql, params);
+      let workflows = rows.map((row: any) => this.mapRowToWorkflow(row));
+
+      // Filter by pattern in-memory since it's derived from generated_code JSONB
+      if (filters.pattern) {
+        workflows = workflows.filter(w => w.pattern === filters.pattern);
+      }
+
+      return workflows;
+    } catch (error) {
+      console.error('Error fetching published workflows:', error);
+      throw new Error(`Failed to fetch workflows: ${getErrorMessage(error)}`);
     }
-
-    if (filters.pattern) {
-      workflows = workflows.filter(w => w.pattern === filters.pattern);
-    }
-
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      workflows = workflows.filter(w => 
-        w.name.toLowerCase().includes(search) || 
-        w.description.toLowerCase().includes(search)
-      );
-    }
-
-    return workflows.sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
   }
 
   /**
    * Get a specific workflow
    */
   async getPublishedWorkflow(workflowId: string): Promise<PublishedWorkflow | null> {
-    return this.workflows.get(workflowId) || null;
+    try {
+      const rows = await postgresPool.query(
+        'SELECT * FROM published_workflows WHERE id = $1',
+        [workflowId]
+      );
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this.mapRowToWorkflow(rows[0]);
+    } catch (error) {
+      console.error('Error fetching workflow:', error);
+      throw new Error(`Failed to fetch workflow: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Update a published workflow
+   */
+  async updateWorkflow(
+    workflowId: string,
+    updates: {
+      name?: string;
+      description?: string;
+      status?: 'draft' | 'published' | 'archived';
+      metadata?: Record<string, any>;
+    }
+  ): Promise<PublishedWorkflow | null> {
+    try {
+      const setClauses: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (updates.name !== undefined) {
+        setClauses.push(`name = $${paramIndex++}`);
+        params.push(updates.name);
+      }
+
+      if (updates.description !== undefined) {
+        setClauses.push(`description = $${paramIndex++}`);
+        params.push(updates.description);
+      }
+
+      if (updates.status !== undefined) {
+        setClauses.push(`status = $${paramIndex++}`);
+        params.push(updates.status);
+      }
+
+      if (updates.metadata !== undefined) {
+        setClauses.push(`metadata = $${paramIndex++}`);
+        params.push(JSON.stringify(updates.metadata));
+      }
+
+      if (setClauses.length === 0) {
+        return this.getPublishedWorkflow(workflowId);
+      }
+
+      setClauses.push(`updated_at = $${paramIndex++}`);
+      params.push(new Date().toISOString());
+
+      params.push(workflowId);
+      const sql = `UPDATE published_workflows SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+
+      const rows = await postgresPool.query(sql, params);
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this.mapRowToWorkflow(rows[0]);
+    } catch (error) {
+      console.error('Error updating workflow:', error);
+      throw new Error(`Failed to update workflow: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Delete a published workflow
+   */
+  async deleteWorkflow(workflowId: string): Promise<boolean> {
+    try {
+      const rows = await postgresPool.query(
+        'DELETE FROM published_workflows WHERE id = $1 RETURNING id',
+        [workflowId]
+      );
+
+      return rows.length > 0;
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      throw new Error(`Failed to delete workflow: ${getErrorMessage(error)}`);
+    }
   }
 
   /**
@@ -170,22 +361,47 @@ class ServerWorkflowService {
       maxRetries?: number;
     } = {}
   ): Promise<WorkflowExecution> {
-    const workflow = this.workflows.get(workflowId);
+    const workflow = await this.getPublishedWorkflow(workflowId);
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
     }
 
     // Create execution record
+    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    const logs: WorkflowExecution['logs'] = [];
+
+    try {
+      await postgresPool.query(
+        `INSERT INTO workflow_executions
+          (id, workflow_id, status, input, logs, error, started_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          executionId,
+          workflow.id,
+          'queued',
+          JSON.stringify(input),
+          JSON.stringify(logs),
+          null,
+          now,
+          now
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating execution record:', error);
+      throw new Error(`Failed to create execution record: ${getErrorMessage(error)}`);
+    }
+
     const execution: WorkflowExecution = {
-      id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: executionId,
       workflowId: workflow.id,
       workflowName: workflow.name,
       status: 'queued',
       progress: 0,
       currentStep: '',
-      startedAt: new Date().toISOString(),
+      startedAt: now,
       input,
-      logs: [],
+      logs,
       metadata: {
         triggeredBy: options.triggeredBy || 'manual',
         priority: options.priority || 'medium',
@@ -193,9 +409,6 @@ class ServerWorkflowService {
         maxRetries: options.maxRetries || 3
       }
     };
-
-    // Store execution
-    this.executions.set(execution.id, execution);
 
     // Start real workflow execution using Dapr
     this.executeRealWorkflow(execution, workflow);
@@ -211,64 +424,101 @@ class ServerWorkflowService {
     status?: string;
     limit?: number;
   } = {}): Promise<WorkflowExecution[]> {
-    let executions = Array.from(this.executions.values());
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
 
-    if (filters.workflowId) {
-      executions = executions.filter(e => e.workflowId === filters.workflowId);
+      if (filters.workflowId) {
+        conditions.push(`workflow_id = $${paramIndex++}`);
+        params.push(filters.workflowId);
+      }
+
+      if (filters.status) {
+        conditions.push(`status = $${paramIndex++}`);
+        params.push(filters.status);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const limitClause = filters.limit ? `LIMIT $${paramIndex++}` : '';
+      if (filters.limit) {
+        params.push(filters.limit);
+      }
+
+      const sql = `SELECT * FROM workflow_executions ${whereClause} ORDER BY started_at DESC ${limitClause}`;
+
+      const rows = await postgresPool.query(sql, params);
+      return rows.map((row: any) => this.mapRowToExecution(row));
+    } catch (error) {
+      console.error('Error fetching workflow executions:', error);
+      throw new Error(`Failed to fetch executions: ${getErrorMessage(error)}`);
     }
-
-    if (filters.status) {
-      executions = executions.filter(e => e.status === filters.status);
-    }
-
-    executions = executions.sort((a, b) => 
-      new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-    );
-
-    if (filters.limit) {
-      executions = executions.slice(0, filters.limit);
-    }
-
-    return executions;
   }
 
   /**
    * Get specific execution
    */
   async getWorkflowExecution(executionId: string): Promise<WorkflowExecution | null> {
-    return this.executions.get(executionId) || null;
+    try {
+      const rows = await postgresPool.query(
+        'SELECT * FROM workflow_executions WHERE id = $1',
+        [executionId]
+      );
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this.mapRowToExecution(rows[0]);
+    } catch (error) {
+      console.error('Error fetching execution:', error);
+      throw new Error(`Failed to fetch execution: ${getErrorMessage(error)}`);
+    }
   }
 
   /**
    * Cancel workflow execution
    */
   async cancelWorkflowExecution(executionId: string): Promise<void> {
-    const execution = this.executions.get(executionId);
+    const execution = await this.getWorkflowExecution(executionId);
     if (execution && (execution.status === 'queued' || execution.status === 'running')) {
+      const now = new Date().toISOString();
       try {
         // Cancel in hybrid Dapr workflow runtime (JS SDK management)
         await hybridDaprWorkflowExecutor.cancelWorkflow(executionId);
-        
+
         execution.status = 'cancelled';
-        execution.completedAt = new Date().toISOString();
+        execution.completedAt = now;
         execution.logs.push({
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           level: 'info',
           message: 'Workflow execution cancelled by user via Dapr JS SDK'
         });
-        this.executions.set(executionId, execution);
+
+        await postgresPool.query(
+          `UPDATE workflow_executions
+           SET status = $1, completed_at = $2, logs = $3
+           WHERE id = $4`,
+          ['cancelled', now, JSON.stringify(execution.logs), executionId]
+        );
       } catch (error) {
         console.error('Failed to cancel workflow in Dapr:', error);
-        // Still mark as cancelled locally
+        // Still mark as cancelled in database
         execution.status = 'cancelled';
-        execution.completedAt = new Date().toISOString();
+        execution.completedAt = now;
         execution.error = `Cancellation error: ${getErrorMessage(error)}`;
         execution.logs.push({
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           level: 'warn',
           message: `Workflow marked as cancelled locally, Dapr cancellation failed: ${getErrorMessage(error)}`
         });
-        this.executions.set(executionId, execution);
+
+        await postgresPool.query(
+          `UPDATE workflow_executions
+           SET status = $1, completed_at = $2, error = $3, logs = $4
+           WHERE id = $5`,
+          ['cancelled', now, execution.error, JSON.stringify(execution.logs), executionId]
+        ).catch(dbErr => console.error('Failed to update cancelled execution in DB:', dbErr));
       }
     }
   }
@@ -286,25 +536,44 @@ class ServerWorkflowService {
         message: `Starting hybrid Dapr workflow execution: ${workflow.name} (Python registration + JS SDK execution)`
       });
 
-      // Update execution in storage
-      this.executions.set(execution.id, execution);
+      // Update execution status in database
+      await postgresPool.query(
+        `UPDATE workflow_executions
+         SET status = $1, logs = $2
+         WHERE id = $3`,
+        ['running', JSON.stringify(execution.logs), execution.id]
+      ).catch(err => console.error('Failed to update execution status to running:', err));
 
       // Execute using hybrid Dapr workflow executor
       await hybridDaprWorkflowExecutor.executeWorkflow(workflow, execution, execution.input);
 
-      // The hybridDaprWorkflowExecutor will update the execution status during monitoring
-      
+      // Update completion status in database
+      const completedAt = new Date().toISOString();
+      await postgresPool.query(
+        `UPDATE workflow_executions
+         SET status = $1, output = $2, logs = $3, completed_at = $4
+         WHERE id = $5`,
+        [execution.status, JSON.stringify(execution.output || null), JSON.stringify(execution.logs), completedAt, execution.id]
+      ).catch(err => console.error('Failed to update execution completion in DB:', err));
+
     } catch (error) {
       console.error(`Hybrid workflow execution ${execution.id} failed:`, error);
+      const now = new Date().toISOString();
       execution.status = 'failed';
       execution.error = getErrorMessage(error);
-      execution.completedAt = new Date().toISOString();
+      execution.completedAt = now;
       execution.logs.push({
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         level: 'error',
         message: `Hybrid workflow execution failed: ${getErrorMessage(error)}`
       });
-      this.executions.set(execution.id, execution);
+
+      await postgresPool.query(
+        `UPDATE workflow_executions
+         SET status = $1, error = $2, logs = $3, completed_at = $4
+         WHERE id = $5`,
+        ['failed', execution.error, JSON.stringify(execution.logs), now, execution.id]
+      ).catch(dbErr => console.error('Failed to update failed execution in DB:', dbErr));
     }
   }
 

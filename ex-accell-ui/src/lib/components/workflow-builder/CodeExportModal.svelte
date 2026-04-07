@@ -5,6 +5,7 @@
    * Displays generated Python workflow code with multiple tabs for different files.
    * Allows users to view, copy, and download the generated workflow code.
    */
+  import { onDestroy } from 'svelte';
 
   let {
     show = false,
@@ -19,6 +20,36 @@
     onDownload: () => void;
     onCopyToClipboard: (text: string) => void;
   } = $props();
+
+  let modalElement: HTMLElement;
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      onClose();
+      return;
+    }
+    if (e.key === 'Tab' && modalElement) {
+      const focusable = modalElement.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+  }
+
+  $effect(() => {
+    if (show) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  });
 
   type CodeTab = 'python' | 'requirements' | 'dapr' | 'activities';
   let activeTab = $state<CodeTab>('python');
@@ -74,11 +105,14 @@
 </script>
 
 {#if show && pythonWorkflow}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="code-export-title">
+    aria-labelledby="code-export-title"
+    onkeydown={handleKeydown}
+    bind:this={modalElement}>
 
     <div class="bg-white rounded-xl shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] flex flex-col">
       <!-- Modal Header -->

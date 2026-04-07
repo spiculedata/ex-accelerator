@@ -1,19 +1,21 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { languageDetectionDb } from '$lib/services/languageDetectionDb';
   import { onMount } from 'svelte';
+  import { getConfidenceColor } from '$lib/utils/colorUtils';
+  import { ErrorAlert } from '$lib/components/ui';
+
+  $: workspaceId = $page.url.searchParams.get('workspace');
   
   // Loading state
   let loading = true;
-  
-  // Redirect to projects if no current project
+  let errorMessage = '';
+
   onMount(async () => {
-    if (!$currentProject) {
-      window.location.href = '/projects';
-      return;
-    }
-    
     // Load language detection data from database
     await loadLanguageDetectionData();
   });
@@ -30,21 +32,22 @@
   async function loadLanguageDetectionData() {
     try {
       // Load all language data from database service
-      languageStats = await languageDetectionDb.getLanguageStats();
-      languageAnalysis = await languageDetectionDb.getLanguageAnalysis();
-      detectionStats = await languageDetectionDb.getLanguageDetectionStats();
+      languageStats = await languageDetectionDb.getLanguageStats(workspaceId || undefined);
+      languageAnalysis = await languageDetectionDb.getLanguageAnalysis(workspaceId || undefined);
+      detectionStats = await languageDetectionDb.getLanguageDetectionStats(workspaceId || undefined);
       
       // Load posts with current filters
       await loadFilteredPosts();
       
       // Load additional data
-      mixingData = await languageDetectionDb.getLanguageMixing();
-      geographicData = await languageDetectionDb.getGeographicDistribution();
+      mixingData = await languageDetectionDb.getLanguageMixing(workspaceId || undefined);
+      geographicData = await languageDetectionDb.getGeographicDistribution(workspaceId || undefined);
       
       console.log('Language detection data loaded successfully from database');
       loading = false;
     } catch (error) {
       console.error('Error loading language detection data:', error);
+      errorMessage = 'Failed to load language detection data. Showing sample data.';
       // Fallback to sample data if database fails
       loadFallbackData();
     }
@@ -59,9 +62,10 @@
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      samplePosts = await languageDetectionDb.getSamplePosts(filters);
+      samplePosts = await languageDetectionDb.getSamplePosts(filters, workspaceId || undefined);
     } catch (error) {
       console.error('Error loading filtered posts:', error);
+      errorMessage = 'Failed to load filtered posts. Please try again.';
     }
   }
   
@@ -107,11 +111,6 @@
     return lang ? lang.name : code.toUpperCase();
   }
 
-  function getConfidenceColor(confidence: number) {
-    if (confidence >= 0.9) return 'bg-amber-100 text-amber-800';
-    if (confidence >= 0.8) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  }
 
   function formatTimestamp(timestamp: string) {
     return new Date(timestamp).toLocaleString();
@@ -126,7 +125,7 @@
         timeRange: timeRange
       };
       
-      const exportData = await languageDetectionDb.exportLanguageData(filters);
+      const exportData = await languageDetectionDb.exportLanguageData(filters, workspaceId || undefined);
       
       // Create CSV from the exported data
       const csvData = (exportData as any).languages.map((lang: any) =>
@@ -145,6 +144,7 @@
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting language data:', error);
+      errorMessage = 'Failed to export language data. Using cached data instead.';
       // Fallback to current data
       const csvData = languageStats.map(lang => 
         `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
@@ -174,64 +174,41 @@
   <meta name="description" content="Language detection and analysis for social media content" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-amber-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-amber-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <button 
-            on:click={() => window.location.href='/text-analytics'}
-            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Language Detection</h1>
-            <p class="text-slate-300 text-lg font-medium">Analyze language distribution and detection confidence in your social media data</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-3">
-          <button 
-            on:click={exportLanguageData}
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-            Export Report
-          </button>
-        </div>
+  <PageHeader
+    title="Language Detection"
+    subtitle="Analyze language distribution and detection confidence in your social media data"
+    accentColor="amber"
+    backHref="/text-analytics">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+        </svg>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <button
+        on:click={exportLanguageData}
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Export Report
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
         <span class="ml-4 text-lg text-gray-600">Loading language detection data from database...</span>
       </div>
     {:else}
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">

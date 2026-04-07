@@ -1,9 +1,16 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
+  import { getTrendColor } from '$lib/utils/colorUtils';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+
+  $: workspaceId = $page.url.searchParams.get('workspace');
   
+  let errorMessage = '';
+
   // Trigrams analysis data
   let loading = true;
   let trigramsData: TrigramData[] = [];
@@ -42,8 +49,8 @@
       
       // Load trigrams data and stats from database
       const [data, stats] = await Promise.all([
-        trigramsDb.getTrigramsData(filters),
-        trigramsDb.getTrigramStats(filters)
+        trigramsDb.getTrigramsData(filters, workspaceId || undefined),
+        trigramsDb.getTrigramStats(filters, workspaceId || undefined)
       ]);
       
       trigramsData = data;
@@ -53,6 +60,7 @@
       console.log('Trigrams data loaded successfully from database');
     } catch (error) {
       console.error('Error loading trigrams data:', error);
+      errorMessage = 'Failed to load trigrams data. Please try again.';
     } finally {
       loading = false;
     }
@@ -91,14 +99,6 @@
     return icons[trend] || icons.stable;
   }
 
-  function getTrendColor(trend: string) {
-    const colors: Record<string, string> = {
-      'up': 'text-green-600',
-      'down': 'text-red-600',
-      'stable': 'text-gray-500'
-    };
-    return colors[trend] || colors.stable;
-  }
 
   async function exportTrigrams() {
     try {
@@ -120,6 +120,7 @@
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting trigrams data:', error);
+      errorMessage = 'Failed to export trigrams data. Please try again.';
     }
   }
 
@@ -136,49 +137,31 @@
   <meta name="description" content="N-gram analysis for discovering phrase patterns and linguistic trends in social media content" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Trigrams Analysis</h1>
-            <p class="text-slate-300 text-lg font-medium">Discover three-word phrase patterns and linguistic trends in your content</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
+  <PageHeader
+    title="Trigram Analysis"
+    subtitle="Discover three-word phrase patterns and linguistic trends in your content"
+    accentColor="purple">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+      </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <div class="hidden lg:flex items-center space-x-6">
+        <div class="text-center">
+          <div class="text-3xl font-bold text-white">{trigramStats.totalTrigrams.toLocaleString()}</div>
+          <div class="text-purple-200 text-sm font-medium">Total Trigrams</div>
         </div>
-        
-        <!-- Quick Stats -->
-        <div class="hidden lg:flex items-center space-x-6">
-          <div class="text-center">
-            <div class="text-3xl font-bold text-white">{trigramStats.totalTrigrams.toLocaleString()}</div>
-            <div class="text-purple-200 text-sm font-medium">Total Trigrams</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl font-bold text-white">{trigramStats.uniqueTrigrams}</div>
-            <div class="text-purple-200 text-sm font-medium">Unique Patterns</div>
-          </div>
+        <div class="text-center">
+          <div class="text-3xl font-bold text-white">{trigramStats.uniqueTrigrams}</div>
+          <div class="text-purple-200 text-sm font-medium">Unique Patterns</div>
         </div>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Controls Section -->
   <div class="bg-white border-b border-gray-200">
@@ -242,6 +225,7 @@
 
   <!-- Main Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Trigrams List -->
       <div class="lg:col-span-3">

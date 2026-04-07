@@ -37,12 +37,19 @@ export const PUT: RequestHandler = async ({ params, request }) => {
   try {
     const { id } = params;
     const body = await request.json();
-    
-    // TODO: Implement workflow update logic
-    return json({
-      success: true,
-      message: 'Workflow update not yet implemented'
+
+    const updated = await serverWorkflowService.updateWorkflow(id, {
+      name: body.name,
+      description: body.description,
+      status: body.status,
+      metadata: body.metadata
     });
+
+    if (!updated) {
+      return error(404, 'Workflow not found');
+    }
+
+    return json({ success: true, workflow: updated });
   } catch (err) {
     console.error('Error updating workflow:', err);
     return error(500, 'Failed to update workflow');
@@ -51,17 +58,19 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
 /**
  * DELETE /api/workflows/[id]
- * Delete/archive a workflow
+ * Delete a workflow and its executions
  */
 export const DELETE: RequestHandler = async ({ params }) => {
   try {
     const { id } = params;
-    
-    // TODO: Implement workflow deletion logic
-    return json({
-      success: true,
-      message: 'Workflow deletion not yet implemented'
-    });
+
+    const deleted = await serverWorkflowService.deleteWorkflow(id);
+
+    if (!deleted) {
+      return error(404, 'Workflow not found');
+    }
+
+    return json({ success: true });
   } catch (err) {
     console.error('Error deleting workflow:', err);
     return error(500, 'Failed to delete workflow');

@@ -1,9 +1,17 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
   import { topicModelingDb } from '$lib/services/topicModelingDb';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { getCategoryColor } from '$lib/utils/colorUtils';
+  import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import { ErrorAlert } from '$lib/components/ui';
+
+  $: workspaceId = $page.url.searchParams.get('workspace');
 
   // Type definitions
   interface Topic {
@@ -22,14 +30,9 @@
   
   // Loading state
   let loading = true;
-  
-  // Redirect to projects if no current project
+  let errorMessage = '';
+
   onMount(async () => {
-    if (!$currentProject) {
-      window.location.href = '/projects';
-      return;
-    }
-    
     // Load topic modeling data from database
     await loadTopicModelingData();
   });
@@ -50,22 +53,24 @@
         minSize: minTopicSize
       };
       
-      topicsData = (await topicModelingDb.getTopics(filters as any)) as Topic[];
-      topicCategories = await topicModelingDb.getTopicCategories();
-      topicRelationships = await topicModelingDb.getTopicRelationships(0.5);
-      topicStats = await topicModelingDb.getTopicStats();
+      topicsData = (await topicModelingDb.getTopics(filters as any, workspaceId || undefined)) as Topic[];
+      topicCategories = await topicModelingDb.getTopicCategories(workspaceId || undefined);
+      topicRelationships = await topicModelingDb.getTopicRelationships(0.05, workspaceId || undefined);
+      topicStats = await topicModelingDb.getTopicStats(workspaceId || undefined);
       
       console.log('Topic modeling data loaded successfully from database');
       loading = false;
       
       // Initialize charts after data is loaded
-      if (typeof window !== 'undefined' && (window as any).echarts) {
-        setTimeout(() => {
-          initializeCharts();
-        }, 100);
+      try {
+        await waitForEcharts();
+        initializeCharts();
+      } catch (e) {
+        console.error('Charts unavailable:', e);
       }
     } catch (error) {
       console.error('Error loading topic modeling data:', error);
+      errorMessage = 'Failed to load topic modeling data. Please try again.';
       // No fallback - topic modeling requires database connection
       loading = false;
     }
@@ -76,61 +81,63 @@
   let selectedTopic: Topic | null = null;
   let searchQuery = '';
   let minTopicSize = 1;
+  let sliderValue = 0; // 0-100 linear slider mapped to log scale
   let showNetworkDiagram = true;
   let networkChart: any = null;
   let treemapChart: any = null;
 
-  // Reactive statements for filter changes - only reload after initial load
-  $: if ((selectedCategory !== 'all' || searchQuery !== '' || minTopicSize !== 1) && !loading && topicsData.length > 0) {
-    loadFilteredTopics();
+  // Debounce timer for API-driven filters
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Reactive: re-fetch from API only when category or search change (debounced)
+  $: if ((selectedCategory !== 'all' || searchQuery !== '') && !loading && topicsData.length > 0) {
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => loadFilteredTopics(), 300);
   }
 
-  // Load filtered topics from database
+  // Load filtered topics from database (only for category/search — minSize is client-side)
   async function loadFilteredTopics() {
     try {
       const filters = {
         category: selectedCategory,
-        search: searchQuery,
-        minSize: minTopicSize
+        search: searchQuery
       };
-      topicsData = (await topicModelingDb.getTopics(filters as any)) as Topic[];
-
-      // Update charts with new data
-      if (typeof window !== 'undefined' && (window as any).echarts) {
-        setTimeout(async () => {
-          updateNetworkChart();
-          await updateTreemapChart();
-        }, 100);
-      }
+      topicsData = (await topicModelingDb.getTopics(filters as any, workspaceId || undefined)) as Topic[];
     } catch (error) {
       console.error('Error loading filtered topics:', error);
+      errorMessage = 'Failed to load filtered topics. Please try again.';
     }
   }
 
-  // Filtered topics (for display purposes, actual filtering happens in database)
-  $: filteredTopics = topicsData;
+  // Log-scale mapping: slider 0-100 → minTopicSize 1 to maxSize
+  $: maxTopicSize = Math.max(100, topicsData.reduce((max, t) => Math.max(max, t.size), 100));
+  $: minTopicSize = sliderValue === 0 ? 1 : Math.round(Math.pow(10, (sliderValue / 100) * Math.log10(maxTopicSize)));
+
+  // Client-side filtering for minTopicSize (no API call needed)
+  $: filteredTopics = topicsData.filter(t => t.size >= minTopicSize);
+
+  // Update charts when filteredTopics change
+  $: if (browser && filteredTopics && !loading) {
+    if (networkChart) updateNetworkChart();
+    if (treemapChart) setTimeout(async () => await updateTreemapChart(), 50);
+  }
 
   // Get categories from database data
-  $: categories = ['all', ...topicCategories.map(cat => cat.name)];
+  $: categories = ['all', ...topicCategories.map(cat => cat.category)];
 
   // Initialize charts after component mounts
   onMount(async () => {
-    // ECharts is now loaded globally from app.html
-    if (typeof window !== 'undefined') {
-      // Wait for echarts to be available
-      if (!(window as any).echarts) {
-        setTimeout(initializeCharts, 100);
-      } else {
-        initializeCharts();
-      }
+    try {
+      await waitForEcharts();
+      initializeCharts();
+    } catch (e) {
+      console.error('Charts unavailable:', e);
     }
   });
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && (window as any).echarts) {
-      initNetworkChart();
-      initTreemapChart();
-    }
+    initNetworkChart();
+    initTreemapChart();
   }
 
   function initNetworkChart() {
@@ -138,7 +145,8 @@
     const networkContainer = document.getElementById('network-chart');
     if (!networkContainer) return;
 
-    networkChart = (window as any).echarts.init(networkContainer);
+    networkChart = initChart(networkContainer);
+    if (!networkChart) return;
     updateNetworkChart();
   }
 
@@ -156,7 +164,8 @@
     }
 
     console.log('Initializing treemap chart...');
-    treemapChart = (window as any).echarts.init(treemapContainer);
+    treemapChart = initChart(treemapContainer);
+    if (!treemapChart) return;
     console.log('Treemap chart initialized:', treemapChart);
     await updateTreemapChart();
     
@@ -174,16 +183,16 @@
       name: topic.name,
       value: topic.size,
       category: topic.category,
-      symbolSize: Math.sqrt(topic.size) / 10
+      symbolSize: Math.max(8, Math.min(60, Math.sqrt(topic.size) / 5))
     }));
 
-    const links = topicRelationships.filter(rel => 
-      filteredTopics.some(t => t.id === rel.source) && 
-      filteredTopics.some(t => t.id === rel.target)
+    const links = topicRelationships.filter(rel =>
+      filteredTopics.some(t => t.id === rel.topic1_id) &&
+      filteredTopics.some(t => t.id === rel.topic2_id)
     ).map(rel => ({
-      source: rel.source,
-      target: rel.target,
-      value: rel.strength
+      source: rel.topic1_id,
+      target: rel.topic2_id,
+      value: rel.similarity_score
     }));
 
     const option = {
@@ -282,7 +291,7 @@
         minSize: minTopicSize
       };
       
-      const treemapData = await topicModelingDb.getTreemapData(filters as any);
+      const treemapData = await topicModelingDb.getTreemapData(filters as any, workspaceId || undefined);
 
       console.log('Treemap data:', treemapData);
 
@@ -455,40 +464,8 @@
     }
   }
 
-  function getCategoryColor(category: string): string {
-    const colors: Record<string, string> = {
-      'Technology': '#3b82f6',
-      'Health': '#10b981',
-      'Business': '#f59e0b',
-      'Environment': '#059669',
-      'Politics': '#dc2626',
-      'Entertainment': '#8b5cf6',
-      'Education': '#0891b2',
-      'Sports': '#ea580c',
-      'Lifestyle': '#ec4899',
-      'Science': '#6366f1',
-      'Culture': '#84cc16',
-      'Religion': '#a855f7',
-      'Legal': '#475569',
-      'Psychology': '#06b6d4',
-      'Agriculture': '#65a30d',
-      'Energy': '#eab308',
-      'Transportation': '#e11d48',
-      'Manufacturing': '#64748b',
-      'Social': '#14b8a6'
-    };
-    return colors[category] || '#6b7280';
-  }
 
-  // Update charts when filters change
-  $: if (browser && filteredTopics) {
-    if (networkChart) {
-      updateNetworkChart();
-    }
-    if (treemapChart) {
-      setTimeout(async () => await updateTreemapChart(), 50);
-    }
-  }
+  // (chart updates handled in the filteredTopics reactive block above)
 
   // Watch for visualization toggle changes
   $: if (browser && showNetworkDiagram !== undefined) {
@@ -519,7 +496,7 @@
         minSize: minTopicSize
       };
       
-      const exportData = await topicModelingDb.exportTopicData(filters as any);
+      const exportData = await topicModelingDb.exportTopicData(filters as any, workspaceId || undefined);
 
       // Create CSV from the exported data
       const csvData = (exportData as any).topics.map((topic: any) =>
@@ -552,64 +529,41 @@
   <meta name="description" content="Advanced topic modeling and analysis with network diagrams and treemap visualizations" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-indigo-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <button 
-            on:click={() => window.location.href='/text-analytics'}
-            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Topic Modeling</h1>
-            <p class="text-slate-300 text-lg font-medium">Discover themes and relationships in your social media data with advanced topic analysis</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-3">
-          <button 
-            on:click={exportTopicData}
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-            Export Analysis
-          </button>
-        </div>
+  <PageHeader
+    title="Topic Modeling"
+    subtitle="Discover themes and relationships in your social media data with advanced topic analysis"
+    accentColor="indigo"
+    backHref="/text-analytics">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <button
+        on:click={exportTopicData}
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Export Analysis
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         <span class="ml-4 text-lg text-gray-600">Loading topic modeling data from database...</span>
       </div>
     {:else}
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -654,12 +608,15 @@
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Min Topic Size: {minTopicSize.toLocaleString()}</label>
-          <input 
-            type="range" 
-            bind:value={minTopicSize}
-            min="1" 
-            max="100" 
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Min mentions: {minTopicSize >= 1000 ? (minTopicSize / 1000).toFixed(1) + 'K' : minTopicSize}
+            <span class="text-gray-400 font-normal">({filteredTopics.length} of {topicsData.length} topics)</span>
+          </label>
+          <input
+            type="range"
+            bind:value={sliderValue}
+            min="0"
+            max="100"
             step="1"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
@@ -751,12 +708,12 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex flex-wrap gap-1">
-                    {#each topic.keywords.slice(0, 3) as keyword}
+                    {#each (topic.keywords || []).slice(0, 3) as keyword}
                       <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                         {keyword}
                       </span>
                     {/each}
-                    {#if topic.keywords.length > 3}
+                    {#if (topic.keywords || []).length > 3}
                       <span class="text-xs text-gray-500">+{topic.keywords.length - 3} more</span>
                     {/if}
                   </div>

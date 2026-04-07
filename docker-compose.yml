@@ -11,7 +11,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - /data/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -54,6 +54,14 @@ services:
       HOST: "0.0.0.0"
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
       DAPR_HTTP_PORT: "3500"
+      OLLAMA_HOST: http://ollama:11434
+      IPFS_ENABLED: "true"
+      IPFS_BLOCKSTORE_PATH: /data/ipfs/blocks
+      IPFS_DATASTORE_PATH: /data/ipfs/datastore
+      PACKAGES_DIR: /data/packages
+    volumes:
+      - /data/ipfs:/data/ipfs
+      - /data/packages:/data/packages
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,6 +90,98 @@ services:
       - redis
     restart: unless-stopped
 
+  # ─── Ollama (Local LLM) ──────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - /data/ollama:/root/.ollama
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_KEEP_ALIVE: "10m"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_QUEUE: "10"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Jupyter Lab ──────────────────────────────────────────────────────────────
+  jupyter:
+    image: ${REGISTRY:-local}/jupyter:${TAG:-latest}
+    build:
+      context: ./jupyter
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-analytics}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - /data/notebooks:/app/notebooks
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── WavePulse Radio Service ──────────────────────────────────────────────────
+  wavepulse:
+    image: ${REGISTRY:-local}/wavepulse:${TAG:-latest}
+    build:
+      context: ./wavepulse
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8890:8890"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-analytics}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DEVICE: cpu
+      COMPUTE_TYPE: float32
+      HF_TOKEN: ${HF_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      WAVEPULSE_PORT: "8890"
+    volumes:
+      - /data/wavepulse:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8890/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Social Crawler (Telegram/YouTube/Bluesky) ───────────────────────────────
+  crawler:
+    image: ${REGISTRY:-local}/crawler:${TAG:-latest}
+    build:
+      context: ./crawler
+      dockerfile: Dockerfile
+    entrypoint: ["./socialexplorer-crawler"]
+    command: ["--mode=standalone", "--platform=bluesky", "--urls=firehose", "--max-posts=5000", "--max-crawl-duration=2m", "--storage-root=/data/crawls"]
+    environment:
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      TG_API_ID: ${TG_API_ID:-}
+      TG_API_HASH: ${TG_API_HASH:-}
+    volumes:
+      - /data/crawls:/data/crawls
+    depends_on:
+      - redis
+    restart: "no"
+
   # ─── ETL ──────────────────────────────────────────────────────────────────────
   etl:
     image: ${REGISTRY:-local}/etl:${TAG:-latest}
@@ -90,12 +190,37 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-analytics}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - /data/gdelt_raw:/app/data/gdelt_raw
     depends_on:
       postgres:
         condition: service_healthy
     profiles:
       - etl  # only starts when: docker compose --profile etl up
     restart: "no"
+
+  # ─── Image Processing Worker ─────────────────────────────────────────────────
+  image-worker:
+    image: ${REGISTRY:-local}/etl:${TAG:-latest}
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    command: python image_worker.py
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-analytics}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   # ─── Telegram scraper (external image — built from its own repo) ───────────────
   # telegram-scraper:
@@ -126,5 +251,4 @@ services:
   #     - telegram-scraper
 
 volumes:
-  pgdata:
   redisdata:

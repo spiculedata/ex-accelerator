@@ -63,8 +63,11 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topic overview statistics
    */
-  async getTopicStats(): Promise<TopicStats> {
-    const topics = await this.queryAPI<any>({ endpoint: 'topics-overview' });
+  async getTopicStats(workspaceId?: string): Promise<TopicStats> {
+    const topics = await this.queryAPI<any>({
+      endpoint: 'topics-overview',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!topics || topics.length === 0) {
       return this.getDefaultTopicStats();
@@ -80,10 +83,11 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topics with optional filtering
    */
-  async getTopics(filters: FilterOptions = {}): Promise<Topic[]> {
+  async getTopics(filters: FilterOptions = {}, workspaceId?: string): Promise<Topic[]> {
+    const wsParam = workspaceId ? { workspace_id: workspaceId } : {};
     const [topics, keywords] = await this.queryMultiple<any>([
-      { endpoint: 'topics-overview' },
-      { endpoint: 'topic-keywords' }
+      { endpoint: 'topics-overview', params: wsParam },
+      { endpoint: 'topic-keywords', params: wsParam }
     ]);
 
     if (!topics || topics.length === 0) {
@@ -118,8 +122,11 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topic categories for filtering
    */
-  async getTopicCategories(): Promise<TopicCategory[]> {
-    const categories = await this.queryAPI<any>({ endpoint: 'topic-categories' });
+  async getTopicCategories(workspaceId?: string): Promise<TopicCategory[]> {
+    const categories = await this.queryAPI<any>({
+      endpoint: 'topic-categories',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!categories || categories.length === 0) {
       return [];
@@ -141,10 +148,10 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topic relationships
    */
-  async getTopicRelationships(threshold: number = 0.5): Promise<TopicRelationship[]> {
+  async getTopicRelationships(threshold: number = 0.5, workspaceId?: string): Promise<TopicRelationship[]> {
     const relationships = await this.queryAPI<any>({
       endpoint: 'topic-relationships',
-      params: { threshold: threshold.toString() }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), threshold: threshold.toString() }
     });
 
     if (!relationships || relationships.length === 0) {
@@ -167,10 +174,11 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get detailed topic analysis
    */
-  async getDetailedTopics(): Promise<Topic[]> {
+  async getDetailedTopics(workspaceId?: string): Promise<Topic[]> {
+    const wsParam = workspaceId ? { workspace_id: workspaceId } : {};
     const [topics, keywords] = await this.queryMultiple<any>([
-      { endpoint: 'topics-overview' },
-      { endpoint: 'topic-keywords' }
+      { endpoint: 'topics-overview', params: wsParam },
+      { endpoint: 'topic-keywords', params: wsParam }
     ]);
 
     if (!topics || topics.length === 0) {
@@ -201,10 +209,10 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topic trends over time
    */
-  async getTopicTrends(timeRange: string = '7d'): Promise<TopicTrend[]> {
+  async getTopicTrends(timeRange: string = '7d', workspaceId?: string): Promise<TopicTrend[]> {
     const trends = await this.queryAPI<any>({
       endpoint: 'topic-trends',
-      params: { timeRange }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange }
     });
 
     if (!trends || trends.length === 0) {
@@ -228,10 +236,10 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get topic correlations
    */
-  async getTopicCorrelations(): Promise<TopicCorrelation[]> {
+  async getTopicCorrelations(workspaceId?: string): Promise<TopicCorrelation[]> {
     const relationships = await this.queryAPI<any>({
       endpoint: 'topic-relationships',
-      params: { threshold: '0.0' }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), threshold: '0.0' }
     });
 
     if (!relationships || relationships.length === 0) {
@@ -253,10 +261,10 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get sample documents for a topic
    */
-  async getTopicDocuments(topicId: number, limit: number = 20): Promise<TopicDocument[]> {
+  async getTopicDocuments(topicId: number, limit: number = 20, workspaceId?: string): Promise<TopicDocument[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sample-posts',
-      params: { limit: limit.toString() }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), limit: limit.toString() }
     });
 
     if (!data || data.length === 0) {
@@ -281,10 +289,10 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Get treemap data for visualization
    */
-  async getTreemapData(filters: FilterOptions = {}): Promise<TreemapNode[]> {
+  async getTreemapData(filters: FilterOptions = {}, workspaceId?: string): Promise<TreemapNode[]> {
     const [topics, categories] = await Promise.all([
-      this.getTopics(filters),
-      this.getTopicCategories()
+      this.getTopics(filters, workspaceId),
+      this.getTopicCategories(workspaceId)
     ]);
 
     if (topics.length === 0) {
@@ -301,12 +309,12 @@ class TopicModelingDatabase extends BaseDatabaseService {
   /**
    * Export topic modeling data
    */
-  async exportTopicData(filters: FilterOptions = {}): Promise<ExportData<Topic>> {
+  async exportTopicData(filters: FilterOptions = {}, workspaceId?: string): Promise<ExportData<Topic>> {
     const [topicStats, detailedTopics, trends, correlations] = await Promise.all([
-      this.getTopicStats(),
-      this.getDetailedTopics(),
-      this.getTopicTrends(filters.timeRange || '7d'),
-      this.getTopicCorrelations()
+      this.getTopicStats(workspaceId),
+      this.getDetailedTopics(workspaceId),
+      this.getTopicTrends(filters.timeRange || '7d', workspaceId),
+      this.getTopicCorrelations(workspaceId)
     ]);
 
     return {
@@ -387,24 +395,26 @@ class TopicModelingDatabase extends BaseDatabaseService {
   ): any[] {
     let filteredTopics = topics;
 
-    if (filters.platform && filters.platform !== 'all') {
+    const category = filters.category || filters.platform;
+    if (category && category !== 'all') {
       filteredTopics = filteredTopics.filter(topic =>
-        topic.category && topic.category.toLowerCase() === filters.platform!.toLowerCase()
+        topic.category && topic.category.toLowerCase() === category.toLowerCase()
       );
     }
 
-    if (filters.sortBy) {
+    const search = filters.search || filters.sortBy;
+    if (search) {
       filteredTopics = filteredTopics.filter(topic =>
-        topic.name.toLowerCase().includes(filters.sortBy!.toLowerCase()) ||
+        topic.name.toLowerCase().includes(search.toLowerCase()) ||
         (keywordMap.get(topic.topic_id) || []).some(keyword =>
-          keyword.toLowerCase().includes(filters.sortBy!.toLowerCase())
+          keyword.toLowerCase().includes(search.toLowerCase())
         )
       );
     }
 
-    if (filters.limit) {
+    if (filters.minSize) {
       filteredTopics = filteredTopics.filter(topic =>
-        (topic.size || 0) >= filters.limit!
+        (topic.size || 0) >= filters.minSize!
       );
     }
 

@@ -59,11 +59,23 @@ export async function setCurrentProject(projectId: string): Promise<boolean> {
 }
 
 // Function to load project from localStorage on app init
+// If no saved project, auto-selects the first available project
 export async function loadCurrentProject(): Promise<boolean> {
   if (typeof window !== 'undefined') {
     const savedProjectId = localStorage.getItem('currentProject');
     if (savedProjectId) {
       return await setCurrentProject(savedProjectId);
+    }
+
+    // No saved project — auto-select the first available one
+    try {
+      const response = await fetch('/api/projects');
+      const result = await response.json();
+      if (result.success && result.projects && result.projects.length > 0) {
+        return await setCurrentProject(result.projects[0].id.toString());
+      }
+    } catch (error) {
+      console.error('Error auto-selecting project:', error);
     }
   }
   return false;

@@ -1,19 +1,21 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
   import { engagementAnalysisDb } from '$lib/services/engagementAnalysisDb';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
+  import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import { ErrorAlert } from '$lib/components/ui';
+
+  $: workspaceId = $page.url.searchParams.get('workspace');
   
   // Loading state
   let loading = true;
-  
-  // Redirect to projects if no current project
+  let errorMessage = '';
+
   onMount(async () => {
-    if (!$currentProject) {
-      window.location.href = '/projects';
-      return;
-    }
-    
     // Load engagement analysis data from database
     await loadEngagementAnalysisData();
   });
@@ -29,7 +31,7 @@
   async function loadEngagementAnalysisData() {
     try {
       // Load all engagement data from database service
-      engagementStats = await engagementAnalysisDb.getEngagementStats();
+      engagementStats = await engagementAnalysisDb.getEngagementStats(workspaceId || undefined);
       
       // Load data with current filters
       await loadFilteredData();
@@ -38,6 +40,7 @@
       loading = false;
     } catch (error) {
       console.error('Error loading engagement analysis data:', error);
+      errorMessage = 'Failed to load engagement data. Showing sample data.';
       // Fallback to sample data if database fails
       loadFallbackData();
     }
@@ -53,12 +56,13 @@
         timeRange: timeRange
       };
       
-      platformEngagement = await engagementAnalysisDb.getPlatformEngagement(filters);
-      contentTypes = await engagementAnalysisDb.getContentTypePerformance(filters);
-      engagementTrends = await engagementAnalysisDb.getEngagementTrends(filters.timeRange);
-      topPosts = await engagementAnalysisDb.getTopPerformingPosts(filters, 10);
+      platformEngagement = await engagementAnalysisDb.getPlatformEngagement(filters, workspaceId || undefined);
+      contentTypes = await engagementAnalysisDb.getContentTypePerformance(filters, workspaceId || undefined);
+      engagementTrends = await engagementAnalysisDb.getEngagementTrends(filters.timeRange, workspaceId || undefined);
+      topPosts = await engagementAnalysisDb.getTopPerformingPosts(filters, 10, workspaceId || undefined);
     } catch (error) {
       console.error('Error loading filtered data:', error);
+      errorMessage = 'Failed to load filtered engagement data. Please try again.';
     }
   }
   
@@ -181,34 +185,28 @@
   $: if (!loading && platformEngagement.length > 0 && typeof window !== 'undefined') {
     initializeChartsWhenReady();
   }
-  
-  function initializeChartsWhenReady() {
-    // Load ECharts from CDN if not already loaded
-    if (!(window as any).echarts) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js';
-      script.onload = () => {
-        setTimeout(initializeCharts, 100); // Small delay to ensure DOM is ready
-      };
-      document.head.appendChild(script);
-    } else {
-      setTimeout(initializeCharts, 100); // Small delay to ensure DOM is ready
+
+  async function initializeChartsWhenReady() {
+    try {
+      await waitForEcharts();
+      initializeCharts();
+    } catch (e) {
+      console.error('Charts unavailable:', e);
     }
   }
 
   function initializeCharts() {
-    if (typeof window !== 'undefined' && (window as any).echarts) {
-      initPlatformChart();
-      initContentChart();
-      initTrendsChart();
-    }
+    initPlatformChart();
+    initContentChart();
+    initTrendsChart();
   }
 
   function initPlatformChart() {
     const container = document.getElementById('platform-engagement-chart');
     if (!container) return;
 
-    platformChart = (window as any).echarts.init(container);
+    platformChart = initChart(container);
+    if (!platformChart) return;
     updatePlatformChart();
   }
 
@@ -216,7 +214,8 @@
     const container = document.getElementById('content-type-chart');
     if (!container) return;
 
-    contentChart = (window as any).echarts.init(container);
+    contentChart = initChart(container);
+    if (!contentChart) return;
     updateContentChart();
   }
 
@@ -224,7 +223,8 @@
     const container = document.getElementById('engagement-trends-chart');
     if (!container) return;
 
-    trendsChart = (window as any).echarts.init(container);
+    trendsChart = initChart(container);
+    if (!trendsChart) return;
     updateTrendsChart();
   }
 
@@ -381,69 +381,46 @@
   <meta name="description" content="Track likes, shares, comments, and engagement rates across all your social media content" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-cyan-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <button 
-            on:click={() => window.location.href='/text-analytics'}
-            class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Engagement Analysis</h1>
-            <p class="text-slate-300 text-lg font-medium">Track likes, shares, comments, and engagement rates across all your social media content</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <button 
-            on:click={exportEngagementData}
-            class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
-            Export Analysis
-          </button>
-          <button 
-            on:click={() => window.location.href='/text-analytics/research-investigation'}
-            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
-            Research Investigation
-          </button>
-        </div>
+  <PageHeader
+    title="Engagement Analysis"
+    subtitle="Track likes, shares, comments, and engagement rates across all your social media content"
+    accentColor="cyan"
+    backHref="/text-analytics">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+        </svg>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <button
+        on:click={exportEngagementData}
+        class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
+        Export Analysis
+      </button>
+      <button
+        on:click={() => goto('/text-analytics/research-investigation')}
+        class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
+        Research Investigation
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
+    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
         <span class="ml-4 text-lg text-gray-600">Loading engagement analysis data from database...</span>
       </div>
     {:else}
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">

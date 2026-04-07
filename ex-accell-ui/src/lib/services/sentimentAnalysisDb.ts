@@ -31,8 +31,11 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get overall sentiment statistics
    */
-  async getSentimentStats(): Promise<SentimentStats> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getSentimentStats(workspaceId?: string): Promise<SentimentStats> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     // Return default stats if no data
     if (!data || data.length === 0) {
@@ -49,8 +52,11 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get detailed sentiment distribution
    */
-  async getDetailedSentiments(): Promise<SentimentCategory[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getDetailedSentiments(workspaceId?: string): Promise<SentimentCategory[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -64,10 +70,13 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   }
 
   /**
-   * Get emotion analysis data
+   * Get emotion analysis data from the emotion_analysis table
    */
-  async getEmotionStats(): Promise<EmotionStat[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'emotion-correlations' });
+  async getEmotionStats(workspaceId?: string): Promise<EmotionStat[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'emotion-stats',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -83,10 +92,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment trends over time
    */
-  async getSentimentTrends(timeRange: string = '7d'): Promise<SentimentTrend[]> {
+  async getSentimentTrends(timeRange: string = '7d', workspaceId?: string): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
-      params: { timeRange }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange }
     });
 
     if (!data || data.length === 0) {
@@ -109,8 +118,9 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sample posts with sentiment analysis
    */
-  async getSamplePosts(filters: FilterOptions = {}): Promise<SentimentPost[]> {
+  async getSamplePosts(filters: FilterOptions = {}, workspaceId?: string): Promise<SentimentPost[]> {
     const params = {
+      ...(workspaceId ? { workspace_id: workspaceId } : {}),
       sentiment: filters.sentiment || 'all',
       platform: filters.platform || 'all',
       limit: filters.limit || 50
@@ -149,8 +159,11 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get platform-specific sentiment performance
    */
-  async getPlatformSentimentPerformance(): Promise<PlatformPerformance[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getPlatformSentimentPerformance(workspaceId?: string): Promise<PlatformPerformance[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -169,12 +182,12 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   }
 
   /**
-   * Get top sentiment keywords
+   * Get top sentiment keywords from the sentiment_keywords table
    */
-  async getTopSentimentKeywords(sentiment: string = 'all'): Promise<SentimentKeyword[]> {
+  async getTopSentimentKeywords(sentiment: string = 'all', workspaceId?: string): Promise<SentimentKeyword[]> {
     const data = await this.queryAPI<any>({
-      endpoint: 'top-keywords',
-      params: { keywordSentiment: sentiment }
+      endpoint: 'sentiment-keywords',
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), keywordSentiment: sentiment }
     });
 
     if (!data || data.length === 0) {
@@ -184,10 +197,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
     return this.safeTransform(
       data,
       (item) => ({
-        keyword: item.keyword || item.keywords,
-        sentiment: sentiment,
-        frequency: Math.floor(Math.random() * 100) + 10, // TODO: Get actual frequency from database
-        impact: Math.random() // TODO: Get actual impact from database
+        keyword: item.keyword,
+        sentiment: item.sentiment_type || sentiment,
+        frequency: item.frequency || 0,
+        impact: item.impact_score ? item.impact_score / 10 : 0 // Normalize 0-10 scale to 0-1
       }),
       []
     );
@@ -196,8 +209,11 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get emotion correlations
    */
-  async getEmotionCorrelations(): Promise<EmotionCorrelation[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'emotion-correlations' });
+  async getEmotionCorrelations(workspaceId?: string): Promise<EmotionCorrelation[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'emotion-correlations',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -209,7 +225,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         emotion1: item.emotion1,
         emotion2: item.emotion2,
         correlation: item.correlation,
-        coOccurrence: Math.floor(Math.random() * 50) + 5 // TODO: Get actual co-occurrence from database
+        coOccurrence: item.co_occurrence_count || 0
       }),
       []
     );
@@ -218,8 +234,11 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment distribution by time of day
    */
-  async getSentimentByTimeOfDay(): Promise<SentimentTrend[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
+  async getSentimentByTimeOfDay(workspaceId?: string): Promise<SentimentTrend[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'hourly-patterns',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -240,8 +259,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Export sentiment analysis data
    */
-  async exportSentimentData(filters: FilterOptions = {}): Promise<ExportData<SentimentPost>> {
+  async exportSentimentData(filters: FilterOptions = {}, workspaceId?: string): Promise<ExportData<SentimentPost>> {
+    const wsParam = workspaceId ? { workspace_id: workspaceId } : {};
     const params = {
+      ...wsParam,
       sentiment: filters.sentiment || 'all',
       platform: filters.platform || 'all',
       timeRange: filters.timeRange || '7d'
@@ -250,9 +271,9 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
     // Execute multiple queries in parallel
     const [posts, sentimentStats, emotionStats, trends] = await this.queryMultiple<any>([
       { endpoint: 'export-data', params },
-      { endpoint: 'cross-platform-sentiment' },
-      { endpoint: 'emotion-correlations' },
-      { endpoint: 'sentiment-trends', params: { timeRange: filters.timeRange || '7d' } }
+      { endpoint: 'cross-platform-sentiment', params: wsParam },
+      { endpoint: 'emotion-correlations', params: wsParam },
+      { endpoint: 'sentiment-trends', params: { ...wsParam, timeRange: filters.timeRange || '7d' } }
     ]);
 
     // Transform posts data
@@ -410,8 +431,8 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
 
     return {
       emotion: emotion,
-      count: item.coOccurrence || item.post_count || Math.floor(Math.random() * 50) + 10,
-      percentage: Math.floor(Math.random() * 30) + 10, // TODO: Calculate actual percentage
+      count: item.count || item.co_occurrence_count || item.post_count || 0,
+      percentage: item.percentage || 0,
       color: emotionColors[emotion] || '#6b7280'
     };
   }

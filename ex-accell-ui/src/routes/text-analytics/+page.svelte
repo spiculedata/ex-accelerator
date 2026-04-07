@@ -1,16 +1,16 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
 
-  // Load current project and check if exists
+  $: workspaceId = $page.url.searchParams.get('workspace');
+  $: wsParam = workspaceId ? `?workspace=${workspaceId}` : '';
+
+  // Load current project context (optional - page works without it)
   onMount(async () => {
     await loadCurrentProject();
-
-    // Only redirect after we've tried to load the project
-    if (!$currentProject) {
-      window.location.href = '/projects';
-    }
   });
 </script>
 
@@ -18,8 +18,6 @@
   <title>Text Analytics - Social Explorer</title>
   <meta name="description" content="Advanced NLP and text analysis tools for social media content" />
 </svelte:head>
-
-<Navigation />
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
@@ -52,6 +50,8 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+
     <!-- Coming Soon Notice -->
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
       <div class="flex items-center">
@@ -72,7 +72,7 @@
       <!-- Sentiment Analysis -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/sentiment-analysis'}>
+        on:click={() => goto(`/text-analytics/sentiment-analysis${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-3">
@@ -104,7 +104,7 @@
       <!-- Topic Modeling -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/topic-modeling'}>
+        on:click={() => goto(`/text-analytics/topic-modeling${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-3">
@@ -132,7 +132,7 @@
       <!-- Trigrams Analysis -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-purple-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/trigrams'}>
+        on:click={() => goto(`/text-analytics/trigrams${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mr-3">
@@ -159,7 +159,7 @@
       <!-- Language Detection -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/language-detection'}>
+        on:click={() => goto(`/text-analytics/language-detection${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-3">
@@ -186,7 +186,7 @@
       <!-- Hashtag Analysis -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-pink-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/hashtag-analysis'}>
+        on:click={() => goto(`/text-analytics/hashtag-analysis${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center mr-3">
@@ -214,7 +214,7 @@
       <!-- Engagement Analysis -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-cyan-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/engagement-analysis'}>
+        on:click={() => goto(`/text-analytics/engagement-analysis${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center mr-3">
@@ -304,7 +304,7 @@
       <!-- Jupyter Lab -->
       <div 
         class="bg-white rounded-xl shadow-md hover:shadow-lg p-6 border-l-4 border-blue-500 cursor-pointer transition-all duration-200"
-        on:click={() => window.location.href='/text-analytics/jupyter'}>
+        on:click={() => goto(`/text-analytics/jupyter${wsParam}`)}>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center">
             <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mr-3">

@@ -14,6 +14,9 @@ export interface FilterOptions {
   offset?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  category?: string;
+  search?: string;
+  minSize?: number;
 }
 
 /**
@@ -134,6 +137,9 @@ export interface TopTopic {
 export interface CrawlingActivity {
   time: string;
   posts: number;
+  positive: number;
+  negative: number;
+  neutral: number;
 }
 
 export interface RecentActivity {

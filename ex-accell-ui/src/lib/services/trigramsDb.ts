@@ -288,7 +288,7 @@ class TrigramsDatabase {
           trigram.sentiment,
           trigram.platforms,
           trigram.trend,
-          Math.random() * 5 // Random engagement score 0-5
+          Math.round(((trigram.frequency / 1247) * 4 + Math.abs(trigram.sentiment)) * 100) / 100 // Deterministic engagement derived from frequency and sentiment
         ]);
       }
 

@@ -1,14 +1,21 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { currentProject } from '$lib/stores/projectStore';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { dashboardDb } from '$lib/services/dashboardDb';
+  import { ErrorAlert } from '$lib/components/ui';
+  import { getStatusColor, getStatusIcon, getTrendIcon, getHealthColor } from '$lib/utils/colorUtils';
+  import { formatTimestamp, formatNumber } from '$lib/utils/formatUtils';
+  import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
+  import { setWorkspaceFromUrl } from '$lib/stores/workspaceStore';
 
   // Get workspace ID from URL query parameter
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let loading = true;
+  let errorMessage = '';
   let workspace: any = null;
 
   // Load workspace data and set project context if needed
@@ -30,16 +37,14 @@
         }
       } catch (error) {
         console.error('Error loading workspace:', error);
+        errorMessage = 'Failed to load workspace data. Please try again.';
       }
     }
 
-    // If still no project, redirect to projects page
-    if (!$currentProject && !workspaceId) {
-      window.location.href = '/projects';
-      return;
-    }
+    // Set workspace store from URL
+    await setWorkspaceFromUrl($page.url);
 
-    // Load data from database (workspace-scoped if workspaceId provided)
+    // Load data from database — shows all data when no workspace is scoped
     await loadDashboardData();
 
     // Auto refresh setup
@@ -83,11 +88,19 @@
   // Recent activity feed
   let recentActivity: any[] = [];
 
+  // Platform filter — users can toggle which data sources are visible
+  let availablePlatforms: string[] = [];
+  let activePlatforms: Set<string> = new Set();
+  let languagesLimit = 5;
+  let topicsLimit = 5;
+
+  $: filteredSources = dataSources.filter(s => activePlatforms.size === 0 || activePlatforms.has(s.name.toLowerCase()));
+
   // Load all dashboard data from database
   async function loadDashboardData() {
     try {
       // Load dashboard stats
-      const stats = await dashboardDb.getDashboardStats();
+      const stats = await dashboardDb.getDashboardStats(workspaceId || undefined);
       dashboardStats = {
         totalPosts: stats.total_posts,
         totalSources: stats.total_sources,
@@ -96,12 +109,16 @@
         processingRate: stats.processing_rate,
         dataQuality: stats.data_quality
       };
-      
+
       // Load data sources
-      dataSources = await dashboardDb.getDataSources();
-      
+      dataSources = await dashboardDb.getDataSources(workspaceId || undefined);
+
+      // Build platform filter from loaded sources
+      availablePlatforms = dataSources.map(s => s.name);
+      activePlatforms = new Set(availablePlatforms.map(p => p.toLowerCase()));
+
       // Load sentiment breakdown
-      const sentimentData = await dashboardDb.getSentimentBreakdown();
+      const sentimentData = await dashboardDb.getSentimentBreakdown(workspaceId || undefined);
       sentimentData.forEach(item => {
         if (item.sentiment === 'positive') {
           textAnalytics.sentimentBreakdown.positive = { count: item.count, percentage: item.percentage };
@@ -111,30 +128,32 @@
           textAnalytics.sentimentBreakdown.neutral = { count: item.count, percentage: item.percentage };
         }
       });
-      
+
       // Load top languages
-      textAnalytics.topLanguages = await dashboardDb.getTopLanguages();
-      
+      textAnalytics.topLanguages = await dashboardDb.getTopLanguages(workspaceId || undefined);
+
       // Load top topics
-      textAnalytics.topTopics = await dashboardDb.getTopTopics();
-      
+      textAnalytics.topTopics = await dashboardDb.getTopTopics(workspaceId || undefined);
+
       // Load crawling activity
-      crawlingActivity = await dashboardDb.getCrawlingActivity();
-      
+      crawlingActivity = await dashboardDb.getCrawlingActivity(workspaceId || undefined);
+
       // Load recent activity
-      recentActivity = await dashboardDb.getRecentActivity();
+      recentActivity = await dashboardDb.getRecentActivity(workspaceId || undefined);
       
       console.log('Dashboard data loaded successfully');
-      
+      loading = false;
+
       // Initialize charts after data is loaded
-      if (typeof window !== 'undefined' && (window as any).echarts) {
-        setTimeout(() => {
-          initializeCharts();
-        }, 100);
+      try {
+        await waitForEcharts();
+        initializeCharts();
+      } catch (e) {
+        console.error('Charts unavailable:', e);
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      // No fallback - dashboard requires database connection
+      errorMessage = 'Failed to load dashboard data. Please try again.';
       loading = false;
     }
   }
@@ -151,64 +170,19 @@
   let activityChart: any = null;
   let topicsChart: any = null;
 
-  function formatTimestamp(timestamp: string) {
-    return new Date(timestamp).toLocaleString();
-  }
-
-  function getStatusColor(status: string) {
-    const colors: Record<string, string> = {
-      'active': 'bg-blue-100 text-blue-800',
-      'paused': 'bg-yellow-100 text-yellow-800',
-      'error': 'bg-red-100 text-red-800',
-      'success': 'bg-blue-100 text-blue-800',
-      'warning': 'bg-yellow-100 text-yellow-800',
-      'info': 'bg-blue-100 text-blue-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  }
-
-  function getStatusIcon(status: string) {
-    const icons: Record<string, string> = {
-      'active': '🟢',
-      'paused': '🟡',
-      'error': '🔴',
-      'success': '✅',
-      'warning': '⚠️',
-      'info': 'ℹ️'
-    };
-    return icons[status] || '●';
-  }
-
-  function getTrendIcon(trend: string) {
-    const icons: Record<string, string> = {
-      'up': '📈',
-      'down': '📉',
-      'stable': '➡️'
-    };
-    return icons[trend] || '➡️';
-  }
-
-  function getHealthColor(health: number) {
-    if (health >= 95) return 'text-blue-600';
-    if (health >= 90) return 'text-yellow-600';
-    return 'text-red-600';
-  }
-
-
   function initializeCharts() {
-    if (typeof window !== 'undefined' && (window as any).echarts) {
-      initSentimentChart();
-      initSourceChart();
-      initActivityChart();
-      initTopicsChart();
-    }
+    initSentimentChart();
+    initSourceChart();
+    initActivityChart();
+    initTopicsChart();
   }
 
   function initSentimentChart() {
     const container = document.getElementById('sentiment-overview-chart');
     if (!container) return;
 
-    sentimentChart = (window as any).echarts.init(container);
+    sentimentChart = initChart(container);
+    if (!sentimentChart) return;
     updateSentimentChart();
   }
 
@@ -216,7 +190,8 @@
     const container = document.getElementById('source-breakdown-chart');
     if (!container) return;
 
-    sourceChart = (window as any).echarts.init(container);
+    sourceChart = initChart(container);
+    if (!sourceChart) return;
     updateSourceChart();
   }
 
@@ -224,7 +199,8 @@
     const container = document.getElementById('activity-chart');
     if (!container) return;
 
-    activityChart = (window as any).echarts.init(container);
+    activityChart = initChart(container);
+    if (!activityChart) return;
     updateActivityChart();
   }
 
@@ -232,7 +208,8 @@
     const container = document.getElementById('topics-chart');
     if (!container) return;
 
-    topicsChart = (window as any).echarts.init(container);
+    topicsChart = initChart(container);
+    if (!topicsChart) return;
     updateTopicsChart();
   }
 
@@ -325,41 +302,90 @@
 
     const option = {
       title: {
-        text: 'Crawling Activity (24h)',
+        text: 'Sentiment by Hour',
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 'bold' }
       },
       tooltip: {
         trigger: 'axis'
       },
+      legend: {
+        data: ['Positive', 'Negative', 'Neutral'],
+        bottom: 0,
+        textStyle: { fontSize: 11 }
+      },
+      grid: {
+        left: 50,
+        right: 20,
+        top: 40,
+        bottom: 40
+      },
       xAxis: {
         type: 'category',
-        data: crawlingActivity.map(a => a.time)
+        data: crawlingActivity.map(a => a.time),
+        axisLabel: { fontSize: 10 }
       },
       yAxis: {
         type: 'value',
-        name: 'Posts/hour'
+        name: 'Posts',
+        axisLabel: { fontSize: 10 }
       },
-      series: [{
-        type: 'line',
-        data: crawlingActivity.map(a => a.posts),
-        itemStyle: { color: '#06d6a0' },
-        lineStyle: { 
-          width: 3,
-          shadowColor: 'rgba(6, 214, 160, 0.3)',
-          shadowBlur: 8
+      series: [
+        {
+          name: 'Positive',
+          type: 'line',
+          data: crawlingActivity.map(a => a.positive),
+          itemStyle: { color: '#06d6a0' },
+          lineStyle: { width: 2 },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(6, 214, 160, 0.3)' },
+                { offset: 1, color: 'rgba(6, 214, 160, 0.02)' }
+              ]
+            }
+          },
+          smooth: true
         },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(6, 214, 160, 0.4)' },
-              { offset: 1, color: 'rgba(6, 214, 160, 0.05)' }
-            ]
-          }
+        {
+          name: 'Negative',
+          type: 'line',
+          data: crawlingActivity.map(a => a.negative),
+          itemStyle: { color: '#f72585' },
+          lineStyle: { width: 2 },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(247, 37, 133, 0.3)' },
+                { offset: 1, color: 'rgba(247, 37, 133, 0.02)' }
+              ]
+            }
+          },
+          smooth: true
         },
-      }]
+        {
+          name: 'Neutral',
+          type: 'line',
+          data: crawlingActivity.map(a => a.neutral),
+          itemStyle: { color: '#8b5cf6' },
+          lineStyle: { width: 2 },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
+                { offset: 1, color: 'rgba(139, 92, 246, 0.02)' }
+              ]
+            }
+          },
+          smooth: true
+        }
+      ]
     };
 
     activityChart.setOption(option);
@@ -367,6 +393,8 @@
 
   function updateTopicsChart() {
     if (!topicsChart) return;
+
+    const fullNames = textAnalytics.topTopics.map((t: any) => t.topic);
 
     const option = {
       title: {
@@ -376,15 +404,36 @@
       },
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'shadow' }
+        axisPointer: { type: 'shadow' },
+        formatter: function(params: any) {
+          const idx = params[0]?.dataIndex;
+          const fullName = fullNames[idx] || '';
+          return `<strong>${fullName}</strong><br/>${params[0]?.value} posts`;
+        }
+      },
+      grid: {
+        left: 10,
+        right: 50,
+        top: 40,
+        bottom: 20,
+        containLabel: true
       },
       xAxis: {
-        type: 'value'
+        type: 'value',
+        axisLabel: { fontSize: 10 }
       },
       yAxis: {
         type: 'category',
-        data: textAnalytics.topTopics.map((t: any) => t.topic),
-        axisLabel: { fontSize: 10 }
+        data: fullNames,
+        axisLabel: {
+          fontSize: 11,
+          width: 220,
+          overflow: 'truncate',
+          ellipsis: '...',
+        },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        triggerEvent: true
       },
       series: [{
         type: 'bar',
@@ -399,11 +448,32 @@
             shadowBlur: 10,
             shadowColor: 'rgba(0, 0, 0, 0.5)'
           }
+        },
+        barMaxWidth: 30,
+        label: {
+          show: true,
+          position: 'right',
+          fontSize: 10,
+          color: '#666'
         }
       }]
     };
 
     topicsChart.setOption(option);
+
+    // Add tooltip on y-axis label hover
+    topicsChart.on('mouseover', function(params: any) {
+      if (params.componentType === 'yAxis') {
+        const idx = params.dataIndex;
+        const name = fullNames[idx] || '';
+        const posts = textAnalytics.topTopics[idx]?.posts || 0;
+        topicsChart.dispatchAction({
+          type: 'showTip',
+          seriesIndex: 0,
+          dataIndex: idx
+        });
+      }
+    });
   }
 
   // Update charts when data changes
@@ -419,8 +489,6 @@
   <title>Interactive Dashboards - Social Explorer</title>
   <meta name="description" content="Comprehensive analytics dashboard for social media data insights and monitoring" />
 </svelte:head>
-
-<Navigation />
 
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
@@ -483,7 +551,44 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
+    <WorkspaceBanner
+      workspaceId={workspaceId || ''}
+      workspaceName={workspace?.name || ''}
+      projectName={$currentProject?.name || ''}
+    />
+
+    <!-- Platform Filter -->
+    {#if dataSources.length > 1}
+      <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium text-gray-700">Filter by source:</span>
+          <div class="flex flex-wrap gap-2">
+            {#each dataSources as source}
+              <button
+                on:click={() => {
+                  const key = source.name.toLowerCase();
+                  if (activePlatforms.has(key)) {
+                    activePlatforms.delete(key);
+                  } else {
+                    activePlatforms.add(key);
+                  }
+                  activePlatforms = new Set(activePlatforms);
+                }}
+                class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors {
+                  activePlatforms.has(source.name.toLowerCase())
+                    ? 'bg-blue-100 text-blue-800 border-blue-300'
+                    : 'bg-gray-50 text-gray-400 border-gray-200 line-through'
+                }">
+                {source.name} ({source.posts})
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- Key Metrics Overview -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -504,7 +609,7 @@
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-indigo-600 mb-1">{dashboardStats.dataQuality}%</div>
-        <div class="text-sm text-gray-600">Data Quality</div>
+        <div class="text-sm text-gray-600" title="Percentage of posts with sentiment classification">Enrichment Rate</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-xs text-gray-500 mb-1">Last Updated</div>
@@ -567,9 +672,17 @@
 
       <!-- Language Breakdown -->
       <div class="bg-white rounded-xl shadow-sm p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-6">Language Distribution</h2>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-lg font-semibold text-gray-900">Language Distribution</h2>
+          <select bind:value={languagesLimit} class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600">
+            <option value={5}>Top 5</option>
+            <option value={10}>Top 10</option>
+            <option value={20}>Top 20</option>
+            <option value={100}>All</option>
+          </select>
+        </div>
         <div class="space-y-4">
-          {#each textAnalytics.topLanguages as language}
+          {#each textAnalytics.topLanguages.slice(0, languagesLimit) as language}
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-3">
                 <div class="w-3 h-3 bg-blue-600 rounded-full"></div>
@@ -619,16 +732,31 @@
       <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-lg font-semibold text-gray-900">Trending Topics</h2>
-          <button class="text-sm text-blue-600 hover:text-blue-800">View Analysis</button>
+          <div class="flex items-center space-x-2">
+            <select bind:value={topicsLimit} class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600">
+              <option value={5}>Top 5</option>
+              <option value={10}>Top 10</option>
+              <option value={20}>Top 20</option>
+            </select>
+            <button on:click={() => goto('/text-analytics/topic-modeling')} class="text-sm text-blue-600 hover:text-blue-800">View Analysis</button>
+          </div>
         </div>
+        {#if textAnalytics.topTopics.length === 0}
+          <div class="text-center py-8 text-gray-400">
+            <span class="text-3xl mb-2 block">💬</span>
+            <p class="text-sm">No social post topics yet.</p>
+            <p class="text-xs mt-1">Topics will appear after running topic analysis on social posts.</p>
+            <button on:click={() => goto('/text-analytics/topic-modeling')} class="text-xs text-blue-600 hover:text-blue-800 mt-2">Go to Topic Modeling</button>
+          </div>
+        {:else}
         <div class="space-y-4">
-          {#each textAnalytics.topTopics as topic}
+          {#each textAnalytics.topTopics.slice(0, topicsLimit) as topic}
             <div class="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
               <div class="flex items-center space-x-3">
                 <span class="text-lg">{getTrendIcon(topic.trend)}</span>
                 <div>
                   <div class="font-medium text-gray-900">{topic.topic}</div>
-                  <div class="text-sm text-gray-500">{topic.posts.toLocaleString()} posts</div>
+                  <div class="text-sm text-gray-500">{formatNumber(topic.posts)} posts</div>
                 </div>
               </div>
               <div class="text-right">
@@ -643,6 +771,7 @@
             </div>
           {/each}
         </div>
+        {/if}
       </div>
     </div>
   </div>

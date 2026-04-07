@@ -1,10 +1,12 @@
 // Database Seeding API
 // Populates the unified database with sample data for testing
+// WARNING: This endpoint is disabled in production environments.
 
-import { json } from '@sveltejs/kit';
+import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { DuckDBInstance } from '@duckdb/node-api';
 import { join } from 'path';
+import { dev } from '$app/environment';
 
 // Direct DuckDB connection for server-side operations
 let db: DuckDBInstance | null = null;
@@ -25,8 +27,8 @@ async function executeQuery(sql: string): Promise<any[]> {
     const rows = result.getRowObjectsJS();
     connection.closeSync();
     return rows;
-  } catch (error) {
-    console.error('Direct DuckDB query error:', error);
+  } catch (err) {
+    console.error('Direct DuckDB query error:', err);
     return [];
   }
 }
@@ -34,8 +36,14 @@ async function executeQuery(sql: string): Promise<any[]> {
 /**
  * POST /api/unified-analytics/seed
  * Seed the database with sample data
+ * Only available in development mode.
  */
 export const POST: RequestHandler = async () => {
+  // Block seeding in production environments
+  if (!dev) {
+    throw error(403, 'Database seeding is only available in development mode');
+  }
+
   try {
     await getDb();
     

@@ -490,7 +490,9 @@ class DaprWorkflowExecutor {
     };
     
     const baseTime = (baseTimes as Record<string, number>)[stepType] || 2000;
-    return baseTime + Math.random() * 1000; // Add some variance
+    // Add deterministic variance based on step type hash
+    const variance = (stepType.length % 5) * 200;
+    return baseTime + variance;
   }
 
   /**
@@ -503,32 +505,38 @@ class DaprWorkflowExecutor {
     const hasTopicModeling = steps.some((s: any) => s.type === 'topic_modeling');
     const hasClustering = steps.some((s: any) => s.type === 'clustering');
 
+    const stepCount = steps.length;
+    const baseRecords = stepCount * 500;
+
     let output: any = {
       workflowName: workflow.name,
       executionId: workflow.id,
-      processedRecords: Math.floor(Math.random() * 5000) + 1000,
+      processedRecords: baseRecords,
       resultDataset: `result_${workflow.id}`,
-      processingTimeSeconds: Math.floor(Math.random() * 30) + 10,
+      processingTimeSeconds: stepCount * 5,
       deployedCodeUsed: true
     };
 
     if (hasTextProcessing) {
-      output = { ...output, 
+      output = { ...output,
         textProcessing: {
-          cleanedTexts: Math.floor(Math.random() * 1000) + 500,
-          removedStopWords: Math.floor(Math.random() * 50000) + 10000,
-          normalizedTokens: Math.floor(Math.random() * 100000) + 50000
+          cleanedTexts: baseRecords,
+          removedStopWords: baseRecords * 20,
+          normalizedTokens: baseRecords * 50
         }
       };
     }
 
     if (hasSentiment) {
+      const positiveCount = Math.round(baseRecords * 0.4);
+      const negativeCount = Math.round(baseRecords * 0.2);
+      const neutralCount = baseRecords - positiveCount - negativeCount;
       output = { ...output,
         sentimentAnalysis: {
-          positiveCount: Math.floor(Math.random() * 300) + 100,
-          negativeCount: Math.floor(Math.random() * 200) + 50,
-          neutralCount: Math.floor(Math.random() * 500) + 200,
-          averageScore: (Math.random() * 2 - 1).toFixed(3) // -1 to 1
+          positiveCount,
+          negativeCount,
+          neutralCount,
+          averageScore: '0.200'
         }
       };
     }
@@ -536,8 +544,8 @@ class DaprWorkflowExecutor {
     if (hasTopicModeling) {
       output = { ...output,
         topicModeling: {
-          topicsFound: Math.floor(Math.random() * 8) + 3,
-          coherenceScore: (Math.random() * 0.5 + 0.5).toFixed(3), // 0.5 to 1.0
+          topicsFound: Math.min(stepCount + 2, 10),
+          coherenceScore: '0.750',
           topKeywords: ['technology', 'analysis', 'data', 'processing', 'insights']
         }
       };
@@ -546,9 +554,9 @@ class DaprWorkflowExecutor {
     if (hasClustering) {
       output = { ...output,
         clustering: {
-          clustersFormed: Math.floor(Math.random() * 6) + 2,
-          silhouetteScore: (Math.random() * 0.5 + 0.5).toFixed(3),
-          inertia: Math.floor(Math.random() * 1000) + 500
+          clustersFormed: Math.min(stepCount, 8),
+          silhouetteScore: '0.650',
+          inertia: baseRecords
         }
       };
     }

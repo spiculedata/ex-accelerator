@@ -1,7 +1,9 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { setCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import { getStatusColor } from '$lib/utils/colorUtils';
+  import { formatDate } from '$lib/utils/formatUtils';
 
   let projects: any[] = [];
   let loading = true;
@@ -26,16 +28,6 @@
     }
   }
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'active': return 'bg-blue-100 text-blue-800';
-      case 'paused': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'archived': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  }
-
   function getTypeLabel(type: string) {
     if (!type) return 'General';
 
@@ -48,15 +40,11 @@
     }
   }
 
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString();
-  }
-
   async function openProject(projectId: string) {
     // Set the current project context and redirect to project view
     const success = await setCurrentProject(projectId);
     if (success) {
-      window.location.href = `/projects/${projectId}`;
+      goto(`/projects/${projectId}`);
     }
   }
 </script>
@@ -65,8 +53,6 @@
   <title>Projects - Social Explorer</title>
   <meta name="description" content="Manage your data analysis projects" />
 </svelte:head>
-
-<Navigation />
 
 <!-- Header -->
 <div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
@@ -77,7 +63,7 @@
         <p class="text-blue-100 mt-2">Manage your data analysis workspaces</p>
       </div>
       <button 
-        on:click={() => window.location.href='/projects/new'}
+        on:click={() => goto('/projects/new')}
         class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-white border-opacity-30">
         + New Project
       </button>
@@ -97,7 +83,7 @@
       <p class="mt-1 text-sm text-gray-500">Get started by creating a new project.</p>
       <div class="mt-6">
         <button 
-          on:click={() => window.location.href='/projects/new'}
+          on:click={() => goto('/projects/new')}
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
           Create New Project
         </button>

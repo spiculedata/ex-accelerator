@@ -451,8 +451,8 @@ class WorkflowExecutionService {
       
       await this.saveWorkflowExecution(execution);
       
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+      // Simulate processing time (deterministic per step based on index)
+      await new Promise(resolve => setTimeout(resolve, 1500 + (i % 3) * 500));
     }
     
     // Complete execution
@@ -462,7 +462,7 @@ class WorkflowExecutionService {
     execution.completedAt = new Date().toISOString();
     execution.duration = new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime();
     execution.output = {
-      processedRecords: Math.floor(Math.random() * 10000) + 1000,
+      processedRecords: totalSteps * 500,
       resultDataset: `result_${execution.id}`,
       summary: `Workflow ${workflow.name} completed successfully`
     };

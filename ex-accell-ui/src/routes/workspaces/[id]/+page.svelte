@@ -1,7 +1,9 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { ErrorAlert } from '$lib/components/ui';
+  import { formatDate, formatRelativeTime, formatTimestamp } from '$lib/utils/formatUtils';
 
   // Get workspace ID from URL
   $: workspaceId = $page.params.id;
@@ -11,6 +13,7 @@
   let linkedDatasets: any[] = [];
   let availableDatasets: any[] = [];
   let loading = true;
+  let errorMessage = '';
   let showAddDatasets = false;
   let selectedDatasets: number[] = [];
   let loadingDatasets = false;
@@ -40,11 +43,12 @@
         await loadLinkedDatasets();
       } else {
         // Workspace not found
-        window.location.href = '/projects';
+        goto('/projects');
       }
     } catch (error) {
       console.error('Error loading workspace:', error);
-      window.location.href = '/projects';
+      errorMessage = 'Failed to load workspace. Redirecting to projects.';
+      goto('/projects');
     } finally {
       loading = false;
     }
@@ -59,6 +63,7 @@
       }
     } catch (error) {
       console.error('Error loading linked datasets:', error);
+      errorMessage = 'Failed to load linked datasets. Please try again.';
     }
   }
 
@@ -76,6 +81,7 @@
       }
     } catch (error) {
       console.error('Error loading available datasets:', error);
+      errorMessage = 'Failed to load available datasets. Please try again.';
     } finally {
       loadingDatasets = false;
     }
@@ -116,6 +122,7 @@
       availableDatasets = [];
     } catch (error) {
       console.error('Error adding datasets:', error);
+      errorMessage = 'Failed to add datasets to workspace. Please try again.';
     }
   }
 
@@ -137,6 +144,7 @@
       }
     } catch (error) {
       console.error('Error unlinking dataset:', error);
+      errorMessage = 'Failed to remove dataset from workspace. Please try again.';
     }
   }
 
@@ -150,8 +158,6 @@
   <title>{workspace ? workspace.name : 'Workspace'} | ex-accell</title>
 </svelte:head>
 
-<Navigation />
-
 <main class="min-h-screen bg-gray-50 pt-16">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {#if loading}
@@ -159,6 +165,7 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     {:else if workspace}
+      {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
       <!-- Breadcrumbs -->
       <nav class="flex items-center space-x-2 text-sm text-gray-600 mb-6">
         <a href="/projects" class="hover:text-blue-600 transition-colors">Projects</a>
@@ -185,7 +192,7 @@
               <p class="text-gray-600 mt-2">{workspace.description}</p>
             {/if}
             <div class="flex items-center mt-4 space-x-4 text-sm text-gray-500">
-              <span>Created {new Date(workspace.created_at).toLocaleDateString()}</span>
+              <span>Created {formatDate(workspace.created_at)}</span>
               {#if workspace.created_by}
                 <span>• by {workspace.created_by}</span>
               {/if}
@@ -194,105 +201,61 @@
         </div>
       </div>
 
-      <!-- Data Overview Section -->
-      <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">Data Overview</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <!-- Data Quality -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-gray-600">Data Quality</span>
-              <span class="text-xs text-blue-600 font-medium">Excellent</span>
-            </div>
-            <div class="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" style="width: 94.8%"></div>
-            </div>
-            <div class="mt-1 text-xs text-gray-500">94.8% records processed</div>
-          </div>
-
-          <!-- Processing Rate -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-gray-600">Processing Rate</span>
-              <span class="text-xs text-emerald-600 font-medium">Active</span>
-            </div>
-            <div class="relative h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full animate-pulse" style="width: 73%"></div>
-            </div>
-            <div class="mt-1 text-xs text-gray-500">~1,247 records/min</div>
-          </div>
-
-          <!-- Last Sync -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-gray-600">Last Sync</span>
-              <span class="text-xs text-purple-600 font-medium">Recent</span>
-            </div>
-            <div class="flex items-center text-sm text-gray-900">
-              <svg class="w-4 h-4 text-purple-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              {new Date(workspace.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            <div class="mt-1 text-xs text-gray-500">
-              {Math.floor((Date.now() - new Date(workspace.updated_at).getTime()) / 60000)} minutes ago
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Workspace Overview Stats -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded-xl shadow-sm p-6">
+      <!-- Workspace Overview Stats — derived from actual linked datasets -->
+      {@const totalRecords = linkedDatasets.reduce((sum, d) => sum + (parseInt(d.record_count) || 0), 0)}
+      {@const activeCount = linkedDatasets.filter(d => d.status === 'active').length}
+      {@const dataTypes = [...new Set(linkedDatasets.map(d => d.dataset_type).filter(Boolean))]}
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-gray-600">Total Records</h3>
-            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="text-sm font-medium text-gray-500">Total Records</span>
+            <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
               </svg>
             </div>
           </div>
-          <div class="text-2xl font-bold text-gray-900">{workspace.total_records?.toLocaleString() || 0}</div>
-          <p class="text-xs text-gray-500 mt-1">across all datasets</p>
+          <div class="text-2xl font-bold text-gray-900">{totalRecords.toLocaleString()}</div>
+          <p class="text-xs text-gray-500 mt-1">across {linkedDatasets.length} dataset{linkedDatasets.length !== 1 ? 's' : ''}</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-gray-600">Datasets</h3>
-            <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="text-sm font-medium text-gray-500">Datasets</span>
+            <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
               </svg>
             </div>
           </div>
-          <div class="text-2xl font-bold text-gray-900">{workspace.data_source_count || linkedDatasets.length}</div>
-          <p class="text-xs text-gray-500 mt-1">linked data sources</p>
+          <div class="text-2xl font-bold text-gray-900">{linkedDatasets.length}</div>
+          <p class="text-xs text-gray-500 mt-1">{activeCount} active</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-gray-600">Team Members</h3>
-            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            <span class="text-sm font-medium text-gray-500">Data Types</span>
+            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
               </svg>
             </div>
           </div>
-          <div class="text-2xl font-bold text-gray-900">{workspace.member_count || 1}</div>
-          <p class="text-xs text-gray-500 mt-1">collaborators</p>
+          <div class="text-2xl font-bold text-gray-900">{dataTypes.length}</div>
+          <p class="text-xs text-gray-500 mt-1">{dataTypes.join(', ') || 'none'}</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="bg-white rounded-xl shadow-sm p-5">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-medium text-gray-600">Last Updated</h3>
-            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span class="text-sm font-medium text-gray-500">Last Updated</span>
+            <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
           </div>
-          <div class="text-2xl font-bold text-gray-900">{new Date(workspace.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-          <p class="text-xs text-gray-500 mt-1">{new Date(workspace.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+          <div class="text-lg font-bold text-gray-900">{formatDate(workspace.updated_at) || '—'}</div>
+          <p class="text-xs text-gray-500 mt-1">{formatRelativeTime(workspace.updated_at) || ''}</p>
         </div>
       </div>
 
@@ -361,9 +324,9 @@
                           <p class="text-xs text-gray-600 mt-1">{dataset.description}</p>
                         {/if}
                         <div class="flex items-center mt-2 space-x-4 text-xs text-gray-500">
-                          <span>{dataset.record_count?.toLocaleString() || 0} records</span>
+                          <span>{(parseInt(dataset.record_count) || 0).toLocaleString()} records</span>
                           {#if dataset.date_range_start && dataset.date_range_end}
-                            <span>• {new Date(dataset.date_range_start).toLocaleDateString()} - {new Date(dataset.date_range_end).toLocaleDateString()}</span>
+                            <span>• {formatDate(dataset.date_range_start)} - {formatDate(dataset.date_range_end)}</span>
                           {/if}
                           <span>• {dataset.schema_name}.{dataset.table_name}</span>
                         </div>
@@ -395,39 +358,24 @@
           </div>
         {/if}
 
-        <!-- Dataset Statistics Summary -->
+        <!-- Dataset Breakdown -->
         {#if linkedDatasets.length > 0}
-          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-200">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Dataset Statistics</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div class="text-sm text-gray-600">Total Records</div>
-                <div class="text-2xl font-bold text-gray-900">
-                  {linkedDatasets.reduce((sum, d) => sum + (d.record_count || 0), 0).toLocaleString()}
+          <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Dataset Breakdown</h3>
+            <div class="space-y-3">
+              {#each linkedDatasets as dataset}
+                {@const maxRecords = Math.max(...linkedDatasets.map(d => parseInt(d.record_count) || 0), 1)}
+                <div class="flex items-center gap-3">
+                  <div class="w-32 text-sm text-gray-700 truncate font-medium" title={dataset.dataset_name}>{dataset.dataset_name}</div>
+                  <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      class="h-full rounded-full {dataset.dataset_type === 'gdelt_events' ? 'bg-amber-500' : dataset.dataset_type === 'radio' ? 'bg-purple-500' : 'bg-blue-500'}"
+                      style="width: {Math.max(((parseInt(dataset.record_count) || 0) / maxRecords) * 100, 2)}%"
+                    ></div>
+                  </div>
+                  <div class="w-24 text-right text-sm text-gray-600">{(parseInt(dataset.record_count) || 0).toLocaleString()}</div>
                 </div>
-              </div>
-              <div>
-                <div class="text-sm text-gray-600">Data Sources</div>
-                <div class="text-2xl font-bold text-gray-900">{linkedDatasets.length}</div>
-              </div>
-              <div>
-                <div class="text-sm text-gray-600">Active Datasets</div>
-                <div class="text-2xl font-bold text-emerald-600">
-                  {linkedDatasets.filter(d => d.status === 'active').length}
-                </div>
-              </div>
-              <div>
-                <div class="text-sm text-gray-600">Date Range</div>
-                <div class="text-sm font-medium text-gray-900">
-                  {#if linkedDatasets.some(d => d.date_range_start)}
-                    {@const earliestDate = linkedDatasets.filter(d => d.date_range_start).reduce((min, d) => d.date_range_start < min ? d.date_range_start : min, linkedDatasets[0]?.date_range_start || '')}
-                    {@const latestDate = linkedDatasets.filter(d => d.date_range_end).reduce((max, d) => d.date_range_end > max ? d.date_range_end : max, linkedDatasets[0]?.date_range_end || '')}
-                    {new Date(earliestDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - {new Date(latestDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                  {:else}
-                    N/A
-                  {/if}
-                </div>
-              </div>
+              {/each}
             </div>
           </div>
         {/if}
@@ -479,20 +427,20 @@
                 <div class="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
                   <div>
                     <p class="text-xs text-gray-500">Records</p>
-                    <p class="text-sm font-medium text-gray-900">{dataset.record_count?.toLocaleString() || 0}</p>
+                    <p class="text-sm font-medium text-gray-900">{(parseInt(dataset.record_count) || 0).toLocaleString()}</p>
                   </div>
                   {#if dataset.date_range_start && dataset.date_range_end}
                     <div>
                       <p class="text-xs text-gray-500">Date Range</p>
                       <p class="text-sm font-medium text-gray-900">
-                        {new Date(dataset.date_range_start).toLocaleDateString()} - {new Date(dataset.date_range_end).toLocaleDateString()}
+                        {formatDate(dataset.date_range_start)} - {formatDate(dataset.date_range_end)}
                       </p>
                     </div>
                   {/if}
                 </div>
 
                 <div class="mt-3 pt-3 border-t border-gray-100">
-                  <p class="text-xs text-gray-500">Added {new Date(dataset.added_at).toLocaleDateString()}</p>
+                  <p class="text-xs text-gray-500">Added {formatDate(dataset.added_at)}</p>
                 </div>
               </div>
             {/each}

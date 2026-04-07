@@ -22,7 +22,7 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
   constructor() {
     super({
       serviceName: 'AndroidAnalytics',
-      apiEndpoint: '/api/android-analytics',
+      apiEndpoint: '/api/unified-analytics',
       autoConnect: false
     });
   }
@@ -89,7 +89,7 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
   /**
    * Get aggregated analytics summary
    */
-  async getAnalyticsSummary(): Promise<AndroidAnalyticsSummary> {
+  async getAnalyticsSummary(): Promise<AndroidAnalyticsSummary & { isDemo?: boolean }> {
     try {
       const result = await this.queryAndroidAnalyticsAPI('stats');
 
@@ -105,27 +105,28 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
         };
       }
 
-      return this.getDefaultAndroidSummary();
+      return { ...this.getDefaultAndroidSummary(), isDemo: true };
     } catch (error) {
       this.log('error', 'Failed to fetch analytics summary');
-      return this.getDefaultAndroidSummary();
+      return { ...this.getDefaultAndroidSummary(), isDemo: true };
     }
   }
 
   /**
    * Get top apps by usage time (fallback to unified API)
+   * Note: Returns demo data derived from social analytics platforms since no real Android tables exist.
    */
-  async getTopApps(limit: number = 10): Promise<AppUsage[]> {
+  async getTopApps(limit: number = 10): Promise<{ data: AppUsage[]; isDemo: boolean }> {
     // Fallback to unified analytics for now
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance'
     });
 
     if (!data || data.length === 0) {
-      return [];
+      return { data: [], isDemo: true };
     }
 
-    return this.safeTransform(
+    const apps = this.safeTransform(
       data.slice(0, limit),
       (item, index) => ({
         app_name: item.platform.charAt(0).toUpperCase() + item.platform.slice(1),
@@ -136,22 +137,25 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
       }),
       []
     );
+
+    return { data: apps, isDemo: true };
   }
 
   /**
    * Get app usage timeline
+   * Note: Returns demo data derived from sentiment trends since no real Android tables exist.
    */
-  async getAppUsageTimeline(limit: number = 50): Promise<any[]> {
+  async getAppUsageTimeline(limit: number = 50): Promise<{ data: any[]; isDemo: boolean }> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
       params: { timeRange: '7d' }
     });
 
     if (!data || data.length === 0) {
-      return [];
+      return { data: [], isDemo: true };
     }
 
-    return this.safeTransform(
+    const timeline = this.safeTransform(
       data.slice(0, limit),
       (item, index) => {
         const totalSentiment = (item.positive || 0) + (item.negative || 0) + (item.neutral || 0);
@@ -168,22 +172,25 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
       },
       []
     );
+
+    return { data: timeline, isDemo: true };
   }
 
   /**
    * Get screen text analysis
+   * Note: Returns demo data derived from sample posts since no real Android tables exist.
    */
-  async getScreenTextAnalysis(limit: number = 50): Promise<ScreenData[]> {
+  async getScreenTextAnalysis(limit: number = 50): Promise<{ data: ScreenData[]; isDemo: boolean }> {
     const data = await this.queryAPI<any>({
       endpoint: 'sample-posts',
       params: { limit: limit.toString() }
     });
 
     if (!data || data.length === 0) {
-      return [];
+      return { data: [], isDemo: true };
     }
 
-    return this.safeTransform(
+    const screens = this.safeTransform(
       data,
       (post, index) => ({
         screen_id: index + 1,
@@ -194,36 +201,40 @@ class AndroidAnalyticsDatabase extends BaseDatabaseService {
       }),
       []
     );
+
+    return { data: screens, isDemo: true };
   }
 
   /**
    * Get URL visits
+   * Note: Returns demo data derived from platform performance since no real Android tables exist.
    */
-  async getUrlVisits(limit: number = 50): Promise<UrlVisit[]> {
+  async getUrlVisits(limit: number = 50): Promise<{ data: UrlVisit[]; isDemo: boolean }> {
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance'
     });
 
     if (!data || data.length === 0) {
-      return [];
+      return { data: [], isDemo: true };
     }
 
     const urls: UrlVisit[] = [];
     data.forEach((item: any, index: number) => {
       for (let i = 0; i < Math.min(item.total_posts / 10, 10); i++) {
+        const seed = (index * 10 + i);
         urls.push({
           id: urls.length + 1,
           url: `https://${item.platform}.com/post/${index}_${i}`,
           domain: `${item.platform}.com`,
-          visit_count: Math.floor(Math.random() * 50 + 1),
-          avg_duration_seconds: Math.floor(Math.random() * 300 + 30),
+          visit_count: (seed % 50) + 1,
+          avg_duration_seconds: (seed * 7 % 300) + 30,
           last_visited: new Date().toISOString(),
           confidence_score: Math.round((item.avg_confidence || 0.8) * 100) / 100
         });
       }
     });
 
-    return urls.slice(0, limit);
+    return { data: urls.slice(0, limit), isDemo: true };
   }
 
   // ========== Private Helper Methods ==========

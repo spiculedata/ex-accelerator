@@ -1,117 +1,93 @@
+// GDELT Events API — optimised for map display
 import { json } from '@sveltejs/kit';
-import duckdb from '@duckdb/node-api';
-import { resolve } from 'path';
+import { postgresPool } from '$lib/services/postgres';
 
 export async function GET({ url }) {
 	try {
-		// Get query parameters
 		const goldsteinMin = parseFloat(url.searchParams.get('goldsteinMin') || '-10');
 		const goldsteinMax = parseFloat(url.searchParams.get('goldsteinMax') || '10');
+		if (!Number.isFinite(goldsteinMin) || !Number.isFinite(goldsteinMax)) {
+			return json({ error: 'Invalid goldstein scale values' }, { status: 400 });
+		}
+
 		const dateStart = url.searchParams.get('dateStart');
 		const dateEnd = url.searchParams.get('dateEnd');
-		
-		// Get the absolute path to the database file
-		const dbPath = resolve('../etl/duckdatabase');
-		
-		// Create DuckDB instance with the database file
-		const instance = await duckdb.DuckDBInstance.create(dbPath);
-		const connection = await instance.connect();
-		
-		// Query to get up to 1000 events per major event type category
+		const dateFormat = /^\d{8}$/;
+		if (dateStart && !dateFormat.test(dateStart.replace(/-/g, ''))) {
+			return json({ error: 'Invalid dateStart format' }, { status: 400 });
+		}
+		if (dateEnd && !dateFormat.test(dateEnd.replace(/-/g, ''))) {
+			return json({ error: 'Invalid dateEnd format' }, { status: 400 });
+		}
+
+		const conditions: string[] = [
+			'actiongeo_lat IS NOT NULL',
+			'actiongeo_long IS NOT NULL',
+			'goldsteinscale BETWEEN $1 AND $2'
+		];
+		const params: any[] = [goldsteinMin, goldsteinMax];
+		let paramIndex = 3;
+
+		// Default to last 3 months if no date specified (prevents full table scan)
+		if (dateStart) {
+			conditions.push(`sqldate >= $${paramIndex}`);
+			params.push(parseInt(dateStart.replace(/-/g, '')));
+			paramIndex++;
+		} else {
+			const threeMonthsAgo = new Date();
+			threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+			const defaultStart = parseInt(threeMonthsAgo.toISOString().slice(0, 10).replace(/-/g, ''));
+			conditions.push(`sqldate >= $${paramIndex}`);
+			params.push(defaultStart);
+			paramIndex++;
+		}
+
+		if (dateEnd) {
+			conditions.push(`sqldate <= $${paramIndex}`);
+			params.push(parseInt(dateEnd.replace(/-/g, '')));
+			paramIndex++;
+		}
+
+		// Fast query: use TABLESAMPLE for random selection instead of ORDER BY RANDOM()
+		// This gives a representative sample without sorting millions of rows
 		const query = `
-			WITH event_categories AS (
-				SELECT 
-					GLOBALEVENTID,
-					Actor1Name,
-					Actor2Name,
-					EventCode,
-					ActionGeo_CountryCode,
-					ActionGeo_Fullname,
-					ActionGeo_Lat,
-					ActionGeo_Long,
-					GoldsteinScale,
-					AvgTone,
-					SQLDATE,
-					CASE 
-						WHEN EventCode LIKE '1%' THEN 'verbal_cooperation'
-						WHEN EventCode LIKE '2%' THEN 'material_cooperation'
-						WHEN EventCode LIKE '3%' THEN 'diplomacy'
-						WHEN EventCode LIKE '4%' THEN 'support'
-						WHEN EventCode LIKE '5%' THEN 'information'
-						WHEN EventCode LIKE '6%' THEN 'economic'
-						WHEN EventCode LIKE '7%' THEN 'political'
-						WHEN EventCode LIKE '8%' THEN 'military'
-						WHEN EventCode IN ('141', '142', '143', '144', '145') THEN 'protests'
-						WHEN EventCode IN ('17', '18', '19', '190', '193', '194', '195') THEN 'violence'
-						ELSE 'other'
-					END as event_category,
-					ROW_NUMBER() OVER (
-						PARTITION BY CASE 
-							WHEN EventCode LIKE '1%' THEN 'verbal_cooperation'
-							WHEN EventCode LIKE '2%' THEN 'material_cooperation'
-							WHEN EventCode LIKE '3%' THEN 'diplomacy'
-							WHEN EventCode LIKE '4%' THEN 'support'
-							WHEN EventCode LIKE '5%' THEN 'information'
-							WHEN EventCode LIKE '6%' THEN 'economic'
-							WHEN EventCode LIKE '7%' THEN 'political'
-							WHEN EventCode LIKE '8%' THEN 'military'
-							WHEN EventCode IN ('141', '142', '143', '144', '145') THEN 'protests'
-							WHEN EventCode IN ('17', '18', '19', '190', '193', '194', '195') THEN 'violence'
-							ELSE 'other'
-						END 
-						ORDER BY RANDOM()
-					) as rn
-				FROM gdelt_events 
-				WHERE ActionGeo_Lat IS NOT NULL 
-				AND ActionGeo_Long IS NOT NULL
-				AND ActionGeo_Lat BETWEEN -90 AND 90
-				AND ActionGeo_Long BETWEEN -180 AND 180
-				AND GoldsteinScale IS NOT NULL
-				AND GoldsteinScale BETWEEN ${goldsteinMin} AND ${goldsteinMax}
-				${dateStart ? `AND SQLDATE >= ${dateStart.replace(/-/g, '')}` : ''}
-				${dateEnd ? `AND SQLDATE <= ${dateEnd.replace(/-/g, '')}` : ''}
-			)
-			SELECT 
-				GLOBALEVENTID,
-				Actor1Name,
-				Actor2Name,
-				EventCode,
-				ActionGeo_CountryCode,
-				ActionGeo_Fullname,
-				ActionGeo_Lat,
-				ActionGeo_Long,
-				GoldsteinScale,
-				AvgTone,
-				SQLDATE
-			FROM event_categories
-			WHERE rn <= 1000
-			ORDER BY RANDOM()
-			LIMIT 10000
+			SELECT
+				globaleventid,
+				actor1name,
+				actor2name,
+				eventcode,
+				actiongeo_countrycode,
+				actiongeo_fullname,
+				actiongeo_lat,
+				actiongeo_long,
+				goldsteinscale,
+				avgtone,
+				sqldate
+			FROM gdelt_events TABLESAMPLE SYSTEM(1)
+			WHERE ${conditions.join(' AND ')}
+			LIMIT 5000
 		`;
-		
-		const reader = await connection.runAndReadAll(query);
-		connection.closeSync();
-		
-		const rowObjects = reader.getRowObjects();
-		
-		const events = rowObjects.map((row: any) => ({
-			id: typeof row.GLOBALEVENTID === 'bigint' ? Number(row.GLOBALEVENTID) : row.GLOBALEVENTID,
-			actor1: row.Actor1Name,
-			actor2: row.Actor2Name,
-			eventCode: row.EventCode,
-			country: row.ActionGeo_CountryCode,
-			location: row.ActionGeo_Fullname,
-			lat: row.ActionGeo_Lat,
-			lng: row.ActionGeo_Long,
-			goldstein: row.GoldsteinScale,
-			tone: row.AvgTone,
-			date: typeof row.SQLDATE === 'bigint' ? Number(row.SQLDATE) : row.SQLDATE
+
+		const rows = await postgresPool.query(query, params);
+
+		const events = rows.map((row: any) => ({
+			id: typeof row.globaleventid === 'bigint' ? Number(row.globaleventid) : row.globaleventid,
+			actor1: row.actor1name,
+			actor2: row.actor2name,
+			eventCode: row.eventcode,
+			country: row.actiongeo_countrycode,
+			location: row.actiongeo_fullname,
+			lat: typeof row.actiongeo_lat === 'string' ? parseFloat(row.actiongeo_lat) : row.actiongeo_lat,
+			lng: typeof row.actiongeo_long === 'string' ? parseFloat(row.actiongeo_long) : row.actiongeo_long,
+			goldstein: typeof row.goldsteinscale === 'string' ? parseFloat(row.goldsteinscale) : row.goldsteinscale,
+			tone: typeof row.avgtone === 'string' ? parseFloat(row.avgtone) : row.avgtone,
+			date: typeof row.sqldate === 'bigint' ? Number(row.sqldate) : row.sqldate
 		}));
-		
+
 		return json({ events, count: events.length });
-		
-	} catch (error) {
-		console.error('API Error:', error);
+
+	} catch (err) {
+		console.error('GDELT API Error:', err);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 }

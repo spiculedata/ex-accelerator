@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import Navigation from '$lib/components/Navigation.svelte';
 	import { getCountryNameWithFallback, getAllCountries } from '$lib/countryMapping';
 	
 	let mapContainer: HTMLDivElement;
@@ -1133,8 +1132,6 @@
 	</style>
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
 	<!-- Page Header -->
 	<div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
@@ -1683,69 +1680,71 @@
 				</div>
 
 				<!-- Map Container -->
-				<div class="xl:col-span-4 lg:col-span-3 space-y-6">
+				<div class="xl:col-span-4 lg:col-span-3">
+					<!-- Sticky wrapper: stats + map pin at top while scrolling mentions -->
+					<div class="sticky top-0 z-10 space-y-4 pb-4 bg-gray-50">
 					<!-- Stats Cards -->
-					<div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-4 xl:gap-6">
-						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+					<div class="grid grid-cols-4 gap-3">
+						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
-								<div class="absolute top-2 right-2">
+								<div class="absolute top-1 right-1">
 									<div class="animate-spin rounded-full h-3 w-3 border border-blue-200 border-t-blue-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-blue-600 mb-1 xl:mb-2">{visibleEvents.length.toLocaleString()}</div>
-							<div class="text-sm xl:text-base text-gray-600">Visible Events</div>
+							<div class="text-xl xl:text-2xl font-bold text-blue-600">{visibleEvents.length.toLocaleString()}</div>
+							<div class="text-xs text-gray-600">Visible Events</div>
 						</div>
-						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
-								<div class="absolute top-2 right-2">
+								<div class="absolute top-1 right-1">
 									<div class="animate-spin rounded-full h-3 w-3 border border-emerald-200 border-t-emerald-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-emerald-600 mb-1 xl:mb-2">{new Set(visibleEvents.map((e: any) => e.country)).size}</div>
-							<div class="text-sm xl:text-base text-gray-600">Countries</div>
+							<div class="text-xl xl:text-2xl font-bold text-emerald-600">{new Set(visibleEvents.map((e: any) => e.country)).size}</div>
+							<div class="text-xs text-gray-600">Countries</div>
 						</div>
-						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
-								<div class="absolute top-2 right-2">
+								<div class="absolute top-1 right-1">
 									<div class="animate-spin rounded-full h-3 w-3 border border-amber-200 border-t-amber-600"></div>
 								</div>
 							{/if}
-							<div class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-amber-600 mb-1 xl:mb-2">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
-							<div class="text-sm xl:text-base text-gray-600">Event Types</div>
+							<div class="text-xl xl:text-2xl font-bold text-amber-600">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
+							<div class="text-xs text-gray-600">Event Types</div>
 						</div>
-						<div class="bg-white rounded-xl shadow-sm p-4 xl:p-6 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
+						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
 							{#if isUpdatingFilter}
-								<div class="absolute top-2 right-2">
+								<div class="absolute top-1 right-1">
 									<div class="animate-spin rounded-full h-3 w-3 border border-blue-200 border-t-blue-600"></div>
 								</div>
 							{/if}
 							{#if true}
 								{@const avgTone = visibleEvents.length > 0 ? Math.round(visibleEvents.reduce((acc: number, e: any) => acc + (e.tone || 0), 0) / visibleEvents.length * 100) / 100 : 0}
-								<div class="text-xl xl:text-2xl 2xl:text-3xl font-bold text-blue-600 mb-1">{getToneDescription(avgTone)}</div>
-								<div class="text-lg xl:text-xl 2xl:text-2xl font-semibold text-blue-500 mb-1">{avgTone}</div>
-								<div class="text-sm xl:text-base text-gray-600">Avg Tone</div>
+								<div class="text-base xl:text-lg font-bold text-blue-600">{getToneDescription(avgTone)}</div>
+								<div class="text-sm font-semibold text-blue-500">{avgTone}</div>
+								<div class="text-xs text-gray-600">Avg Tone</div>
 							{/if}
 						</div>
 					</div>
 
 					<!-- Map -->
 					<div class="bg-white rounded-xl shadow-sm overflow-hidden">
-						<div class="p-4 xl:p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+						<div class="px-4 py-2 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center">
-									<div class="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-3">
-										<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<div class="w-6 h-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mr-2">
+										<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 										</svg>
 									</div>
-									<h2 class="text-xl xl:text-2xl font-semibold text-gray-900">Global Events Map</h2>
+									<h2 class="text-base xl:text-lg font-semibold text-gray-900">Global Events Map</h2>
 								</div>
-								<div class="flex items-center space-x-4 xl:space-x-6">
+								<div class="flex items-center space-x-3">
 									{#if visibleEvents.length > 0 && visibleEvents.length < events.length}
-										<button 
+										<button
 											on:click={() => fetchAllMentionsForVisible()}
 											disabled={loadingMentions || isBatchLoading}
-											class="text-xs xl:text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-xl transition-all duration-200 flex items-center gap-2 min-w-max"
+											class="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-2 py-1 rounded-lg transition-all duration-200 flex items-center gap-1.5 min-w-max"
 										>
 											{#if loadingMentions || isBatchLoading}
 												<div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-white"></div>
@@ -1766,18 +1765,18 @@
 											{/if}
 										</button>
 									{/if}
-									<div class="text-sm xl:text-base text-gray-600">
-										Displaying {visibleEvents.length} of {events.length} events
+									<div class="text-xs text-gray-600">
+										{visibleEvents.length} of {events.length} events
 									</div>
-									<div class="flex items-center text-xs xl:text-sm text-gray-500">
-										<div class="w-2 h-2 {isUpdatingFilter ? 'bg-blue-400' : 'bg-blue-400'} rounded-full animate-pulse mr-1"></div>
-										{isUpdatingFilter ? 'Refreshing...' : 'Live Data'}
+									<div class="flex items-center text-xs text-gray-500">
+										<div class="w-1.5 h-1.5 {isUpdatingFilter ? 'bg-blue-400' : 'bg-blue-400'} rounded-full animate-pulse mr-1"></div>
+										{isUpdatingFilter ? 'Refreshing...' : 'Live'}
 									</div>
 								</div>
 							</div>
 						</div>
 						<div class="relative">
-							<div bind:this={mapContainer} class="h-[500px] lg:h-[600px] xl:h-[700px] 2xl:h-[800px] w-full"></div>
+							<div bind:this={mapContainer} class="h-[calc(100vh-220px)] min-h-[350px] max-h-[700px] w-full"></div>
 							
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}
@@ -1807,10 +1806,12 @@
 							{/if}
 						</div>
 					</div>
+					</div>
+					<!-- END sticky wrapper -->
 
 					<!-- Mentions Section -->
 					{#if showMentions}
-						<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+						<div class="bg-white rounded-xl shadow-sm overflow-hidden mt-6">
 							<div class="p-4 xl:p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center">

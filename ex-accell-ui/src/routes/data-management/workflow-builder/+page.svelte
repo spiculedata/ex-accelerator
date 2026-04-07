@@ -6,7 +6,6 @@
    * Refactored to use modular components for better maintainability.
    */
 
-  import Navigation from '$lib/components/Navigation.svelte';
   import WorkflowCanvas from '$lib/components/workflow-builder/WorkflowCanvas.svelte';
   import StepLibrary from '$lib/components/workflow-builder/StepLibrary.svelte';
   import StepConfigPanel from '$lib/components/workflow-builder/StepConfigPanel.svelte';
@@ -14,6 +13,7 @@
   import PublishWorkflowModal from '$lib/components/workflow-builder/PublishWorkflowModal.svelte';
   import ExecuteWorkflowModal from '$lib/components/workflow-builder/ExecuteWorkflowModal.svelte';
 
+  import { goto } from '$app/navigation';
   import { workflowBuilder, type Dataset } from '$lib/stores/workflowBuilderStore';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount, onDestroy } from 'svelte';
@@ -88,7 +88,7 @@
 
     // Redirect to projects if no current project after loading
     if (!projectLoaded || !$currentProject) {
-      window.location.href = '/projects';
+      goto('/projects');
       return;
     }
 
@@ -490,8 +490,6 @@
   <meta name="description" content="Visual workflow builder for creating custom data processing pipelines" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
   <div class="bg-white shadow-sm border-b border-gray-200">
@@ -499,7 +497,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <button
-            onclick={() => window.location.href='/data-management'}
+            onclick={() => goto('/data-management')}
             class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-xl transition-colors"
             aria-label="Back to data management">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

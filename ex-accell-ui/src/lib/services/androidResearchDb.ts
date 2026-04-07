@@ -101,26 +101,27 @@ class AndroidResearchDatabase extends BaseDatabaseService {
 
   /**
    * Get temporal usage patterns for 24-hour analysis
+   * Note: Returns demo data derived from sentiment hourly patterns since no real Android tables exist.
    */
-  async getTemporalUsagePatterns(): Promise<TemporalUsagePattern[]> {
+  async getTemporalUsagePatterns(): Promise<{ data: TemporalUsagePattern[]; isDemo: boolean }> {
     const results = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
 
     if (!results || results.length === 0) {
-      return this.getFallbackTemporalPatterns();
+      return { data: this.getFallbackTemporalPatterns(), isDemo: true };
     }
 
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
 
-    return this.safeTransform(
+    const patterns = this.safeTransform(
       results,
       (hourData) => {
         const totalActivity = (hourData.positive || 0) + (hourData.negative || 0) + (hourData.neutral || 0);
-        const appUsage = apps.map(app => ({
+        const appUsage = apps.map((app, appIdx) => ({
           app,
           hour: hourData.hour_of_day,
-          usage: Math.floor(totalActivity * (0.2 + Math.random() * 0.6)),
+          usage: Math.floor(totalActivity * (0.2 + (appIdx * 0.12))),
           sessions: Math.floor(totalActivity * 0.1),
-          avgDuration: Math.floor(Math.random() * 300) + 30
+          avgDuration: ((hourData.hour_of_day * 13 + appIdx * 47) % 300) + 30
         }));
 
         return {
@@ -131,16 +132,19 @@ class AndroidResearchDatabase extends BaseDatabaseService {
       },
       this.getFallbackTemporalPatterns()
     );
+
+    return { data: patterns, isDemo: true };
   }
 
   /**
    * Get app transition network data
+   * Note: Returns demo data derived from platform performance since no real Android tables exist.
    */
-  async getAppTransitions(): Promise<AppTransition[]> {
+  async getAppTransitions(): Promise<{ data: AppTransition[]; isDemo: boolean }> {
     const results = await this.queryAPI<any>({ endpoint: 'platform-performance' });
 
     if (!results || results.length < 2) {
-      return this.getFallbackAppTransitions();
+      return { data: this.getFallbackAppTransitions(), isDemo: true };
     }
 
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
@@ -152,22 +156,22 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         source: apps[i],
         target: apps[i + 1],
         value: Math.floor(platformData.total_posts * 0.1),
-        avgTime: Math.floor(Math.random() * 300) + 60
+        avgTime: ((i * 67) % 300) + 60
       });
     }
 
-    return transitions;
+    return { data: transitions, isDemo: true };
   }
 
   /**
    * Get attention span distribution data
    */
-  async getAttentionSpans(): Promise<AttentionSpan[]> {
+  async getAttentionSpans(): Promise<{ data: AttentionSpan[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('attention-spans');
 
       if (results.length === 0) {
-        return this.getFallbackAttentionSpans();
+        return { data: this.getFallbackAttentionSpans(), isDemo: true };
       }
 
       // Group by app
@@ -198,25 +202,25 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         }
       });
 
-      return Object.values(appGroups);
+      return { data: Object.values(appGroups), isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get attention spans');
-      return this.getFallbackAttentionSpans();
+      return { data: this.getFallbackAttentionSpans(), isDemo: true };
     }
   }
 
   /**
    * Get content engagement analysis data
    */
-  async getContentEngagement(): Promise<ContentEngagement[]> {
+  async getContentEngagement(): Promise<{ data: ContentEngagement[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('content-engagement');
 
       if (results.length === 0) {
-        return this.getFallbackContentEngagement();
+        return { data: this.getFallbackContentEngagement(), isDemo: true };
       }
 
-      return this.safeTransform(
+      const engagement = this.safeTransform(
         results,
         (r) => ({
           content: r.content_category || r.content,
@@ -227,21 +231,23 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         }),
         this.getFallbackContentEngagement()
       );
+
+      return { data: engagement, isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get content engagement');
-      return this.getFallbackContentEngagement();
+      return { data: this.getFallbackContentEngagement(), isDemo: true };
     }
   }
 
   /**
    * Get cognitive load indicators
    */
-  async getCognitiveLoadData(): Promise<CognitiveLoad[]> {
+  async getCognitiveLoadData(): Promise<{ data: CognitiveLoad[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('cognitive-load');
 
       if (results.length === 0) {
-        return this.getFallbackCognitiveLoad();
+        return { data: this.getFallbackCognitiveLoad(), isDemo: true };
       }
 
       // Group by hour
@@ -267,67 +273,71 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         };
       });
 
-      return hourlyData;
+      return { data: hourlyData, isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get cognitive load data');
-      return this.getFallbackCognitiveLoad();
+      return { data: this.getFallbackCognitiveLoad(), isDemo: true };
     }
   }
 
   /**
    * Get behavioral metrics calculation
    */
-  async getBehavioralMetrics(): Promise<BehavioralMetrics> {
+  async getBehavioralMetrics(): Promise<{ data: BehavioralMetrics; isDemo: boolean }> {
     const results = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
 
     if (!results || results.length === 0) {
-      return this.getFallbackBehavioralMetrics();
+      return { data: this.getFallbackBehavioralMetrics(), isDemo: true };
     }
 
     try {
-      return await this.calculateBehavioralMetrics(results);
+      const metrics = await this.calculateBehavioralMetrics(results);
+      return { data: metrics, isDemo: true };
     } catch (error) {
       this.log('error', 'Failed to calculate behavioral metrics');
-      return this.getFallbackBehavioralMetrics();
+      return { data: this.getFallbackBehavioralMetrics(), isDemo: true };
     }
   }
 
   /**
    * Get digital phenotype classification
    */
-  async getDigitalPhenotype(): Promise<DigitalPhenotype> {
+  async getDigitalPhenotype(): Promise<{ data: DigitalPhenotype; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('digital-phenotype');
 
       if (results.length > 0) {
         const phenotype = results[0];
         return {
-          behaviorType: phenotype.usage_behavior_type || 'Moderate User',
-          attentionProfile: phenotype.attention_profile || 'Moderate',
-          usagePattern: phenotype.usage_pattern || 'Evening-Peak',
-          multitaskingIndex: phenotype.multitasking_profile || 'Moderate'
+          data: {
+            behaviorType: phenotype.usage_behavior_type || 'Moderate User',
+            attentionProfile: phenotype.attention_profile || 'Moderate',
+            usagePattern: phenotype.usage_pattern || 'Evening-Peak',
+            multitaskingIndex: phenotype.multitasking_profile || 'Moderate'
+          },
+          isDemo: false
         };
       }
 
-      return this.getFallbackDigitalPhenotype();
+      return { data: this.getFallbackDigitalPhenotype(), isDemo: true };
     } catch (error) {
       this.log('error', 'Failed to get digital phenotype');
-      return this.getFallbackDigitalPhenotype();
+      return { data: this.getFallbackDigitalPhenotype(), isDemo: true };
     }
   }
 
   /**
    * Get research findings and insights
    */
-  async getResearchFindings(): Promise<ResearchFinding[]> {
+  async getResearchFindings(): Promise<{ data: ResearchFinding[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('research-findings');
 
       if (results.length === 0) {
-        return this.getFallbackResearchFindings();
+        return { data: this.getFallbackResearchFindings(), isDemo: true };
       }
 
-      return this.safeTransform(
+      const findings = this.safeTransform(
         results,
         (r) => ({
           title: r.finding_title || r.title,
@@ -337,21 +347,23 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         }),
         this.getFallbackResearchFindings()
       );
+
+      return { data: findings, isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get research findings');
-      return this.getFallbackResearchFindings();
+      return { data: this.getFallbackResearchFindings(), isDemo: true };
     }
   }
 
   /**
    * Get network centrality analysis
    */
-  async getNetworkCentrality(): Promise<NetworkCentrality[]> {
+  async getNetworkCentrality(): Promise<{ data: NetworkCentrality[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('network-centrality');
 
       if (results.length === 0) {
-        return this.getFallbackNetworkCentrality();
+        return { data: this.getFallbackNetworkCentrality(), isDemo: true };
       }
 
       const centrality = this.safeTransform(
@@ -366,25 +378,25 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         this.getFallbackNetworkCentrality()
       );
 
-      return centrality.sort((a, b) => b.centralityScore - a.centralityScore);
+      return { data: centrality.sort((a, b) => b.centralityScore - a.centralityScore), isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get network centrality');
-      return this.getFallbackNetworkCentrality();
+      return { data: this.getFallbackNetworkCentrality(), isDemo: true };
     }
   }
 
   /**
    * Get transition flow data for Sankey diagram
    */
-  async getTransitionFlow(): Promise<AppTransition[]> {
+  async getTransitionFlow(): Promise<{ data: AppTransition[]; isDemo: boolean }> {
     try {
       const results = await this.queryAndroidResearchAPI('transition-flow');
 
       if (results.length === 0) {
-        return this.getFallbackTransitionFlow();
+        return { data: this.getFallbackTransitionFlow(), isDemo: true };
       }
 
-      return this.safeTransform(
+      const flow = this.safeTransform(
         results,
         (r) => ({
           source: r.from_app_name || r.source,
@@ -393,9 +405,11 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         }),
         this.getFallbackTransitionFlow()
       );
+
+      return { data: flow, isDemo: false };
     } catch (error) {
       this.log('error', 'Failed to get transition flow');
-      return this.getFallbackTransitionFlow();
+      return { data: this.getFallbackTransitionFlow(), isDemo: true };
     }
   }
 
@@ -404,13 +418,13 @@ class AndroidResearchDatabase extends BaseDatabaseService {
   private getFallbackTemporalPatterns(): TemporalUsagePattern[] {
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp', 'Gmail'];
     return Array.from({ length: 24 }, (_, hour) => {
-      const baseUsage = Math.max(0, Math.sin((hour - 6) * Math.PI / 12) * 100 + Math.random() * 20);
-      const appUsage = apps.map(app => ({
+      const baseUsage = Math.max(0, Math.sin((hour - 6) * Math.PI / 12) * 100 + (hour % 5) * 4);
+      const appUsage = apps.map((app, appIdx) => ({
         app,
         hour,
-        usage: Math.max(0, baseUsage * (0.5 + Math.random())),
-        sessions: Math.floor(Math.random() * 15) + 1,
-        avgDuration: Math.floor(Math.random() * 300) + 30
+        usage: Math.max(0, baseUsage * (0.5 + appIdx * 0.15)),
+        sessions: (hour + appIdx * 3) % 15 + 1,
+        avgDuration: ((hour * 13 + appIdx * 47) % 300) + 30
       }));
       return { hour, apps: appUsage, totalUsage: appUsage.reduce((sum, a) => sum + a.usage, 0) };
     });
@@ -427,14 +441,14 @@ class AndroidResearchDatabase extends BaseDatabaseService {
 
   private getFallbackAttentionSpans(): AttentionSpan[] {
     const apps = ['YouTube', 'Chrome', 'Instagram', 'WhatsApp'];
-    return apps.map(app => ({
+    return apps.map((app, appIdx) => ({
       app,
       meanDuration: app === 'YouTube' ? 280 : app === 'Chrome' ? 200 : 120,
-      sessions: Array.from({ length: 10 }, () => ({
-        duration: Math.floor(Math.random() * 300) + 30,
-        timestamp: Date.now() - Math.random() * 86400000,
-        taskSwitches: Math.floor(Math.random() * 3),
-        interruptions: Math.floor(Math.random() * 2)
+      sessions: Array.from({ length: 10 }, (_, sessIdx) => ({
+        duration: ((appIdx * 10 + sessIdx) * 31 % 300) + 30,
+        timestamp: Date.now() - (appIdx * 10 + sessIdx) * 8640000,
+        taskSwitches: (appIdx + sessIdx) % 3,
+        interruptions: (appIdx + sessIdx) % 2
       }))
     }));
   }
@@ -450,10 +464,10 @@ class AndroidResearchDatabase extends BaseDatabaseService {
   private getFallbackCognitiveLoad(): CognitiveLoad[] {
     return Array.from({ length: 24 }, (_, hour) => ({
       hour,
-      taskSwitches: Math.floor(Math.random() * 15) + 5,
-      multitaskingIndex: Math.random() * 8,
-      attentionFragmentation: Math.random() * 80,
-      cognitiveEfficiency: Math.max(20, 100 - Math.random() * 60)
+      taskSwitches: (hour * 3) % 15 + 5,
+      multitaskingIndex: (hour * 7 % 80) / 10,
+      attentionFragmentation: (hour * 11 % 80),
+      cognitiveEfficiency: Math.max(20, 100 - (hour * 5 % 60))
     }));
   }
 

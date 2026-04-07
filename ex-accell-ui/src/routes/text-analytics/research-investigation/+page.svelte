@@ -1,7 +1,8 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
 
   // Load current project and check if exists
   onMount(async () => {
@@ -9,11 +10,12 @@
 
     // Only redirect after we've tried to load the project
     if (!$currentProject) {
-      window.location.href = '/projects';
+      goto('/projects');
     }
   });
 
-  let jupyterUrl = 'http://localhost:8888';
+  let errorMessage = '';
+  let jupyterUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8888` : 'http://localhost:8888';
   let isJupyterRunning = false;
   let notebookFile = '';
   let notebookTemplate = 'sentiment_analysis';
@@ -199,8 +201,6 @@
   <meta name="description" content="Interactive Jupyter notebooks for text analytics research and experimentation" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
   <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
@@ -211,7 +211,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <button 
-            on:click={() => window.location.href='/text-analytics'}
+            on:click={() => goto('/text-analytics')}
             class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -248,7 +248,8 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
+    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+
     <!-- Quick Start Section -->
     <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-xl font-semibold text-gray-900 mb-4">Quick Start</h2>
@@ -315,7 +316,7 @@
               {:else}
                 <div class="bg-green-50 rounded-xl p-4 text-sm">
                   <p class="font-medium text-green-900 mb-2">✓ JupyterLab is running</p>
-                  <p class="text-green-700">Server available at <a href="http://localhost:8888" target="_blank" class="text-blue-600 hover:underline font-medium">http://localhost:8888</a></p>
+                  <p class="text-green-700">Server available at <a href="{jupyterUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">{jupyterUrl}</a></p>
                 </div>
               {/if}
             </div>
@@ -347,7 +348,7 @@
                   </button>
                 {:else}
                   <button 
-                    on:click={() => window.location.href='/text-analytics/jupyter'}
+                    on:click={() => goto('/text-analytics/jupyter')}
                     class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                     Go to Jupyter Lab Page
                   </button>

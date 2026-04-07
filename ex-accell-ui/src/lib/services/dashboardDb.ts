@@ -33,8 +33,11 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get comprehensive dashboard statistics
    */
-  async getDashboardStats(): Promise<DashboardStats> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getDashboardStats(workspaceId?: string): Promise<DashboardStats> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return this.getDefaultDashboardStats();
@@ -50,8 +53,11 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get data sources with statistics
    */
-  async getDataSources(): Promise<DataSource[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getDataSources(workspaceId?: string): Promise<DataSource[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'platform-performance',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -76,8 +82,11 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get sentiment breakdown across all platforms
    */
-  async getSentimentBreakdown(): Promise<SentimentBreakdown[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getSentimentBreakdown(workspaceId?: string): Promise<SentimentBreakdown[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'cross-platform-sentiment',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -93,71 +102,61 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get top languages from platform data
    */
-  async getTopLanguages(): Promise<TopLanguage[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'platform-performance' });
+  async getTopLanguages(workspaceId?: string): Promise<TopLanguage[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'language-stats',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
     }
 
-    const totalPosts = data.reduce((sum: number, item: any) => sum + item.total_posts, 0);
+    const totalPosts = data.reduce((sum: number, item: any) => sum + (item.post_count || 0), 0);
 
-    // Language distribution (TODO: Get actual language data from database)
-    const languages = [
-      { name: 'English', code: 'en' },
-      { name: 'Spanish', code: 'es' },
-      { name: 'French', code: 'fr' },
-      { name: 'German', code: 'de' },
-      { name: 'Italian', code: 'it' }
-    ];
-
-    return languages.map((lang, index) => {
-      const count = Math.floor(totalPosts * (0.6 - index * 0.1)); // Decreasing distribution
-      return {
-        language: lang.name,
-        count,
-        percentage: totalPosts > 0 ? Math.round((count / totalPosts * 100) * 100) / 100 : 0
-      };
-    });
+    return data.map((lang: any) => ({
+      language: lang.language,
+      count: lang.post_count || 0,
+      percentage: totalPosts > 0 ? Math.round(((lang.post_count || 0) / totalPosts * 100) * 100) / 100 : 0
+    }));
   }
 
   /**
-   * Get top topics from cross-platform data
+   * Get top topics from the topics table
    */
-  async getTopTopics(): Promise<TopTopic[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'cross-platform-sentiment' });
+  async getTopTopics(workspaceId?: string): Promise<TopTopic[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'topics-overview',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
     }
 
-    // Topic generation (TODO: Get actual topics from topic modeling database)
-    const topics = [
-      'Technology',
-      'Social Issues',
-      'Business',
-      'Entertainment',
-      'Sports'
-    ];
+    // Prefer social-derived topics over GDELT news themes for dashboards
+    const socialTopics = data.filter((t: any) => !t.topic_id?.startsWith('gdelt_'));
+    const topicsToShow = socialTopics.length > 0 ? socialTopics : data;
 
-    return topics.map((topic, index) => {
-      const baseData = data[index % data.length] || { post_count: 0, avg_confidence: 0.7 };
-      const posts = Math.floor(baseData.post_count * (0.8 - index * 0.1));
-      const coherenceScore = baseData.avg_confidence || 0.7;
-
-      return {
-        topic,
-        posts,
-        trend: this.getTrendDirection(coherenceScore)
-      };
-    });
+    // Return top 5 topics by size
+    return topicsToShow
+      .sort((a: any, b: any) => (b.size || 0) - (a.size || 0))
+      .slice(0, 5)
+      .map((topic: any) => ({
+        topic: topic.name,
+        posts: topic.size || 0,
+        trend: (topic.coherence_score || 0) > 0.5 ? 'up' as const : 'stable' as const
+      }));
   }
 
   /**
    * Get crawling activity by hour
    */
-  async getCrawlingActivity(): Promise<CrawlingActivity[]> {
-    const data = await this.queryAPI<any>({ endpoint: 'hourly-patterns' });
+  async getCrawlingActivity(workspaceId?: string): Promise<CrawlingActivity[]> {
+    const data = await this.queryAPI<any>({
+      endpoint: 'hourly-patterns',
+      params: workspaceId ? { workspace_id: workspaceId } : {}
+    });
 
     if (!data || data.length === 0) {
       return [];
@@ -167,7 +166,10 @@ class DashboardDatabase extends BaseDatabaseService {
       data,
       (row) => ({
         time: `${String(row.hour_of_day).padStart(2, '0')}:00`,
-        posts: (row.positive || 0) + (row.negative || 0) + (row.neutral || 0)
+        posts: (row.positive || 0) + (row.negative || 0) + (row.neutral || 0),
+        positive: row.positive || 0,
+        negative: row.negative || 0,
+        neutral: row.neutral || 0
       }),
       []
     );
@@ -176,10 +178,10 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get recent activity feed
    */
-  async getRecentActivity(): Promise<RecentActivity[]> {
+  async getRecentActivity(workspaceId?: string): Promise<RecentActivity[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sample-posts',
-      params: { limit: 10 }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), limit: 10 }
     });
 
     if (!data || data.length === 0) {
@@ -223,16 +225,19 @@ class DashboardDatabase extends BaseDatabaseService {
    */
   private calculateDashboardStats(data: any[]): DashboardStats {
     const totalPosts = data.reduce((sum, item) => sum + item.post_count, 0);
-    const avgConfidence = data.reduce((sum, item) => sum + (item.avg_confidence || 0.8), 0) / data.length;
-    const positiveRatio = data
-      .filter(item => item.sentiment_category.toLowerCase().includes('positive'))
-      .reduce((sum, item) => sum + item.post_count, 0) / totalPosts;
+    // Processing rate: posts per hour (total posts / 24h window)
+    const processingRate = Math.round((totalPosts / 24) * 100) / 100;
+    // Data quality: % of posts that have sentiment classification (non-unknown)
+    const classifiedPosts = data
+      .filter(item => !item.sentiment_category.toLowerCase().includes('unknown'))
+      .reduce((sum, item) => sum + item.post_count, 0);
+    const dataQuality = totalPosts > 0 ? Math.round((classifiedPosts / totalPosts) * 10000) / 100 : 0;
 
     return {
       total_posts: totalPosts,
-      processing_rate: Math.round(avgConfidence * 100) / 100,
-      data_quality: Math.round(positiveRatio * 100) / 100,
-      total_sources: data.length, // Number of platform-sentiment combinations
+      processing_rate: processingRate,
+      data_quality: dataQuality,
+      total_sources: data.length,
       active_crawlers: Math.min(data.length, 8),
       last_updated: new Date().toISOString()
     };

@@ -1,184 +1,192 @@
 <script lang="ts">
-  import Navigation from '$lib/components/Navigation.svelte';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { ErrorAlert } from '$lib/components/ui';
+  import { getStatusColor } from '$lib/utils/colorUtils';
+  import { formatNumber } from '$lib/utils/formatUtils';
 
-  // Redirect to projects if no current project
-  onMount(async () => {
-    await loadCurrentProject();
-    if (!$currentProject) {
-      window.location.href = '/projects';
-    }
-  });
+  $: workspaceId = $page.url.searchParams.get('workspace');
 
-  // Active tab state
-  let activeTab = 'capture';
-
-  // Data capture sources and configurations
-  let dataSources = [
-    {
-      id: 'twitter',
-      name: 'Twitter',
-      description: 'Capture tweets, trends, and user data',
-      icon: '🐦',
-      color: 'blue',
-      status: 'connected',
-      lastSync: '2025-01-27T15:30:00Z',
-      recordsCaptured: 45672,
-      config: {
-        keywords: ['#AI', '#tech', 'innovation'],
-        languages: ['en', 'es'],
-        geoLocation: 'US',
-        includeRetweets: true
-      }
-    },
-    {
-      id: 'reddit',
-      name: 'Reddit',
-      description: 'Monitor subreddits and discussions',
-      icon: '🤖',
-      color: 'orange',
-      status: 'connected',
-      lastSync: '2025-01-27T15:25:00Z',
-      recordsCaptured: 23456,
-      config: {
-        subreddits: ['technology', 'artificial', 'MachineLearning'],
-        postTypes: ['hot', 'new', 'top'],
-        timeRange: '24h'
-      }
-    },
-    {
-      id: 'instagram',
-      name: 'Instagram',
-      description: 'Capture posts, stories, and hashtags',
-      icon: '📷',
-      color: 'pink',
-      status: 'paused',
-      lastSync: '2025-01-27T14:15:00Z',
-      recordsCaptured: 18934,
-      config: {
-        hashtags: ['#lifestyle', '#tech', '#innovation'],
-        includeStories: false,
-        mediaTypes: ['image', 'video']
-      }
-    },
-    {
-      id: 'linkedin',
-      name: 'LinkedIn',
-      description: 'Professional content and company updates',
-      icon: '💼',
-      color: 'indigo',
-      status: 'disconnected',
-      lastSync: null,
-      recordsCaptured: 0,
-      config: {
-        companies: [],
-        industries: ['Technology', 'AI'],
-        postTypes: ['articles', 'posts']
-      }
-    }
-  ];
-
-  // Available datasets for processing
-  let availableDatasets = [
-    { 
-      id: 'ds1', 
-      name: 'Twitter Sentiment Dataset', 
-      type: 'sentiment', 
-      records: 487293, 
-      size: '45.2 MB',
-      created: '2025-01-25T10:00:00Z',
-      status: 'ready',
-      source: 'twitter',
-      columns: ['id', 'text', 'sentiment', 'confidence', 'platform', 'timestamp', 'user_id']
-    },
-    { 
-      id: 'ds2', 
-      name: 'Multi-Platform Engagement Data', 
-      type: 'engagement', 
-      records: 1234567, 
-      size: '156.8 MB',
-      created: '2025-01-24T14:30:00Z',
-      status: 'ready',
-      source: 'multi-platform',
-      columns: ['post_id', 'platform', 'likes', 'shares', 'comments', 'reach', 'content_type', 'hashtags']
-    },
-    { 
-      id: 'ds3', 
-      name: 'Reddit Discussion Analysis', 
-      type: 'discussions', 
-      records: 89456, 
-      size: '12.4 MB',
-      created: '2025-01-23T09:15:00Z',
-      status: 'ready',
-      source: 'reddit',
-      columns: ['post_id', 'subreddit', 'title', 'content', 'score', 'comments', 'author']
-    }
-  ];
-
-  // Processing workflows
-  let workflows = [
-    {
-      id: 'wf1',
-      name: 'Real-time Sentiment Pipeline',
-      description: 'Live sentiment analysis on captured Twitter data',
-      status: 'running',
-      inputSource: 'twitter',
-      outputDataset: 'twitter_sentiment_live',
-      steps: 6,
-      progress: 78,
-      recordsProcessed: 12456,
-      created: '2025-01-27T09:30:00Z'
-    },
-    {
-      id: 'wf2',
-      name: 'Multi-Platform Content Classifier',
-      description: 'Classify and tag content across all platforms',
-      status: 'completed',
-      inputSource: 'multi-platform',
-      outputDataset: 'classified_content_v2',
-      steps: 8,
-      recordsProcessed: 45678,
-      created: '2025-01-26T14:20:00Z'
-    },
-    {
-      id: 'wf3',
-      name: 'Reddit Topic Extraction',
-      description: 'Extract topics and themes from Reddit discussions',
-      status: 'draft',
-      inputSource: 'reddit',
-      outputDataset: 'reddit_topics',
-      steps: 5,
-      created: '2025-01-27T11:45:00Z'
-    }
-  ];
-
-  // Combined statistics
+  let loading = true;
+  let errorMessage = '';
+  let dataSources: any[] = [];
+  let availableDatasets: any[] = [];
+  let allDatasets: any[] = [];
+  let workflows: any[] = [];
   let dataStats = {
-    totalRecordsCapture: dataSources.reduce((sum, source) => sum + source.recordsCaptured, 0),
-    activeConnections: dataSources.filter(s => s.status === 'connected').length,
-    totalDatasets: availableDatasets.length,
-    activeWorkflows: workflows.filter(w => w.status === 'running').length,
-    totalStorageUsed: '278.5 MB',
-    lastCaptureUpdate: '2025-01-27T15:30:00Z'
+    totalRecordsCapture: 0,
+    activeConnections: 0,
+    totalDatasets: 0,
+    activeWorkflows: 0,
+    totalStorageUsed: '—',
+    lastCaptureUpdate: '—'
   };
+
+  let showAddSourceModal = false;
+  let showPreviewModal = false;
+  let showRadioConfigModal = false;
+  let showCrawlerModal = false;
+  let previewDataset: any = null;
 
   let selectedDataset: any = null;
   let selectedWorkflow: any = null;
 
-  function getStatusColor(status: string) {
-    const colors: Record<string, string> = {
-      'connected': 'bg-blue-100 text-blue-800',
-      'paused': 'bg-yellow-100 text-yellow-800',
-      'disconnected': 'bg-gray-100 text-gray-800',
-      'error': 'bg-red-100 text-red-800',
-      'ready': 'bg-blue-100 text-blue-800',
-      'processing': 'bg-blue-100 text-blue-800',
-      'running': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-blue-100 text-blue-800',
-      'draft': 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+  // Crawler state
+  let crawlerConfig = {
+    platform: 'bluesky',
+    urls: '',
+    crawlId: '',
+    maxPosts: 1000,
+    maxDepth: 1,
+    timeAgo: '30d',
+    skipMedia: true,
+    samplingMethod: 'channel',
+    youtubeApiKey: ''
+  };
+  let crawlerStatus = '';
+
+  // WavePulse radio state
+  let wavePulseStatus: any = { status: 'offline' };
+  let radioConfig = {
+    radioStreams: [
+      { url: 'https://ice42.securenetsystems.net/WGSV', radioName: 'WGSV', state: 'VA', timeSlots: [{ start: '00:00', end: '23:59' }] }
+    ],
+    device: 'cpu',
+    computeType: 'float32',
+    whisperModel: 'large-v3',
+    enableTranscription: true,
+    enableClassification: false,
+    huggingFaceToken: '',
+    geminiApiKey: ''
+  };
+
+  // Active tab state — supports deep linking: /data-management?tab=workflows
+  let activeTab = typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('tab') || 'capture') : 'capture';
+
+  onMount(async () => {
+    await loadCurrentProject();
+    if (!$currentProject) {
+      goto('/projects');
+      return;
+    }
+    await loadData();
+  });
+
+  async function loadData() {
+    try {
+      loading = true;
+      errorMessage = '';
+
+      // Load datasets for current workspace (if scoped)
+      const dsParams = workspaceId ? `?workspace_id=${workspaceId}` : '';
+      const dsResponse = await fetch(`/api/datasets${dsParams}`);
+      const dsResult = await dsResponse.json();
+      if (dsResult.success) {
+        availableDatasets = dsResult.datasets || [];
+      }
+
+      // Load all available datasets (for the "add source" modal)
+      const allDsResponse = await fetch('/api/datasets?status=available');
+      const allDsResult = await allDsResponse.json();
+      if (allDsResult.success) {
+        allDatasets = allDsResult.datasets || [];
+      }
+
+      // Load workflows
+      const wfResponse = await fetch('/api/workflows');
+      const wfResult = await wfResponse.json();
+      if (wfResult.success) {
+        workflows = wfResult.workflows || [];
+      }
+
+      // Build data sources from datasets
+      dataSources = availableDatasets.map((ds: any) => {
+        const isRadio = ds.dataset_type === 'radio';
+        const isGdelt = ds.dataset_type?.startsWith('gdelt');
+        return {
+          id: ds.id,
+          name: ds.name,
+          description: ds.description || '',
+          icon: isRadio ? '📻' : isGdelt ? '🌍' : ds.source_platform === 'bluesky' ? '🦋' : ds.dataset_type === 'social_media' ? '📱' : '📊',
+          color: isRadio ? 'rose' : isGdelt ? 'amber' : ds.source_platform === 'bluesky' ? 'sky' : 'blue',
+          status: isRadio ? (wavePulseStatus.status === 'running' ? 'recording' : 'idle') : (ds.status === 'available' ? 'connected' : ds.status),
+          lastSync: ds.last_updated,
+          recordsCaptured: parseInt(ds.record_count) || 0,
+          datasetType: ds.dataset_type,
+          sourcePlatform: ds.source_platform,
+          isRadio
+        };
+      });
+
+      // Calculate stats
+      dataStats = {
+        totalRecordsCapture: dataSources.reduce((sum: number, s: any) => sum + s.recordsCaptured, 0),
+        activeConnections: dataSources.filter((s: any) => s.status === 'connected').length,
+        totalDatasets: availableDatasets.length,
+        activeWorkflows: workflows.filter((w: any) => w.status === 'running').length,
+        totalStorageUsed: formatNumber(dataSources.reduce((sum: number, s: any) => sum + s.recordsCaptured, 0)) + ' records',
+        lastCaptureUpdate: dataSources[0]?.lastSync || '—'
+      };
+
+      loading = false;
+    } catch (error) {
+      console.error('Error loading data management data:', error);
+      errorMessage = 'Failed to load data. Please try again.';
+      loading = false;
+    }
+  }
+
+  function openAddSourceModal() {
+    showAddSourceModal = true;
+  }
+
+  function handleImportDataset() {
+    showCrawlerModal = true;
+  }
+
+  async function handleLinkDataset(datasetId: number) {
+    try {
+      const response = await fetch('/api/datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'link',
+          workspace_id: parseInt(workspaceId || '0'),
+          dataset_id: datasetId,
+          added_by: 'user',
+          settings: {}
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        showAddSourceModal = false;
+        await loadData();
+      } else {
+        errorMessage = result.error || 'Failed to link dataset';
+      }
+    } catch (error) {
+      errorMessage = 'Failed to link dataset';
+    }
+  }
+
+  function handlePreviewDataset(dataset: any) {
+    previewDataset = dataset;
+    showPreviewModal = true;
+  }
+
+  function handleConfigureSource(source: any) {
+    if (source.isRadio) {
+      showRadioConfigModal = true;
+      return;
+    }
+    if (workspaceId) {
+      goto(`/workspaces/${workspaceId}`);
+    } else {
+      goto('/projects');
+    }
   }
 
   function getStatusIcon(status: string) {
@@ -200,24 +208,114 @@
     return new Date(timestamp).toLocaleString();
   }
 
-  function toggleDataSource(sourceId: string) {
-    dataSources = dataSources.map(source => {
-      if (source.id === sourceId) {
-        const newStatus = source.status === 'connected' ? 'paused' : 'connected';
-        return { ...source, status: newStatus };
-      }
-      return source;
-    });
-  }
-
   function createWorkflowFromDataset(dataset: any) {
     selectedDataset = dataset;
-    window.location.href = `/data-management/workflow-builder?dataset=${dataset.id}`;
+    goto(`/data-management/workflow-builder?dataset=${dataset.id}`);
   }
 
   function editWorkflow(workflow: any) {
-    window.location.href = `/data-management/workflow-builder?workflow=${workflow.id}`;
+    goto(`/data-management/workflow-builder?workflow=${workflow.id}`);
   }
+
+  // ─── WavePulse Radio Functions ───────────────────────────────────────────
+
+  async function checkWavePulseStatus() {
+    try {
+      const response = await fetch('/api/wavepulse?action=status');
+      const result = await response.json();
+      wavePulseStatus = result.success ? result : { status: 'offline' };
+    } catch {
+      wavePulseStatus = { status: 'offline' };
+    }
+  }
+
+  async function startRadioRecording() {
+    try {
+      errorMessage = '';
+      const response = await fetch('/api/wavepulse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', config: radioConfig })
+      });
+      const result = await response.json();
+      if (!result.success) {
+        errorMessage = result.error || 'Failed to start radio recording';
+      }
+      showRadioConfigModal = false;
+      await checkWavePulseStatus();
+    } catch (error) {
+      errorMessage = 'Failed to connect to radio service';
+    }
+  }
+
+  async function stopRadioRecording() {
+    try {
+      await fetch('/api/wavepulse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' })
+      });
+      await checkWavePulseStatus();
+    } catch {
+      errorMessage = 'Failed to stop radio recording';
+    }
+  }
+
+  function addRadioStream() {
+    radioConfig.radioStreams = [...radioConfig.radioStreams, { url: '', radioName: '', state: '', timeSlots: [{ start: '00:00', end: '23:59' }] }];
+  }
+
+  function removeRadioStream(index: number) {
+    radioConfig.radioStreams = radioConfig.radioStreams.filter((_: any, i: number) => i !== index);
+  }
+
+  function handleConfigureRadio() {
+    showRadioConfigModal = true;
+  }
+
+  // ─── Crawler Functions ────────────────────────────────────────────────
+
+  async function startCrawl() {
+    try {
+      crawlerStatus = 'starting';
+      const urls = crawlerConfig.urls.split(/[,\n]/).map(u => u.trim()).filter(Boolean);
+      if (urls.length === 0) {
+        errorMessage = 'Please enter at least one URL or channel';
+        crawlerStatus = '';
+        return;
+      }
+
+      const response = await fetch('/api/crawler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...crawlerConfig,
+          urls,
+          crawlId: crawlerConfig.crawlId || `${crawlerConfig.platform}-${Date.now()}`
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        crawlerStatus = 'scheduled';
+        showCrawlerModal = false;
+        setTimeout(() => { crawlerStatus = ''; }, 5000);
+      } else {
+        errorMessage = result.error || 'Failed to schedule crawl';
+        crawlerStatus = '';
+      }
+    } catch (error) {
+      errorMessage = 'Failed to connect to crawler service';
+      crawlerStatus = '';
+    }
+  }
+
+  // Poll WavePulse status
+  let statusInterval: ReturnType<typeof setInterval>;
+  onMount(() => {
+    checkWavePulseStatus();
+    statusInterval = setInterval(checkWavePulseStatus, 15000);
+    return () => clearInterval(statusInterval);
+  });
 </script>
 
 <svelte:head>
@@ -225,86 +323,90 @@
   <meta name="description" content="Unified data capture and processing platform for social media analytics" />
 </svelte:head>
 
-<Navigation />
-
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-teal-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Data Management</h1>
-            <p class="text-slate-300 text-lg font-medium">Capture, process, and transform your social media data with unified workflows</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-3">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <button 
-            on:click={() => window.location.href = '/data-management/workflow-builder'}
-            class="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
-            Create Workflow
-          </button>
-        </div>
+  <PageHeader
+    title="Data Management"
+    subtitle="Capture, process, and transform your social media data with unified workflows"
+    accentColor="teal">
+    <svelte:fragment slot="icon">
+      <div class="w-16 h-16 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+        </svg>
       </div>
-    </div>
-  </div>
+    </svelte:fragment>
+    <svelte:fragment slot="actions">
+      <button
+        on:click={() => goto('/data-management/workflow-builder')}
+        class="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
+        Create Workflow
+      </button>
+    </svelte:fragment>
+  </PageHeader>
+
+  {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
 
   <!-- Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
-    <!-- Overview Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-teal-600 mb-1">{dataStats.totalRecordsCapture.toLocaleString()}</div>
-        <div class="text-sm text-gray-600">Records Captured</div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+
+  {#if loading}
+    <div class="flex items-center justify-center py-20">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+        <p class="text-gray-500">Loading data management...</p>
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.activeConnections}</div>
-        <div class="text-sm text-gray-600">Active Sources</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.totalDatasets}</div>
-        <div class="text-sm text-gray-600">Datasets</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.activeWorkflows}</div>
-        <div class="text-sm text-gray-600">Active Workflows</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dataStats.totalStorageUsed}</div>
-        <div class="text-sm text-gray-600">Storage Used</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-xs text-gray-500 mb-1">Last Update</div>
-        <div class="text-sm font-medium text-gray-900">{formatTimestamp(dataStats.lastCaptureUpdate).split(',')[1]}</div>
+    </div>
+  {:else}
+
+    <!-- Pipeline Overview -->
+    <div class="bg-white rounded-xl shadow-sm p-4 mb-6 overflow-x-auto">
+      <div class="flex items-center justify-between min-w-[600px]">
+        <button on:click={() => activeTab = 'capture'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'capture' ? 'bg-blue-50' : ''}">
+          <span class="text-2xl mb-1">📡</span>
+          <span class="text-xs font-medium text-gray-700">Sources</span>
+          <span class="text-lg font-bold text-blue-600">{dataSources.length}</span>
+        </button>
+        <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
+        <button on:click={() => activeTab = 'capture'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <span class="text-2xl mb-1">⚡</span>
+          <span class="text-xs font-medium text-gray-700">Jobs</span>
+          <span class="text-lg font-bold text-amber-600">{dataStats.activeWorkflows}</span>
+        </button>
+        <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
+        <button class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <span class="text-2xl mb-1">💾</span>
+          <span class="text-xs font-medium text-gray-700">Records</span>
+          <span class="text-lg font-bold text-emerald-600">{formatNumber(dataStats.totalRecordsCapture)}</span>
+        </button>
+        <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
+        <button on:click={() => activeTab = 'workflows'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'workflows' ? 'bg-blue-50' : ''}">
+          <span class="text-2xl mb-1">⚙️</span>
+          <span class="text-xs font-medium text-gray-700">Workflows</span>
+          <span class="text-lg font-bold text-purple-600">{workflows.length}</span>
+        </button>
+        <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
+        <button on:click={() => activeTab = 'datasets'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'datasets' ? 'bg-blue-50' : ''}">
+          <span class="text-2xl mb-1">📦</span>
+          <span class="text-xs font-medium text-gray-700">Datasets</span>
+          <span class="text-lg font-bold text-indigo-600">{availableDatasets.length}</span>
+        </button>
+        <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
+        <div class="flex flex-col items-center px-4 py-2">
+          <span class="text-2xl mb-1">📊</span>
+          <span class="text-xs font-medium text-gray-700">Analytics</span>
+          <span class="text-lg font-bold text-green-600">✓</span>
+        </div>
       </div>
     </div>
 
     <!-- Tab Navigation -->
-    <div class="bg-white rounded-xl shadow-sm mb-8">
+    <div class="bg-white rounded-xl shadow-sm mb-4">
       <div class="border-b border-gray-200">
         <nav class="-mb-px flex space-x-8 px-6">
           <button
             on:click={() => activeTab = 'capture'}
             class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'capture' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}">
-            Data Capture ({dataSources.length})
+            Data Sources ({dataSources.length})
           </button>
           <button
             on:click={() => activeTab = 'datasets'}
@@ -321,117 +423,134 @@
 
       <div class="p-6">
         {#if activeTab === 'capture'}
-          <!-- Data Capture Sources -->
-          <div class="space-y-6">
-            <div class="flex items-center justify-between">
-              <h2 class="text-xl font-semibold text-gray-900">Data Sources</h2>
-              <button class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-medium transition-colors">
+          <!-- Data Sources -->
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Data Sources</h3>
+            <div class="flex space-x-2">
+              <button on:click={openAddSourceModal} class="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors">
                 Add Source
               </button>
+              <button on:click={handleImportDataset} class="px-4 py-2 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg border border-teal-200 transition-colors">
+                Start Crawl
+              </button>
             </div>
+          </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {#each dataSources as source}
-                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center space-x-3">
-                      <span class="text-2xl">{source.icon}</span>
-                      <div>
-                        <h3 class="font-medium text-gray-900">{source.name}</h3>
-                        <p class="text-sm text-gray-600">{source.description}</p>
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Records</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {#each dataSources as source}
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center">
+                        <span class="text-xl mr-3">{source.icon}</span>
+                        <div>
+                          <div class="text-sm font-medium text-gray-900">{source.name}</div>
+                          <div class="text-xs text-gray-500 truncate max-w-xs">{source.description?.substring(0, 60) || ''}</div>
+                        </div>
                       </div>
-                    </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(source.status)}">
-                      {getStatusIcon(source.status)} {source.status}
-                    </span>
-                  </div>
-
-                  <div class="space-y-3 mb-4">
-                    <div class="flex justify-between text-sm">
-                      <span class="text-gray-600">Records:</span>
-                      <span class="font-medium text-gray-900">{source.recordsCaptured.toLocaleString()}</span>
-                    </div>
-                    {#if source.lastSync}
-                      <div class="flex justify-between text-sm">
-                        <span class="text-gray-600">Last Sync:</span>
-                        <span class="font-medium text-gray-900">{formatTimestamp(source.lastSync).split(',')[1]}</span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{source.datasetType || source.sourcePlatform || '—'}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-medium text-gray-900">{formatNumber(source.recordsCaptured)}</td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {
+                        source.status === 'connected' || source.status === 'available' ? 'bg-green-100 text-green-700' :
+                        source.status === 'recording' ? 'bg-blue-100 text-blue-700' :
+                        source.status === 'idle' ? 'bg-gray-100 text-gray-600' :
+                        'bg-yellow-100 text-yellow-700'
+                      }">
+                        {source.status}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end space-x-2">
+                        {#if source.isRadio}
+                          <button on:click={() => handleConfigureSource(source)} class="text-xs text-blue-600 hover:text-blue-800 font-medium">Configure</button>
+                        {:else}
+                          <button on:click={() => handlePreviewDataset(source)} class="text-xs text-blue-600 hover:text-blue-800 font-medium">Preview</button>
+                        {/if}
                       </div>
-                    {/if}
-                  </div>
-
-                  <div class="flex space-x-2">
-                    <button 
-                      on:click={() => toggleDataSource(source.id)}
-                      class="flex-1 px-3 py-2 {source.status === 'connected' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'} rounded-xl text-sm font-medium transition-colors">
-                      {source.status === 'connected' ? 'Pause' : 'Start'}
-                    </button>
-                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
-                      Configure
-                    </button>
-                  </div>
-                </div>
-              {/each}
-            </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           </div>
 
         {:else if activeTab === 'datasets'}
           <!-- Available Datasets -->
-          <div class="space-y-6">
-            <div class="flex items-center justify-between">
-              <h2 class="text-xl font-semibold text-gray-900">Available Datasets</h2>
-              <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
-                Import Dataset
-              </button>
-            </div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Available Datasets</h3>
+            <button on:click={handleImportDataset} class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+              Import Dataset
+            </button>
+          </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {#each availableDatasets as dataset}
-                <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                  <div class="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 class="font-medium text-gray-900 mb-1">{dataset.name}</h3>
-                      <p class="text-sm text-gray-600">{dataset.records.toLocaleString()} records • {dataset.size}</p>
-                      <div class="flex items-center space-x-2 mt-2">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          {dataset.type}
-                        </span>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(dataset.status)}">
-                          {getStatusIcon(dataset.status)} {dataset.status}
-                        </span>
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dataset</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Records</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {#each availableDatasets as dataset}
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3">
+                      <div class="text-sm font-medium text-gray-900">{dataset.name}</div>
+                      {#if dataset.columns && dataset.columns.length > 0}
+                        <div class="flex flex-wrap gap-1 mt-1">
+                          {#each dataset.columns.slice(0, 3) as column}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">{column}</span>
+                          {/each}
+                          {#if dataset.columns.length > 3}
+                            <span class="text-xs text-gray-400">+{dataset.columns.length - 3}</span>
+                          {/if}
+                        </div>
+                      {/if}
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">{dataset.dataset_type || dataset.type || 'unknown'}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-sm font-medium text-gray-900">{formatNumber(parseInt(dataset.record_count) || dataset.records || 0)}</td>
+                    <td class="px-4 py-3 text-center">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {getStatusColor(dataset.status)}">
+                        {dataset.status}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-500">
+                      {#if dataset.created || dataset.last_updated}
+                        {formatTimestamp(dataset.created || dataset.last_updated).split(',')[0]}
+                      {:else}
+                        —
+                      {/if}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end space-x-2">
+                        <button on:click={() => createWorkflowFromDataset(dataset)} class="text-xs text-teal-600 hover:text-teal-800 font-medium">Process</button>
+                        <button on:click={() => handlePreviewDataset(dataset)} class="text-xs text-blue-600 hover:text-blue-800 font-medium">Preview</button>
                       </div>
-                    </div>
-                  </div>
-
-                  <div class="text-xs text-gray-500 mb-4">
-                    Created: {formatTimestamp(dataset.created)}
-                  </div>
-
-                  <div class="flex flex-wrap gap-1 mb-4">
-                    {#each dataset.columns.slice(0, 3) as column}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        {column}
-                      </span>
-                    {/each}
-                    {#if dataset.columns.length > 3}
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        +{dataset.columns.length - 3} more
-                      </span>
-                    {/if}
-                  </div>
-
-                  <div class="flex space-x-2">
-                    <button 
-                      on:click={() => createWorkflowFromDataset(dataset)}
-                      class="flex-1 px-3 py-2 bg-teal-100 text-teal-800 hover:bg-teal-200 rounded-xl text-sm font-medium transition-colors">
-                      Process
-                    </button>
-                    <button class="px-3 py-2 bg-gray-100 text-gray-800 hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors">
-                      Preview
-                    </button>
-                  </div>
-                </div>
-              {/each}
-            </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           </div>
 
         {:else if activeTab === 'workflows'}
@@ -440,7 +559,7 @@
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-semibold text-gray-900">Processing Workflows</h2>
               <button 
-                on:click={() => window.location.href = '/data-management/workflow-builder'}
+                on:click={() => goto('/data-management/workflow-builder')}
                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
                 New Workflow
               </button>
@@ -454,11 +573,11 @@
                       <h3 class="font-medium text-gray-900 mb-1">{workflow.name}</h3>
                       <p class="text-sm text-gray-600 mb-2">{workflow.description}</p>
                       <div class="flex items-center space-x-4 text-sm text-gray-500">
-                        <span>📊 {workflow.steps} steps</span>
+                        {#if workflow.steps}<span>📊 {workflow.steps} steps</span>{/if}
                         {#if workflow.recordsProcessed}
                           <span>📈 {workflow.recordsProcessed.toLocaleString()} records</span>
                         {/if}
-                        <span>📅 {formatTimestamp(workflow.created)}</span>
+                        {#if workflow.created}<span>📅 {formatTimestamp(workflow.created)}</span>{/if}
                       </div>
                     </div>
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(workflow.status)}">
@@ -469,10 +588,10 @@
                   <div class="flex items-center justify-between mb-4">
                     <div class="text-sm">
                       <span class="text-gray-600">Input:</span>
-                      <span class="font-medium text-gray-900 ml-1">{workflow.inputSource}</span>
+                      <span class="font-medium text-gray-900 ml-1">{workflow.inputSource || workflow.input_source || '—'}</span>
                       <span class="text-gray-400 mx-2">→</span>
                       <span class="text-gray-600">Output:</span>
-                      <span class="font-medium text-gray-900 ml-1">{workflow.outputDataset}</span>
+                      <span class="font-medium text-gray-900 ml-1">{workflow.outputDataset || workflow.output_dataset || '—'}</span>
                     </div>
                   </div>
 
@@ -511,5 +630,261 @@
         {/if}
       </div>
     </div>
+
+  {/if}
   </div>
+
+{#if showAddSourceModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showAddSourceModal = false}>
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Add Data Source</h3>
+        <p class="text-sm text-gray-500 mt-1">Link an available dataset to this workspace</p>
+      </div>
+      <div class="p-4 space-y-2">
+        {#each allDatasets.filter(d => !availableDatasets.some(ad => ad.id === d.id)) as dataset}
+          <button on:click={() => handleLinkDataset(dataset.id)}
+            class="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+            <div class="font-medium text-gray-900">{dataset.name}</div>
+            <div class="text-sm text-gray-500 mt-1">{dataset.description?.substring(0, 80) || ''}</div>
+            <div class="flex items-center space-x-3 mt-2 text-xs text-gray-400">
+              <span>{dataset.dataset_type}</span>
+              <span>{formatNumber(parseInt(dataset.record_count) || 0)} records</span>
+            </div>
+          </button>
+        {:else}
+          <p class="text-sm text-gray-500 text-center py-4">No additional datasets available to link.</p>
+        {/each}
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <button on:click={() => showAddSourceModal = false} class="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Close</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showRadioConfigModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showRadioConfigModal = false}>
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Radio Stream Configuration</h3>
+            <p class="text-sm text-gray-500 mt-1">Configure radio stations to record and transcribe</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            {#if wavePulseStatus.status === 'running'}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Recording</span>
+            {:else if wavePulseStatus.status === 'offline'}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Service Offline</span>
+            {:else}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{wavePulseStatus.status}</span>
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <!-- Radio Streams -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-medium text-gray-700">Radio Stations</label>
+            <button on:click={addRadioStream} class="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add Station</button>
+          </div>
+          {#each radioConfig.radioStreams as stream, i}
+            <div class="border border-gray-200 rounded-lg p-4 mb-3">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-medium text-gray-600">Station {i + 1}</span>
+                {#if radioConfig.radioStreams.length > 1}
+                  <button on:click={() => removeRadioStream(i)} class="text-sm text-red-500 hover:text-red-700">Remove</button>
+                {/if}
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="col-span-2">
+                  <label class="block text-xs text-gray-500 mb-1">Stream URL</label>
+                  <input bind:value={stream.url} type="text" placeholder="https://..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Station Name</label>
+                  <input bind:value={stream.radioName} type="text" placeholder="WGSV" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-3 mt-2">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">State</label>
+                  <input bind:value={stream.state} type="text" placeholder="VA" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Record From</label>
+                  <input bind:value={stream.timeSlots[0].start} type="time" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Record Until</label>
+                  <input bind:value={stream.timeSlots[0].end} type="time" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Transcription Settings -->
+        <div>
+          <label class="text-sm font-medium text-gray-700 mb-3 block">Transcription Settings</label>
+          <div class="grid grid-cols-2 gap-4">
+            <label class="flex items-center space-x-2">
+              <input type="checkbox" bind:checked={radioConfig.enableTranscription} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <span class="text-sm text-gray-700">Enable Transcription</span>
+            </label>
+            <label class="flex items-center space-x-2">
+              <input type="checkbox" bind:checked={radioConfig.enableClassification} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <span class="text-sm text-gray-700">Enable Classification</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- API Keys (optional) -->
+        <div>
+          <label class="text-sm font-medium text-gray-700 mb-3 block">API Keys (Optional)</label>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">HuggingFace Token (for speaker diarization)</label>
+              <input bind:value={radioConfig.huggingFaceToken} type="password" placeholder="hf_..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Gemini API Key (for content classification)</label>
+              <input bind:value={radioConfig.geminiApiKey} type="password" placeholder="AI..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Info -->
+        {#if wavePulseStatus.status === 'running'}
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center">
+              <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              <span class="text-sm font-medium text-green-800">Recording Active</span>
+            </div>
+            <div class="mt-2 text-sm text-green-700">
+              <p>Streams: {wavePulseStatus.active_streams?.length || 0}</p>
+              <p>Recordings: {wavePulseStatus.recordings_count || 0}</p>
+              <p>Transcripts: {wavePulseStatus.transcripts_count || 0}</p>
+            </div>
+          </div>
+        {:else if wavePulseStatus.status === 'offline'}
+          <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+            Radio service is starting up. This may take a moment on first launch.
+          </div>
+        {:else if wavePulseStatus.status === 'idle'}
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+            Radio service is ready. Configure your stations above and click Start Recording.
+          </div>
+        {/if}
+      </div>
+
+      <div class="p-6 border-t border-gray-200 flex justify-between">
+        <button on:click={() => showRadioConfigModal = false} class="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+          Cancel
+        </button>
+        <div class="flex space-x-3">
+          {#if wavePulseStatus.status === 'running'}
+            <button on:click={stopRadioRecording} class="px-4 py-2 text-sm text-red-700 bg-red-100 hover:bg-red-200 rounded-lg font-medium">
+              Stop Recording
+            </button>
+          {:else}
+            <button on:click={startRadioRecording}
+              class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
+              {wavePulseStatus.status === 'offline' ? 'Start Recording (service starting...)' : 'Start Recording'}
+            </button>
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showCrawlerModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showCrawlerModal = false}>
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Start Crawl Job</h3>
+        <p class="text-sm text-gray-500 mt-1">Configure and launch a social media crawl</p>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+          <select bind:value={crawlerConfig.platform} class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="bluesky">Bluesky</option>
+            <option value="youtube">YouTube</option>
+            <option value="telegram">Telegram</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            {crawlerConfig.platform === 'bluesky' ? 'Handles or DIDs' : crawlerConfig.platform === 'youtube' ? 'Channel URLs' : 'Channel Names'}
+          </label>
+          <textarea bind:value={crawlerConfig.urls} rows="3" placeholder="One per line or comma-separated"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+          <p class="text-xs text-gray-400 mt-1">
+            {crawlerConfig.platform === 'bluesky' ? 'e.g. user.bsky.social or "firehose" for full network' : crawlerConfig.platform === 'youtube' ? 'e.g. UCxxxxxxx or channel URLs' : 'e.g. @channelname'}
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Max Posts</label>
+            <input bind:value={crawlerConfig.maxPosts} type="number" min="10" max="100000"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Time Range</label>
+            <select bind:value={crawlerConfig.timeAgo} class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="365d">Last year</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Crawl ID (optional)</label>
+          <input bind:value={crawlerConfig.crawlId} type="text" placeholder="auto-generated if empty"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+
+        {#if crawlerConfig.platform === 'youtube'}
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">YouTube API Key</label>
+            <input bind:value={crawlerConfig.youtubeApiKey} type="password" placeholder="AIza..."
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          </div>
+        {/if}
+
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" bind:checked={crawlerConfig.skipMedia} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+          <span class="text-sm text-gray-700">Skip media downloads (faster)</span>
+        </label>
+
+        {#if crawlerStatus === 'scheduled'}
+          <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+            Crawl job scheduled successfully
+          </div>
+        {/if}
+      </div>
+
+      <div class="p-6 border-t border-gray-200 flex justify-between">
+        <button on:click={() => showCrawlerModal = false} class="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">
+          Cancel
+        </button>
+        <button on:click={startCrawl} disabled={crawlerStatus === 'starting'}
+          class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50">
+          {crawlerStatus === 'starting' ? 'Scheduling...' : 'Start Crawl'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 </div>
