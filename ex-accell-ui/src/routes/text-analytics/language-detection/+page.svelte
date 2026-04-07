@@ -11,6 +11,17 @@
   import { ErrorAlert } from '$lib/components/ui';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
+
+  let currentFilterParams: Record<string, string> = {};
+
+  function handleFilterChange(event: CustomEvent) {
+    const detail = event.detail || {};
+    currentFilterParams = {};
+    if (detail.workspaceId) currentFilterParams.workspace_id = detail.workspaceId;
+    currentFilterParams.platforms = (detail.platforms || []).join(',');
+    if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
+    if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+  }
   
   // Loading state
   let loading = true;
@@ -205,7 +216,7 @@
 
     <!-- Data Source Filter -->
     <div class="mb-6">
-      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} />
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} on:change={handleFilterChange} />
     </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">

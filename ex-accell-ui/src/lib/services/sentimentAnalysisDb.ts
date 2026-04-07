@@ -31,10 +31,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get overall sentiment statistics
    */
-  async getSentimentStats(workspaceId?: string): Promise<SentimentStats> {
+  async getSentimentStats(workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentStats> {
     const data = await this.queryAPI<any>({
       endpoint: 'cross-platform-sentiment',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     // Return default stats if no data
@@ -52,10 +52,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get detailed sentiment distribution
    */
-  async getDetailedSentiments(workspaceId?: string): Promise<SentimentCategory[]> {
+  async getDetailedSentiments(workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentCategory[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'cross-platform-sentiment',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -72,10 +72,10 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get emotion analysis data from the emotion_analysis table
    */
-  async getEmotionStats(workspaceId?: string): Promise<EmotionStat[]> {
+  async getEmotionStats(workspaceId?: string, extraParams?: Record<string, string>): Promise<EmotionStat[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'emotion-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -92,7 +92,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment trends over time
    */
-  async getSentimentTrends(timeRange: string = '7d', workspaceId?: string): Promise<SentimentTrend[]> {
+  async getSentimentTrends(timeRange: string = '7d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange }
@@ -162,7 +162,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   async getPlatformSentimentPerformance(workspaceId?: string): Promise<PlatformPerformance[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -212,7 +212,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   async getEmotionCorrelations(workspaceId?: string): Promise<EmotionCorrelation[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'emotion-correlations',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {
@@ -237,7 +237,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   async getSentimentByTimeOfDay(workspaceId?: string): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'hourly-patterns',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
     });
 
     if (!data || data.length === 0) {

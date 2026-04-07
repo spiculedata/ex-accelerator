@@ -10,6 +10,17 @@
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
+  let currentFilterParams: Record<string, string> = {};
+
+  function handleFilterChange(event: CustomEvent) {
+    const detail = event.detail || {};
+    currentFilterParams = {};
+    if (detail.workspaceId) currentFilterParams.workspace_id = detail.workspaceId;
+    currentFilterParams.platforms = (detail.platforms || []).join(',');
+    if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
+    if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+  }
+
   let loading = true;
   let errorMessage = '';
 
@@ -101,7 +112,7 @@
 
     <!-- Data Source Filter -->
     <div class="mb-6">
-      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} />
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} on:change={handleFilterChange} />
     </div>
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}

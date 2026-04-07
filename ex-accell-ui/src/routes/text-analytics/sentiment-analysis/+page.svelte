@@ -12,12 +12,22 @@
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
-  
+
   // Loading state
   let loading = true;
-  
+  let currentFilterParams: Record<string, string> = {};
+
+  function handleFilterChange(event: CustomEvent) {
+    const detail = event.detail || {};
+    currentFilterParams = {};
+    if (detail.workspaceId) currentFilterParams.workspace_id = detail.workspaceId;
+    currentFilterParams.platforms = (detail.platforms || []).join(',');
+    if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
+    if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+    loadSentimentData();
+  }
+
   onMount(async () => {
-    // Load sentiment analysis data from database
     await loadSentimentData();
   });
 
@@ -46,13 +56,14 @@
   async function loadSentimentData() {
     try {
       // Load all sentiment data from database service
-      const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined);
+      const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
+      const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp);
       sentimentStats = stats;
       totalPosts = stats.total;
 
-      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined);
-      emotionStats = await sentimentAnalysisDb.getEmotionStats(workspaceId || undefined);
-      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined);
+      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined, fp);
+      emotionStats = await sentimentAnalysisDb.getEmotionStats(workspaceId || undefined, fp);
+      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, fp);
       
       // Load posts with current filters
       await loadFilteredPosts();
@@ -383,7 +394,7 @@
 
     <!-- Data Source Filter -->
     <div class="mb-6">
-      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} />
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} on:change={handleFilterChange} />
     </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">
@@ -420,7 +431,7 @@
     <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Analysis Filters</h2>
       
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment</label>
           <select bind:value={selectedSentiment} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -432,40 +443,19 @@
             <option value="Very Negative">Very Negative</option>
           </select>
         </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-          <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="all">All Platforms</option>
-            <option value="twitter">Twitter</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-            <option value="reddit">Reddit</option>
-            <option value="linkedin">LinkedIn</option>
-          </select>
-        </div>
-        
+
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Min Confidence: {confidenceThreshold}</label>
-          <input 
-            type="range" 
+          <input
+            type="range"
             bind:value={confidenceThreshold}
-            min="0.5" 
-            max="1" 
+            min="0.5"
+            max="1"
             step="0.05"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            <option value="1d">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
-        </div>
       </div>
+      <p class="text-xs text-gray-400 mt-3">Data source and date range filters are in the bar above.</p>
     </div>
 
     <!-- Charts Grid -->
