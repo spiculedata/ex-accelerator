@@ -206,32 +206,62 @@
   const navigationItems: NavItem[] = [
     { name: 'Home', href: '/', current: false, requiresProject: false },
     {
-      name: 'Dashboards',
+      name: 'Social Analytics',
       href: '/dashboards',
       current: false,
       requiresProject: false,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Overview', href: '/workspaces', requiresProject: true, requiresWorkspace: true, useWorkspace: true },
-        { name: 'Analytics Dashboard', href: '/dashboards', requiresProject: false, useWorkspace: true },
-        { name: 'Brand Sentiment', href: '/text-analytics/sentiment-analysis', requiresProject: false, requiresDataType: 'social', useWorkspace: true },
-        { name: 'GDELT Events', href: '/gdelt/intelligence', requiresProject: false },
-        { name: 'Android Analytics', href: '/android-analytics', requiresProject: true, requiresDataType: 'android', useWorkspace: true }
+        { name: 'Dashboard', href: '/dashboards', requiresProject: false, useWorkspace: true },
+        { name: 'Sentiment Analysis', href: '/text-analytics/sentiment-analysis', requiresProject: false, useWorkspace: true },
+        { name: 'Topic Modeling', href: '/text-analytics/topic-modeling', requiresProject: false, useWorkspace: true },
+        { name: 'Language Detection', href: '/text-analytics/language-detection', requiresProject: false, useWorkspace: true },
+        { name: 'Engagement', href: '/text-analytics/engagement-analysis', requiresProject: false, useWorkspace: true },
+        { name: 'Hashtags', href: '/text-analytics/hashtag-analysis', requiresProject: false, useWorkspace: true },
+        { name: 'Trigrams', href: '/text-analytics/trigrams', requiresProject: false, useWorkspace: true },
+        { name: 'Correlation', href: '/analytics-correlation', requiresProject: false, useWorkspace: true }
       ]
     },
-    { name: 'Research Investigation', href: '/text-analytics/research-investigation', current: false, requiresProject: true },
     {
-      name: 'Tools',
-      href: '#',
+      name: 'GDELT',
+      href: '/gdelt/intelligence',
       current: false,
       requiresProject: false,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Text Analytics', href: '/text-analytics', requiresProject: false, useWorkspace: true },
-        { name: 'Data Management', href: '/data-management', requiresProject: true, useWorkspace: true },
+        { name: 'Intelligence Dashboard', href: '/gdelt/intelligence', requiresProject: false },
+        { name: 'World Map', href: '/gdelt', requiresProject: false },
+        { name: 'Analytics Tables', href: '/gdelt/analytics', requiresProject: false }
+      ]
+    },
+    {
+      name: 'Images',
+      href: '/image-processing',
+      current: false,
+      requiresProject: false,
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Overview', href: '/image-processing', requiresProject: false },
+        { name: 'Object Detection', href: '/image-processing/object-detection', requiresProject: false },
+        { name: 'Face Detection', href: '/image-processing/face-detection', requiresProject: false },
+        { name: 'Content Moderation', href: '/image-processing/content-moderation', requiresProject: false },
+        { name: 'OCR & Text', href: '/image-processing/ocr', requiresProject: false },
+        { name: 'Classification', href: '/image-processing/classification', requiresProject: false },
+        { name: 'Brand Recognition', href: '/image-processing/brand-recognition', requiresProject: false }
+      ]
+    },
+    { name: 'Research', href: '/text-analytics/research-investigation', current: false, requiresProject: false },
+    {
+      name: 'Data',
+      href: '/data-management',
+      current: false,
+      requiresProject: false,
+      hasDropdown: true,
+      dropdownItems: [
+        { name: 'Data Management', href: '/data-management', requiresProject: false },
+        { name: 'Data Capture', href: '/data-capture', requiresProject: false },
         { name: 'Data Sharing', href: '/data-sharing', requiresProject: false },
-        { name: 'Image Processing', href: '/image-processing', requiresProject: false },
-        { name: 'Workflow Builder', href: '/data-management/workflow-builder', requiresProject: true }
+        { name: 'Workflow Builder', href: '/data-management/workflow-builder', requiresProject: false }
       ]
     }
   ];
