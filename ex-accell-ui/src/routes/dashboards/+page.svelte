@@ -47,8 +47,8 @@
     // Set workspace store from URL
     await setWorkspaceFromUrl($page.url);
 
-    // Load data from database — shows all data when no workspace is scoped
-    await loadDashboardData();
+    // Load data after a brief delay to let FilterBar set initial params
+    setTimeout(() => loadDashboardData(), 300);
 
     // Auto refresh setup
     if (autoRefresh) {
@@ -102,11 +102,15 @@
   // Current filter state from FilterBar
   let currentFilterParams: Record<string, string> = {};
 
+  function handleFilterReady(params: Record<string, string>) {
+    currentFilterParams = params;
+    loadDashboardData();
+  }
+
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
     currentFilterParams = {};
     if (detail.workspaceId) currentFilterParams.workspace_id = detail.workspaceId;
-    // Always send platforms param — empty string = nothing selected
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
@@ -581,6 +585,7 @@
         bind:this={filterBar}
         workspaceId={workspaceId}
         datasetTypes={['social_media']}
+        onReady={handleFilterReady}
         on:change={handleFilterChange}
       />
     </div>

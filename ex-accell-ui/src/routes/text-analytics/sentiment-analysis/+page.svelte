@@ -17,6 +17,11 @@
   let loading = true;
   let currentFilterParams: Record<string, string> = {};
 
+  function handleFilterReady(params: Record<string, string>) {
+    currentFilterParams = params;
+    loadSentimentData();
+  }
+
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
     currentFilterParams = {};
@@ -24,15 +29,10 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
-
-    // Reload data with new filters
     loadSentimentData();
   }
 
-  // Single load point — wait briefly for FilterBar to set initial params
-  onMount(() => {
-    setTimeout(() => loadSentimentData(), 200);
-  });
+  // No onMount load — FilterBar's onReady callback triggers the initial load
 
   // Comprehensive sentiment analysis data - loaded from database
   let sentimentStats: any = {
@@ -397,7 +397,7 @@
 
     <!-- Data Source Filter -->
     <div class="mb-6">
-      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} on:change={handleFilterChange} />
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} onReady={handleFilterReady} on:change={handleFilterChange} />
     </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">

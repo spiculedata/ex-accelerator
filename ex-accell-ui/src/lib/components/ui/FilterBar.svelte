@@ -7,12 +7,14 @@
   export let workspaceId: string | null = null;
   export let compact = false;
   export let datasetTypes: string[] = [];  // Filter to only show these dataset types (empty = all)
+  export let onReady: ((params: Record<string, string>) => void) | null = null;  // Called once after initial load
 
   const dispatch = createEventDispatcher();
 
   // Filter state
   let datasets: any[] = [];
   let enabledIds = new Set<number>();
+  let readyCalled = false;
   let dateStart = '';
   let dateEnd = '';
   let loading = true;
@@ -63,6 +65,12 @@
     } finally {
       loading = false;
       emitChange();
+      // Call onReady callback after first successful client-side load
+      if (onReady && browser && !readyCalled) {
+        readyCalled = true;
+        const params = getFilterParams();
+        setTimeout(() => onReady?.(params), 0);
+      }
     }
   }
 
@@ -105,11 +113,18 @@
   }
 
   function emitChange() {
+    // Compute platforms directly (don't rely on reactive $: which may not have updated yet)
+    const currentVisible = datasetTypes.length > 0
+      ? datasets.filter(d => datasetTypes.includes(d.dataset_type))
+      : datasets;
+    const currentEnabled = currentVisible.filter(d => enabledIds.has(d.id ?? d.dataset_id));
+    const currentPlatforms = [...new Set(currentEnabled.map((d: any) => d.source_platform).filter(Boolean))];
+
     dispatch('change', {
       workspaceId,
       enabledDatasets: [...enabledIds],
-      platforms,
-      datasetTypes: derivedDatasetTypes,
+      platforms: currentPlatforms,
+      datasetTypes: [...new Set(currentEnabled.map((d: any) => d.dataset_type).filter(Boolean))],
       dateStart: dateStart || null,
       dateEnd: dateEnd || null,
     });
@@ -128,9 +143,15 @@
   }
 
   export function getFilterParams(): Record<string, string> {
+    const currentVisible = datasetTypes.length > 0
+      ? datasets.filter(d => datasetTypes.includes(d.dataset_type))
+      : datasets;
+    const currentEnabled = currentVisible.filter(d => enabledIds.has(d.id ?? d.dataset_id));
+    const currentPlatforms = [...new Set(currentEnabled.map((d: any) => d.source_platform).filter(Boolean))];
+
     const params: Record<string, string> = {};
     if (workspaceId) params.workspace_id = workspaceId;
-    if (platforms.length > 0) params.platforms = platforms.join(',');
+    params.platforms = currentPlatforms.join(',');
     if (dateStart) params.date_start = dateStart;
     if (dateEnd) params.date_end = dateEnd;
     return params;

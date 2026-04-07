@@ -110,6 +110,20 @@ export const GET: RequestHandler = async ({ url }) => {
       }
     }
     
+    // Global filter: if platforms param is explicitly empty, return empty for all social endpoints
+    const socialEndpoints = ['cross-platform-sentiment', 'sentiment-trends', 'sample-posts',
+      'platform-performance', 'hourly-patterns', 'topics-overview', 'topic-keywords',
+      'topic-trends', 'topic-relationships', 'topic-categories', 'language-stats',
+      'language-trends', 'language-detection-detail', 'emotion-stats', 'emotion-correlations',
+      'sentiment-keywords', 'top-keywords', 'export-data', 'hashtag-analysis'];
+
+    const platformsParam = url.searchParams.get('platforms');
+    if (platformsParam !== null && platformsParam.split(',').filter(p => p.trim()).length === 0) {
+      if (socialEndpoints.includes(type)) {
+        return json({ success: true, data: [] });
+      }
+    }
+
     // Handle sentiment analysis queries
     if (type === 'cross-platform-sentiment') {
       try {
