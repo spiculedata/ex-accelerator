@@ -31,7 +31,7 @@ export interface WorkspaceDataScope {
  * Returns null if no workspace_id param (= global/unfiltered view).
  */
 export async function resolveWorkspaceScope(url: URL): Promise<WorkspaceDataScope | null> {
-  const wsId = url.searchParams.get('workspace_id');
+  const wsId = url.searchParams.get('workspace_id') || url.searchParams.get('workspace');
   if (!wsId) return null;
 
   const workspaceId = parseInt(wsId);
@@ -156,4 +156,68 @@ export function buildGdeltDateFilter(
 export function hasDataType(scope: WorkspaceDataScope | null, type: string): boolean {
   if (!scope) return true; // Global view
   return scope.datasetTypes.includes(type);
+}
+
+/**
+ * Extract all filter params from URL — workspace, platforms, date range.
+ * Used by API endpoints to build comprehensive SQL conditions.
+ */
+export interface QueryFilters {
+  scope: WorkspaceDataScope | null;
+  platforms: string[] | null;      // explicit platform filter (overrides workspace)
+  dateStart: string | null;        // ISO date string
+  dateEnd: string | null;          // ISO date string
+}
+
+export async function resolveFilters(url: URL): Promise<QueryFilters> {
+  const scope = await resolveWorkspaceScope(url);
+
+  // Explicit platform filter (comma-separated)
+  const platformsParam = url.searchParams.get('platforms');
+  const platforms = platformsParam ? platformsParam.split(',').filter(Boolean) : null;
+
+  // Date range filter
+  const dateStart = url.searchParams.get('date_start') || null;
+  const dateEnd = url.searchParams.get('date_end') || null;
+
+  return { scope, platforms, dateStart, dateEnd };
+}
+
+/**
+ * Build SQL conditions for social media queries with all filters applied.
+ * Returns conditions array and params array for parameterized queries.
+ */
+export function buildSocialFilters(
+  filters: QueryFilters,
+  paramIndex: number,
+  tableAlias: string = ''
+): { conditions: string[]; params: any[]; nextIndex: number } {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let idx = paramIndex;
+  const prefix = tableAlias ? `${tableAlias}.` : '';
+
+  // Platform filter: explicit platforms > workspace scope > no filter
+  const platformList = filters.platforms
+    || (filters.scope?.hasSocialMedia ? filters.scope.socialPlatforms : null);
+
+  if (platformList && platformList.length > 0) {
+    conditions.push(`LOWER(${prefix}platform) = ANY($${idx})`);
+    params.push(platformList.map(p => p.toLowerCase()));
+    idx++;
+  }
+
+  // Date range filter
+  if (filters.dateStart) {
+    conditions.push(`${prefix}published_at >= $${idx}`);
+    params.push(filters.dateStart);
+    idx++;
+  }
+  if (filters.dateEnd) {
+    conditions.push(`${prefix}published_at <= $${idx}`);
+    params.push(filters.dateEnd);
+    idx++;
+  }
+
+  return { conditions, params, nextIndex: idx };
 }

@@ -9,7 +9,10 @@
   import { formatTimestamp, formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
+  import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { setWorkspaceFromUrl } from '$lib/stores/workspaceStore';
+
+  let filterBar: FilterBar;
 
   // Get workspace ID from URL query parameter
   $: workspaceId = $page.url.searchParams.get('workspace');
@@ -94,7 +97,13 @@
   let languagesLimit = 5;
   let topicsLimit = 5;
 
-  $: filteredSources = dataSources.filter(s => activePlatforms.size === 0 || activePlatforms.has(s.name.toLowerCase()));
+  $: filteredSources = dataSources;
+
+  function handleFilterChange(event: CustomEvent) {
+    // Reload dashboard data when filters change
+    // The filter params will be read by the API from the FilterBar
+    loadDashboardData();
+  }
 
   // Load all dashboard data from database
   async function loadDashboardData() {
@@ -559,35 +568,15 @@
       projectName={$currentProject?.name || ''}
     />
 
-    <!-- Platform Filter -->
-    {#if dataSources.length > 1}
-      <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div class="flex items-center justify-between">
-          <span class="text-sm font-medium text-gray-700">Filter by source:</span>
-          <div class="flex flex-wrap gap-2">
-            {#each dataSources as source}
-              <button
-                on:click={() => {
-                  const key = source.name.toLowerCase();
-                  if (activePlatforms.has(key)) {
-                    activePlatforms.delete(key);
-                  } else {
-                    activePlatforms.add(key);
-                  }
-                  activePlatforms = new Set(activePlatforms);
-                }}
-                class="px-3 py-1.5 text-xs font-medium rounded-full border transition-colors {
-                  activePlatforms.has(source.name.toLowerCase())
-                    ? 'bg-blue-100 text-blue-800 border-blue-300'
-                    : 'bg-gray-50 text-gray-400 border-gray-200 line-through'
-                }">
-                {source.name} ({source.posts})
-              </button>
-            {/each}
-          </div>
-        </div>
-      </div>
-    {/if}
+    <!-- Data Source & Date Filter -->
+    <div class="mb-6">
+      <FilterBar
+        bind:this={filterBar}
+        workspaceId={workspaceId}
+        datasetTypes={['social_media']}
+        on:change={handleFilterChange}
+      />
+    </div>
 
     <!-- Key Metrics Overview -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
@@ -654,7 +643,12 @@
                 </div>
                 <div>
                   <div class="font-medium text-gray-900">{source.name}</div>
-                  <div class="text-sm text-gray-500">{source.posts.toLocaleString()} posts ({source.percentage}%)</div>
+                  <div class="text-sm text-gray-500">
+                    {#if source.platform && source.platform !== source.name}
+                      <span class="text-xs text-gray-400 mr-1">{source.platform}</span> ·
+                    {/if}
+                    {source.posts.toLocaleString()} posts ({source.percentage}%)
+                  </div>
                 </div>
               </div>
               <div class="flex items-center space-x-3">

@@ -54,6 +54,7 @@ class DashboardDatabase extends BaseDatabaseService {
    * Get data sources with statistics
    */
   async getDataSources(workspaceId?: string): Promise<DataSource[]> {
+    // Get platform performance stats
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance',
       params: workspaceId ? { workspace_id: workspaceId } : {}
@@ -63,18 +64,40 @@ class DashboardDatabase extends BaseDatabaseService {
       return [];
     }
 
+    // Try to get dataset names for richer display
+    let datasetNames: Record<string, string> = {};
+    try {
+      const dsParams = workspaceId ? `?workspace_id=${workspaceId}` : '?status=available';
+      const dsRes = await fetch(`/api/datasets${dsParams}`);
+      const dsData = await dsRes.json();
+      if (dsData.datasets) {
+        for (const ds of dsData.datasets) {
+          const platform = (ds.source_platform || '').toLowerCase();
+          if (platform) {
+            datasetNames[platform] = ds.name || ds.dataset_name || platform;
+          }
+        }
+      }
+    } catch { /* fallback to platform name */ }
+
     const totalPosts = data.reduce((sum: number, item: any) => sum + item.total_posts, 0);
 
     return this.safeTransform(
       data,
-      (source) => ({
-        name: source.platform.charAt(0).toUpperCase() + source.platform.slice(1),
-        posts: source.total_posts,
-        percentage: totalPosts > 0 ? Math.round((source.total_posts / totalPosts * 100) * 100) / 100 : 0,
-        status: (source.total_posts > 0 ? 'active' : 'inactive') as 'active' | 'inactive' | 'error',
-        last_sync: new Date().toISOString(),
-        health: Math.round((source.avg_confidence || 0.8) * 100)
-      }),
+      (source) => {
+        const platformKey = (source.platform || '').toLowerCase();
+        const datasetName = datasetNames[platformKey];
+        const platformLabel = source.platform.charAt(0).toUpperCase() + source.platform.slice(1);
+        return {
+          name: datasetName || platformLabel,
+          platform: platformLabel,
+          posts: source.total_posts,
+          percentage: totalPosts > 0 ? Math.round((source.total_posts / totalPosts * 100) * 100) / 100 : 0,
+          status: (source.total_posts > 0 ? 'active' : 'inactive') as 'active' | 'inactive' | 'error',
+          last_sync: new Date().toISOString(),
+          health: Math.round((source.avg_confidence || 0.8) * 100)
+        };
+      },
       []
     );
   }

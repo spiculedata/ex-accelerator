@@ -556,6 +556,11 @@
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
 
+
+    <!-- Data Source Filter -->
+    <div class="mb-6">
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} />
+    </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>

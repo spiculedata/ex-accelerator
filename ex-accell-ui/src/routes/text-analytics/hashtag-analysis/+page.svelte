@@ -97,6 +97,11 @@
 
 <WorkspaceBanner />
 
+
+    <!-- Data Source Filter -->
+    <div class="mb-6">
+      <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} />
+    </div>
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
 

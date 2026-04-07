@@ -1,0 +1,218 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { page } from '$app/stores';
+  import { createEventDispatcher } from 'svelte';
+
+  export let workspaceId: string | null = null;
+  export let compact = false;
+  export let datasetTypes: string[] = [];  // Filter to only show these dataset types (empty = all)
+
+  const dispatch = createEventDispatcher();
+
+  // Filter state
+  let datasets: any[] = [];
+  let enabledIds = new Set<number>();
+  let dateStart = '';
+  let dateEnd = '';
+  let loading = true;
+
+  // Filter datasets by allowed types (prop), then by user toggle
+  $: visibleDatasets = datasetTypes.length > 0
+    ? datasets.filter(d => datasetTypes.includes(d.dataset_type))
+    : datasets;
+  $: activeDatasets = visibleDatasets.filter(d => enabledIds.has(d.id ?? d.dataset_id));
+  $: platforms = [...new Set(activeDatasets.map((d: any) => d.source_platform).filter(Boolean))];
+  $: derivedDatasetTypes = [...new Set(activeDatasets.map((d: any) => d.dataset_type).filter(Boolean))];
+
+  // Color map for dataset types
+  const typeColors: Record<string, { bg: string; text: string; border: string }> = {
+    social_media: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
+    gdelt_events: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
+    radio: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
+    imported: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
+  };
+
+  function getTypeColor(type: string) {
+    return typeColors[type] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300' };
+  }
+
+  let lastLoadKey = '';
+
+  async function loadDatasets() {
+    const loadKey = `${workspaceId || 'global'}_${datasetTypes.join(',')}`;
+    // Skip only if exact same load params and we have data
+    if (lastLoadKey === loadKey && visibleDatasets.length > 0) return;
+    lastLoadKey = loadKey;
+    if (browser) {
+      console.log('[FilterBar] Client loading:', { workspaceId, datasetTypes: JSON.stringify(datasetTypes), loadKey });
+    }
+
+    loading = true;
+    try {
+      const params = workspaceId ? `?workspace_id=${workspaceId}` : '?status=available';
+      const res = await fetch(`/api/datasets${params}`);
+      const data = await res.json();
+      const allDatasets = data.datasets || [];
+      datasets = allDatasets;
+      // Enable all visible datasets (filtering by type happens reactively in $: visibleDatasets)
+      enabledIds = new Set(allDatasets.map((d: any) => d.id ?? d.dataset_id));
+    } catch (e) {
+      console.error('Failed to load datasets for filter bar:', e);
+      datasets = [];
+    } finally {
+      loading = false;
+      emitChange();
+    }
+  }
+
+  // No reactive reload needed — onMount handles initial load
+  // If workspaceId changes (SPA navigation), the parent page re-renders the component
+
+  function toggleDataset(id: number) {
+    if (enabledIds.has(id)) {
+      enabledIds.delete(id);
+    } else {
+      enabledIds.add(id);
+    }
+    enabledIds = new Set(enabledIds); // trigger reactivity
+    emitChange();
+  }
+
+  function enableAll() {
+    enabledIds = new Set(visibleDatasets.map((d: any) => d.id ?? d.dataset_id));
+    emitChange();
+  }
+
+  function disableAll() {
+    enabledIds = new Set();
+    emitChange();
+  }
+
+  function setQuickRange(days: number) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    dateStart = start.toISOString().split('T')[0];
+    dateEnd = end.toISOString().split('T')[0];
+    emitChange();
+  }
+
+  function clearDates() {
+    dateStart = '';
+    dateEnd = '';
+    emitChange();
+  }
+
+  function emitChange() {
+    dispatch('change', {
+      workspaceId,
+      enabledDatasets: [...enabledIds],
+      platforms,
+      datasetTypes: derivedDatasetTypes,
+      dateStart: dateStart || null,
+      dateEnd: dateEnd || null,
+    });
+  }
+
+  // Export for parent to read
+  export function getFilters() {
+    return {
+      workspaceId,
+      enabledDatasets: [...enabledIds],
+      platforms,
+      datasetTypes,
+      dateStart: dateStart || null,
+      dateEnd: dateEnd || null,
+    };
+  }
+
+  export function getFilterParams(): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (workspaceId) params.workspace_id = workspaceId;
+    if (platforms.length > 0) params.platforms = platforms.join(',');
+    if (dateStart) params.date_start = dateStart;
+    if (dateEnd) params.date_end = dateEnd;
+    return params;
+  }
+
+  onMount(loadDatasets);
+</script>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 {compact ? 'p-3' : 'p-4'}">
+  {#if loading}
+    <div class="flex items-center gap-2 text-sm text-gray-400">
+      <div class="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-blue-500"></div>
+      Loading data sources...
+    </div>
+  {:else if visibleDatasets.length === 0}
+    <p class="text-xs text-gray-400">No matching data sources{datasetTypes.length > 0 ? ` (filter: ${datasetTypes.join(', ')})` : ''}</p>
+  {:else}
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Dataset toggles -->
+      <div class="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wider mr-1">Sources:</span>
+        {#each visibleDatasets as dataset}
+          {@const id = dataset.id ?? dataset.dataset_id}
+          {@const enabled = enabledIds.has(id)}
+          {@const colors = getTypeColor(dataset.dataset_type)}
+          <button
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+              {enabled
+                ? `${colors.bg} ${colors.text} ${colors.border} shadow-sm`
+                : 'bg-gray-100 text-gray-400 border-gray-200 opacity-60'}"
+            on:click={() => toggleDataset(id)}
+            title="{enabled ? 'Click to disable' : 'Click to enable'}: {dataset.name || dataset.dataset_name}"
+          >
+            <span class="w-2 h-2 rounded-full {enabled ? 'bg-current' : 'bg-gray-300'}"></span>
+            <span class="truncate max-w-32">{dataset.name || dataset.dataset_name}</span>
+            {#if dataset.source_platform && !compact}
+              <span class="text-[10px] opacity-60">({dataset.source_platform})</span>
+            {/if}
+          </button>
+        {/each}
+        {#if visibleDatasets.length > 1}
+          <button on:click={enableAll} class="text-[10px] text-blue-600 hover:text-blue-800 px-1">All</button>
+          <button on:click={disableAll} class="text-[10px] text-gray-500 hover:text-gray-700 px-1">None</button>
+        {/if}
+      </div>
+
+      <!-- Separator -->
+      <div class="w-px h-6 bg-gray-200 hidden sm:block"></div>
+
+      <!-- Date range -->
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Dates:</span>
+        <input
+          type="date"
+          bind:value={dateStart}
+          on:change={emitChange}
+          class="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+        />
+        <span class="text-xs text-gray-300">—</span>
+        <input
+          type="date"
+          bind:value={dateEnd}
+          on:change={emitChange}
+          class="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+        />
+        {#if !compact}
+          <div class="flex gap-0.5 ml-1">
+            <button on:click={() => setQuickRange(7)} class="text-[10px] px-2 py-1 rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-gray-500 transition-colors">7d</button>
+            <button on:click={() => setQuickRange(30)} class="text-[10px] px-2 py-1 rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-gray-500 transition-colors">30d</button>
+            <button on:click={() => setQuickRange(90)} class="text-[10px] px-2 py-1 rounded-md border border-gray-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 text-gray-500 transition-colors">90d</button>
+          </div>
+        {/if}
+        {#if dateStart || dateEnd}
+          <button on:click={clearDates} class="text-[10px] text-red-500 hover:text-red-700 ml-1">Reset</button>
+        {/if}
+      </div>
+    </div>
+
+    {#if enabledIds.size < visibleDatasets.length}
+      <div class="mt-2 text-xs text-amber-600">
+        Showing {enabledIds.size} of {visibleDatasets.length} data sources
+      </div>
+    {/if}
+  {/if}
+</div>
