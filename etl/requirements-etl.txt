@@ -18,3 +18,7 @@ mediapipe>=0.10.0
 pillow>=10.0.0
 imagehash>=4.3.0
 open-clip-torch>=2.24.0
+insightface>=0.7.0
+onnxruntime>=1.18.0
+paddleocr>=2.7.0,<3.0.0
+paddlepaddle>=2.6.0,<3.0.0

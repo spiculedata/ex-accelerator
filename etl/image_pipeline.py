@@ -125,14 +125,55 @@ def get_face_net():
     return _face_net
 
 
+_retinaface_app = None
+
+def get_retinaface():
+    global _retinaface_app
+    if _retinaface_app is None:
+        try:
+            from insightface.app import FaceAnalysis
+            _retinaface_app = FaceAnalysis(allowed_modules=['detection'], providers=['CPUExecutionProvider'])
+            _retinaface_app.prepare(ctx_id=0, det_size=(640, 640))
+            logger.info("RetinaFace (InsightFace) detector loaded")
+        except Exception as e:
+            logger.warning(f"RetinaFace not available: {e}")
+            _retinaface_app = False  # Mark as failed, don't retry
+    return _retinaface_app if _retinaface_app is not False else None
+
+
 def detect_faces(img, tier='fast'):
-    """Detect faces with tier-based model selection.
-    Fast: Haar cascade, Standard: Haar cascade (same), Accurate: YOLO person + Haar combined."""
+    """Detect faces — fast: Haar cascade, standard: Haar, accurate: RetinaFace."""
     import numpy as np
 
+    # Accurate tier: use RetinaFace
+    if tier == 'accurate':
+        retinaface = get_retinaface()
+        if retinaface:
+            img_array = np.array(img)
+            # RetinaFace expects BGR
+            import cv2
+            img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            faces = retinaface.get(img_bgr)
+            h_img, w_img = img_array.shape[:2]
+            bboxes = []
+            for face in faces:
+                x1, y1, x2, y2 = face.bbox.astype(int)
+                conf = float(face.det_score)
+                bboxes.append({
+                    'x': round((x1 + x2) / 2 / w_img, 4),
+                    'y': round((y1 + y2) / 2 / h_img, 4),
+                    'w': round((x2 - x1) / w_img, 4),
+                    'h': round((y2 - y1) / h_img, 4),
+                    'confidence': round(conf, 3),
+                    'type': 'face'
+                })
+            face_count = len(bboxes)
+            avg_conf = sum(b['confidence'] for b in bboxes) / max(face_count, 1)
+            return face_count, bboxes, round(avg_conf, 3), 'face (RetinaFace)'
+
+    # Fast/standard: Haar cascade
     face_cascade = get_face_net()
     if face_cascade is None:
-        # Fall back to YOLO person detection
         model = get_yolo_model()
         results = model(img, verbose=False, conf=0.3)
         person_count = sum(1 for r in results for box in r.boxes if model.names[int(box.cls[0])] == 'person')
@@ -270,6 +311,69 @@ def moderate_with_clip(img):
         'hate_score': round(hate, 3),
         'flags': flags
     }
+
+
+# ── PaddleOCR (Standard/Accurate Tier) ───────────────────────────────────────
+
+_paddleocr = None
+
+def get_paddleocr():
+    global _paddleocr
+    if _paddleocr is None:
+        try:
+            from paddleocr import PaddleOCR
+            _paddleocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+            logger.info("PaddleOCR loaded")
+        except ImportError:
+            logger.warning("PaddleOCR not installed — OCR unavailable")
+            _paddleocr = False
+    return _paddleocr if _paddleocr is not False else None
+
+
+def extract_text_ocr(img, tier='fast'):
+    """Extract text from image — standard/accurate uses PaddleOCR."""
+    if tier == 'fast':
+        return '', [], 0.0  # Fast tier doesn't do OCR
+
+    import numpy as np
+    ocr = get_paddleocr()
+    if ocr is None:
+        return '', [], 0.0
+
+    img_array = np.array(img)
+
+    result = ocr.ocr(img_array, cls=True)
+
+    if not result or not result[0]:
+        return '', [], 0.0
+
+    text_regions = []
+    all_text = []
+    total_conf = 0.0
+    count = 0
+
+    for line in result[0]:
+        if not line or len(line) < 2:
+            continue
+        bbox_points = line[0]
+        text_conf = line[1]
+        if isinstance(text_conf, (list, tuple)) and len(text_conf) == 2:
+            text, conf = text_conf
+        else:
+            continue
+        if text and str(text).strip():
+            all_text.append(str(text).strip())
+            text_regions.append({
+                'text': str(text).strip(),
+                'confidence': round(float(conf), 3),
+                'bbox': [[round(float(p[0]), 1), round(float(p[1]), 1)] for p in bbox_points] if bbox_points else []
+            })
+            total_conf += float(conf)
+            count += 1
+
+    extracted_text = ' '.join(all_text)
+    avg_conf = total_conf / max(count, 1)
+    return extracted_text, text_regions, round(avg_conf, 3)
 
 
 # ── Heuristic Classification (Fast Tier) ─────────────────────────────────────
@@ -502,7 +606,23 @@ def process_single_image(image_id, image_url, conn, model_config=None):
     except Exception as e:
         logger.error(f"  Classification failed: {e}")
 
-    # 4. Perceptual Hash
+    # 4. OCR Text Extraction (standard/accurate tier)
+    try:
+        extracted_text, text_regions, ocr_conf = extract_text_ocr(img, tier=tier)
+        if extracted_text:
+            cur.execute("DELETE FROM image_ocr WHERE image_id=%s", (image_id,))
+            cur.execute(
+                "INSERT INTO image_ocr (image_id, extracted_text, confidence, text_regions, model) VALUES (%s,%s,%s,%s,%s)",
+                (image_id, extracted_text, ocr_conf, json.dumps(text_regions),
+                 'paddleocr' if tier != 'fast' else 'none')
+            )
+            logger.info(f"  OCR: {len(extracted_text)} chars extracted ({len(text_regions)} regions)")
+        else:
+            logger.info(f"  OCR: no text found" + (" (fast tier skips OCR)" if tier == 'fast' else ""))
+    except Exception as e:
+        logger.error(f"  OCR failed: {e}")
+
+    # 5. Perceptual Hash
     try:
         phash = compute_hashes(img)
         cur.execute("DELETE FROM image_embeddings WHERE image_id=%s", (image_id,))
@@ -514,7 +634,7 @@ def process_single_image(image_id, image_url, conn, model_config=None):
     except Exception as e:
         logger.error(f"  Hashing failed: {e}")
 
-    # 5. Content Moderation
+    # 6. Content Moderation
     try:
         mod = moderate_image(img, objects, face_count, tier=tier)
         cur.execute("DELETE FROM image_moderation WHERE image_id=%s", (image_id,))
