@@ -28,46 +28,58 @@
       description: 'Analyze sentiment patterns in social media data using NLTK and TextBlob',
       file: 'sentiment_analysis.ipynb'
     },
-    { 
-      id: 'topic_modeling', 
+    {
+      id: 'getting_started',
+      name: 'Getting Started',
+      description: 'Start here — guided walkthrough of all available data, queries, visualizations, and LLM tools',
+      file: '00_getting_started.ipynb'
+    },
+    {
+      id: 'topic_modeling',
       name: 'Topic Modeling',
-      description: 'Discover hidden topics using LDA and word embeddings',
+      description: 'Discover themes in social posts using BERTopic and LDA, visualize topic networks',
       file: 'topic_modeling.ipynb'
     },
-    { 
-      id: 'text_classification', 
+    {
+      id: 'text_classification',
       name: 'Text Classification',
-      description: 'Build custom classifiers for content categorization',
+      description: 'Build custom classifiers with sklearn, compare ML vs LLM zero-shot classification',
       file: 'text_classification.ipynb'
     },
-    { 
-      id: 'language_detection', 
+    {
+      id: 'language_detection',
       name: 'Language Detection',
-      description: 'Multi-language text detection and analysis',
+      description: 'Multi-language text detection, language distribution analysis, cross-lingual patterns',
       file: 'language_detection.ipynb'
     },
-    { 
-      id: 'deepseek_openllm_demo', 
-      name: 'DeepSeek R1 OpenLLM Demo',
-      description: 'Comprehensive demo of DeepSeek R1 model capabilities via OpenLLM',
-      file: 'deepseek_openllm_demo.ipynb'
+    {
+      id: 'image_analysis',
+      name: 'Image Analysis',
+      description: 'Explore image processing results — object detection, face counts, CLIP classification',
+      file: 'image_analysis.ipynb'
     },
-    { 
-      id: 'deepseek_gdelt_integration', 
-      name: 'DeepSeek + GDELT Integration',
-      description: 'AI-powered analysis of global events using DeepSeek R1 and GDELT data',
-      file: 'deepseek_gdelt_integration.ipynb'
+    {
+      id: 'cross_platform',
+      name: 'Cross-Platform Analytics',
+      description: 'Compare Bluesky, Radio, and GDELT data — sentiment, topics, engagement across sources',
+      file: 'cross_platform_analytics.ipynb'
     },
-    { 
-      id: 'ollama_gdelt_integration', 
-      name: 'Ollama + GDELT Integration',
-      description: 'Local AI model deployment with Ollama for GDELT analysis - easier setup alternative to OpenLLM',
+    {
+      id: 'ollama_gdelt_integration',
+      name: 'Ollama + GDELT Intelligence',
+      description: 'LLM-powered geopolitical analysis using Gemma via Ollama and 23M+ GDELT events',
       file: 'ollama_gdelt_integration.ipynb'
     },
-    { 
-      id: 'custom_research', 
-      name: 'Custom Research',
-      description: 'Blank notebook for custom text analytics research',
+    {
+      id: 'deepseek_openllm_demo',
+      name: 'DeepSeek R1 Demo (Advanced)',
+      description: 'DeepSeek R1 via OpenLLM — requires separate poetry setup, GPU recommended',
+      file: 'deepseek_openllm_demo.ipynb'
+    },
+    {
+      id: 'custom_research',
+      name: 'Custom Research Template',
+      description: 'Blank notebook pre-configured with workspace_utils — start your own analysis',
       file: 'custom_research.ipynb'
     }
   ];
