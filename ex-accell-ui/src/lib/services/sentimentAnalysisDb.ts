@@ -42,11 +42,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
       return this.getDefaultSentimentStats();
     }
 
-    return this.safeTransform(
-      [data],
-      () => this.aggregateSentimentStats(data),
-      [this.getDefaultSentimentStats()]
-    )[0];
+    return this.aggregateSentimentStats(data);
   }
 
   /**
@@ -144,7 +140,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(',') : [],
         platform: post.platform,
-        timestamp: new Date(post.timestamp).toISOString(),
+        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,
@@ -286,7 +282,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(';') : [],
         platform: post.platform,
-        timestamp: new Date(post.timestamp).toISOString(),
+        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,
@@ -346,8 +342,9 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
       }
 
       const current = sentimentMap.get(sentiment)!;
-      current.count += row.post_count;
-      totalPosts += row.post_count;
+      const postCount = parseInt(row.post_count) || 0;
+      current.count += postCount;
+      totalPosts += postCount;
 
       if (row.avg_confidence) {
         current.confidence = (current.confidence + row.avg_confidence) / 2;

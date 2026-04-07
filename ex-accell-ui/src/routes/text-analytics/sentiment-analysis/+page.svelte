@@ -24,11 +24,14 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+
+    // Reload data with new filters
     loadSentimentData();
   }
 
-  onMount(async () => {
-    await loadSentimentData();
+  // Single load point — wait briefly for FilterBar to set initial params
+  onMount(() => {
+    setTimeout(() => loadSentimentData(), 200);
   });
 
   // Comprehensive sentiment analysis data - loaded from database
