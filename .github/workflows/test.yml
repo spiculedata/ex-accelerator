@@ -75,6 +75,22 @@ jobs:
     name: E2E Tests (Playwright)
     needs: build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgduckdb/pgduckdb:17-main
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: analytics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:changeme@localhost:5432/analytics
     steps:
       - uses: actions/checkout@v4
 
