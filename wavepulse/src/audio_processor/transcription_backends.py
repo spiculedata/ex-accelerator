@@ -205,7 +205,7 @@ class ScalewayAPIBackend(TranscriptionBackend):
                         files={"file": (os.path.basename(audio_file), f)},
                         data={
                             "model": self.model,
-                            "response_format": "verbose_json",
+                            "response_format": "json",
                             "language": "en",
                         },
                         timeout=600,  # 10 min timeout for large files
@@ -248,16 +248,23 @@ class ScalewayAPIBackend(TranscriptionBackend):
         raise RuntimeError("Scaleway API failed after all retries")
 
     def _convert_response(self, api_response: dict) -> dict:
-        """Convert OpenAI-format response to WhisperX segment format."""
-        segments = []
-        for seg in api_response.get("segments", []):
-            segments.append(
+        """Convert Scaleway API response to WhisperX segment format."""
+        # Scaleway returns {"text": "...", "usage": {"seconds": N}}
+        # If segments are available, use them; otherwise create a single segment
+        if "segments" in api_response and api_response["segments"]:
+            segments = [
                 {
                     "start": seg.get("start", 0.0),
                     "end": seg.get("end", 0.0),
                     "text": seg.get("text", "").strip(),
                 }
-            )
+                for seg in api_response["segments"]
+            ]
+        else:
+            # Full text as single segment
+            duration = api_response.get("usage", {}).get("seconds", 0)
+            text = api_response.get("text", "").strip()
+            segments = [{"start": 0.0, "end": float(duration), "text": text}] if text else []
 
         return {
             "segments": segments,
