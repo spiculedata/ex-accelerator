@@ -252,6 +252,7 @@
       ]
     },
     { name: 'Research', href: '/text-analytics/research-investigation', current: false, requiresProject: false },
+    { name: 'Investigations', href: '/investigations', current: false, requiresProject: false },
     {
       name: 'Data',
       href: '/data-management',

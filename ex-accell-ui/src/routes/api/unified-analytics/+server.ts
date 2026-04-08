@@ -1556,6 +1556,226 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
+    // ── Investigation query types ────────────────────────────────────
+
+    if (type === 'investigation-timeline') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          WITH date_series AS (
+            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS d
+          ),
+          gdelt AS (
+            SELECT TO_DATE(sqldate::text, 'YYYYMMDD') AS d,
+              COUNT(*) AS event_count, AVG(goldsteinscale) AS avg_goldstein, AVG(avgtone) AS avg_tone
+            FROM gdelt_events
+            WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
+              AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
+              AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
+                   OR actiongeo_fullname ILIKE ANY($3::text[]))
+            GROUP BY 1
+          ),
+          radio AS (
+            SELECT DATE(segment_start) AS d, COUNT(*) AS segment_count,
+              COUNT(*) FILTER (WHERE sentiment = 'positive') AS positive,
+              COUNT(*) FILTER (WHERE sentiment = 'negative') AS negative,
+              COUNT(*) FILTER (WHERE sentiment = 'neutral') AS neutral
+            FROM radio_transcripts
+            WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
+              AND transcript ILIKE ANY($3::text[])
+            GROUP BY 1
+          ),
+          social AS (
+            SELECT DATE(to_timestamp(timestamp/1000)) AS d, COUNT(*) AS post_count,
+              COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) AS positive,
+              COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) AS negative,
+              COUNT(*) FILTER (WHERE sentiment_category = 'Neutral') AS neutral
+            FROM posts_with_sentiment
+            WHERE to_timestamp(timestamp/1000) >= $1::timestamp
+              AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
+              AND text ILIKE ANY($3::text[])
+            GROUP BY 1
+          )
+          SELECT ds.d as date,
+            COALESCE(g.event_count, 0) as gdelt_events, g.avg_goldstein, g.avg_tone,
+            COALESCE(r.segment_count, 0) as radio_segments, COALESCE(r.positive, 0) as radio_positive,
+            COALESCE(r.negative, 0) as radio_negative, COALESCE(r.neutral, 0) as radio_neutral,
+            COALESCE(s.post_count, 0) as social_posts, COALESCE(s.positive, 0) as social_positive,
+            COALESCE(s.negative, 0) as social_negative, COALESCE(s.neutral, 0) as social_neutral
+          FROM date_series ds
+          LEFT JOIN gdelt g ON g.d = ds.d LEFT JOIN radio r ON r.d = ds.d LEFT JOIN social s ON s.d = ds.d
+          ORDER BY ds.d
+        `, [dateStart, dateEnd, keywordsArray]);
+
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Investigation timeline query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'investigation-gdelt-events') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          SELECT globaleventid, sqldate, actor1name, actor2name,
+            eventcode, goldsteinscale, nummentions, avgtone,
+            actor1countrycode, actor2countrycode,
+            actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
+          FROM gdelt_events
+          WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
+            AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
+            AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
+                 OR actiongeo_fullname ILIKE ANY($3::text[]))
+          ORDER BY sqldate DESC, nummentions DESC
+          LIMIT $4
+        `, [dateStart, dateEnd, keywordsArray, limit]);
+
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Investigation GDELT events query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'investigation-radio-segments') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+      const limit = parseInt(url.searchParams.get('limit') || '50');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          SELECT id, station, segment_start, segment_end, duration_seconds,
+            transcript, sentiment, topics, relevance_score
+          FROM radio_transcripts
+          WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
+            AND transcript ILIKE ANY($3::text[])
+          ORDER BY segment_start DESC
+          LIMIT $4
+        `, [dateStart, dateEnd, keywordsArray, limit]);
+
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Investigation radio segments query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'investigation-social-posts') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          SELECT id, text, timestamp, platform, author,
+            sentiment_score, sentiment_category,
+            engagement_score, hashtags
+          FROM posts_with_sentiment
+          WHERE to_timestamp(timestamp/1000) >= $1::timestamp
+            AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
+            AND text ILIKE ANY($3::text[])
+          ORDER BY timestamp DESC
+          LIMIT $4
+        `, [dateStart, dateEnd, keywordsArray, limit]);
+
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Investigation social posts query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'investigation-keyword-overlap') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          WITH gdelt_mentions AS (
+            SELECT unnest($3::text[]) AS keyword, 'gdelt' AS source,
+              COUNT(*) AS mention_count
+            FROM gdelt_events, unnest($3::text[]) kw
+            WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
+              AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
+              AND (actor1name ILIKE kw OR actor2name ILIKE kw OR actiongeo_fullname ILIKE kw)
+            GROUP BY kw
+          ),
+          radio_mentions AS (
+            SELECT unnest($3::text[]) AS keyword, 'radio' AS source,
+              COUNT(*) AS mention_count
+            FROM radio_transcripts, unnest($3::text[]) kw
+            WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
+              AND transcript ILIKE kw
+            GROUP BY kw
+          ),
+          social_mentions AS (
+            SELECT unnest($3::text[]) AS keyword, 'social' AS source,
+              COUNT(*) AS mention_count
+            FROM posts_with_sentiment, unnest($3::text[]) kw
+            WHERE to_timestamp(timestamp/1000) >= $1::timestamp
+              AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
+              AND text ILIKE kw
+            GROUP BY kw
+          )
+          SELECT keyword, source, mention_count
+          FROM (
+            SELECT * FROM gdelt_mentions
+            UNION ALL
+            SELECT * FROM radio_mentions
+            UNION ALL
+            SELECT * FROM social_mentions
+          ) combined
+          ORDER BY keyword, source
+        `, [dateStart, dateEnd, keywordsArray]);
+
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Investigation keyword overlap query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
     // Default response for unsupported query types
     return json({
       success: true,
@@ -1573,7 +1793,12 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         'radio-topics': '/api/unified-analytics?type=radio-topics',
         'radio-political': '/api/unified-analytics?type=radio-political',
         'radio-transcripts': '/api/unified-analytics?type=radio-transcripts',
-        'radio-wordcloud': '/api/unified-analytics?type=radio-wordcloud'
+        'radio-wordcloud': '/api/unified-analytics?type=radio-wordcloud',
+        'investigation-timeline': '/api/unified-analytics?type=investigation-timeline&keywords=...&date_start=...&date_end=...',
+        'investigation-gdelt-events': '/api/unified-analytics?type=investigation-gdelt-events&keywords=...&date_start=...&date_end=...',
+        'investigation-radio-segments': '/api/unified-analytics?type=investigation-radio-segments&keywords=...&date_start=...&date_end=...',
+        'investigation-social-posts': '/api/unified-analytics?type=investigation-social-posts&keywords=...&date_start=...&date_end=...',
+        'investigation-keyword-overlap': '/api/unified-analytics?type=investigation-keyword-overlap&keywords=...&date_start=...&date_end=...'
       }
     });
   } catch (err) {
