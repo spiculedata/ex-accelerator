@@ -2,7 +2,24 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { investigationSelection, clearSelection, setTimeRange, toggleSelectedId, setHoveredId, setSourceFilter } from '$lib/stores/investigationStore';
+  import {
+    investigationSelection,
+    clearSelection,
+    setTimeRange,
+    setSentimentFilter,
+    setSourceFilter
+  } from '$lib/stores/investigationStore';
+  import SwimLaneTimeline from '$lib/components/investigation/SwimLaneTimeline.svelte';
+  import type { TimelineEntry } from '$lib/components/investigation/SwimLaneTimeline.svelte';
+  import SentimentDistribution from '$lib/components/investigation/SentimentDistribution.svelte';
+  import ParallelCoordinates from '$lib/components/investigation/ParallelCoordinates.svelte';
+  import LagAnalysisChart from '$lib/components/investigation/LagAnalysisChart.svelte';
+  import KeywordNetwork from '$lib/components/investigation/KeywordNetwork.svelte';
+  import WordCloudChart from '$lib/components/investigation/WordCloudChart.svelte';
+  import GdeltEventPanel from '$lib/components/investigation/GdeltEventPanel.svelte';
+  import RadioTranscriptPanel from '$lib/components/investigation/RadioTranscriptPanel.svelte';
+  import SocialPostPanel from '$lib/components/investigation/SocialPostPanel.svelte';
+  import ComponentPalette from '$lib/components/investigation/ComponentPalette.svelte';
 
   interface Investigation {
     id: string;
@@ -13,54 +30,114 @@
     date_end: string;
     sources: string[];
     created_at: string;
-    query_config?: any;
+    query_config?: {
+      keywords?: string[];
+      dateStart?: string;
+      dateEnd?: string;
+      [key: string]: unknown;
+    };
   }
 
   interface GdeltEvent {
-    id: string;
-    date: string;
-    actor1: string;
-    actor2: string;
-    goldstein_scale: number;
-    avg_tone: number;
-    location: string;
-    event_code: string;
+    globaleventid: string | number;
+    sqldate: string;
+    actor1name?: string;
+    actor2name?: string;
+    goldsteinscale: number;
+    avgtone: number;
+    actiongeo_fullname?: string;
+    numarticles?: number;
   }
 
   interface RadioSegment {
-    id: string;
-    station: string;
-    timestamp: string;
-    sentiment: string;
-    sentiment_score: number;
-    text: string;
+    id: string | number;
+    radio_name: string;
+    state?: string;
+    segment_start: string;
+    duration_seconds: number;
+    transcript: string;
+    sentiment?: string;
+    emotion?: string;
+    confidence?: number;
+    is_political?: boolean;
   }
 
   interface SocialPost {
-    id: string;
+    id: string | number;
     text: string;
-    sentiment: string;
-    sentiment_score: number;
-    platform: string;
-    engagement: number;
-    created_at: string;
+    sentiment_category?: string;
+    confidence_score?: number;
+    platform?: string;
+    timestamp?: string;
   }
 
   let investigation: Investigation | null = null;
   let loading = true;
+  let timelineData: TimelineEntry[] = [];
+  let timelineLoading = true;
   let gdeltEvents: GdeltEvent[] = [];
   let radioSegments: RadioSegment[] = [];
   let socialPosts: SocialPost[] = [];
+  let keywordData: any[] = [];
+  let activeInsightSlots: string[] = ['sentiment', 'parallel', 'lag'];
   let gdeltLoading = true;
   let radioLoading = true;
   let socialLoading = true;
-  let expandedRadioId: string | null = null;
   let sourcesEnabled = { gdelt: true, radio: true, social: true };
+  let paletteOpen = false;
+
+  // Extracted investigation parameters
+  let keywords: string[] = [];
+  let dateStart = '';
+  let dateEnd = '';
 
   $: investigationId = $page.params.id || '';
 
-  onMount(async () => {
-    await loadInvestigation();
+  // Compute sentiment distribution from all loaded sources
+  $: sentimentChartData = computeSentimentFromAllSources(gdeltEvents, radioSegments, socialPosts);
+
+  function computeSentimentFromAllSources(
+    gdelt: GdeltEvent[],
+    radio: RadioSegment[],
+    social: SocialPost[]
+  ): { label: string; value: number; color: string }[] {
+    let positive = 0;
+    let negative = 0;
+    let neutral = 0;
+
+    // GDELT: classify by average tone
+    for (const e of gdelt) {
+      if (e.avgtone > 1) positive++;
+      else if (e.avgtone < -1) negative++;
+      else neutral++;
+    }
+
+    // Radio: classify by sentiment field
+    for (const s of radio) {
+      const label = (s.sentiment || 'neutral').toLowerCase();
+      if (label === 'positive') positive++;
+      else if (label === 'negative') negative++;
+      else neutral++;
+    }
+
+    // Social: classify by sentiment_category
+    for (const p of social) {
+      const label = (p.sentiment_category || 'neutral').toLowerCase();
+      if (label === 'positive') positive++;
+      else if (label === 'negative') negative++;
+      else neutral++;
+    }
+
+    return [
+      { label: 'Positive', value: positive, color: '#06d6a0' },
+      { label: 'Negative', value: negative, color: '#f72585' },
+      { label: 'Neutral', value: neutral, color: '#8b5cf6' }
+    ];
+  }
+
+  onMount(() => {
+    loadInvestigation();
+    return () => clearSelection();
   });
 
   async function loadInvestigation() {
@@ -71,19 +148,19 @@
       if (result.success && result.investigation) {
         investigation = result.investigation;
         const config = investigation?.query_config || {};
-        const keywords = investigation?.keywords || config.keywords || [];
-        const dateStart = investigation?.date_start || config.dateStart || '';
-        const dateEnd = investigation?.date_end || config.dateEnd || '';
+        keywords = investigation?.keywords || config.keywords || [];
+        dateStart = investigation?.date_start || config.dateStart || '';
+        dateEnd = investigation?.date_end || config.dateEnd || '';
 
         if (dateStart && dateEnd) {
           setTimeRange(dateStart, dateEnd);
         }
 
-        // Fetch all panel data in parallel
+        // Fetch timeline, detail panels, and keyword data in parallel
         await Promise.all([
-          loadGdeltEvents(keywords, dateStart, dateEnd),
-          loadRadioSegments(keywords, dateStart, dateEnd),
-          loadSocialPosts(keywords, dateStart, dateEnd)
+          loadTimeline(keywords, dateStart, dateEnd),
+          loadDetailPanels(keywords, dateStart, dateEnd),
+          loadKeywordData(keywords, dateStart, dateEnd)
         ]);
       }
     } catch (error) {
@@ -93,19 +170,46 @@
     }
   }
 
-  async function loadGdeltEvents(keywords: string[], dateStart: string, dateEnd: string) {
-    gdeltLoading = true;
+  async function loadTimeline(kw: string[], ds: string, de: string) {
+    timelineLoading = true;
     try {
-      const params = new URLSearchParams();
-      if (keywords.length) params.set('keywords', keywords.join(','));
-      if (dateStart) params.set('date_start', dateStart);
-      if (dateEnd) params.set('date_end', dateEnd);
-      params.set('investigation_id', investigationId);
+      const params = new URLSearchParams({ type: 'investigation-timeline' });
+      if (kw.length) params.set('keywords', kw.join(','));
+      if (ds) params.set('date_start', ds);
+      if (de) params.set('date_end', de);
 
-      const response = await fetch(`/api/investigation-gdelt-events?${params}`);
+      const response = await fetch(`/api/unified-analytics?${params}`);
       const result = await response.json();
       if (result.success) {
-        gdeltEvents = result.events || [];
+        timelineData = result.data || result.timeline || [];
+      }
+    } catch (error) {
+      console.error('Error loading timeline:', error);
+    } finally {
+      timelineLoading = false;
+    }
+  }
+
+  async function loadDetailPanels(kw: string[], ds: string, de: string) {
+    await Promise.all([
+      loadGdeltEvents(kw, ds, de),
+      loadRadioSegments(kw, ds, de),
+      loadSocialPosts(kw, ds, de)
+    ]);
+  }
+
+  async function loadGdeltEvents(kw: string[], ds: string, de: string) {
+    gdeltLoading = true;
+    try {
+      const params = new URLSearchParams({ type: 'investigation-gdelt-events', limit: '100' });
+      if (kw.length) params.set('keywords', kw.join(','));
+      if (ds) params.set('date_start', ds);
+      if (de) params.set('date_end', de);
+
+      const response = await fetch(`/api/unified-analytics?${params}`);
+      const result = await response.json();
+      if (result.success) {
+        gdeltEvents = result.data || result.events || [];
       }
     } catch (error) {
       console.error('Error loading GDELT events:', error);
@@ -114,19 +218,18 @@
     }
   }
 
-  async function loadRadioSegments(keywords: string[], dateStart: string, dateEnd: string) {
+  async function loadRadioSegments(kw: string[], ds: string, de: string) {
     radioLoading = true;
     try {
-      const params = new URLSearchParams();
-      if (keywords.length) params.set('keywords', keywords.join(','));
-      if (dateStart) params.set('date_start', dateStart);
-      if (dateEnd) params.set('date_end', dateEnd);
-      params.set('investigation_id', investigationId);
+      const params = new URLSearchParams({ type: 'investigation-radio-segments', limit: '50' });
+      if (kw.length) params.set('keywords', kw.join(','));
+      if (ds) params.set('date_start', ds);
+      if (de) params.set('date_end', de);
 
-      const response = await fetch(`/api/investigation-radio-segments?${params}`);
+      const response = await fetch(`/api/unified-analytics?${params}`);
       const result = await response.json();
       if (result.success) {
-        radioSegments = result.segments || [];
+        radioSegments = result.data || result.segments || [];
       }
     } catch (error) {
       console.error('Error loading radio segments:', error);
@@ -135,19 +238,18 @@
     }
   }
 
-  async function loadSocialPosts(keywords: string[], dateStart: string, dateEnd: string) {
+  async function loadSocialPosts(kw: string[], ds: string, de: string) {
     socialLoading = true;
     try {
-      const params = new URLSearchParams();
-      if (keywords.length) params.set('keywords', keywords.join(','));
-      if (dateStart) params.set('date_start', dateStart);
-      if (dateEnd) params.set('date_end', dateEnd);
-      params.set('investigation_id', investigationId);
+      const params = new URLSearchParams({ type: 'investigation-social-posts', limit: '100' });
+      if (kw.length) params.set('keywords', kw.join(','));
+      if (ds) params.set('date_start', ds);
+      if (de) params.set('date_end', de);
 
-      const response = await fetch(`/api/investigation-social-posts?${params}`);
+      const response = await fetch(`/api/unified-analytics?${params}`);
       const result = await response.json();
       if (result.success) {
-        socialPosts = result.posts || [];
+        socialPosts = result.data || result.posts || [];
       }
     } catch (error) {
       console.error('Error loading social posts:', error);
@@ -156,12 +258,52 @@
     }
   }
 
-  function selectGdeltEvent(event: GdeltEvent) {
-    toggleSelectedId(event.id);
+  async function loadKeywordData(kw: string[], ds: string, de: string) {
+    try {
+      const params = new URLSearchParams({ type: 'investigation-keyword-overlap' });
+      if (kw.length) params.set('keywords', kw.join(','));
+      if (ds) params.set('date_start', ds);
+      if (de) params.set('date_end', de);
+
+      const response = await fetch(`/api/unified-analytics?${params}`);
+      const result = await response.json();
+      if (result.success) {
+        keywordData = result.data || [];
+      }
+    } catch (error) {
+      console.error('Error loading keyword data:', error);
+    }
   }
 
-  function selectSocialPost(post: SocialPost) {
-    toggleSelectedId(post.id);
+  // Compute word cloud data from keyword overlap
+  $: wordCloudData = keywordData.map((k: any) => ({
+    text: k.keyword || k.word,
+    size: (k.gdelt_count || 0) + (k.radio_count || 0) + (k.social_count || 0)
+  })).filter((w: any) => w.size > 0);
+
+  function handleBrushChange(event: CustomEvent<{ start: Date; end: Date }>) {
+    const { start, end } = event.detail;
+    const brushStart = start.toISOString().split('T')[0];
+    const brushEnd = end.toISOString().split('T')[0];
+    setTimeRange(brushStart, brushEnd);
+    // Re-fetch detail panels with the narrowed date range
+    loadDetailPanels(keywords, brushStart, brushEnd);
+  }
+
+  function handleDayClick(event: CustomEvent<{ date: string }>) {
+    const { date } = event.detail;
+    setTimeRange(date, date);
+    loadDetailPanels(keywords, date, date);
+  }
+
+  function handleSentimentFilter(event: CustomEvent<{ label: string }>) {
+    const { label } = event.detail;
+    const current = $investigationSelection.sentiment || [];
+    if (current.includes(label.toLowerCase())) {
+      setSentimentFilter(current.filter((s: string) => s !== label.toLowerCase()));
+    } else {
+      setSentimentFilter([...current, label.toLowerCase()]);
+    }
   }
 
   function toggleSourceEnabled(source: 'gdelt' | 'radio' | 'social') {
@@ -170,8 +312,16 @@
     setSourceFilter(active);
   }
 
-  function toggleRadioExpand(segmentId: string) {
-    expandedRadioId = expandedRadioId === segmentId ? null : segmentId;
+  function handleAddComponent(type: string) {
+    console.log('Add component:', type);
+    // Placeholder: future implementation for adding visualization components to Band D
+  }
+
+  function resetBrush() {
+    if (dateStart && dateEnd) {
+      setTimeRange(dateStart, dateEnd);
+      loadDetailPanels(keywords, dateStart, dateEnd);
+    }
   }
 
   function formatDate(dateStr: string): string {
@@ -187,50 +337,81 @@
     }
   }
 
-  function formatDateTime(dateStr: string): string {
-    if (!dateStr) return '';
+  // Annotations
+  let annotations: { id: string; text: string; timestamp: string }[] = [];
+  let newAnnotation = '';
+  let showAnnotations = false;
+  let saveStatus = '';
+
+  function addAnnotation() {
+    if (!newAnnotation.trim()) return;
+    annotations = [...annotations, {
+      id: crypto.randomUUID(),
+      text: newAnnotation.trim(),
+      timestamp: new Date().toISOString()
+    }];
+    newAnnotation = '';
+  }
+
+  function removeAnnotation(id: string) {
+    annotations = annotations.filter(a => a.id !== id);
+  }
+
+  async function handleSave() {
+    saveStatus = 'saving';
     try {
-      return new Date(dateStr).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+      await fetch('/api/investigations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: investigationId,
+          query_config: {
+            ...investigation?.query_config,
+            keywords,
+            dateStart,
+            dateEnd
+          },
+          annotations: JSON.stringify(annotations),
+          layout_config: JSON.stringify({ activeInsightSlots, sourcesEnabled })
+        })
       });
-    } catch {
-      return dateStr;
+      saveStatus = 'saved';
+      setTimeout(() => { saveStatus = ''; }, 2000);
+    } catch (error) {
+      console.error('Error saving investigation:', error);
+      saveStatus = 'error';
     }
   }
 
-  function getSentimentColor(sentiment: string): string {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive': return 'bg-emerald-100 text-emerald-800';
-      case 'negative': return 'bg-red-100 text-red-800';
-      case 'neutral': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+  async function handleExport() {
+    // Collect all visible data into a report object
+    const report = {
+      investigation: { name: investigation?.name, keywords, dateStart, dateEnd },
+      annotations,
+      summary: {
+        gdelt_events: gdeltEvents.length,
+        radio_segments: radioSegments.length,
+        social_posts: socialPosts.length,
+        timeline_days: timelineData.length
+      },
+      gdelt_sample: gdeltEvents.slice(0, 20),
+      radio_sample: radioSegments.slice(0, 10),
+      social_sample: socialPosts.slice(0, 20),
+      exported_at: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investigation-${investigation?.name?.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  function getGoldsteinColor(value: number): string {
-    if (value >= 5) return 'text-emerald-600';
-    if (value >= 0) return 'text-blue-600';
-    if (value >= -5) return 'text-amber-600';
-    return 'text-red-600';
-  }
-
-  function truncateText(text: string, maxLen: number): string {
-    if (!text || text.length <= maxLen) return text || '';
-    return text.substring(0, maxLen) + '...';
-  }
-
-  function handleExport() {
-    // Placeholder for export functionality
-    console.log('Export investigation:', investigationId);
-  }
-
-  function handleSave() {
-    // Placeholder for save functionality
-    console.log('Save investigation:', investigationId);
-  }
+  // Count of active panels for responsive grid
+  $: activePanelCount = [sourcesEnabled.gdelt, sourcesEnabled.radio, sourcesEnabled.social].filter(Boolean).length;
+  $: gridCols = activePanelCount === 3 ? 'lg:grid-cols-3' : activePanelCount === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-1';
 </script>
 
 <svelte:head>
@@ -246,46 +427,59 @@
     <span class="ml-3 text-gray-600">Loading investigation...</span>
   </div>
 {:else if investigation}
-  <!-- Band A: Header -->
+  <!-- Band A: Compact Header -->
   <div class="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
       <div class="flex items-start justify-between">
         <div class="flex-1 min-w-0">
           <div class="flex items-center space-x-3 mb-2">
             <button
               on:click={() => goto('/investigations')}
-              class="text-indigo-300 hover:text-white transition-colors"
+              class="text-indigo-300 hover:text-white transition-colors flex items-center gap-1 text-sm"
               aria-label="Back to investigations"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
+              <span class="hidden sm:inline">Investigations</span>
             </button>
-            <h1 class="text-2xl font-bold text-white truncate">{investigation.name}</h1>
+            <div class="w-px h-5 bg-white/20"></div>
+            <h1 class="text-xl font-bold text-white truncate">{investigation.name}</h1>
           </div>
 
           <div class="flex items-center flex-wrap gap-2">
-            <!-- Keywords -->
-            {#each (investigation.keywords || []) as keyword}
+            {#each keywords as keyword}
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/15 text-indigo-200">
                 {keyword}
               </span>
             {/each}
 
-            <!-- Date range -->
-            {#if investigation.date_start || investigation.date_end}
+            {#if dateStart || dateEnd}
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-slate-300 ml-2">
                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {formatDate(investigation.date_start)} - {formatDate(investigation.date_end)}
+                {formatDate(dateStart)} - {formatDate(dateEnd)}
               </span>
+            {/if}
+
+            <!-- Brush reset button (visible when time range differs from original) -->
+            {#if $investigationSelection.timeRange && ($investigationSelection.timeRange.start !== dateStart || $investigationSelection.timeRange.end !== dateEnd)}
+              <button
+                on:click={resetBrush}
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 transition-colors ml-1"
+              >
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset range
+              </button>
             {/if}
           </div>
         </div>
 
         <!-- Source toggles + actions -->
-        <div class="flex items-center space-x-4 ml-6">
+        <div class="flex items-center space-x-4 ml-6 flex-shrink-0">
           <div class="flex items-center space-x-2">
             <button
               on:click={() => toggleSourceEnabled('gdelt')}
@@ -307,247 +501,232 @@
             </button>
           </div>
 
-          <div class="flex items-center space-x-2">
-            <button
-              on:click={handleSave}
-              class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors"
-            >
-              Save
-            </button>
-            <button
-              on:click={handleExport}
-              class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-colors"
-            >
-              Export
-            </button>
-          </div>
+          <button
+            on:click={() => showAnnotations = !showAnnotations}
+            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors {showAnnotations ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+          >
+            Notes {annotations.length > 0 ? `(${annotations.length})` : ''}
+          </button>
+          <button
+            on:click={handleExport}
+            class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors"
+          >
+            Export
+          </button>
+          <button
+            on:click={handleSave}
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save'}
+          </button>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-    <!-- Band B: Timeline placeholder -->
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
-        <h2 class="text-sm font-semibold text-gray-700">Timeline</h2>
-      </div>
-      <div class="flex items-center justify-center h-[280px] bg-slate-50">
-        <div class="text-center">
-          <svg class="mx-auto w-10 h-10 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-          </svg>
-          <p class="text-sm text-slate-500 font-medium">Timeline visualization loading...</p>
-          <p class="text-xs text-slate-400 mt-1">
-            {#if investigation.date_start && investigation.date_end}
-              {formatDate(investigation.date_start)} &mdash; {formatDate(investigation.date_end)}
-            {:else}
-              No date range specified
-            {/if}
-          </p>
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Annotations Panel (collapsible) -->
+    {#if showAnnotations}
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <h3 class="text-sm font-semibold text-amber-800 mb-3">Research Notes</h3>
+        <div class="space-y-2 mb-3">
+          {#each annotations as annotation}
+            <div class="flex items-start gap-2 bg-white rounded-lg p-3 border border-amber-100">
+              <div class="flex-1">
+                <p class="text-sm text-gray-700">{annotation.text}</p>
+                <p class="text-xs text-gray-400 mt-1">{new Date(annotation.timestamp).toLocaleString()}</p>
+              </div>
+              <button on:click={() => removeAnnotation(annotation.id)} class="text-gray-400 hover:text-red-500 text-xs">✕</button>
+            </div>
+          {/each}
+          {#if annotations.length === 0}
+            <p class="text-xs text-amber-600">No notes yet. Add your research findings below.</p>
+          {/if}
         </div>
+        <div class="flex gap-2">
+          <input
+            bind:value={newAnnotation}
+            placeholder="Add a research note..."
+            class="flex-1 px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+            on:keydown={(e) => { if (e.key === 'Enter') addAnnotation(); }}
+          />
+          <button on:click={addAnnotation} class="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-500 transition-colors">
+            Add Note
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Band B: Swim-Lane Timeline -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700">Timeline</h2>
+        {#if $investigationSelection.timeRange}
+          <span class="text-xs text-gray-500">
+            Viewing: {formatDate($investigationSelection.timeRange.start)} - {formatDate($investigationSelection.timeRange.end)}
+          </span>
+        {/if}
+      </div>
+      <div class="p-2">
+        {#if timelineLoading}
+          <div class="flex items-center justify-center h-[280px]">
+            <svg class="animate-spin h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="ml-2 text-sm text-gray-500">Loading timeline...</span>
+          </div>
+        {:else}
+          <SwimLaneTimeline
+            data={timelineData}
+            height={280}
+            on:brushChange={handleBrushChange}
+            on:dayClick={handleDayClick}
+          />
+        {/if}
       </div>
     </div>
 
-    <!-- Band C: Three-column detail panels -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Band C: Three-column Detail Panels -->
+    <div class="grid grid-cols-1 {gridCols} gap-6" style="min-height: 500px;">
       <!-- Left: GDELT Events -->
       {#if sourcesEnabled.gdelt}
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-          <div class="px-5 py-3 border-b border-gray-100 bg-amber-50 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-amber-900 flex items-center">
-              <span class="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>
-              GDELT Events
-            </h2>
-            <span class="text-xs text-amber-600">{gdeltEvents.length} results</span>
-          </div>
-          <div class="flex-1 overflow-y-auto max-h-[500px]">
-            {#if gdeltLoading}
-              <div class="flex items-center justify-center py-12">
-                <svg class="animate-spin h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-              </div>
-            {:else if gdeltEvents.length === 0}
-              <div class="text-center py-12 px-4">
-                <p class="text-sm text-gray-500">No GDELT events found for these keywords.</p>
-              </div>
-            {:else}
-              <table class="w-full text-xs">
-                <thead class="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500">Date</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500">Actors</th>
-                    <th class="px-3 py-2 text-right font-medium text-gray-500">Gold.</th>
-                    <th class="px-3 py-2 text-right font-medium text-gray-500">Tone</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500">Location</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                  {#each gdeltEvents as event}
-                    <tr
-                      class="hover:bg-amber-50 cursor-pointer transition-colors {$investigationSelection.selectedIds.has(event.id) ? 'bg-amber-100' : ''}"
-                      on:click={() => selectGdeltEvent(event)}
-                    >
-                      <td class="px-3 py-2 text-gray-600 whitespace-nowrap">{formatDate(event.date)}</td>
-                      <td class="px-3 py-2 text-gray-900">
-                        <span class="truncate block max-w-[100px]" title="{event.actor1} / {event.actor2}">
-                          {event.actor1 || '?'} / {event.actor2 || '?'}
-                        </span>
-                      </td>
-                      <td class="px-3 py-2 text-right font-mono {getGoldsteinColor(event.goldstein_scale)}">
-                        {event.goldstein_scale?.toFixed(1) || '-'}
-                      </td>
-                      <td class="px-3 py-2 text-right font-mono text-gray-600">
-                        {event.avg_tone?.toFixed(1) || '-'}
-                      </td>
-                      <td class="px-3 py-2 text-gray-600">
-                        <span class="truncate block max-w-[80px]" title={event.location}>
-                          {event.location || '-'}
-                        </span>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            {/if}
-          </div>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: 600px;">
+          {#if gdeltLoading}
+            <div class="flex items-center justify-center flex-1 py-12">
+              <svg class="animate-spin h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span class="ml-2 text-sm text-gray-500">Loading GDELT events...</span>
+            </div>
+          {:else}
+            <GdeltEventPanel events={gdeltEvents} />
+          {/if}
         </div>
       {/if}
 
       <!-- Center: Radio Transcripts -->
       {#if sourcesEnabled.radio}
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-          <div class="px-5 py-3 border-b border-gray-100 bg-emerald-50 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-emerald-900 flex items-center">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
-              Radio Transcripts
-            </h2>
-            <span class="text-xs text-emerald-600">{radioSegments.length} results</span>
-          </div>
-          <div class="flex-1 overflow-y-auto max-h-[500px]">
-            {#if radioLoading}
-              <div class="flex items-center justify-center py-12">
-                <svg class="animate-spin h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-              </div>
-            {:else if radioSegments.length === 0}
-              <div class="text-center py-12 px-4">
-                <p class="text-sm text-gray-500">No radio transcripts found for these keywords.</p>
-              </div>
-            {:else}
-              <div class="divide-y divide-gray-100">
-                {#each radioSegments as segment}
-                  <button
-                    class="w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors"
-                    on:click={() => toggleRadioExpand(segment.id)}
-                  >
-                    <div class="flex items-center justify-between mb-1.5">
-                      <span class="text-xs font-semibold text-gray-900">{segment.station}</span>
-                      <div class="flex items-center space-x-2">
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {getSentimentColor(segment.sentiment)}">
-                          {segment.sentiment}
-                        </span>
-                        <span class="text-xs text-gray-400">{formatDateTime(segment.timestamp)}</span>
-                      </div>
-                    </div>
-                    <p class="text-xs text-gray-600 leading-relaxed">
-                      {#if expandedRadioId === segment.id}
-                        {segment.text}
-                      {:else}
-                        {truncateText(segment.text, 150)}
-                      {/if}
-                    </p>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: 600px;">
+          {#if radioLoading}
+            <div class="flex items-center justify-center flex-1 py-12">
+              <svg class="animate-spin h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span class="ml-2 text-sm text-gray-500">Loading radio segments...</span>
+            </div>
+          {:else}
+            <RadioTranscriptPanel segments={radioSegments} />
+          {/if}
         </div>
       {/if}
 
       <!-- Right: Social Posts -->
       {#if sourcesEnabled.social}
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-          <div class="px-5 py-3 border-b border-gray-100 bg-blue-50 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-blue-900 flex items-center">
-              <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-              Social Posts
-            </h2>
-            <span class="text-xs text-blue-600">{socialPosts.length} results</span>
-          </div>
-          <div class="flex-1 overflow-y-auto max-h-[500px]">
-            {#if socialLoading}
-              <div class="flex items-center justify-center py-12">
-                <svg class="animate-spin h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-              </div>
-            {:else if socialPosts.length === 0}
-              <div class="text-center py-12 px-4">
-                <p class="text-sm text-gray-500">No social posts found for these keywords.</p>
-              </div>
-            {:else}
-              <div class="divide-y divide-gray-100">
-                {#each socialPosts as post}
-                  <button
-                    class="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors {$investigationSelection.selectedIds.has(post.id) ? 'bg-blue-100' : ''}"
-                    on:click={() => selectSocialPost(post)}
-                  >
-                    <p class="text-xs text-gray-800 leading-relaxed mb-2">
-                      {truncateText(post.text, 200)}
-                    </p>
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center space-x-2">
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {getSentimentColor(post.sentiment)}">
-                          {post.sentiment}
-                        </span>
-                        <span class="text-xs text-gray-400 capitalize">{post.platform}</span>
-                      </div>
-                      <div class="flex items-center text-xs text-gray-400">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        {post.engagement || 0}
-                      </div>
-                    </div>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: 600px;">
+          {#if socialLoading}
+            <div class="flex items-center justify-center flex-1 py-12">
+              <svg class="animate-spin h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span class="ml-2 text-sm text-gray-500">Loading social posts...</span>
+            </div>
+          {:else}
+            <SocialPostPanel posts={socialPosts} />
+          {/if}
         </div>
       {/if}
     </div>
 
-    <!-- Band D: Insights placeholder -->
+    <!-- Band D: Insights -->
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50">
+      <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-gray-700">Insights</h2>
+        <button
+          on:click={() => paletteOpen = !paletteOpen}
+          class="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors {paletteOpen ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+        >
+          {paletteOpen ? 'Close Palette' : 'Add Visualization'}
+        </button>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-100">
-        {#each [1, 2, 3] as slot}
-          <div class="bg-white flex items-center justify-center py-16">
-            <button class="flex flex-col items-center text-gray-400 hover:text-indigo-500 transition-colors group">
-              <div class="w-12 h-12 rounded-xl border-2 border-dashed border-gray-300 group-hover:border-indigo-400 flex items-center justify-center mb-2 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+
+      <div class="flex">
+        <!-- Main insights area -->
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-100">
+          <!-- Sentiment Distribution (D3 donut chart) -->
+          <div class="bg-white p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sentiment Distribution</h3>
+            {#if gdeltLoading && radioLoading && socialLoading}
+              <div class="flex items-center justify-center h-48">
+                <svg class="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
               </div>
-              <span class="text-xs font-medium">Add visualization</span>
-            </button>
+            {:else}
+              <SentimentDistribution data={sentimentChartData} on:segmentClick={handleSentimentFilter} />
+            {/if}
           </div>
-        {/each}
+
+          <!-- Parallel Coordinates -->
+          <div class="bg-white p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Parallel Coordinates</h3>
+            {#if timelineData.length > 0}
+              <ParallelCoordinates data={timelineData} />
+            {:else}
+              <div class="flex items-center justify-center h-48 text-gray-400 text-sm">No timeline data for parallel coords</div>
+            {/if}
+          </div>
+
+          <!-- Lag Analysis -->
+          <div class="bg-white p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Lag / Lead Analysis</h3>
+            {#if timelineData.length > 2}
+              <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" />
+            {:else}
+              <div class="flex items-center justify-center h-48 text-gray-400 text-sm">Need 3+ days of data for lag analysis</div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Second insights row: Keyword Network + Word Cloud -->
+        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-100 border-t border-gray-100">
+          <div class="bg-white p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Keyword Network</h3>
+            {#if keywordData.length > 0}
+              <KeywordNetwork data={keywordData} />
+            {:else}
+              <div class="flex items-center justify-center h-48 text-gray-400 text-sm">No keyword overlap data</div>
+            {/if}
+          </div>
+          <div class="bg-white p-4">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Word Cloud</h3>
+            {#if wordCloudData.length > 0}
+              <WordCloudChart words={wordCloudData} />
+            {:else}
+              <div class="flex items-center justify-center h-48 text-gray-400 text-sm">No word data available</div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Component Palette sidebar -->
+        {#if paletteOpen}
+          <div class="w-72 border-l border-gray-200 bg-white flex-shrink-0">
+            <ComponentPalette onAddComponent={handleAddComponent} />
+          </div>
+        {/if}
       </div>
     </div>
   </div>
 {:else}
   <div class="flex items-center justify-center min-h-screen">
     <div class="text-center">
+      <svg class="mx-auto w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
       <h2 class="text-lg font-semibold text-gray-900 mb-2">Investigation not found</h2>
       <p class="text-gray-500 mb-4">The investigation you're looking for doesn't exist or has been deleted.</p>
       <button
