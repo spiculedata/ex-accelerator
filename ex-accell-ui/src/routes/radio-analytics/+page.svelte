@@ -161,9 +161,9 @@
         type: 'pie',
         radius: ['40%', '70%'],
         data: sentimentBreakdown.map(item => ({
-          name: item.sentiment_category,
-          value: item.post_count,
-          itemStyle: { color: colorMap[item.sentiment_category?.toLowerCase()] || '#8b5cf6' }
+          name: item.label || item.sentiment_category,
+          value: item.count || item.post_count,
+          itemStyle: { color: item.color || colorMap[(item.label || item.sentiment_category || '').toLowerCase()] || '#8b5cf6' }
         })),
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
