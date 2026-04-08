@@ -120,7 +120,20 @@ def get_args():
         help="wait time between consecutive retries in seconds (default: 60)",
     )
 
-    # Transcription model arguments
+    # Transcription backend
+    parser.add_argument(
+        "--transcription-backend",
+        type=str,
+        default="auto",
+        choices=["auto", "local", "scaleway-api", "scaleway-gpu"],
+        help=(
+            "Transcription backend: auto (detect GPU then API then CPU), "
+            "local (WhisperX on this machine), scaleway-api (managed Whisper API), "
+            "scaleway-gpu (on-demand L4 GPU instance). Default: auto"
+        ),
+    )
+
+    # Transcription model arguments (used by local backend)
     parser.add_argument(
         "--whisperx-model",
         type=str,
