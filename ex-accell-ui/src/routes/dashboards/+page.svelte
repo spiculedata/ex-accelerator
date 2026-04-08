@@ -47,8 +47,7 @@
     // Set workspace store from URL
     await setWorkspaceFromUrl($page.url);
 
-    // Load data after a brief delay to let FilterBar set initial params
-    setTimeout(() => loadDashboardData(), 300);
+    // Data loading is triggered by FilterBar's onReady callback (no need for setTimeout)
 
     // Auto refresh setup
     if (autoRefresh) {

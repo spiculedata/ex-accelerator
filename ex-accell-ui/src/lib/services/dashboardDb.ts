@@ -53,7 +53,7 @@ class DashboardDatabase extends BaseDatabaseService {
   /**
    * Get data sources with statistics
    */
-  async getDataSources(workspaceId?: string): Promise<DataSource[]> {
+  async getDataSources(workspaceId?: string, extraParams?: Record<string, string>): Promise<DataSource[]> {
     // Get platform performance stats
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance',

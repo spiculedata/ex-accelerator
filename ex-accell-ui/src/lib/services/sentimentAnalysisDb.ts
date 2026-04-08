@@ -155,7 +155,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get platform-specific sentiment performance
    */
-  async getPlatformSentimentPerformance(workspaceId?: string): Promise<PlatformPerformance[]> {
+  async getPlatformSentimentPerformance(workspaceId?: string, extraParams?: Record<string, string>): Promise<PlatformPerformance[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'platform-performance',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
@@ -205,7 +205,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get emotion correlations
    */
-  async getEmotionCorrelations(workspaceId?: string): Promise<EmotionCorrelation[]> {
+  async getEmotionCorrelations(workspaceId?: string, extraParams?: Record<string, string>): Promise<EmotionCorrelation[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'emotion-correlations',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
@@ -230,7 +230,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment distribution by time of day
    */
-  async getSentimentByTimeOfDay(workspaceId?: string): Promise<SentimentTrend[]> {
+  async getSentimentByTimeOfDay(workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'hourly-patterns',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...extraParams }
