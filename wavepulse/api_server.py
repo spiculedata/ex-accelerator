@@ -68,26 +68,32 @@ def start_wavepulse():
             try:
                 import sys
                 sys.path.insert(0, '/app/src')
-                from wavepulse import WavePulse
+                from wavepulse import start_observatory
 
                 # Build schedule from config
                 schedule = []
                 for stream in config.get('radioStreams', []):
-                    time_slots = [[ts.get('start', '00:00'), ts.get('end', '23:59')] for ts in stream.get('timeSlots', [])]
+                    time_slots = stream.get('time', [])
+                    if not time_slots:
+                        time_slots = [[ts.get('start', '00:00'), ts.get('end', '23:59')] for ts in stream.get('timeSlots', [])]
                     if not time_slots:
                         time_slots = [['00:00', '23:59']]
                     schedule.append({
                         'url': stream.get('url', ''),
-                        'radio_name': stream.get('radioName', 'Unknown'),
+                        'radio_name': stream.get('radio_name', stream.get('radioName', 'Unknown')),
                         'time': time_slots,
                         'state': stream.get('state', '')
                     })
 
-                # Save schedule
+                # Save schedule to the path wavepulse expects
                 schedule_path = Path('/app/assets/active_schedule.json')
                 schedule_path.write_text(json.dumps(schedule, indent=2))
 
-                # Configure WavePulse
+                # Also save as weekly_schedule.json (default schedule file)
+                weekly_path = Path('/app/assets/weekly_schedule.json')
+                weekly_path.write_text(json.dumps(schedule, indent=2))
+
+                # Configure environment
                 os.environ['DEVICE'] = config.get('device', os.environ.get('DEVICE', 'cpu'))
                 os.environ['COMPUTE_TYPE'] = config.get('computeType', os.environ.get('COMPUTE_TYPE', 'float32'))
 
@@ -96,9 +102,8 @@ def start_wavepulse():
                 if config.get('geminiApiKey'):
                     os.environ['GEMINI_API_KEY'] = config['geminiApiKey']
 
-                # Start recording
-                wp = WavePulse()
-                wp.start(schedule_path=str(schedule_path))
+                # Start the observatory (recording + transcription + classification)
+                start_observatory()
 
             except ImportError as e:
                 # WavePulse module not fully available — run in recording-only mode

@@ -8,6 +8,7 @@ loguru>=0.7
 pyyaml>=6.0
 requests>=2.31
 tqdm>=4.66
+pytz>=2024.1
 
 # Audio processing
 ffmpeg-python
@@ -17,11 +18,16 @@ m3u8>=5.0
 
 # Transcription
 faster-whisper>=1.0.0
+whisperx
 
 # NLP
 nltk>=3.8
 transformers>=4.40
 sentencepiece>=0.2
+scikit-learn
+
+# Web scraping (fact-checker)
+scrapy
 
 # AI APIs (optional)
 google-generativeai>=0.6
