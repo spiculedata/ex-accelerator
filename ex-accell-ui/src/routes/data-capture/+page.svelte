@@ -1460,18 +1460,18 @@
     <!-- Background pattern -->
     <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
     
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Data Capture & Collection</h1>
-            <p class="text-slate-300 text-lg font-medium">Web Crawling • File Upload • Smart Data Integration</p>
-            <div class="flex items-center mt-3 space-x-4">
+            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Data Capture & Collection</h1>
+            <p class="text-slate-300 text-sm font-medium">Web Crawling • File Upload • Smart Data Integration</p>
+            <div class="flex items-center mt-2 space-x-4">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 🌐 Multi-Platform
               </span>

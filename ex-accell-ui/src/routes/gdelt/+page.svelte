@@ -1138,17 +1138,17 @@
 		<!-- Background pattern -->
 		<div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
 		
-		<div class="relative max-w-7xl xl:max-w-full 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-12 xl:py-16">
+		<div class="relative max-w-7xl xl:max-w-full 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 py-5 xl:py-8">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center">
-					<div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-						<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
+						<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
 						</svg>
 					</div>
 					<div>
-						<h1 class="text-4xl xl:text-5xl 2xl:text-6xl font-bold text-white mb-2 xl:mb-4">GDELT World Events</h1>
-						<p class="text-lg xl:text-xl 2xl:text-2xl text-slate-300">
+						<h1 class="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white mb-1 xl:mb-2">GDELT World Events</h1>
+						<p class="text-sm xl:text-base 2xl:text-lg text-slate-300">
 							Real-time global events visualization powered by GDELT database
 						</p>
 					</div>

@@ -52,27 +52,27 @@
       <!-- Background pattern -->
       <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
       
-      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         <div class="flex items-center justify-between">
           <div class="flex items-center">
-            <button 
+            <button
               on:click={() => goto('/text-analytics')}
-              class="mr-6 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm"
+              class="mr-4 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm"
               aria-label="Go back to Text Analytics">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
               </svg>
             </button>
-            <div class="w-16 h-16 bg-gradient-to-br from-blue-400 to-red-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-red-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
               </svg>
             </div>
             <div>
-              <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Jupyter Lab</h1>
-              <p class="text-slate-300 text-lg font-medium">Interactive Python environment for text analytics research and data science</p>
+              <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Jupyter Lab</h1>
+              <p class="text-slate-300 text-sm font-medium">Interactive Python environment for text analytics research and data science</p>
               {#if $currentProject}
-                <div class="flex items-center mt-3">
+                <div class="flex items-center mt-2">
                   <span class="text-sm text-slate-400">Project:</span>
                   <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                     {$currentProject.name}

@@ -515,20 +515,20 @@
     <!-- Background pattern -->
     <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
     
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
-          <div class="w-16 h-16 bg-gradient-to-br from-violet-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-10 h-10 bg-gradient-to-br from-violet-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
           </div>
           <div>
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">Interactive Dashboards</h1>
-            <p class="text-slate-300 text-lg font-medium">
+            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Interactive Dashboards</h1>
+            <p class="text-slate-300 text-sm font-medium">
               {workspaceId ? 'Workspace-scoped analytics and insights' : 'Comprehensive analytics and insights across all your social media data sources'}
             </p>
-            <div class="flex items-center mt-3 space-x-3">
+            <div class="flex items-center mt-2 space-x-3">
               {#if $currentProject}
                 <div class="flex items-center">
                   <span class="text-sm text-slate-400">Project:</span>
