@@ -26,7 +26,11 @@ async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
       'similarity_score', 'weight', 'size', 'coherence_score', 'rank_position',
       'confidence', 'confidence_score', 'intensity_score',
       'avg_negative_percentage', 'avg_neutral_percentage',
-      'record_count', 'health'
+      'record_count', 'health',
+      'total_transcripts', 'total_seconds', 'station_count', 'avg_duration',
+      'political_count', 'ad_count', 'transcript_count', 'positive_count',
+      'negative_count', 'neutral_count', 'avg_relevance', 'word_count',
+      'duration_seconds', 'avg_confidence'
     ]);
 
     return rows.map(row => {
@@ -1388,6 +1392,170 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       });
     }
     
+    // ========== Radio Analytics Handlers ==========
+
+    if (type === 'radio-overview') {
+      try {
+        const data = await executeQuery(`
+          SELECT COUNT(*) as total_transcripts,
+                 COALESCE(SUM(duration_seconds), 0) as total_seconds,
+                 COUNT(DISTINCT radio_name) as station_count,
+                 COALESCE(AVG(duration_seconds), 0) as avg_duration,
+                 COUNT(*) FILTER (WHERE is_political = true) as political_count,
+                 COUNT(*) FILTER (WHERE is_ad = true) as ad_count
+          FROM radio_transcripts
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio overview query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-sentiment') {
+      try {
+        const data = await executeQuery(`
+          SELECT sentiment as sentiment_category,
+                 COUNT(*) as post_count,
+                 AVG(confidence) as avg_confidence
+          FROM radio_transcripts
+          WHERE sentiment IS NOT NULL
+          GROUP BY sentiment ORDER BY post_count DESC
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio sentiment query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-by-station') {
+      try {
+        const data = await executeQuery(`
+          SELECT radio_name, state, COUNT(*) as transcript_count,
+                 COALESCE(SUM(duration_seconds), 0) as total_seconds,
+                 COUNT(*) FILTER (WHERE sentiment = 'positive') as positive_count,
+                 COUNT(*) FILTER (WHERE sentiment = 'negative') as negative_count,
+                 COUNT(*) FILTER (WHERE sentiment = 'neutral') as neutral_count,
+                 COUNT(*) FILTER (WHERE is_political = true) as political_count
+          FROM radio_transcripts GROUP BY radio_name, state ORDER BY transcript_count DESC
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio by-station query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-trends') {
+      try {
+        const data = await executeQuery(`
+          SELECT DATE(segment_start) as date,
+                 COUNT(*) FILTER (WHERE sentiment = 'positive') as positive,
+                 COUNT(*) FILTER (WHERE sentiment = 'negative') as negative,
+                 COUNT(*) FILTER (WHERE sentiment = 'neutral') as neutral,
+                 COUNT(*) as total
+          FROM radio_transcripts
+          WHERE segment_start IS NOT NULL
+          GROUP BY DATE(segment_start) ORDER BY date DESC LIMIT 30
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio trends query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-topics') {
+      try {
+        const data = await executeQuery(`
+          SELECT topic, COUNT(*) as count, AVG(relevance) as avg_relevance
+          FROM radio_topics GROUP BY topic ORDER BY count DESC LIMIT 20
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio topics query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-political') {
+      try {
+        const data = await executeQuery(`
+          SELECT
+            CASE WHEN is_political = true AND is_ad = true THEN 'political_ad'
+                 WHEN is_political = true THEN 'political_news'
+                 ELSE 'apolitical' END as category,
+            COUNT(*) as count
+          FROM radio_transcripts GROUP BY category ORDER BY count DESC
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio political query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-transcripts') {
+      try {
+        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const offset = parseInt(url.searchParams.get('offset') || '0');
+        const search = url.searchParams.get('search');
+        const political = url.searchParams.get('political');
+
+        const conditions: string[] = [];
+        const params: any[] = [];
+        let paramIndex = 1;
+
+        if (search) {
+          conditions.push(`transcript ILIKE $${paramIndex}`);
+          params.push(`%${search}%`);
+          paramIndex++;
+        }
+
+        if (political !== null && political !== '') {
+          conditions.push(`is_political = $${paramIndex}`);
+          params.push(political === 'true');
+          paramIndex++;
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+        params.push(limit);
+        const limitParam = `$${paramIndex}`;
+        paramIndex++;
+        params.push(offset);
+        const offsetParam = `$${paramIndex}`;
+
+        const data = await executeQuery(`
+          SELECT id, radio_name, state, segment_start, segment_end, duration_seconds,
+                 LEFT(transcript, 300) as transcript, is_political, is_ad,
+                 sentiment, emotion, confidence, word_count, topics
+          FROM radio_transcripts
+          ${whereClause}
+          ORDER BY segment_start DESC LIMIT ${limitParam} OFFSET ${offsetParam}
+        `, params);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio transcripts query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'radio-wordcloud') {
+      try {
+        const data = await executeQuery(`
+          SELECT unnest(topics) as word, COUNT(*) as count
+          FROM radio_transcripts WHERE topics IS NOT NULL
+          GROUP BY word ORDER BY count DESC LIMIT 50
+        `);
+        return json({ success: true, data });
+      } catch (err) {
+        console.error('Radio wordcloud query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
     // Default response for unsupported query types
     return json({
       success: true,
@@ -1397,7 +1565,15 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         test: '/api/unified-analytics?type=test',
         datasets: '/api/unified-analytics?type=datasets',
         'cross-platform-sentiment': '/api/unified-analytics?type=cross-platform-sentiment',
-        'sentiment-trends': '/api/unified-analytics?type=sentiment-trends'
+        'sentiment-trends': '/api/unified-analytics?type=sentiment-trends',
+        'radio-overview': '/api/unified-analytics?type=radio-overview',
+        'radio-sentiment': '/api/unified-analytics?type=radio-sentiment',
+        'radio-by-station': '/api/unified-analytics?type=radio-by-station',
+        'radio-trends': '/api/unified-analytics?type=radio-trends',
+        'radio-topics': '/api/unified-analytics?type=radio-topics',
+        'radio-political': '/api/unified-analytics?type=radio-political',
+        'radio-transcripts': '/api/unified-analytics?type=radio-transcripts',
+        'radio-wordcloud': '/api/unified-analytics?type=radio-wordcloud'
       }
     });
   } catch (err) {

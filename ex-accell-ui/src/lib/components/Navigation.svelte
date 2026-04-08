@@ -219,7 +219,8 @@
         { name: 'Engagement', href: '/text-analytics/engagement-analysis', requiresProject: false, useWorkspace: true },
         { name: 'Hashtags', href: '/text-analytics/hashtag-analysis', requiresProject: false, useWorkspace: true },
         { name: 'Trigrams', href: '/text-analytics/trigrams', requiresProject: false, useWorkspace: true },
-        { name: 'Correlation', href: '/analytics-correlation', requiresProject: false, useWorkspace: true }
+        { name: 'Correlation', href: '/analytics-correlation', requiresProject: false, useWorkspace: true },
+        { name: 'Radio Analytics', href: '/radio-analytics', requiresProject: false, useWorkspace: true }
       ]
     },
     {

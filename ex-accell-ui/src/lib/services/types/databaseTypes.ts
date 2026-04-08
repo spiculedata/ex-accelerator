@@ -413,3 +413,58 @@ export type Optional<T> = T | undefined;
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
 };
+
+// Radio Analytics Types
+export interface RadioOverviewStats {
+  totalTranscripts: number;
+  totalHours: number;
+  stationCount: number;
+  avgDuration: number;
+  politicalPercent: number;
+  adPercent: number;
+}
+
+export interface StationStats {
+  radioName: string;
+  state: string;
+  transcriptCount: number;
+  totalHours: number;
+  positiveCount: number;
+  negativeCount: number;
+  neutralCount: number;
+  politicalCount: number;
+}
+
+export interface RadioTranscript {
+  id: number;
+  radioName: string;
+  state: string;
+  segmentStart: string;
+  segmentEnd: string;
+  durationSeconds: number;
+  transcript: string;
+  isPolitical: boolean;
+  isAd: boolean;
+  sentiment: string;
+  emotion: string;
+  confidence: number;
+  wordCount: number;
+  topics: string[];
+}
+
+export interface PoliticalStats {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface WordFrequency {
+  word: string;
+  count: number;
+}
+
+export interface RadioTopic {
+  topic: string;
+  count: number;
+  avgRelevance: number;
+}
