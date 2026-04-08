@@ -448,7 +448,7 @@
           </div>
 
           <div class="flex items-center flex-wrap gap-2">
-            {#each keywords as keyword}
+            {#each keywords as keyword, i (i)}
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/15 text-indigo-200">
                 {keyword}
               </span>
@@ -530,7 +530,7 @@
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
         <h3 class="text-sm font-semibold text-amber-800 mb-3">Research Notes</h3>
         <div class="space-y-2 mb-3">
-          {#each annotations as annotation}
+          {#each annotations as annotation (annotation.id)}
             <div class="flex items-start gap-2 bg-white rounded-lg p-3 border border-amber-100">
               <div class="flex-1">
                 <p class="text-sm text-gray-700">{annotation.text}</p>
