@@ -70,8 +70,10 @@ jobs:
 
             # Pull latest compose file and deploy configs from the deployed branch
             git fetch origin
+            git stash --include-untracked || true
             git checkout ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
+            git stash pop || true
 
             # Log in to Scaleway registry
             echo "${{ secrets.SCW_SECRET_KEY }}" | \
