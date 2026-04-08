@@ -142,8 +142,8 @@ def get_args():
     parser.add_argument(
         "--whisperx-compute-type",
         type=str,
-        default="float16",
-        help="whisper model to use for transcription (default: float16)",
+        default="float32",
+        help="whisper compute type for transcription (default: float32 for CPU compatibility)",
     )
 
     parser.add_argument(
