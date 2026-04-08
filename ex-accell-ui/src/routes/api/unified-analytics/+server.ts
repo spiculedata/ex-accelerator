@@ -195,22 +195,49 @@ export const GET: RequestHandler = async ({ url }) => {
     
     if (type === 'sentiment-trends') {
       try {
-        const timeRange = url.searchParams.get('timeRange') || '7d';
-        const days = timeRange === '30d' ? 30 : timeRange === '14d' ? 14 : 7;
-        
+        const timeRange = url.searchParams.get('timeRange') || '30d';
+        const days = timeRange === '90d' ? 90 : timeRange === '30d' ? 30 : timeRange === '14d' ? 14 : 7;
+
+        // Build platform filter
+        const conditions: string[] = [];
+        const params: any[] = [days];
+        let paramIndex = 2;
+
+        const explicitPlatforms = url.searchParams.get('platforms');
+        if (explicitPlatforms !== null) {
+          const platformList = explicitPlatforms.split(',').filter(p => p.trim());
+          if (platformList.length > 0) {
+            conditions.push(`LOWER(platform) = ANY($${paramIndex})`);
+            params.push(platformList.map(p => p.toLowerCase()));
+            paramIndex++;
+          }
+        } else {
+          const platformFilter = buildPlatformFilter(scope, paramIndex);
+          if (platformFilter) {
+            conditions.push(platformFilter.clause);
+            params.push(...platformFilter.params);
+            paramIndex = platformFilter.nextIndex;
+          }
+        }
+
+        const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
+
+        // Query live data from posts_with_sentiment instead of stale pre-aggregated table
         const data = await executeQuery(`
           SELECT
-            DATE(stt.analysis_date) as date,
-            SUM(stt.positive_count) as positive,
-            SUM(stt.negative_count) as negative,
-            SUM(stt.neutral_count) as neutral,
-            SUM(stt.total_posts) as total_posts
-          FROM sentiment_temporal_trends stt
-          GROUP BY DATE(stt.analysis_date)
-          ORDER BY DATE(stt.analysis_date) DESC
-          LIMIT $1
-        `, [days]);
-        
+            DATE(to_timestamp(timestamp/1000)) as date,
+            COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) as positive,
+            COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) as negative,
+            COUNT(*) FILTER (WHERE sentiment_category = 'Neutral') as neutral,
+            COUNT(*) as total_posts
+          FROM posts_with_sentiment
+          WHERE timestamp IS NOT NULL
+            AND DATE(to_timestamp(timestamp/1000)) >= CURRENT_DATE - $1::integer
+            ${whereClause}
+          GROUP BY DATE(to_timestamp(timestamp/1000))
+          ORDER BY date
+        `, params);
+
         return json({ success: true, data });
       } catch (error) {
         console.error('Sentiment trends query failed:', error);

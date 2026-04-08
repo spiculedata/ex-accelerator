@@ -91,7 +91,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   async getSentimentTrends(timeRange: string = '7d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
-      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange }
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange, ...extraParams }
     });
 
     if (!data || data.length === 0) {
