@@ -33,7 +33,7 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	const margin = { top: 10, right: 20, bottom: 30, left: 60 };
+	const margin = { top: 20, right: 20, bottom: 30, left: 60 };
 	const laneGap = 8;
 
 	const colors = {
@@ -101,19 +101,18 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#f8fafc')
+			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
-		// Lane label
+		// Lane label (above lane)
 		gdeltGroup
 			.append('text')
-			.attr('x', -8)
-			.attr('y', laneHeight / 2)
-			.attr('text-anchor', 'end')
-			.attr('dominant-baseline', 'middle')
-			.attr('font-size', '11px')
+			.attr('x', 4)
+			.attr('y', -4)
+			.attr('text-anchor', 'start')
+			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#475569')
+			.attr('fill', '#94a3b8')
 			.text('GDELT');
 
 		// Bars
@@ -173,7 +172,7 @@
 			.append('g')
 			.call(gdeltAxis)
 			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#e2e8f0').attr('stroke-dasharray', '2,2'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
 			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
 
 		// ---- LANE 2: Radio ----
@@ -187,18 +186,17 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#f8fafc')
+			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
 		radioGroup
 			.append('text')
-			.attr('x', -8)
-			.attr('y', laneHeight / 2)
-			.attr('text-anchor', 'end')
-			.attr('dominant-baseline', 'middle')
-			.attr('font-size', '11px')
+			.attr('x', 4)
+			.attr('y', -4)
+			.attr('text-anchor', 'start')
+			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#475569')
+			.attr('fill', '#94a3b8')
 			.text('Radio');
 
 		// Stacked area for radio
@@ -237,7 +235,7 @@
 			.append('g')
 			.call(radioAxis)
 			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#e2e8f0').attr('stroke-dasharray', '2,2'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
 			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
 
 		// ---- LANE 3: Social ----
@@ -251,18 +249,17 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#f8fafc')
+			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
 		socialGroup
 			.append('text')
-			.attr('x', -8)
-			.attr('y', laneHeight / 2)
-			.attr('text-anchor', 'end')
-			.attr('dominant-baseline', 'middle')
-			.attr('font-size', '11px')
+			.attr('x', 4)
+			.attr('y', -4)
+			.attr('text-anchor', 'start')
+			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#475569')
+			.attr('fill', '#94a3b8')
 			.text('Social');
 
 		// Stacked area for social
@@ -301,7 +298,7 @@
 			.append('g')
 			.call(socialAxis)
 			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#e2e8f0').attr('stroke-dasharray', '2,2'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
 			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
 
 		// ---- SHARED X AXIS ----
@@ -314,9 +311,9 @@
 					.ticks(d3.timeDay.every(Math.max(1, Math.floor(parsedData.length / 8))) ?? 7)
 					.tickFormat((d) => d3.timeFormat('%b %d')(d as Date))
 			)
-			.call((g2) => g2.select('.domain').attr('stroke', '#cbd5e1'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '10px'))
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#cbd5e1'));
+			.call((g2) => g2.select('.domain').attr('stroke', '#475569'))
+			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
 
 		// ---- BRUSH ----
 		const brush = d3
@@ -381,8 +378,8 @@
 					const dateStr = d3.timeFormat('%B %d, %Y')(closest.parsedDate);
 					const goldsteinSign = closest.gdelt_avg_goldstein >= 0 ? '+' : '';
 					tooltipEl.innerHTML = `
-						<div class="font-semibold text-gray-900 mb-1">${dateStr}</div>
-						<div class="text-sm text-gray-600">
+						<div class="font-semibold text-white mb-1">${dateStr}</div>
+						<div class="text-sm text-slate-300">
 							<div class="flex items-center gap-1.5 mb-0.5">
 								<span class="inline-block w-2 h-2 rounded-sm" style="background:${colors.gdeltBar}"></span>
 								GDELT: ${formatNumber(closest.gdelt_events)} events (Goldstein: ${goldsteinSign}${closest.gdelt_avg_goldstein.toFixed(1)})
@@ -448,7 +445,7 @@
 		<svg bind:this={svg} width={effectiveWidth} {height} class="w-full"></svg>
 		<div
 			bind:this={tooltipEl}
-			class="absolute pointer-events-none bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-xs transition-opacity duration-150 z-10"
+			class="absolute pointer-events-none bg-slate-800 border border-slate-600 rounded-lg shadow-xl px-3 py-2 text-xs transition-opacity duration-150 z-10"
 			style="opacity: 0; max-width: 340px;"
 		></div>
 	{/if}

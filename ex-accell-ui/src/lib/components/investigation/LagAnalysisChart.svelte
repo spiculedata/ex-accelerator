@@ -193,10 +193,10 @@
 					.attr('y1', yScale(slope * x1 + intercept))
 					.attr('x2', xScale(x2))
 					.attr('y2', yScale(slope * x2 + intercept))
-					.attr('stroke', '#f59e0b')
-					.attr('stroke-width', 1.5)
+					.attr('stroke', '#fbbf24')
+					.attr('stroke-width', 2)
 					.attr('stroke-dasharray', '6,3')
-					.attr('opacity', 0.6);
+					.attr('opacity', 0.7);
 			}
 		}
 
@@ -206,11 +206,11 @@
 			.append('circle')
 			.attr('cx', (d: any) => xScale(d.a))
 			.attr('cy', (d: any) => yScale(d.b))
-			.attr('r', 5)
+			.attr('r', 6)
 			.attr('fill', (_: any, i: number) => colorScale(i))
-			.attr('stroke', '#1e293b')
-			.attr('stroke-width', 1)
-			.attr('opacity', 0.8)
+			.attr('stroke', '#0f172a')
+			.attr('stroke-width', 1.5)
+			.attr('opacity', 0.85)
 			.style('cursor', 'pointer')
 			.on('mouseenter', function (event: MouseEvent, d: any) {
 				d3.select(this).attr('r', 8).attr('opacity', 1);
@@ -252,7 +252,7 @@
 			.attr('x', innerWidth - 8)
 			.attr('y', 22)
 			.attr('text-anchor', 'end')
-			.attr('fill', '#64748b')
+			.attr('fill', '#cbd5e1')
 			.attr('font-size', '11px')
 			.text(
 				`${sourceLabels[sourceA] ?? sourceA} → ${sourceLabels[sourceB] ?? sourceB} (lag: ${lagLabel})`

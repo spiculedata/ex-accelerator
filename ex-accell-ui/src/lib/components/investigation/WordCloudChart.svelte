@@ -50,7 +50,7 @@
 			.range(colors);
 
 		const layoutWords = words.map((w) => ({
-			text: w.text,
+			text: w.text.replace(/%/g, '').trim(),
 			size: fontScale(w.size),
 			rawSize: w.size
 		}));
@@ -84,7 +84,8 @@
 				.attr('font-family', 'Inter, system-ui, sans-serif')
 				.attr('font-weight', (d: any) => (d.size > 36 ? '700' : '500'))
 				.attr('fill', (d: any) => colorScale(d.text))
-				.attr('opacity', 0.85)
+				.attr('opacity', 0.9)
+				.attr('stroke', 'none')
 				.style('cursor', 'pointer')
 				.text((d: any) => d.text)
 				.on('mouseenter', function (event: MouseEvent, d: any) {
@@ -94,7 +95,7 @@
 				.on('mousemove', (event: MouseEvent) => moveTooltip(event))
 				.on('mouseleave', function (event: MouseEvent, d: any) {
 					d3.select(this)
-						.attr('opacity', 0.85)
+						.attr('opacity', 0.9)
 						.attr('font-weight', d.size > 36 ? '700' : '500');
 					hideTooltip();
 				})

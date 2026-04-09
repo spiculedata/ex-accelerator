@@ -13,16 +13,16 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	const margin = { top: 40, right: 30, bottom: 20, left: 30 };
+	const margin = { top: 50, right: 40, bottom: 20, left: 40 };
 	const height = 420;
 
 	const axisConfig: { key: string; label: string; domain: [number, number] | null }[] = [
-		{ key: 'gdelt_events', label: 'GDELT Events', domain: null },
-		{ key: 'gdelt_avg_goldstein', label: 'GDELT Goldstein', domain: [-10, 10] },
-		{ key: 'radio_volume', label: 'Radio Volume', domain: null },
-		{ key: 'radio_sentiment', label: 'Radio Sentiment', domain: [-1, 1] },
-		{ key: 'social_volume', label: 'Social Volume', domain: null },
-		{ key: 'social_sentiment', label: 'Social Sentiment', domain: [-1, 1] }
+		{ key: 'gdelt_events', label: 'GDELT Evt', domain: null },
+		{ key: 'gdelt_avg_goldstein', label: 'Goldstein', domain: [-10, 10] },
+		{ key: 'radio_volume', label: 'Radio Vol', domain: null },
+		{ key: 'radio_sentiment', label: 'Radio Sent', domain: [-1, 1] },
+		{ key: 'social_volume', label: 'Social Vol', domain: null },
+		{ key: 'social_sentiment', label: 'Social Sent', domain: [-1, 1] }
 	];
 
 	onMount(() => {
@@ -182,12 +182,13 @@
 
 			axisG
 				.append('text')
-				.attr('y', -14)
+				.attr('y', -12)
 				.attr('x', 0)
-				.attr('text-anchor', 'middle')
+				.attr('text-anchor', 'end')
 				.attr('fill', '#e2e8f0')
-				.attr('font-size', '11px')
+				.attr('font-size', '8px')
 				.attr('font-weight', '600')
+				.attr('transform', 'rotate(-45, 0, -12)')
 				.text(axis.label);
 
 			const brushWidth = 24;
