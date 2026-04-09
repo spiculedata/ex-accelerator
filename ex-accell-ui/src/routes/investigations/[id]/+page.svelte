@@ -635,8 +635,8 @@
       </div>
     {/if}
 
-    <!-- ============ TIMELINE (h-48) ============ -->
-    <div class="h-48 flex-shrink-0 bg-slate-900 border-b border-slate-700/50">
+    <!-- ============ TIMELINE ============ -->
+    <div class="h-40 flex-shrink-0 bg-slate-900 border-b border-slate-700/50">
       <div class="h-full flex flex-col">
         <div class="px-3 py-1 flex items-center justify-between border-b border-slate-800/50">
           <div class="flex items-center gap-2">
@@ -660,7 +660,7 @@
           {:else}
             <SwimLaneTimeline
               data={timelineData}
-              height={160}
+              height={128}
               on:brushChange={handleBrushChange}
               on:dayClick={handleDayClick}
             />
@@ -886,7 +886,7 @@
       </button>
 
       {#if !insightsCollapsed}
-        <div class="h-52 flex gap-px p-1">
+        <div class="h-40 flex gap-px p-1">
           <!-- Sentiment Donut -->
           <div class="flex-1 bg-slate-900 border border-slate-700/30 rounded flex flex-col min-w-0">
             <div class="px-2 py-1 border-b border-slate-800/50">
