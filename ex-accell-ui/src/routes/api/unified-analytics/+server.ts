@@ -1637,16 +1637,19 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT DISTINCT ON (globaleventid) globaleventid, sqldate, actor1name, actor2name,
-            eventcode, goldsteinscale, nummentions, avgtone,
-            actor1countrycode, actor2countrycode,
-            actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
-          FROM gdelt_events
-          WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
-            AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
-            AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
-                 OR actiongeo_fullname ILIKE ANY($3::text[]))
-          ORDER BY globaleventid, sqldate DESC, nummentions DESC
+          SELECT * FROM (
+            SELECT DISTINCT ON (globaleventid) globaleventid, sqldate, actor1name, actor2name,
+              eventcode, goldsteinscale, nummentions, avgtone,
+              actor1countrycode, actor2countrycode,
+              actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
+            FROM gdelt_events
+            WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
+              AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
+              AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
+                   OR actiongeo_fullname ILIKE ANY($3::text[]))
+            ORDER BY globaleventid
+          ) deduped
+          ORDER BY sqldate DESC, nummentions DESC
           LIMIT $4
         `, [dateStart, dateEnd, keywordsArray, limit]);
 
@@ -1770,7 +1773,11 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
           ORDER BY keyword, source
         `, [dateStart, dateEnd, keywordsArray]);
 
-        return json({ success: true, data });
+        const cleanedData = (data || []).map((row: Record<string, unknown>) => ({
+          ...row,
+          keyword: (String(row.keyword || '')).replace(/%/g, '')
+        }));
+        return json({ success: true, data: cleanedData });
       } catch (err) {
         console.error('Investigation keyword overlap query failed:', err);
         return json({ success: true, data: [] });

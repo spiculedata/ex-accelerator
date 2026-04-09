@@ -353,6 +353,19 @@
     }
   }
 
+  function formatPostDate(timestamp: string | number | undefined): string {
+    if (!timestamp) return '';
+    const ts = typeof timestamp === 'number' ? timestamp : parseInt(String(timestamp));
+    if (!isNaN(ts) && ts > 1e12) {
+      return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    if (!isNaN(ts) && ts > 1e9) {
+      return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    const d = new Date(String(timestamp));
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
   function goldsteinColor(val: number): string {
     if (val >= 5) return 'bg-emerald-600/80 text-emerald-100';
     if (val >= 2) return 'bg-emerald-700/60 text-emerald-200';
@@ -688,7 +701,7 @@
                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                 <span class="text-xs font-semibold text-slate-200">GDELT Events</span>
               </div>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-400 rounded">{gdeltEvents.length}</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-400 rounded">{gdeltEvents.length >= 100 ? '100+' : gdeltEvents.length}</span>
             </div>
             <div class="flex-1 overflow-y-auto min-h-0">
               <!-- Compact GDELT table -->
@@ -825,7 +838,7 @@
                 <span class="w-2 h-2 rounded-full bg-sky-500"></span>
                 <span class="text-xs font-semibold text-slate-200">Social Posts</span>
               </div>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-sky-500/20 text-sky-400 rounded">{socialPosts.length}</span>
+              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-sky-500/20 text-sky-400 rounded">{socialPosts.length >= 100 ? '100+' : socialPosts.length}</span>
             </div>
             <div class="flex-1 overflow-y-auto min-h-0">
               {#each socialPosts as post}
@@ -842,7 +855,7 @@
                         <span class="text-[10px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
                       {/if}
                       {#if post.timestamp}
-                        <span class="text-[10px] font-mono text-slate-600">{formatDateCompact(post.timestamp)}</span>
+                        <span class="text-[10px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
                       {/if}
                     </div>
                   </div>
