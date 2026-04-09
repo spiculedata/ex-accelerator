@@ -479,7 +479,7 @@
     </div>
   </div>
 {:else if investigation}
-  <div class="h-screen flex flex-col bg-slate-950 overflow-hidden">
+  <div class="h-[calc(100vh-48px)] flex flex-col bg-slate-950 overflow-hidden">
 
     <!-- ============ HEADER BAR (h-12) ============ -->
     <div class="h-12 flex-shrink-0 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700/50 flex items-center px-3 gap-3">
