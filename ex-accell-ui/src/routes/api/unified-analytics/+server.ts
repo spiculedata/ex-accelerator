@@ -1637,7 +1637,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT globaleventid, sqldate, actor1name, actor2name,
+          SELECT DISTINCT ON (globaleventid) globaleventid, sqldate, actor1name, actor2name,
             eventcode, goldsteinscale, nummentions, avgtone,
             actor1countrycode, actor2countrycode,
             actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
@@ -1646,7 +1646,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
             AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
             AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
                  OR actiongeo_fullname ILIKE ANY($3::text[]))
-          ORDER BY sqldate DESC, nummentions DESC
+          ORDER BY globaleventid, sqldate DESC, nummentions DESC
           LIMIT $4
         `, [dateStart, dateEnd, keywordsArray, limit]);
 

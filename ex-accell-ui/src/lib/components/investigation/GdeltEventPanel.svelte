@@ -113,7 +113,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each filteredEvents as event (event.globaleventid)}
+          {#each filteredEvents as event, idx}
             <tr
               class="border-b border-gray-100 cursor-pointer transition-all duration-150
                 {isSelected(event) ? 'bg-blue-50' : ''}

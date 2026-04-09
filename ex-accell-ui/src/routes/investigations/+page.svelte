@@ -234,7 +234,7 @@
           <!-- Keywords -->
           {#if investigation.keywords && investigation.keywords.length > 0}
             <div class="flex flex-wrap gap-1.5 mb-4">
-              {#each investigation.keywords as keyword}
+              {#each investigation.keywords as keyword, ki}
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                   {keyword}
                 </span>
@@ -253,7 +253,7 @@
               {/if}
             </div>
             <div class="flex items-center space-x-1.5">
-              {#each (investigation.sources || []) as source}
+              {#each (investigation.sources || []) as source, si}
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {getSourceBadgeColor(source)}">
                   {getSourceLabel(source)}
                 </span>
@@ -334,7 +334,7 @@
             </div>
             {#if newKeywords.length > 0}
               <div class="flex flex-wrap gap-1.5 mt-2">
-                {#each newKeywords as keyword}
+                {#each newKeywords as keyword, nki}
                   <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                     {keyword}
                     <button

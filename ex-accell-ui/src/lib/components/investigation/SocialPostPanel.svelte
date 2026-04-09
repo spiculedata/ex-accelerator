@@ -142,7 +142,7 @@
     </div>
   {:else}
     <div class="overflow-auto flex-1 p-3 space-y-2">
-      {#each visiblePosts as post (post.id)}
+      {#each visiblePosts as post, idx}
         {@const pid = postId(post)}
         <div
           class="rounded-lg border p-3 transition-all duration-150 cursor-pointer

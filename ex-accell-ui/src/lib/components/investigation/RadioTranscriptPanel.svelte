@@ -106,7 +106,7 @@
     </div>
   {:else}
     <div class="overflow-auto flex-1 p-3 space-y-2">
-      {#each visibleSegments as seg (seg.id)}
+      {#each visibleSegments as seg, idx}
         {@const sid = segmentId(seg)}
         {@const expanded = expandedIds.has(String(seg.id))}
         <div

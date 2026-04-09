@@ -370,7 +370,7 @@
 
         <!-- Desktop Nav Links -->
         <div class="hidden lg:flex lg:items-center lg:space-x-1 border-l border-gray-200 pl-6">
-          {#each updatedNavItems as item}
+          {#each updatedNavItems as item, ni}
             {#if item.hasDropdown}
               <div class="relative nav-dropdown">
                 <button
@@ -389,7 +389,7 @@
 
                 {#if openDropdowns[item.name]}
                   <div class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                    {#each (item.dropdownItems ?? []) as dropdownItem}
+                    {#each (item.dropdownItems ?? []) as dropdownItem, di}
                       <a
                         href={dropdownItem.href}
                         on:click={(e) => navigateToApp(dropdownItem, e)}
@@ -459,7 +459,7 @@
                     <h3 class="text-sm font-medium text-gray-900">Switch Project</h3>
                   </div>
                   <div class="max-h-64 overflow-y-auto">
-                    {#each availableProjects as project}
+                    {#each availableProjects as project, pi}
                       <button
                         on:click={async () => {
                           projectSwitcherOpen = false;
@@ -539,7 +539,7 @@
                       <h3 class="text-sm font-medium text-gray-900">Switch Workspace</h3>
                     </div>
                     <div class="max-h-64 overflow-y-auto">
-                      {#each availableWorkspaces as workspace}
+                      {#each availableWorkspaces as workspace, wi}
                         {@const summary = workspaceSummaries[workspace.id]}
                         {@const badges = summary ? getDatasetTypeBadges(summary) : []}
                         <button
@@ -567,7 +567,7 @@
                               </div>
                               {#if badges.length > 0}
                                 <div class="flex items-center space-x-1 mt-1.5">
-                                  {#each badges as badge}
+                                  {#each badges as badge, bi}
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{badge.color}-100 text-{badge.color}-800">
                                       {badge.label}
                                     </span>
@@ -639,7 +639,7 @@
   {#if mobileMenuOpen}
     <div class="lg:hidden border-t border-gray-200 bg-white mobile-menu">
       <div class="px-2 pt-2 pb-3 space-y-1">
-        {#each updatedNavItems as item}
+        {#each updatedNavItems as item, ni}
           {#if item.hasDropdown}
             <!-- Mobile dropdown navigation item -->
             <div class="space-y-1">
@@ -662,7 +662,7 @@
               
               {#if openDropdowns[item.name]}
                 <div class="pl-6 space-y-1">
-                  {#each (item.dropdownItems ?? []) as dropdownItem}
+                  {#each (item.dropdownItems ?? []) as dropdownItem, di}
                     <a
                       href={dropdownItem.href}
                       on:click={(e) => {
