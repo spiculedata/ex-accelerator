@@ -1671,8 +1671,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT id, station, segment_start, segment_end, duration_seconds,
-            transcript, sentiment, topics, relevance_score
+          SELECT id, radio_name, state, segment_start, segment_end, duration_seconds,
+            LEFT(transcript, 300) as transcript, sentiment, emotion, confidence,
+            is_political, is_ad, word_count
           FROM radio_transcripts
           WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
             AND transcript ILIKE ANY($3::text[])
@@ -1701,9 +1702,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT id, text, timestamp, platform, author,
-            sentiment_score, sentiment_category,
-            engagement_score, hashtags
+          SELECT id, LEFT(text, 300) as text, timestamp, platform,
+            sentiment_category, confidence_score,
+            engagement_likes, engagement_shares, engagement_comments
           FROM posts_with_sentiment
           WHERE to_timestamp(timestamp/1000) >= $1::timestamp
             AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
