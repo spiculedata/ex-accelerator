@@ -14,7 +14,7 @@
 	let containerWidth = 800;
 	let simulation: d3.Simulation<any, any> | null = null;
 
-	const height = 450;
+	export let height: number = 220;
 	const margin = { top: 10, right: 10, bottom: 10, left: 10 };
 
 	onMount(() => {

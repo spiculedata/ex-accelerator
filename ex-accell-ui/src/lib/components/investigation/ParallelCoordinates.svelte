@@ -13,8 +13,9 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	const margin = { top: 50, right: 40, bottom: 20, left: 40 };
-	const height = 420;
+	export let height: number = 220;
+
+	const margin = { top: 30, right: 20, bottom: 16, left: 20 };
 
 	const axisConfig: { key: string; label: string; domain: [number, number] | null }[] = [
 		{ key: 'gdelt_events', label: 'GDELT Evt', domain: null },

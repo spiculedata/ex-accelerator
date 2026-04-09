@@ -1737,47 +1737,49 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       try {
         const data = await executeQuery(`
           WITH gdelt_mentions AS (
-            SELECT unnest($3::text[]) AS keyword, 'gdelt' AS source,
-              COUNT(*) AS mention_count
-            FROM gdelt_events, unnest($3::text[]) kw
+            SELECT kw AS keyword, 'gdelt' AS source, COUNT(*) AS mention_count
+            FROM gdelt_events
+            CROSS JOIN unnest($3::text[]) AS kw
             WHERE sqldate >= CAST(REPLACE($1::text, '-', '') AS INTEGER)
               AND sqldate <= CAST(REPLACE($2::text, '-', '') AS INTEGER)
               AND (actor1name ILIKE kw OR actor2name ILIKE kw OR actiongeo_fullname ILIKE kw)
             GROUP BY kw
           ),
           radio_mentions AS (
-            SELECT unnest($3::text[]) AS keyword, 'radio' AS source,
-              COUNT(*) AS mention_count
-            FROM radio_transcripts, unnest($3::text[]) kw
+            SELECT kw AS keyword, 'radio' AS source, COUNT(*) AS mention_count
+            FROM radio_transcripts
+            CROSS JOIN unnest($3::text[]) AS kw
             WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
               AND transcript ILIKE kw
             GROUP BY kw
           ),
           social_mentions AS (
-            SELECT unnest($3::text[]) AS keyword, 'social' AS source,
-              COUNT(*) AS mention_count
-            FROM posts_with_sentiment, unnest($3::text[]) kw
+            SELECT kw AS keyword, 'social' AS source, COUNT(*) AS mention_count
+            FROM posts_with_sentiment
+            CROSS JOIN unnest($3::text[]) AS kw
             WHERE to_timestamp(timestamp/1000) >= $1::timestamp
               AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
               AND text ILIKE kw
             GROUP BY kw
-          )
-          SELECT keyword, source, mention_count
-          FROM (
+          ),
+          combined AS (
             SELECT * FROM gdelt_mentions
             UNION ALL
             SELECT * FROM radio_mentions
             UNION ALL
             SELECT * FROM social_mentions
-          ) combined
-          ORDER BY keyword, source
+          )
+          SELECT
+            REPLACE(keyword, '%', '') AS keyword,
+            COALESCE(SUM(mention_count) FILTER (WHERE source = 'gdelt'), 0) AS gdelt_count,
+            COALESCE(SUM(mention_count) FILTER (WHERE source = 'radio'), 0) AS radio_count,
+            COALESCE(SUM(mention_count) FILTER (WHERE source = 'social'), 0) AS social_count
+          FROM combined
+          GROUP BY keyword
+          ORDER BY (COALESCE(SUM(mention_count) FILTER (WHERE source = 'gdelt'), 0) + COALESCE(SUM(mention_count) FILTER (WHERE source = 'radio'), 0) + COALESCE(SUM(mention_count) FILTER (WHERE source = 'social'), 0)) DESC
         `, [dateStart, dateEnd, keywordsArray]);
 
-        const cleanedData = (data || []).map((row: Record<string, unknown>) => ({
-          ...row,
-          keyword: (String(row.keyword || '')).replace(/%/g, '')
-        }));
-        return json({ success: true, data: cleanedData });
+        return json({ success: true, data: data || [] });
       } catch (err) {
         console.error('Investigation keyword overlap query failed:', err);
         return json({ success: true, data: [] });

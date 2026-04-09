@@ -21,7 +21,7 @@
 
 	export let data: TimelineEntry[] = [];
 	export let width: number = 0;
-	export let height: number = 280;
+	export let height: number = 80;
 
 	const dispatch = createEventDispatcher<{
 		brushChange: { start: Date; end: Date };
@@ -33,8 +33,9 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	const margin = { top: 20, right: 20, bottom: 30, left: 60 };
-	const laneGap = 8;
+	// Sparkline-style margins: no left space for Y-axis labels, just room for lane labels
+	const margin = { top: 4, right: 20, bottom: 18, left: 40 };
+	const laneGap = 4;
 
 	const colors = {
 		gdeltBar: '#64748b',
@@ -89,6 +90,9 @@
 			.append('g')
 			.attr('transform', `translate(${margin.left},${margin.top})`);
 
+		// Gradient defs for Goldstein line
+		const defs = svgEl.append('defs');
+
 		// ---- LANE 1: GDELT ----
 		const gdeltY = 0;
 		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 1;
@@ -104,12 +108,13 @@
 			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
-		// Lane label (above lane)
-		gdeltGroup
+		// Lane label: left of lane, vertically centered
+		svgEl
 			.append('text')
-			.attr('x', 4)
-			.attr('y', -4)
-			.attr('text-anchor', 'start')
+			.attr('x', margin.left - 4)
+			.attr('y', margin.top + gdeltY + laneHeight / 2)
+			.attr('text-anchor', 'end')
+			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
 			.attr('fill', '#94a3b8')
@@ -136,8 +141,6 @@
 			.domain([Math.min(goldsteinExtent[0], -10), Math.max(goldsteinExtent[1], 10)])
 			.range([laneHeight, 0]);
 
-		// Gradient definition
-		const defs = svgEl.append('defs');
 		const goldsteinGradient = defs
 			.append('linearGradient')
 			.attr('id', 'goldstein-gradient')
@@ -166,15 +169,6 @@
 			.attr('stroke-width', 2)
 			.attr('d', goldsteinLine);
 
-		// GDELT Y axis
-		const gdeltAxis = d3.axisLeft(yGdelt).ticks(4).tickSize(-innerWidth);
-		gdeltGroup
-			.append('g')
-			.call(gdeltAxis)
-			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
-
 		// ---- LANE 2: Radio ----
 		const radioY = laneHeight + laneGap;
 		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 1;
@@ -189,11 +183,13 @@
 			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
-		radioGroup
+		// Lane label: left of lane, vertically centered
+		svgEl
 			.append('text')
-			.attr('x', 4)
-			.attr('y', -4)
-			.attr('text-anchor', 'start')
+			.attr('x', margin.left - 4)
+			.attr('y', margin.top + radioY + laneHeight / 2)
+			.attr('text-anchor', 'end')
+			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
 			.attr('fill', '#94a3b8')
@@ -229,15 +225,6 @@
 			.attr('opacity', 0.75)
 			.attr('d', radioArea);
 
-		// Radio Y axis
-		const radioAxis = d3.axisLeft(yRadio).ticks(4).tickSize(-innerWidth);
-		radioGroup
-			.append('g')
-			.call(radioAxis)
-			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
-
 		// ---- LANE 3: Social ----
 		const socialY = 2 * (laneHeight + laneGap);
 		const socialMaxPosts = d3.max(parsedData, (d) => d.social_positive + d.social_negative + d.social_neutral) ?? 1;
@@ -252,11 +239,13 @@
 			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
-		socialGroup
+		// Lane label: left of lane, vertically centered
+		svgEl
 			.append('text')
-			.attr('x', 4)
-			.attr('y', -4)
-			.attr('text-anchor', 'start')
+			.attr('x', margin.left - 4)
+			.attr('y', margin.top + socialY + laneHeight / 2)
+			.attr('text-anchor', 'end')
+			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
 			.attr('fill', '#94a3b8')
@@ -292,17 +281,8 @@
 			.attr('opacity', 0.75)
 			.attr('d', socialArea);
 
-		// Social Y axis
-		const socialAxis = d3.axisLeft(ySocial).ticks(4).tickSize(-innerWidth);
-		socialGroup
-			.append('g')
-			.call(socialAxis)
-			.call((g2) => g2.select('.domain').remove())
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'));
-
 		// ---- SHARED X AXIS ----
-		const xAxisGroup = g
+		g
 			.append('g')
 			.attr('transform', `translate(0,${innerHeight})`)
 			.call(
@@ -312,7 +292,7 @@
 					.tickFormat((d) => d3.timeFormat('%b %d')(d as Date))
 			)
 			.call((g2) => g2.select('.domain').attr('stroke', '#475569'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '10px'))
+			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '9px'))
 			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
 
 		// ---- BRUSH ----

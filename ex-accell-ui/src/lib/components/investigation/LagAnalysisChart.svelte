@@ -17,10 +17,10 @@
 	let lagHours = 0;
 	let correlation = 0;
 
-	const chartHeight = 360;
-	const sliderHeight = 50;
-	const totalHeight = chartHeight + sliderHeight + 20;
-	const margin = { top: 30, right: 30, bottom: 50, left: 55 };
+	export let chartHeight: number = 200;
+	const sliderHeight = 40;
+	const totalHeight = chartHeight + sliderHeight + 16;
+	const margin = { top: 20, right: 20, bottom: 36, left: 40 };
 
 	const sourceLabels: Record<string, string> = {
 		gdelt: 'GDELT Tone',

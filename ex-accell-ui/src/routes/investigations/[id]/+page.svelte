@@ -16,10 +16,8 @@
   import LagAnalysisChart from '$lib/components/investigation/LagAnalysisChart.svelte';
   import KeywordNetwork from '$lib/components/investigation/KeywordNetwork.svelte';
   import WordCloudChart from '$lib/components/investigation/WordCloudChart.svelte';
-  import GdeltEventPanel from '$lib/components/investigation/GdeltEventPanel.svelte';
-  import RadioTranscriptPanel from '$lib/components/investigation/RadioTranscriptPanel.svelte';
-  import SocialPostPanel from '$lib/components/investigation/SocialPostPanel.svelte';
-  import ComponentPalette from '$lib/components/investigation/ComponentPalette.svelte';
+
+  export const ssr = false;
 
   interface Investigation {
     id: string;
@@ -79,13 +77,16 @@
   let radioSegments: RadioSegment[] = [];
   let socialPosts: SocialPost[] = [];
   let keywordData: any[] = [];
-  let activeInsightSlots: string[] = ['sentiment', 'parallel', 'lag'];
   let gdeltLoading = true;
   let radioLoading = true;
   let socialLoading = true;
   let sourcesEnabled = { gdelt: true, radio: true, social: true };
-  let paletteOpen = false;
-  let insightsCollapsed = true;
+
+  // Right-side insights drawer
+  let insightsOpen = false;
+
+  // Transcript viewer
+  let expandedTranscriptId: string | number | null = null;
 
   // Extracted investigation parameters
   let keywords: string[] = [];
@@ -106,14 +107,12 @@
     let negative = 0;
     let neutral = 0;
 
-    // GDELT: classify by average tone
     for (const e of gdelt) {
       if (e.avgtone > 1) positive++;
       else if (e.avgtone < -1) negative++;
       else neutral++;
     }
 
-    // Radio: classify by sentiment field
     for (const s of radio) {
       const label = (s.sentiment || 'neutral').toLowerCase();
       if (label === 'positive') positive++;
@@ -121,7 +120,6 @@
       else neutral++;
     }
 
-    // Social: classify by sentiment_category
     for (const p of social) {
       const label = (p.sentiment_category || 'neutral').toLowerCase();
       if (label === 'positive') positive++;
@@ -157,7 +155,6 @@
           setTimeRange(dateStart, dateEnd);
         }
 
-        // Fetch timeline, detail panels, and keyword data in parallel
         await Promise.all([
           loadTimeline(keywords, dateStart, dateEnd),
           loadDetailPanels(keywords, dateStart, dateEnd),
@@ -287,7 +284,6 @@
     const brushStart = start.toISOString().split('T')[0];
     const brushEnd = end.toISOString().split('T')[0];
     setTimeRange(brushStart, brushEnd);
-    // Re-fetch detail panels with the narrowed date range
     loadDetailPanels(keywords, brushStart, brushEnd);
   }
 
@@ -313,10 +309,6 @@
     setSourceFilter(active);
   }
 
-  function handleAddComponent(type: string) {
-    console.log('Add component:', type);
-  }
-
   function resetBrush() {
     if (dateStart && dateEnd) {
       setTimeRange(dateStart, dateEnd);
@@ -324,14 +316,10 @@
     }
   }
 
-  function formatDate(dateStr: string): string {
+  function formatDateCompact(dateStr: string): string {
     if (!dateStr) return '';
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -342,15 +330,6 @@
     if (s.length !== 8) return s;
     const d = new Date(parseInt(s.slice(0, 4)), parseInt(s.slice(4, 6)) - 1, parseInt(s.slice(6, 8)));
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  function formatDateCompact(dateStr: string): string {
-    if (!dateStr) return '';
-    try {
-      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch {
-      return dateStr;
-    }
   }
 
   function formatPostDate(timestamp: string | number | undefined): string {
@@ -377,7 +356,6 @@
   }
 
   function toneBarWidth(tone: number): number {
-    // Normalize tone to 0-100 range (tone typically -10 to +10)
     return Math.min(100, Math.max(0, (tone + 10) * 5));
   }
 
@@ -422,8 +400,7 @@
             dateStart,
             dateEnd
           },
-          annotations: JSON.stringify(annotations),
-          layout_config: JSON.stringify({ activeInsightSlots, sourcesEnabled })
+          annotations: JSON.stringify(annotations)
         })
       });
       saveStatus = 'saved';
@@ -459,22 +436,15 @@
     URL.revokeObjectURL(url);
   }
 
-  // Smart panel sizing
-  $: panelsWithData = [
-    sourcesEnabled.gdelt && gdeltEvents.length > 0 ? 'gdelt' : null,
-    sourcesEnabled.radio && radioSegments.length > 0 ? 'radio' : null,
-    sourcesEnabled.social && socialPosts.length > 0 ? 'social' : null
-  ].filter(Boolean) as string[];
-
-  $: collapsedPanels = [
-    sourcesEnabled.gdelt && gdeltEvents.length === 0 && !gdeltLoading ? 'gdelt' : null,
-    sourcesEnabled.radio && radioSegments.length === 0 && !radioLoading ? 'radio' : null,
-    sourcesEnabled.social && socialPosts.length === 0 && !socialLoading ? 'social' : null
-  ].filter(Boolean) as string[];
-
-  $: activePanelCount = [sourcesEnabled.gdelt, sourcesEnabled.radio, sourcesEnabled.social].filter(Boolean).length;
-
   $: totalItems = gdeltEvents.length + radioSegments.length + socialPosts.length;
+
+  // Highlight keywords in text
+  function highlightKeywords(text: string): string {
+    if (!keywords.length) return text;
+    const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+    return text.replace(regex, '<mark class="bg-amber-500/30 text-amber-200 rounded px-0.5">$1</mark>');
+  }
 </script>
 
 <svelte:head>
@@ -494,45 +464,40 @@
 {:else if investigation}
   <div class="h-[calc(100dvh-65px)] flex flex-col bg-slate-950 overflow-hidden">
 
-    <!-- ============ HEADER BAR (h-12) ============ -->
-    <div class="h-12 flex-shrink-0 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700/50 flex items-center px-3 gap-3">
-      <!-- Back + Title -->
+    <!-- ============ HEADER BAR (h-10) ============ -->
+    <div class="h-10 flex-shrink-0 bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700/50 flex items-center px-3 gap-2">
       <button
         on:click={() => goto('/investigations')}
         class="text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
-        aria-label="Back to investigations"
+        aria-label="Back"
       >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
       </button>
-      <h1 class="text-sm font-semibold text-slate-200 truncate max-w-[200px]">{investigation.name}</h1>
-      <div class="w-px h-5 bg-slate-700 flex-shrink-0"></div>
+      <h1 class="text-xs font-semibold text-slate-200 truncate max-w-[180px]">{investigation.name}</h1>
+      <div class="w-px h-4 bg-slate-700 flex-shrink-0"></div>
 
       <!-- Keywords -->
       <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden">
-        {#each keywords.slice(0, 5) as keyword}
-          <span class="px-1.5 py-0.5 text-[10px] bg-slate-700 text-slate-300 rounded font-medium truncate max-w-[80px]">{keyword}</span>
+        {#each keywords.slice(0, 4) as keyword}
+          <span class="px-1 py-0 text-[9px] bg-slate-700 text-slate-300 rounded font-medium truncate max-w-[70px]">{keyword}</span>
         {/each}
-        {#if keywords.length > 5}
-          <span class="text-[10px] text-slate-500">+{keywords.length - 5}</span>
+        {#if keywords.length > 4}
+          <span class="text-[9px] text-slate-500">+{keywords.length - 4}</span>
         {/if}
       </div>
 
       <!-- Date Range -->
       {#if dateStart || dateEnd}
-        <span class="text-[10px] font-mono text-slate-400 flex-shrink-0">
-          {formatDateCompact(dateStart)} - {formatDateCompact(dateEnd)}
+        <span class="text-[9px] font-mono text-slate-500 flex-shrink-0">
+          {formatDateCompact(dateStart)}-{formatDateCompact(dateEnd)}
         </span>
       {/if}
 
       <!-- Brush reset -->
       {#if $investigationSelection.timeRange && ($investigationSelection.timeRange.start !== dateStart || $investigationSelection.timeRange.end !== dateEnd)}
-        <button
-          on:click={resetBrush}
-          class="text-[10px] text-amber-400 hover:text-amber-300 flex-shrink-0"
-          title="Reset time range"
-        >
+        <button on:click={resetBrush} class="text-[9px] text-amber-400 hover:text-amber-300 flex-shrink-0" title="Reset">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -542,51 +507,60 @@
       <div class="flex-1"></div>
 
       <!-- Source Toggles -->
-      <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="flex items-center gap-1.5 flex-shrink-0">
         <button
           on:click={() => toggleSourceEnabled('gdelt')}
-          class="flex items-center gap-1 text-[10px] uppercase tracking-wider transition-colors {sourcesEnabled.gdelt ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}"
+          class="flex items-center gap-0.5 text-[9px] uppercase tracking-wider transition-colors {sourcesEnabled.gdelt ? 'text-amber-400' : 'text-slate-600'}"
         >
-          <span class="w-2 h-2 rounded-full {sourcesEnabled.gdelt ? 'bg-amber-500' : 'bg-slate-700'}"></span>
+          <span class="w-1.5 h-1.5 rounded-full {sourcesEnabled.gdelt ? 'bg-amber-500' : 'bg-slate-700'}"></span>
           GDELT
         </button>
         <button
           on:click={() => toggleSourceEnabled('radio')}
-          class="flex items-center gap-1 text-[10px] uppercase tracking-wider transition-colors {sourcesEnabled.radio ? 'text-violet-400' : 'text-slate-600 hover:text-slate-400'}"
+          class="flex items-center gap-0.5 text-[9px] uppercase tracking-wider transition-colors {sourcesEnabled.radio ? 'text-violet-400' : 'text-slate-600'}"
         >
-          <span class="w-2 h-2 rounded-full {sourcesEnabled.radio ? 'bg-violet-500' : 'bg-slate-700'}"></span>
+          <span class="w-1.5 h-1.5 rounded-full {sourcesEnabled.radio ? 'bg-violet-500' : 'bg-slate-700'}"></span>
           Radio
         </button>
         <button
           on:click={() => toggleSourceEnabled('social')}
-          class="flex items-center gap-1 text-[10px] uppercase tracking-wider transition-colors {sourcesEnabled.social ? 'text-sky-400' : 'text-slate-600 hover:text-slate-400'}"
+          class="flex items-center gap-0.5 text-[9px] uppercase tracking-wider transition-colors {sourcesEnabled.social ? 'text-sky-400' : 'text-slate-600'}"
         >
-          <span class="w-2 h-2 rounded-full {sourcesEnabled.social ? 'bg-sky-500' : 'bg-slate-700'}"></span>
+          <span class="w-1.5 h-1.5 rounded-full {sourcesEnabled.social ? 'bg-sky-500' : 'bg-slate-700'}"></span>
           Social
         </button>
       </div>
 
-      <div class="w-px h-5 bg-slate-700 flex-shrink-0"></div>
+      <div class="w-px h-4 bg-slate-700 flex-shrink-0"></div>
 
-      <!-- Action Icons -->
+      <!-- Insights toggle -->
+      <button
+        on:click={() => insightsOpen = !insightsOpen}
+        class="p-1 rounded transition-colors {insightsOpen ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-500 hover:text-slate-300'}"
+        title="Insights ({totalItems} items)"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      </button>
+
+      <!-- Notes -->
       <button
         on:click={() => showAnnotations = !showAnnotations}
-        class="p-1 rounded transition-colors {showAnnotations ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 hover:text-slate-300'}"
-        title="Notes {annotations.length > 0 ? `(${annotations.length})` : ''}"
+        class="relative p-1 rounded transition-colors {showAnnotations ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 hover:text-slate-300'}"
+        title="Notes"
       >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
         </svg>
         {#if annotations.length > 0}
-          <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full text-[8px] text-white flex items-center justify-center">{annotations.length}</span>
+          <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full text-[7px] text-white flex items-center justify-center">{annotations.length}</span>
         {/if}
       </button>
-      <button
-        on:click={handleExport}
-        class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors"
-        title="Export"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+      <!-- Export & Save -->
+      <button on:click={handleExport} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors" title="Export">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </button>
@@ -595,7 +569,7 @@
         class="p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
         title={saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Save'}
       >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {#if saveStatus === 'saved'}
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           {:else}
@@ -605,29 +579,29 @@
       </button>
     </div>
 
-    <!-- ============ ANNOTATIONS OVERLAY ============ -->
+    <!-- ============ ANNOTATIONS (conditional) ============ -->
     {#if showAnnotations}
-      <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50 px-3 py-2">
-        <div class="flex items-start gap-2">
+      <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50 px-3 py-1.5">
+        <div class="flex items-center gap-2">
           <div class="flex-1 flex flex-wrap gap-1">
             {#each annotations as annotation}
-              <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700/50 rounded px-2 py-1 max-w-xs">
-                <p class="text-[10px] text-slate-300 truncate">{annotation.text}</p>
-                <button on:click={() => removeAnnotation(annotation.id)} class="text-slate-600 hover:text-rose-400 text-[10px] flex-shrink-0">x</button>
+              <div class="flex items-center gap-1 bg-slate-800 border border-slate-700/50 rounded px-1.5 py-0.5 max-w-[200px]">
+                <p class="text-[9px] text-slate-300 truncate">{annotation.text}</p>
+                <button on:click={() => removeAnnotation(annotation.id)} class="text-slate-600 hover:text-rose-400 text-[9px] flex-shrink-0">x</button>
               </div>
             {/each}
             {#if annotations.length === 0}
-              <span class="text-[10px] text-slate-600">No notes yet</span>
+              <span class="text-[9px] text-slate-600">No notes yet</span>
             {/if}
           </div>
           <div class="flex items-center gap-1 flex-shrink-0">
             <input
               bind:value={newAnnotation}
               placeholder="Add note..."
-              class="w-48 px-2 py-1 text-[10px] bg-slate-800 border border-slate-700 rounded text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+              class="w-40 px-1.5 py-0.5 text-[9px] bg-slate-800 border border-slate-700 rounded text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
               on:keydown={(e) => { if (e.key === 'Enter') addAnnotation(); }}
             />
-            <button on:click={addAnnotation} class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-medium rounded transition-colors">
+            <button on:click={addAnnotation} class="px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-medium rounded transition-colors">
               Add
             </button>
           </div>
@@ -635,19 +609,19 @@
       </div>
     {/if}
 
-    <!-- ============ TIMELINE ============ -->
-    <div class="h-40 flex-shrink-0 bg-slate-900 border-b border-slate-700/50">
+    <!-- ============ TIMELINE (compact sparkline) ============ -->
+    <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50" style="height: 88px;">
       <div class="h-full flex flex-col">
-        <div class="px-3 py-1 flex items-center justify-between border-b border-slate-800/50">
+        <div class="px-3 py-0.5 flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-2">
-            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Timeline</span>
+            <span class="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Timeline</span>
             {#if $investigationSelection.timeRange}
-              <span class="text-[10px] font-mono text-slate-500">
+              <span class="text-[9px] font-mono text-slate-500">
                 {formatDateCompact($investigationSelection.timeRange.start)} - {formatDateCompact($investigationSelection.timeRange.end)}
               </span>
             {/if}
           </div>
-          <span class="text-[10px] font-mono text-slate-600">{timelineData.length} days</span>
+          <span class="text-[9px] font-mono text-slate-600">{timelineData.length} days</span>
         </div>
         <div class="flex-1 min-h-0 px-1">
           {#if timelineLoading}
@@ -660,7 +634,7 @@
           {:else}
             <SwimLaneTimeline
               data={timelineData}
-              height={128}
+              height={72}
               on:brushChange={handleBrushChange}
               on:dayClick={handleDayClick}
             />
@@ -669,294 +643,334 @@
       </div>
     </div>
 
-    <!-- ============ MAIN CONTENT AREA (flex-1) ============ -->
-    <div class="flex-1 min-h-0 flex gap-px bg-slate-950 p-1">
+    <!-- ============ MAIN CONTENT AREA ============ -->
+    <div class="flex-1 min-h-0 flex relative">
 
-      <!-- GDELT Panel -->
-      {#if sourcesEnabled.gdelt}
-        {#if gdeltLoading}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span class="text-xs font-semibold text-slate-200">GDELT Events</span>
-            </div>
-            <div class="flex-1 flex items-center justify-center">
-              <svg class="animate-spin h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            </div>
-          </div>
-        {:else if gdeltEvents.length === 0}
-          <!-- Collapsed empty panel -->
-          <div class="h-8 bg-slate-900 border border-slate-700/30 rounded flex items-center px-3 gap-2 flex-shrink-0" style="width: 200px;">
-            <span class="w-2 h-2 rounded-full bg-amber-500/30"></span>
-            <span class="text-[10px] text-slate-500">GDELT Events</span>
-            <span class="text-[10px] text-slate-600 font-mono">0</span>
-          </div>
-        {:else}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span class="text-xs font-semibold text-slate-200">GDELT Events</span>
+      <!-- Data Panels -->
+      <div class="flex-1 min-h-0 flex gap-px p-1">
+
+        <!-- GDELT Panel -->
+        {#if sourcesEnabled.gdelt}
+          {#if gdeltLoading}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span class="text-[10px] font-semibold text-slate-200">GDELT Events</span>
               </div>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-400 rounded">{gdeltEvents.length >= 100 ? '100+' : gdeltEvents.length}</span>
+              <div class="flex-1 flex items-center justify-center">
+                <svg class="animate-spin h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
             </div>
-            <div class="flex-1 overflow-y-auto min-h-0">
-              <!-- Compact GDELT table -->
-              <table class="w-full text-xs">
-                <thead class="sticky top-0 z-10">
-                  <tr class="bg-slate-800/90 backdrop-blur-sm">
-                    <th class="text-left text-[10px] uppercase tracking-wider text-slate-500 font-medium px-2 py-1">Date</th>
-                    <th class="text-left text-[10px] uppercase tracking-wider text-slate-500 font-medium px-2 py-1">Actor</th>
-                    <th class="text-center text-[10px] uppercase tracking-wider text-slate-500 font-medium px-2 py-1">Gold.</th>
-                    <th class="text-left text-[10px] uppercase tracking-wider text-slate-500 font-medium px-2 py-1">Tone</th>
-                    <th class="text-right text-[10px] uppercase tracking-wider text-slate-500 font-medium px-2 py-1">Arts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each gdeltEvents as event, i}
-                    <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                      <td class="px-2 py-1 text-slate-400 font-mono whitespace-nowrap">{formatGdeltDate(event.sqldate)}</td>
-                      <td class="px-2 py-1 text-slate-300 truncate max-w-[120px]" title="{event.actor1name || ''}{event.actor2name ? ' > ' + event.actor2name : ''}">
-                        {event.actor1name || '-'}
-                        {#if event.actor2name}
-                          <span class="text-slate-600"> &gt; </span><span class="text-slate-400">{event.actor2name}</span>
-                        {/if}
-                      </td>
-                      <td class="px-2 py-1 text-center">
-                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-medium {goldsteinColor(event.goldsteinscale)}">
-                          {event.goldsteinscale > 0 ? '+' : ''}{event.goldsteinscale.toFixed(1)}
-                        </span>
-                      </td>
-                      <td class="px-2 py-1">
-                        <div class="flex items-center gap-1">
-                          <div class="w-12 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              class="h-full rounded-full {event.avgtone >= 0 ? 'bg-emerald-500/70' : 'bg-rose-500/70'}"
-                              style="width: {toneBarWidth(event.avgtone)}%"
-                            ></div>
-                          </div>
-                          <span class="text-[10px] font-mono text-slate-500 w-8">{event.avgtone.toFixed(1)}</span>
-                        </div>
-                      </td>
-                      <td class="px-2 py-1 text-right font-mono text-slate-500">{event.numarticles || '-'}</td>
+          {:else if gdeltEvents.length === 0}
+            <div class="w-32 bg-slate-900/50 border border-slate-700/30 rounded flex items-center px-2 py-1 gap-1 flex-shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500/30"></span>
+              <span class="text-[9px] text-slate-500">GDELT 0</span>
+            </div>
+          {:else}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  <span class="text-[10px] font-semibold text-slate-200">GDELT</span>
+                </div>
+                <span class="px-1 py-0 text-[9px] font-medium bg-amber-500/20 text-amber-400 rounded">{gdeltEvents.length >= 100 ? '100+' : gdeltEvents.length}</span>
+              </div>
+              <div class="flex-1 overflow-y-auto min-h-0">
+                <table class="w-full text-[10px]">
+                  <thead class="sticky top-0 z-10">
+                    <tr class="bg-slate-800/90 backdrop-blur-sm">
+                      <th class="text-left uppercase tracking-wider text-slate-500 font-medium px-1.5 py-0.5">Date</th>
+                      <th class="text-left uppercase tracking-wider text-slate-500 font-medium px-1.5 py-0.5">Actor</th>
+                      <th class="text-center uppercase tracking-wider text-slate-500 font-medium px-1.5 py-0.5">Gold.</th>
+                      <th class="text-left uppercase tracking-wider text-slate-500 font-medium px-1.5 py-0.5">Tone</th>
+                      <th class="text-right uppercase tracking-wider text-slate-500 font-medium px-1.5 py-0.5">Arts</th>
                     </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        {/if}
-      {/if}
-
-      <!-- Radio Panel -->
-      {#if sourcesEnabled.radio}
-        {#if radioLoading}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-violet-500"></span>
-              <span class="text-xs font-semibold text-slate-200">Radio Transcripts</span>
-            </div>
-            <div class="flex-1 flex items-center justify-center">
-              <svg class="animate-spin h-4 w-4 text-violet-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            </div>
-          </div>
-        {:else if radioSegments.length === 0}
-          <div class="h-8 bg-slate-900 border border-slate-700/30 rounded flex items-center px-3 gap-2 flex-shrink-0" style="width: 200px;">
-            <span class="w-2 h-2 rounded-full bg-violet-500/30"></span>
-            <span class="text-[10px] text-slate-500">Radio Transcripts</span>
-            <span class="text-[10px] text-slate-600 font-mono">0</span>
-          </div>
-        {:else}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-violet-500"></span>
-                <span class="text-xs font-semibold text-slate-200">Radio Transcripts</span>
+                  </thead>
+                  <tbody>
+                    {#each gdeltEvents as event}
+                      <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                        <td class="px-1.5 py-0.5 text-slate-400 font-mono whitespace-nowrap">{formatGdeltDate(event.sqldate)}</td>
+                        <td class="px-1.5 py-0.5 text-slate-300 truncate max-w-[100px]" title="{event.actor1name || ''}{event.actor2name ? ' > ' + event.actor2name : ''}">
+                          {event.actor1name || '-'}
+                          {#if event.actor2name}
+                            <span class="text-slate-600">&gt;</span><span class="text-slate-400">{event.actor2name}</span>
+                          {/if}
+                        </td>
+                        <td class="px-1.5 py-0.5 text-center">
+                          <span class="inline-block px-1 py-0 rounded text-[9px] font-mono font-medium {goldsteinColor(event.goldsteinscale)}">
+                            {event.goldsteinscale > 0 ? '+' : ''}{event.goldsteinscale.toFixed(1)}
+                          </span>
+                        </td>
+                        <td class="px-1.5 py-0.5">
+                          <div class="flex items-center gap-0.5">
+                            <div class="w-10 h-1 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                class="h-full rounded-full {event.avgtone >= 0 ? 'bg-emerald-500/70' : 'bg-rose-500/70'}"
+                                style="width: {toneBarWidth(event.avgtone)}%"
+                              ></div>
+                            </div>
+                            <span class="text-[9px] font-mono text-slate-500">{event.avgtone.toFixed(1)}</span>
+                          </div>
+                        </td>
+                        <td class="px-1.5 py-0.5 text-right font-mono text-slate-500">{event.numarticles || '-'}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
               </div>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-violet-500/20 text-violet-400 rounded">{radioSegments.length}</span>
             </div>
-            <div class="flex-1 overflow-y-auto min-h-0">
-              {#each radioSegments as segment}
-                <div class="px-2 py-1.5 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                  <div class="flex items-center justify-between mb-0.5">
-                    <div class="flex items-center gap-1.5">
-                      <span class="w-1.5 h-1.5 rounded-full {sentimentDotColor(segment.sentiment)}"></span>
-                      <span class="text-[10px] font-semibold text-slate-300">{segment.radio_name}</span>
-                      {#if segment.state}
-                        <span class="text-[10px] text-slate-600">{segment.state}</span>
-                      {/if}
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                      {#if segment.is_political}
-                        <span class="px-1 py-0 text-[8px] uppercase tracking-wider bg-rose-500/20 text-rose-400 rounded font-medium">POL</span>
-                      {/if}
-                      <span class="text-[10px] font-mono text-slate-600">{Math.floor(segment.duration_seconds / 60)}m{(segment.duration_seconds % 60).toString().padStart(2, '0')}s</span>
-                    </div>
-                  </div>
-                  <p class="text-[11px] text-slate-400 leading-tight line-clamp-2">{segment.transcript}</p>
-                  {#if segment.emotion}
-                    <span class="text-[9px] text-slate-600 mt-0.5 inline-block">{segment.emotion}{segment.confidence ? ` (${(segment.confidence * 100).toFixed(0)}%)` : ''}</span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </div>
+          {/if}
         {/if}
-      {/if}
 
-      <!-- Social Panel -->
-      {#if sourcesEnabled.social}
-        {#if socialLoading}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-              <span class="text-xs font-semibold text-slate-200">Social Posts</span>
-            </div>
-            <div class="flex-1 flex items-center justify-center">
-              <svg class="animate-spin h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            </div>
-          </div>
-        {:else if socialPosts.length === 0}
-          <div class="h-8 bg-slate-900 border border-slate-700/30 rounded flex items-center px-3 gap-2 flex-shrink-0" style="width: 200px;">
-            <span class="w-2 h-2 rounded-full bg-sky-500/30"></span>
-            <span class="text-[10px] text-slate-500">Social Posts</span>
-            <span class="text-[10px] text-slate-600 font-mono">0</span>
-          </div>
-        {:else}
-          <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
-            <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                <span class="text-xs font-semibold text-slate-200">Social Posts</span>
+        <!-- Radio Panel -->
+        {#if sourcesEnabled.radio}
+          {#if radioLoading}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                <span class="text-[10px] font-semibold text-slate-200">Radio</span>
               </div>
-              <span class="px-1.5 py-0.5 text-[10px] font-medium bg-sky-500/20 text-sky-400 rounded">{socialPosts.length >= 100 ? '100+' : socialPosts.length}</span>
+              <div class="flex-1 flex items-center justify-center">
+                <svg class="animate-spin h-4 w-4 text-violet-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
             </div>
-            <div class="flex-1 overflow-y-auto min-h-0">
-              {#each socialPosts as post}
-                <div class="px-2 py-1.5 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                  <div class="flex items-center justify-between mb-0.5">
-                    <div class="flex items-center gap-1.5">
-                      <span class="w-1.5 h-1.5 rounded-full {sentimentDotColor(post.sentiment_category)}"></span>
-                      {#if post.platform}
-                        <span class="text-[10px] font-medium text-slate-400">{post.platform}</span>
-                      {/if}
+          {:else if radioSegments.length === 0}
+            <div class="w-32 bg-slate-900/50 border border-slate-700/30 rounded flex items-center px-2 py-1 gap-1 flex-shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-violet-500/30"></span>
+              <span class="text-[9px] text-slate-500">Radio 0</span>
+            </div>
+          {:else}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-violet-500"></span>
+                  <span class="text-[10px] font-semibold text-slate-200">Radio</span>
+                </div>
+                <span class="px-1 py-0 text-[9px] font-medium bg-violet-500/20 text-violet-400 rounded">{radioSegments.length}</span>
+              </div>
+              <div class="flex-1 overflow-y-auto min-h-0">
+                {#each radioSegments as segment}
+                  <div
+                    class="px-2 py-1 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer"
+                    on:click={() => expandedTranscriptId = expandedTranscriptId === segment.id ? null : segment.id}
+                    on:keydown={(e) => { if (e.key === 'Enter') expandedTranscriptId = expandedTranscriptId === segment.id ? null : segment.id; }}
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="flex items-center justify-between mb-0.5">
+                      <div class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full {sentimentDotColor(segment.sentiment)}"></span>
+                        <span class="text-[9px] font-semibold text-slate-300">{segment.radio_name}</span>
+                        {#if segment.state}
+                          <span class="text-[9px] text-slate-600">{segment.state}</span>
+                        {/if}
+                      </div>
+                      <div class="flex items-center gap-1">
+                        {#if segment.is_political}
+                          <span class="px-0.5 py-0 text-[7px] uppercase tracking-wider bg-rose-500/20 text-rose-400 rounded font-medium">POL</span>
+                        {/if}
+                        <span class="text-[9px] font-mono text-slate-600">{Math.floor(segment.duration_seconds / 60)}m{(segment.duration_seconds % 60).toString().padStart(2, '0')}s</span>
+                        <svg class="w-2.5 h-2.5 text-slate-600 transition-transform {expandedTranscriptId === segment.id ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                      {#if post.confidence_score}
-                        <span class="text-[10px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
-                      {/if}
-                      {#if post.timestamp}
-                        <span class="text-[10px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
-                      {/if}
-                    </div>
+                    {#if expandedTranscriptId === segment.id}
+                      <!-- Full transcript view -->
+                      <div class="mt-1 p-2 bg-slate-800/50 rounded border border-slate-700/30">
+                        <div class="flex items-center gap-2 mb-1.5 pb-1 border-b border-slate-700/30">
+                          <span class="text-[9px] font-medium text-slate-400">Full Transcript</span>
+                          {#if segment.emotion}
+                            <span class="text-[8px] px-1 py-0 bg-slate-700 text-slate-400 rounded">{segment.emotion}</span>
+                          {/if}
+                          {#if segment.confidence}
+                            <span class="text-[8px] font-mono text-slate-500">{(segment.confidence * 100).toFixed(0)}% conf</span>
+                          {/if}
+                        </div>
+                        <p class="text-[10px] text-slate-300 leading-relaxed whitespace-pre-wrap">{@html highlightKeywords(segment.transcript)}</p>
+                      </div>
+                    {:else}
+                      <p class="text-[10px] text-slate-400 leading-tight line-clamp-2">{segment.transcript}</p>
+                    {/if}
                   </div>
-                  <p class="text-[11px] text-slate-400 leading-tight line-clamp-3">{post.text}</p>
-                </div>
-              {/each}
+                {/each}
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
+
+        <!-- Social Panel -->
+        {#if sourcesEnabled.social}
+          {#if socialLoading}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                <span class="text-[10px] font-semibold text-slate-200">Social</span>
+              </div>
+              <div class="flex-1 flex items-center justify-center">
+                <svg class="animate-spin h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
+            </div>
+          {:else if socialPosts.length === 0}
+            <div class="w-32 bg-slate-900/50 border border-slate-700/30 rounded flex items-center px-2 py-1 gap-1 flex-shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-500/30"></span>
+              <span class="text-[9px] text-slate-500">Social 0</span>
+            </div>
+          {:else}
+            <div class="flex-1 bg-slate-900 border border-slate-700/50 rounded flex flex-col min-w-0">
+              <div class="px-2 py-1 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                  <span class="text-[10px] font-semibold text-slate-200">Social</span>
+                </div>
+                <span class="px-1 py-0 text-[9px] font-medium bg-sky-500/20 text-sky-400 rounded">{socialPosts.length >= 100 ? '100+' : socialPosts.length}</span>
+              </div>
+              <div class="flex-1 overflow-y-auto min-h-0">
+                {#each socialPosts as post}
+                  <div class="px-2 py-1 border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                    <div class="flex items-center justify-between mb-0.5">
+                      <div class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full {sentimentDotColor(post.sentiment_category)}"></span>
+                        {#if post.platform}
+                          <span class="text-[9px] font-medium text-slate-400">{post.platform}</span>
+                        {/if}
+                      </div>
+                      <div class="flex items-center gap-1">
+                        {#if post.confidence_score}
+                          <span class="text-[9px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
+                        {/if}
+                        {#if post.timestamp}
+                          <span class="text-[9px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
+                        {/if}
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 leading-tight line-clamp-2">{post.text}</p>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        {/if}
+
+      </div>
+
+      <!-- ============ INSIGHTS DRAWER (right overlay) ============ -->
+      {#if insightsOpen}
+        <div class="absolute top-0 right-0 h-full w-80 bg-slate-900 border-l border-slate-700/50 shadow-2xl z-20 flex flex-col overflow-hidden">
+          <!-- Drawer header -->
+          <div class="px-3 py-1.5 bg-slate-800 border-b border-slate-700/50 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Insights</span>
+              <span class="text-[9px] text-slate-600 font-mono">{totalItems} items</span>
+            </div>
+            <button on:click={() => insightsOpen = false} class="text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Scrollable insights content -->
+          <div class="flex-1 overflow-y-auto min-h-0 p-2 space-y-2">
+
+            <!-- Sentiment -->
+            <div class="bg-slate-800/50 border border-slate-700/30 rounded">
+              <div class="px-2 py-1 border-b border-slate-700/30">
+                <span class="text-[9px] uppercase tracking-wider text-slate-500 font-medium">Sentiment Distribution</span>
+              </div>
+              <div class="p-2" style="height: 180px;">
+                {#if gdeltLoading && radioLoading && socialLoading}
+                  <div class="flex items-center justify-center h-full">
+                    <svg class="animate-spin h-3 w-3 text-slate-600" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
+                {:else}
+                  <SentimentDistribution data={sentimentChartData} on:segmentClick={handleSentimentFilter} />
+                {/if}
+              </div>
+            </div>
+
+            <!-- Parallel Coordinates -->
+            <div class="bg-slate-800/50 border border-slate-700/30 rounded">
+              <div class="px-2 py-1 border-b border-slate-700/30">
+                <span class="text-[9px] uppercase tracking-wider text-slate-500 font-medium">Parallel Coordinates</span>
+              </div>
+              <div class="p-1">
+                {#if timelineData.length > 0}
+                  <ParallelCoordinates data={timelineData} height={200} />
+                {:else}
+                  <div class="flex items-center justify-center h-24">
+                    <span class="text-[9px] text-slate-600">No data</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Lag Analysis -->
+            <div class="bg-slate-800/50 border border-slate-700/30 rounded">
+              <div class="px-2 py-1 border-b border-slate-700/30">
+                <span class="text-[9px] uppercase tracking-wider text-slate-500 font-medium">Lag Analysis</span>
+              </div>
+              <div class="p-1">
+                {#if timelineData.length > 2}
+                  <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" chartHeight={180} />
+                {:else}
+                  <div class="flex items-center justify-center h-24">
+                    <span class="text-[9px] text-slate-600">Need 3+ days</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Keywords -->
+            <div class="bg-slate-800/50 border border-slate-700/30 rounded">
+              <div class="px-2 py-1 border-b border-slate-700/30">
+                <span class="text-[9px] uppercase tracking-wider text-slate-500 font-medium">Keywords</span>
+                {#if keywordData.length > 0}
+                  <span class="text-[8px] text-slate-600 ml-1">({keywordData.length} terms)</span>
+                {/if}
+              </div>
+              <div class="p-1">
+                {#if keywordData.length > 0}
+                  <!-- Keyword table showing cross-source counts -->
+                  <div class="space-y-0.5 mb-2">
+                    {#each keywordData.slice(0, 10) as kw}
+                      <div class="flex items-center justify-between px-1.5 py-0.5 rounded hover:bg-slate-700/30">
+                        <span class="text-[10px] text-slate-300 font-medium truncate max-w-[100px]">{kw.keyword}</span>
+                        <div class="flex items-center gap-2 text-[9px] font-mono">
+                          <span class="text-amber-400" title="GDELT">{kw.gdelt_count || 0}</span>
+                          <span class="text-violet-400" title="Radio">{kw.radio_count || 0}</span>
+                          <span class="text-sky-400" title="Social">{kw.social_count || 0}</span>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  <KeywordNetwork data={keywordData} height={180} />
+                {:else if wordCloudData.length > 0}
+                  <WordCloudChart words={wordCloudData} />
+                {:else}
+                  <div class="flex items-center justify-center h-20">
+                    <span class="text-[9px] text-slate-600">No keyword data</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+          </div>
+        </div>
       {/if}
 
-    </div>
-
-    <!-- ============ INSIGHTS BAR (h-56, collapsible) ============ -->
-    <div class="flex-shrink-0 border-t border-slate-700/50 bg-slate-900">
-      <!-- Insights header / toggle -->
-      <button
-        on:click={() => insightsCollapsed = !insightsCollapsed}
-        class="w-full px-3 py-1 flex items-center justify-between bg-slate-800 border-b border-slate-700/50 hover:bg-slate-750 transition-colors"
-      >
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Insights</span>
-          <span class="text-[10px] text-slate-600 font-mono">{totalItems} items analyzed</span>
-        </div>
-        <svg class="w-3 h-3 text-slate-500 transition-transform {insightsCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-        </svg>
-      </button>
-
-      {#if !insightsCollapsed}
-        <div class="h-40 flex gap-px p-1">
-          <!-- Sentiment Donut -->
-          <div class="flex-1 bg-slate-900 border border-slate-700/30 rounded flex flex-col min-w-0">
-            <div class="px-2 py-1 border-b border-slate-800/50">
-              <span class="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Sentiment</span>
-            </div>
-            <div class="flex-1 min-h-0 p-1">
-              {#if gdeltLoading && radioLoading && socialLoading}
-                <div class="flex items-center justify-center h-full">
-                  <svg class="animate-spin h-3 w-3 text-slate-600" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              {:else}
-                <SentimentDistribution data={sentimentChartData} on:segmentClick={handleSentimentFilter} />
-              {/if}
-            </div>
-          </div>
-
-          <!-- Parallel Coordinates -->
-          <div class="flex-1 bg-slate-900 border border-slate-700/30 rounded flex flex-col min-w-0">
-            <div class="px-2 py-1 border-b border-slate-800/50">
-              <span class="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Parallel Coords</span>
-            </div>
-            <div class="flex-1 min-h-0 p-1">
-              {#if timelineData.length > 0}
-                <ParallelCoordinates data={timelineData} />
-              {:else}
-                <div class="flex items-center justify-center h-full">
-                  <span class="text-[10px] text-slate-600">No data</span>
-                </div>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Lag Analysis -->
-          <div class="flex-1 bg-slate-900 border border-slate-700/30 rounded flex flex-col min-w-0">
-            <div class="px-2 py-1 border-b border-slate-800/50">
-              <span class="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Lag Analysis</span>
-            </div>
-            <div class="flex-1 min-h-0 p-1">
-              {#if timelineData.length > 2}
-                <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" />
-              {:else}
-                <div class="flex items-center justify-center h-full">
-                  <span class="text-[10px] text-slate-600">Need 3+ days</span>
-                </div>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Keywords -->
-          <div class="flex-1 bg-slate-900 border border-slate-700/30 rounded flex flex-col min-w-0">
-            <div class="px-2 py-1 border-b border-slate-800/50">
-              <span class="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Keywords</span>
-            </div>
-            <div class="flex-1 min-h-0 p-1">
-              {#if keywordData.length > 0}
-                <KeywordNetwork data={keywordData} />
-              {:else if wordCloudData.length > 0}
-                <WordCloudChart words={wordCloudData} />
-              {:else}
-                <div class="flex items-center justify-center h-full">
-                  <span class="text-[10px] text-slate-600">No keyword data</span>
-                </div>
-              {/if}
-            </div>
-          </div>
-        </div>
-      {/if}
     </div>
 
   </div>
