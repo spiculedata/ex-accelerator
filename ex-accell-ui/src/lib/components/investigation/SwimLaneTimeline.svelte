@@ -33,9 +33,8 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	// Sparkline-style margins: no left space for Y-axis labels, just room for lane labels
-	const margin = { top: 4, right: 20, bottom: 18, left: 40 };
-	const laneGap = 4;
+	const margin = { top: 4, right: 20, bottom: 18, left: 50 };
+	const laneGap = 6;
 
 	const colors = {
 		gdeltBar: '#64748b',
@@ -310,12 +309,7 @@
 				dispatch('brushChange', { start, end });
 			});
 
-		const brushGroup = g.append('g').attr('class', 'brush').call(brush);
-
-		// Style brush overlay
-		brushGroup.selectAll('.selection').attr('fill', '#3b82f6').attr('fill-opacity', 0.12).attr('stroke', '#3b82f6').attr('stroke-width', 1);
-
-		// ---- HOVER & CLICK OVERLAY ----
+		// ---- HOVER & CLICK OVERLAY (below brush so brush takes priority) ----
 		const overlay = g
 			.append('rect')
 			.attr('width', innerWidth)
@@ -323,6 +317,12 @@
 			.attr('fill', 'transparent')
 			.attr('pointer-events', 'all')
 			.style('cursor', 'crosshair');
+
+		const brushGroup = g.append('g').attr('class', 'brush').call(brush);
+
+		// Style brush overlay
+		brushGroup.selectAll('.selection').attr('fill', '#3b82f6').attr('fill-opacity', 0.15).attr('stroke', '#3b82f6').attr('stroke-width', 1);
+		brushGroup.selectAll('.overlay').style('cursor', 'crosshair');
 
 		// Vertical hover line
 		const hoverLine = g

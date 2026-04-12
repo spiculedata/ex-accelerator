@@ -15,15 +15,15 @@
 
 	export let height: number = 220;
 
-	const margin = { top: 30, right: 20, bottom: 16, left: 20 };
+	const margin = { top: 36, right: 20, bottom: 16, left: 20 };
 
 	const axisConfig: { key: string; label: string; domain: [number, number] | null }[] = [
-		{ key: 'gdelt_events', label: 'GDELT Evt', domain: null },
+		{ key: 'gdelt_events', label: 'Events', domain: null },
 		{ key: 'gdelt_avg_goldstein', label: 'Goldstein', domain: [-10, 10] },
-		{ key: 'radio_volume', label: 'Radio Vol', domain: null },
-		{ key: 'radio_sentiment', label: 'Radio Sent', domain: [-1, 1] },
-		{ key: 'social_volume', label: 'Social Vol', domain: null },
-		{ key: 'social_sentiment', label: 'Social Sent', domain: [-1, 1] }
+		{ key: 'radio_volume', label: 'Radio', domain: null },
+		{ key: 'radio_sentiment', label: 'R.Sent', domain: [-1, 1] },
+		{ key: 'social_volume', label: 'Social', domain: null },
+		{ key: 'social_sentiment', label: 'S.Sent', domain: [-1, 1] }
 	];
 
 	onMount(() => {
@@ -183,13 +183,12 @@
 
 			axisG
 				.append('text')
-				.attr('y', -12)
+				.attr('y', -14)
 				.attr('x', 0)
-				.attr('text-anchor', 'end')
+				.attr('text-anchor', 'middle')
 				.attr('fill', '#e2e8f0')
-				.attr('font-size', '8px')
+				.attr('font-size', '9px')
 				.attr('font-weight', '600')
-				.attr('transform', 'rotate(-45, 0, -12)')
 				.text(axis.label);
 
 			const brushWidth = 24;

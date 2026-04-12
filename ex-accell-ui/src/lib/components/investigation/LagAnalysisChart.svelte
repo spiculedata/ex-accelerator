@@ -113,7 +113,7 @@
 
 		const xArr = pairs.map((p) => p.a);
 		const yArr = pairs.map((p) => p.b);
-		correlation = pearsonCorrelation(xArr, yArr);
+		correlation = pairs.length >= 3 ? pearsonCorrelation(xArr, yArr) : NaN;
 
 		const g = svgEl
 			.attr('width', effectiveWidth)
@@ -123,8 +123,10 @@
 
 		const xExtent = d3.extent(xArr) as [number, number];
 		const yExtent = d3.extent(yArr) as [number, number];
-		const xPad = (xExtent[1] - xExtent[0]) * 0.1 || 0.1;
-		const yPad = (yExtent[1] - yExtent[0]) * 0.1 || 0.1;
+		const xRange = xExtent[1] - xExtent[0];
+		const yRange = yExtent[1] - yExtent[0];
+		const xPad = xRange > 0 ? xRange * 0.15 : Math.max(Math.abs(xExtent[0]) * 0.3, 1);
+		const yPad = yRange > 0 ? yRange * 0.15 : Math.max(Math.abs(yExtent[0]) * 0.3, 0.5);
 
 		const xScale = d3
 			.scaleLinear()
@@ -225,8 +227,10 @@
 				dispatch('dayClick', { date: d.date });
 			});
 
-		const corrColor =
-			Math.abs(correlation) > 0.5
+		const hasValidCorr = !isNaN(correlation);
+		const corrColor = !hasValidCorr
+			? '#64748b'
+			: Math.abs(correlation) > 0.5
 				? '#22c55e'
 				: Math.abs(correlation) > 0.3
 					? '#eab308'
@@ -239,7 +243,7 @@
 			.attr('fill', corrColor)
 			.attr('font-size', '18px')
 			.attr('font-weight', '700')
-			.text(`r = ${correlation.toFixed(3)}`);
+			.text(hasValidCorr ? `r = ${correlation.toFixed(3)}` : 'insufficient data');
 
 		const lagLabel =
 			lagHours === 0

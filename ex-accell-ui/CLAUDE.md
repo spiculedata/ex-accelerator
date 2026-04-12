@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Cognee Knowledge Graph (Shared Memory)
+
+This project is connected to a shared Cognee knowledge graph via MCP. The project dataset is **`ex-accelerator-codebase`**. When the `cognee` MCP server is available, use it as the **primary source for storing and retrieving project knowledge**.
+
+### Retrieving Knowledge
+- Before exploring the codebase for architectural questions, **search Cognee first** using the `search` tool with `search_type: "GRAPH_COMPLETION"` for natural language questions or `"CHUNKS"` for specific passages.
+- The `ex-accelerator-codebase` dataset contains comprehensive documentation of the project's routes, API endpoints, database schema, services, components, architecture, and data flows.
+- If Cognee returns relevant results, use them to inform your work without redundant file reads.
+- If Cognee is unavailable or returns no results, fall back to reading the codebase directly. Do not error or block on Cognee being down.
+
+### Storing Knowledge
+- When you learn something significant about the project that isn't already in the knowledge graph (new features, architectural decisions, major refactors, integration patterns), **save it to Cognee** using the `cognify` or `save_interaction` tools.
+- **Always use the dataset name `ex-accelerator-codebase`** when adding data. Example: when calling the Cognee add API or cognify tool, data should target this dataset so all project knowledge stays in one place.
+- Keep entries focused and descriptive — Cognee builds a knowledge graph from entities and relationships, so clear, structured text produces better results.
+- Do not store ephemeral information (debugging sessions, temporary workarounds). Store durable knowledge that helps future sessions and other team members.
+
+### Graceful Degradation
+- The Cognee MCP server may not always be available (network issues, server restarts, Tailscale disconnected).
+- If any Cognee tool call fails, **continue working normally** using local files and the codebase. Never block progress on Cognee availability.
+- Do not repeatedly retry failed Cognee calls within the same task.
+
 ## Project Overview
 
 This is the frontend UI component of the ex-accelerator project, built with SvelteKit 2.x, TypeScript, and Vite. It's a minimal Svelte application setup with modern tooling.

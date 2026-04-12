@@ -14,7 +14,7 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	const height = 350;
+	export let height: number = 250;
 	const colors = ['#06d6a0', '#f72585', '#8b5cf6', '#3b82f6', '#f59e0b'];
 
 	onMount(() => {

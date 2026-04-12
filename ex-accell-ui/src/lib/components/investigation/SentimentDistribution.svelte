@@ -123,7 +123,7 @@
       for (const entry of entries) {
         const cr = entry.contentRect;
         width = cr.width;
-        height = Math.min(cr.width, 360);
+        height = Math.min(cr.width, cr.height - 40, 280);
       }
     });
     if (containerEl) {
@@ -154,12 +154,12 @@
     <div class="flex flex-wrap justify-center gap-4 mt-3">
       {#each data as segment}
         <button
-          class="flex items-center gap-1.5 text-xs text-gray-700 hover:text-gray-900 transition-colors"
+          class="flex items-center gap-1.5 text-xs text-slate-300 hover:text-slate-100 transition-colors"
           on:click={() => dispatch('segmentClick', { label: segment.label })}
         >
           <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: {segment.color}"></span>
           {segment.label}
-          <span class="text-gray-400">({segment.value.toLocaleString()})</span>
+          <span class="text-slate-500">({segment.value.toLocaleString()})</span>
         </button>
       {/each}
     </div>

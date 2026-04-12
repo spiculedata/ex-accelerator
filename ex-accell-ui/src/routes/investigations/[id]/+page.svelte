@@ -295,9 +295,11 @@
   function formatDateCompact(dateStr: string): string {
     if (!dateStr) return '';
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch {
-      return dateStr;
+      return '';
     }
   }
 
@@ -309,12 +311,21 @@
   }
 
   function formatPostDate(timestamp: string | number | undefined): string {
-    if (!timestamp) return '';
-    const ts = typeof timestamp === 'number' ? timestamp : parseInt(String(timestamp));
-    if (!isNaN(ts) && ts > 1e12) return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    if (!isNaN(ts) && ts > 1e9) return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const d = new Date(String(timestamp));
-    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (!timestamp && timestamp !== 0) return '';
+    const fmt = (d: Date) => isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (typeof timestamp === 'number') {
+      if (timestamp > 1e12) return fmt(new Date(timestamp));
+      if (timestamp > 1e9) return fmt(new Date(timestamp * 1000));
+      return '';
+    }
+    // Try ISO string parse first (most common for API data)
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) return fmt(d);
+    // Try numeric parse as fallback
+    const ts = Number(timestamp);
+    if (!isNaN(ts) && ts > 1e12) return fmt(new Date(ts));
+    if (!isNaN(ts) && ts > 1e9) return fmt(new Date(ts * 1000));
+    return '';
   }
 
   function goldsteinColor(val: number): string {
@@ -518,7 +529,7 @@
     {/if}
 
     <!-- ============ TIMELINE ============ -->
-    <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50" style="height: 80px;">
+    <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50" style="height: 140px;">
       <div class="h-full flex flex-col">
         <div class="px-3 flex items-center justify-between flex-shrink-0" style="height: 16px;">
           <div class="flex items-center gap-2">
@@ -538,7 +549,7 @@
               </svg>
             </div>
           {:else}
-            <SwimLaneTimeline data={timelineData} height={60} on:brushChange={handleBrushChange} on:dayClick={handleDayClick} />
+            <SwimLaneTimeline data={timelineData} height={120} on:brushChange={handleBrushChange} on:dayClick={handleDayClick} />
           {/if}
         </div>
       </div>
@@ -780,18 +791,18 @@
             </div>
 
             <!-- Keywords -->
-            <div class="bg-slate-900 border border-slate-700/30 rounded-lg">
+            <div class="bg-slate-900 border border-slate-700/30 rounded-lg overflow-hidden">
               <div class="px-3 py-2 border-b border-slate-700/30">
                 <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cross-Source Keywords</span>
                 {#if keywordData.length > 0}
                   <span class="text-[9px] text-slate-600 ml-2">{keywordData.length} terms</span>
                 {/if}
               </div>
-              <div class="p-3">
+              <div class="p-3" style="height: 280px; overflow-y: auto;">
                 {#if keywordData.length > 0}
                   <!-- Keyword counts table -->
-                  <div class="mb-3">
-                    <div class="grid grid-cols-4 gap-1 text-[9px] uppercase tracking-wider text-slate-500 font-medium mb-1 px-1">
+                  <div class="mb-3 max-h-[120px] overflow-y-auto">
+                    <div class="grid grid-cols-4 gap-1 text-[9px] uppercase tracking-wider text-slate-500 font-medium mb-1 px-1 sticky top-0 bg-slate-900">
                       <span>Keyword</span>
                       <span class="text-right text-amber-400/70">GDELT</span>
                       <span class="text-right text-violet-400/70">Radio</span>
@@ -799,16 +810,16 @@
                     </div>
                     {#each keywordData as kw}
                       <div class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded hover:bg-slate-800/30">
-                        <span class="text-xs text-slate-300 font-medium">{kw.keyword}</span>
+                        <span class="text-xs text-slate-300 font-medium truncate">{kw.keyword}</span>
                         <span class="text-right text-xs font-mono text-amber-400">{kw.gdelt_count || 0}</span>
                         <span class="text-right text-xs font-mono text-violet-400">{kw.radio_count || 0}</span>
                         <span class="text-right text-xs font-mono text-sky-400">{kw.social_count || 0}</span>
                       </div>
                     {/each}
                   </div>
-                  <KeywordNetwork data={keywordData} height={200} />
+                  <KeywordNetwork data={keywordData} height={140} />
                 {:else if wordCloudData.length > 0}
-                  <WordCloudChart words={wordCloudData} />
+                  <WordCloudChart words={wordCloudData} height={250} />
                 {:else}
                   <div class="flex items-center justify-center h-40 text-slate-600 text-xs">No keyword data</div>
                 {/if}
