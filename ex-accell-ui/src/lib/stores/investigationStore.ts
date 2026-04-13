@@ -144,12 +144,12 @@ export interface PortalGridItem {
 }
 
 const DEFAULT_GRID: PortalGridItem[] = [
-  { id: 'sentiment', x: 0, y: 0, w: 4, h: 2 },
-  { id: 'volume', x: 4, y: 0, w: 4, h: 2 },
-  { id: 'correlation', x: 8, y: 0, w: 4, h: 2 },
-  { id: 'topics', x: 0, y: 2, w: 4, h: 2 },
-  { id: 'geography', x: 4, y: 2, w: 4, h: 2 },
-  { id: 'actors', x: 8, y: 2, w: 4, h: 2 },
+  { id: 'sentiment', x: 0, y: 0, w: 6, h: 2 },
+  { id: 'volume', x: 6, y: 0, w: 6, h: 2 },
+  { id: 'correlation', x: 0, y: 2, w: 6, h: 2 },
+  { id: 'topics', x: 6, y: 2, w: 6, h: 2 },
+  { id: 'geography', x: 0, y: 4, w: 6, h: 2 },
+  { id: 'actors', x: 6, y: 4, w: 6, h: 2 },
 ];
 
 export function getPortalLayout(): { visible: string[]; order: string[] } {

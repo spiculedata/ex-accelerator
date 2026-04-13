@@ -117,28 +117,58 @@
   // Grid items for visible portals, maintaining saved sizes
   $: gridItems = visiblePortals.map(id => {
     const saved = portalGrid.find(g => g.id === id);
-    return saved || { id, x: 0, y: 0, w: 4, h: 2 };
+    return saved || { id, x: 0, y: 0, w: 6, h: 2 };
   });
 
-  // Compute CSS grid span classes per portal
-  function portalSpanClass(item: PortalGridItem): string {
-    const colSpan = item.w <= 4 ? '' : item.w <= 8 ? 'col-span-2' : 'col-span-3';
-    const rowSpan = item.h <= 2 ? '' : 'row-span-2';
-    return `${colSpan} ${rowSpan}`.trim();
-  }
-
   function portalHeight(item: PortalGridItem): number {
-    return item.h <= 2 ? 280 : 580;
+    return item.h * 140;
   }
 
-  function resizePortal(portalId: string, dw: number, dh: number) {
-    portalGrid = portalGrid.map(g => {
-      if (g.id !== portalId) return g;
-      const newW = Math.max(3, Math.min(12, g.w + dw)); // 3-12 cols (quarter to full width)
-      const newH = Math.max(2, Math.min(8, g.h + dh));  // 2-8 rows (1x to 4x height)
-      return { ...g, w: newW, h: newH };
-    });
-    setPortalGrid(portalGrid);
+  // Corner-drag resize
+  let resizingPortal: string | null = null;
+  let resizeStartX = 0;
+  let resizeStartY = 0;
+  let resizeStartW = 0;
+  let resizeStartH = 0;
+  let resizeEl: HTMLElement | null = null;
+
+  function startResize(portalId: string, e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingPortal = portalId;
+    resizeStartX = e.clientX;
+    resizeStartY = e.clientY;
+    const item = portalGrid.find(g => g.id === portalId);
+    resizeStartW = item?.w ?? 6;
+    resizeStartH = item?.h ?? 2;
+    resizeEl = (e.target as HTMLElement).closest('[data-portal-cell]');
+
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+  }
+
+  function handleResizeMove(e: MouseEvent) {
+    if (!resizingPortal || !resizeEl) return;
+    const cellW = resizeEl.parentElement?.clientWidth ? resizeEl.parentElement.clientWidth / 12 : 80;
+    const cellH = 140;
+    const dx = e.clientX - resizeStartX;
+    const dy = e.clientY - resizeStartY;
+    const newW = Math.max(3, Math.min(12, Math.round(resizeStartW + dx / cellW)));
+    const newH = Math.max(2, Math.min(8, Math.round(resizeStartH + dy / cellH)));
+
+    portalGrid = portalGrid.map(g =>
+      g.id === resizingPortal ? { ...g, w: newW, h: newH } : g
+    );
+  }
+
+  function handleResizeEnd() {
+    if (resizingPortal) {
+      setPortalGrid(portalGrid);
+      resizingPortal = null;
+      resizeEl = null;
+    }
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
   }
 
   function handleDragStart(portalId: string) {
@@ -888,12 +918,13 @@
             >Reset</button>
           </div>
 
-          <!-- Portal grid — drag to reorder, click resize icon to cycle sizes -->
+          <!-- Portal grid — drag headers to reorder, drag corners to resize -->
           <div class="grid grid-cols-12 gap-3 auto-rows-[140px]">
             {#each visiblePortals as portalId (portalId)}
-              {@const item = gridItems.find(g => g.id === portalId) || { id: portalId, w: 4, h: 2, x: 0, y: 0 }}
+              {@const item = gridItems.find(g => g.id === portalId) || { id: portalId, w: 6, h: 2, x: 0, y: 0 }}
               <div
-                class="relative group transition-all duration-200 {dragTarget === portalId ? 'ring-2 ring-indigo-500/50' : ''}"
+                data-portal-cell
+                class="relative transition-all duration-150 {dragTarget === portalId ? 'ring-2 ring-indigo-500/50' : ''} {resizingPortal === portalId ? 'ring-1 ring-indigo-400/30' : ''}"
                 style="grid-column: span {Math.min(12, item.w)}; grid-row: span {item.h};"
                 draggable="true"
                 on:dragstart={() => handleDragStart(portalId)}
@@ -903,14 +934,16 @@
                 on:dragend={() => { dragSource = null; dragTarget = null; }}
                 role="listitem"
               >
-                <!-- Resize controls — visible on hover -->
-                <div class="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 rounded px-1 py-0.5">
-                  <span class="text-[8px] text-slate-500 mr-0.5">{item.w}×{item.h}</span>
-                  <button on:click|stopPropagation={() => resizePortal(portalId, -1, 0)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Narrower">◀</button>
-                  <button on:click|stopPropagation={() => resizePortal(portalId, 1, 0)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Wider">▶</button>
-                  <span class="text-slate-700">|</span>
-                  <button on:click|stopPropagation={() => resizePortal(portalId, 0, -1)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Shorter">▲</button>
-                  <button on:click|stopPropagation={() => resizePortal(portalId, 0, 1)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Taller">▼</button>
+                <!-- Corner resize handle (bottom-right) -->
+                <div
+                  class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-20 opacity-0 hover:opacity-100 transition-opacity"
+                  on:mousedown={(e) => startResize(portalId, e)}
+                  role="separator"
+                  aria-orientation="horizontal"
+                >
+                  <svg class="w-4 h-4 text-slate-500" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="12" cy="12" r="1.5" /><circle cx="8" cy="12" r="1.5" /><circle cx="12" cy="8" r="1.5" />
+                  </svg>
                 </div>
 
                 {#if portalId === 'sentiment'}
