@@ -309,13 +309,45 @@
 			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
 
 		// ---- BRUSH ----
+		// Floating label that shows date range during drag (outside clip group so it's not clipped)
+		const labelGroup = svgEl.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+		const brushLabel = labelGroup
+			.append('text')
+			.attr('text-anchor', 'middle')
+			.attr('fill', '#e2e8f0')
+			.attr('font-size', '10px')
+			.attr('font-weight', '600')
+			.attr('pointer-events', 'none')
+			.style('opacity', 0);
+
+		const fmtShort = d3.timeFormat('%b %d');
+
 		const brush = d3
 			.brushX()
 			.extent([
 				[0, 0],
 				[innerWidth, innerHeight]
 			])
+			.on('brush', (event: d3.D3BrushEvent<unknown>) => {
+				if (!event.selection) {
+					brushLabel.style('opacity', 0);
+					return;
+				}
+				const [x0, x1] = event.selection as [number, number];
+				const s = d3.timeDay.floor(xScale.invert(x0));
+				const e = d3.timeDay.ceil(xScale.invert(x1));
+				const midX = (x0 + x1) / 2;
+				const label = s.getTime() === e.getTime() || (e.getTime() - s.getTime()) < 86400000
+					? fmtShort(s)
+					: `${fmtShort(s)} – ${fmtShort(e)}`;
+				brushLabel
+					.attr('x', midX)
+					.attr('y', -4)
+					.text(label)
+					.style('opacity', 1);
+			})
 			.on('end', (event: d3.D3BrushEvent<unknown>) => {
+				brushLabel.style('opacity', 0);
 				if (!event.selection) {
 					// Click without drag — find nearest day
 					if (event.sourceEvent) {
