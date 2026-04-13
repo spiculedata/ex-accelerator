@@ -135,10 +135,41 @@ export function setPortalView(portalId: string, viewId: string): void {
 
 const DEFAULT_PORTALS = ['sentiment', 'volume', 'correlation', 'topics', 'geography', 'actors'];
 
+export interface PortalGridItem {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const DEFAULT_GRID: PortalGridItem[] = [
+  { id: 'sentiment', x: 0, y: 0, w: 4, h: 2 },
+  { id: 'volume', x: 4, y: 0, w: 4, h: 2 },
+  { id: 'correlation', x: 8, y: 0, w: 4, h: 2 },
+  { id: 'topics', x: 0, y: 2, w: 4, h: 2 },
+  { id: 'geography', x: 4, y: 2, w: 4, h: 2 },
+  { id: 'actors', x: 8, y: 2, w: 4, h: 2 },
+];
+
 export function getPortalLayout(): { visible: string[]; order: string[] } {
   return loadJson(PORTAL_LAYOUT_KEY, { visible: DEFAULT_PORTALS, order: DEFAULT_PORTALS });
 }
 
 export function setPortalLayout(layout: { visible: string[]; order: string[] }): void {
   saveJson(PORTAL_LAYOUT_KEY, layout);
+}
+
+const PORTAL_GRID_KEY = 'investigation-portal-grid';
+
+export function getPortalGrid(): PortalGridItem[] {
+  return loadJson<PortalGridItem[]>(PORTAL_GRID_KEY, DEFAULT_GRID);
+}
+
+export function setPortalGrid(grid: PortalGridItem[]): void {
+  saveJson(PORTAL_GRID_KEY, grid);
+}
+
+export function resetPortalGrid(): void {
+  saveJson(PORTAL_GRID_KEY, DEFAULT_GRID);
 }

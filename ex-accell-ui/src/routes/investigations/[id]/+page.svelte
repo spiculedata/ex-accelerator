@@ -9,7 +9,7 @@
     setSentimentFilter,
     setSourceFilter
   } from '$lib/stores/investigationStore';
-  import { getPortalLayout, setPortalLayout } from '$lib/stores/investigationStore';
+  import { getPortalLayout, setPortalLayout, getPortalGrid, setPortalGrid, resetPortalGrid, type PortalGridItem } from '$lib/stores/investigationStore';
   import SwimLaneTimeline from '$lib/components/investigation/SwimLaneTimeline.svelte';
   import type { TimelineEntry } from '$lib/components/investigation/SwimLaneTimeline.svelte';
   import SentimentDistribution from '$lib/components/investigation/SentimentDistribution.svelte';
@@ -102,13 +102,77 @@
   ];
   let portalLayout = getPortalLayout();
   $: visiblePortals = portalLayout.order.filter(id => portalLayout.visible.includes(id));
-  $: portalCols = visiblePortals.length <= 2 ? visiblePortals.length : visiblePortals.length <= 4 ? 2 : 3;
+  let portalGrid: PortalGridItem[] = getPortalGrid();
+  let dragSource: string | null = null;
+  let dragTarget: string | null = null;
 
   function togglePortal(portalId: string) {
     const visible = portalLayout.visible.includes(portalId)
       ? portalLayout.visible.filter(id => id !== portalId)
       : [...portalLayout.visible, portalId];
     portalLayout = { ...portalLayout, visible };
+    setPortalLayout(portalLayout);
+  }
+
+  // Grid items for visible portals, maintaining saved sizes
+  $: gridItems = visiblePortals.map(id => {
+    const saved = portalGrid.find(g => g.id === id);
+    return saved || { id, x: 0, y: 0, w: 4, h: 2 };
+  });
+
+  // Compute CSS grid span classes per portal
+  function portalSpanClass(item: PortalGridItem): string {
+    const colSpan = item.w <= 4 ? '' : item.w <= 8 ? 'col-span-2' : 'col-span-3';
+    const rowSpan = item.h <= 2 ? '' : 'row-span-2';
+    return `${colSpan} ${rowSpan}`.trim();
+  }
+
+  function portalHeight(item: PortalGridItem): number {
+    return item.h <= 2 ? 280 : 580;
+  }
+
+  function resizePortal(portalId: string, dw: number, dh: number) {
+    portalGrid = portalGrid.map(g => {
+      if (g.id !== portalId) return g;
+      const newW = Math.max(3, Math.min(12, g.w + dw)); // 3-12 cols (quarter to full width)
+      const newH = Math.max(2, Math.min(8, g.h + dh));  // 2-8 rows (1x to 4x height)
+      return { ...g, w: newW, h: newH };
+    });
+    setPortalGrid(portalGrid);
+  }
+
+  function handleDragStart(portalId: string) {
+    dragSource = portalId;
+  }
+
+  function handleDragOver(portalId: string, e: DragEvent) {
+    e.preventDefault();
+    dragTarget = portalId;
+  }
+
+  function handleDrop(portalId: string) {
+    if (!dragSource || dragSource === portalId) {
+      dragSource = null;
+      dragTarget = null;
+      return;
+    }
+    // Swap positions in the order
+    const order = [...portalLayout.order];
+    const srcIdx = order.indexOf(dragSource);
+    const tgtIdx = order.indexOf(portalId);
+    if (srcIdx >= 0 && tgtIdx >= 0) {
+      [order[srcIdx], order[tgtIdx]] = [order[tgtIdx], order[srcIdx]];
+      portalLayout = { ...portalLayout, order };
+      setPortalLayout(portalLayout);
+    }
+    dragSource = null;
+    dragTarget = null;
+  }
+
+  function handleResetGrid() {
+    resetPortalGrid();
+    portalGrid = getPortalGrid();
+    portalLayout = { visible: allPortals.map(p => p.id), order: allPortals.map(p => p.id) };
     setPortalLayout(portalLayout);
   }
 
@@ -804,7 +868,7 @@
       <!-- Visualizations Tab — Analytical Portals -->
       {#if activeTab === 'visualizations'}
         <div class="h-full overflow-y-auto p-3">
-          <!-- Portal toggle toolbar -->
+          <!-- Portal toolbar -->
           <div class="flex items-center gap-1.5 mb-3">
             <span class="text-[9px] uppercase tracking-wider text-slate-600 font-semibold mr-1">Portals</span>
             {#each allPortals as portal}
@@ -817,43 +881,52 @@
                 {portal.label}
               </button>
             {/each}
+            <div class="flex-1"></div>
+            <button on:click={handleResetGrid}
+              class="px-2 py-0.5 text-[9px] text-slate-600 hover:text-slate-400 transition-colors"
+              title="Reset layout"
+            >Reset</button>
           </div>
 
-          <!-- Portal grid -->
-          <div class="grid gap-3" style="grid-template-columns: repeat({portalCols}, 1fr);">
+          <!-- Portal grid — drag to reorder, click resize icon to cycle sizes -->
+          <div class="grid grid-cols-12 gap-3 auto-rows-[140px]">
             {#each visiblePortals as portalId (portalId)}
-              {#if portalId === 'sentiment'}
-                <SentimentPortal
-                  timelineData={filteredTimelineData}
-                  {gdeltEvents} {radioSegments} {socialPosts}
-                  height={280}
-                />
-              {:else if portalId === 'volume'}
-                <VolumePortal
-                  timelineData={filteredTimelineData}
-                  height={280}
-                />
-              {:else if portalId === 'correlation'}
-                <CorrelationPortal
-                  timelineData={filteredTimelineData}
-                  height={280}
-                />
-              {:else if portalId === 'topics'}
-                <TopicsPortal
-                  {keywordData}
-                  height={280}
-                />
-              {:else if portalId === 'geography'}
-                <GeographyPortal
-                  {keywords} {dateStart} {dateEnd}
-                  height={280}
-                />
-              {:else if portalId === 'actors'}
-                <ActorsPortal
-                  {keywords} {dateStart} {dateEnd}
-                  height={280}
-                />
-              {/if}
+              {@const item = gridItems.find(g => g.id === portalId) || { id: portalId, w: 4, h: 2, x: 0, y: 0 }}
+              <div
+                class="relative group transition-all duration-200 {dragTarget === portalId ? 'ring-2 ring-indigo-500/50' : ''}"
+                style="grid-column: span {Math.min(12, item.w)}; grid-row: span {item.h};"
+                draggable="true"
+                on:dragstart={() => handleDragStart(portalId)}
+                on:dragover={(e) => handleDragOver(portalId, e)}
+                on:dragleave={() => { if (dragTarget === portalId) dragTarget = null; }}
+                on:drop={() => handleDrop(portalId)}
+                on:dragend={() => { dragSource = null; dragTarget = null; }}
+                role="listitem"
+              >
+                <!-- Resize controls — visible on hover -->
+                <div class="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/90 rounded px-1 py-0.5">
+                  <span class="text-[8px] text-slate-500 mr-0.5">{item.w}×{item.h}</span>
+                  <button on:click|stopPropagation={() => resizePortal(portalId, -1, 0)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Narrower">◀</button>
+                  <button on:click|stopPropagation={() => resizePortal(portalId, 1, 0)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Wider">▶</button>
+                  <span class="text-slate-700">|</span>
+                  <button on:click|stopPropagation={() => resizePortal(portalId, 0, -1)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Shorter">▲</button>
+                  <button on:click|stopPropagation={() => resizePortal(portalId, 0, 1)} class="text-slate-500 hover:text-slate-200 text-[10px] px-0.5" title="Taller">▼</button>
+                </div>
+
+                {#if portalId === 'sentiment'}
+                  <SentimentPortal timelineData={filteredTimelineData} {gdeltEvents} {radioSegments} {socialPosts} height={portalHeight(item)} />
+                {:else if portalId === 'volume'}
+                  <VolumePortal timelineData={filteredTimelineData} height={portalHeight(item)} />
+                {:else if portalId === 'correlation'}
+                  <CorrelationPortal timelineData={filteredTimelineData} height={portalHeight(item)} />
+                {:else if portalId === 'topics'}
+                  <TopicsPortal {keywordData} height={portalHeight(item)} />
+                {:else if portalId === 'geography'}
+                  <GeographyPortal {keywords} {dateStart} {dateEnd} height={portalHeight(item)} />
+                {:else if portalId === 'actors'}
+                  <ActorsPortal {keywords} {dateStart} {dateEnd} height={portalHeight(item)} />
+                {/if}
+              </div>
             {/each}
           </div>
         </div>
