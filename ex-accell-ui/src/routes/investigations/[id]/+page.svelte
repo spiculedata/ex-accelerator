@@ -74,6 +74,10 @@
     confidence_score?: number;
     platform?: string;
     timestamp?: string;
+    engagement_likes?: number;
+    engagement_shares?: number;
+    engagement_comments?: number;
+    emotions?: string;
   }
 
   let investigation: Investigation | null = null;
@@ -206,8 +210,10 @@
     setPortalLayout(portalLayout);
   }
 
-  // Transcript expand
+  // Row expand states
   let expandedTranscriptId: string | number | null = null;
+  let expandedGdeltId: string | number | null = null;
+  let expandedSocialId: string | number | null = null;
 
   // Investigation parameters
   let keywords: string[] = [];
@@ -765,7 +771,11 @@
               </thead>
               <tbody>
                 {#each gdeltEvents as event}
-                  <tr class="border-b border-slate-800/40 hover:bg-slate-800/40 transition-colors">
+                  {@const expanded = expandedGdeltId === event.globaleventid}
+                  <tr
+                    class="border-b border-slate-800/40 hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    on:click={() => expandedGdeltId = expanded ? null : event.globaleventid}
+                  >
                     <td class="px-3 py-1.5 text-slate-400 font-mono whitespace-nowrap">{formatGdeltDate(event.sqldate)}</td>
                     <td class="px-3 py-1.5 text-slate-300">
                       <span class="font-medium">{event.actor1name || '-'}</span>
@@ -787,9 +797,51 @@
                         <span class="text-[10px] font-mono text-slate-500">{event.avgtone.toFixed(1)}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-1.5 text-slate-500 truncate max-w-[200px]">{event.actiongeo_fullname || '-'}</td>
+                    <td class="px-3 py-1.5 text-slate-500 truncate max-w-[200px]" title={event.actiongeo_fullname}>{event.actiongeo_fullname || '-'}</td>
                     <td class="px-3 py-1.5 text-right font-mono text-slate-500">{event.numarticles || '-'}</td>
                   </tr>
+                  {#if expanded}
+                    <tr class="bg-slate-800/20">
+                      <td colspan="6" class="px-4 py-3">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                          <div>
+                            <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Event Type</span>
+                            <span class="text-slate-300 font-mono">{event.eventcode || '-'}</span>
+                            {#if event.quadclass}
+                              <span class="ml-1.5 text-[9px] px-1 py-0 rounded {event.quadclass == 1 ? 'bg-emerald-500/15 text-emerald-400' : event.quadclass == 2 ? 'bg-sky-500/15 text-sky-400' : event.quadclass == 3 ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}">
+                                {event.quadclass == 1 ? 'Verbal Coop' : event.quadclass == 2 ? 'Material Coop' : event.quadclass == 3 ? 'Verbal Conflict' : 'Material Conflict'}
+                              </span>
+                            {/if}
+                          </div>
+                          <div>
+                            <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Coverage</span>
+                            <span class="text-slate-300">{event.nummentions ?? 0} mentions &middot; {event.numsources ?? 0} sources &middot; {event.numarticles ?? 0} articles</span>
+                          </div>
+                          <div>
+                            <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Location</span>
+                            <span class="text-slate-300">{event.actiongeo_fullname || 'Unknown'}</span>
+                            {#if event.actiongeo_lat && event.actiongeo_long}
+                              <span class="text-[9px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
+                            {/if}
+                          </div>
+                          <div>
+                            <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Actors</span>
+                            <div class="text-slate-300">
+                              {#if event.actor1name}<span class="font-medium">{event.actor1name}</span>{#if event.actor1countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor1countrycode})</span>{/if}{/if}
+                              {#if event.actor2name}<span class="text-slate-600 mx-1">&rarr;</span><span>{event.actor2name}</span>{#if event.actor2countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor2countrycode})</span>{/if}{/if}
+                            </div>
+                          </div>
+                        </div>
+                        {#if event.sourceurl}
+                          <div class="mt-2 pt-2 border-t border-slate-700/30">
+                            <a href={event.sourceurl} target="_blank" rel="noopener noreferrer" class="text-[10px] text-indigo-400 hover:text-indigo-300 truncate block max-w-full">
+                              {event.sourceurl}
+                            </a>
+                          </div>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/if}
                 {/each}
               </tbody>
             </table>
@@ -867,7 +919,18 @@
           <div class="h-full overflow-y-auto">
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-slate-800/30 p-1">
               {#each socialPosts as post}
-                <div class="bg-slate-900 p-3 hover:bg-slate-800/50 transition-colors">
+                {@const isExpanded = expandedSocialId === post.id}
+                {@const likes = Number(post.engagement_likes || 0)}
+                {@const shares = Number(post.engagement_shares || 0)}
+                {@const comments = Number(post.engagement_comments || 0)}
+                {@const totalEng = likes + shares + comments}
+                <div
+                  class="bg-slate-900 p-3 hover:bg-slate-800/50 transition-colors cursor-pointer {isExpanded ? 'col-span-1 md:col-span-2 xl:col-span-3 bg-slate-800/50' : ''}"
+                  on:click={() => expandedSocialId = isExpanded ? null : post.id}
+                  on:keydown={(e) => { if (e.key === 'Enter') expandedSocialId = isExpanded ? null : post.id; }}
+                  role="button"
+                  tabindex="0"
+                >
                   <div class="flex items-center justify-between mb-1.5">
                     <div class="flex items-center gap-1.5">
                       <span class="w-2 h-2 rounded-full {sentimentDotColor(post.sentiment_category)}"></span>
@@ -875,10 +938,18 @@
                         <span class="text-[10px] font-medium text-sky-400">{post.platform}</span>
                       {/if}
                       {#if post.sentiment_category}
-                        <span class="text-[9px] px-1 py-0 rounded {post.sentiment_category?.toLowerCase() === 'positive' ? 'bg-emerald-500/15 text-emerald-400' : post.sentiment_category?.toLowerCase() === 'negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}">{post.sentiment_category}</span>
+                        <span class="text-[9px] px-1 py-0 rounded {post.sentiment_category?.toLowerCase() === 'positive' || post.sentiment_category?.toLowerCase() === 'very positive' ? 'bg-emerald-500/15 text-emerald-400' : post.sentiment_category?.toLowerCase() === 'negative' || post.sentiment_category?.toLowerCase() === 'very negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}">{post.sentiment_category}</span>
                       {/if}
                     </div>
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-2">
+                      <!-- Inline engagement -->
+                      {#if totalEng > 0}
+                        <div class="flex items-center gap-1.5 text-[9px] text-slate-600">
+                          {#if likes > 0}<span title="Likes">❤ {likes.toLocaleString()}</span>{/if}
+                          {#if shares > 0}<span title="Shares">↗ {shares.toLocaleString()}</span>{/if}
+                          {#if comments > 0}<span title="Comments">💬 {comments.toLocaleString()}</span>{/if}
+                        </div>
+                      {/if}
                       {#if post.confidence_score}
                         <span class="text-[9px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
                       {/if}
@@ -887,7 +958,43 @@
                       {/if}
                     </div>
                   </div>
-                  <p class="text-xs text-slate-300 leading-snug">{post.text}</p>
+
+                  {#if isExpanded}
+                    <!-- Expanded view -->
+                    <p class="text-sm text-slate-200 leading-relaxed mb-3 whitespace-pre-wrap">{post.text}</p>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-700/30">
+                      <div>
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Engagement</span>
+                        <div class="flex items-center gap-3 text-xs">
+                          <span class="text-rose-400">❤ {likes.toLocaleString()}</span>
+                          <span class="text-sky-400">↗ {shares.toLocaleString()}</span>
+                          <span class="text-amber-400">💬 {comments.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Sentiment</span>
+                        <span class="text-xs text-slate-300">{post.sentiment_category || 'Unknown'}</span>
+                        {#if post.confidence_score}
+                          <span class="text-[9px] text-slate-500 ml-1">({(post.confidence_score * 100).toFixed(0)}% confidence)</span>
+                        {/if}
+                      </div>
+                      {#if post.emotions}
+                        <div>
+                          <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Emotions</span>
+                          <span class="text-xs text-slate-300">{post.emotions}</span>
+                        </div>
+                      {/if}
+                      <div>
+                        <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Platform</span>
+                        <span class="text-xs text-sky-400">{post.platform || 'Unknown'}</span>
+                        {#if post.timestamp}
+                          <span class="text-[9px] text-slate-500 ml-1">{formatPostDate(post.timestamp)}</span>
+                        {/if}
+                      </div>
+                    </div>
+                  {:else}
+                    <p class="text-xs text-slate-300 leading-snug line-clamp-3">{post.text}</p>
+                  {/if}
                 </div>
               {/each}
             </div>

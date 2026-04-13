@@ -1639,7 +1639,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         const data = await executeQuery(`
           SELECT * FROM (
             SELECT DISTINCT ON (globaleventid) globaleventid, sqldate, actor1name, actor2name,
-              eventcode, goldsteinscale, nummentions, avgtone,
+              eventcode, eventrootcode, quadclass, goldsteinscale, nummentions, numsources, numarticles, avgtone,
               actor1countrycode, actor2countrycode,
               actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
             FROM gdelt_events
@@ -1706,7 +1706,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       try {
         const data = await executeQuery(`
           SELECT id, text, timestamp, platform,
-            sentiment_category, confidence_score,
+            sentiment_category, confidence_score, emotions,
             engagement_likes, engagement_shares, engagement_comments
           FROM posts_with_sentiment
           WHERE to_timestamp(timestamp/1000) >= $1::timestamp
