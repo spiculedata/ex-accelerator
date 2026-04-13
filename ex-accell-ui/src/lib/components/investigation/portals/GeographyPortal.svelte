@@ -25,6 +25,7 @@
     if (container) {
       const ro = new ResizeObserver((entries) => {
         containerWidth = entries[0].contentRect.width;
+        height = entries[0].contentRect.height || height;
         if (activeView === 'hotspots' && locationData.length > 0) renderChart();
       });
       ro.observe(container);
@@ -38,7 +39,14 @@
     if (id === 'hotspots') setTimeout(renderChart, 50);
   }
 
-  $: if (keywords.length > 0 && dateStart && dateEnd) loadData();
+  let lastFetchKey = '';
+  $: {
+    const fetchKey = `${keywords.join(',')}|${dateStart}|${dateEnd}`;
+    if (keywords.length > 0 && dateStart && dateEnd && fetchKey !== lastFetchKey) {
+      lastFetchKey = fetchKey;
+      loadData();
+    }
+  }
 
   async function loadData() {
     loading = true;

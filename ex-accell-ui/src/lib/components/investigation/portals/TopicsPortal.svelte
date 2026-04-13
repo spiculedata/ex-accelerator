@@ -24,6 +24,7 @@
     if (container) {
       const ro = new ResizeObserver((entries) => {
         containerWidth = entries[0].contentRect.width;
+        height = entries[0].contentRect.height || height;
         if (activeView === 'shared') renderShared();
       });
       ro.observe(container);
