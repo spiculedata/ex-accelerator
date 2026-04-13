@@ -133,7 +133,7 @@ export function setPortalView(portalId: string, viewId: string): void {
   saveJson(PORTAL_VIEWS_KEY, views);
 }
 
-const DEFAULT_PORTALS = ['sentiment', 'volume', 'correlation', 'topics'];
+const DEFAULT_PORTALS = ['sentiment', 'volume', 'correlation', 'topics', 'geography', 'actors'];
 
 export function getPortalLayout(): { visible: string[]; order: string[] } {
   return loadJson(PORTAL_LAYOUT_KEY, { visible: DEFAULT_PORTALS, order: DEFAULT_PORTALS });

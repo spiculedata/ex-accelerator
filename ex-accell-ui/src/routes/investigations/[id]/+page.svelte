@@ -21,6 +21,8 @@
   import VolumePortal from '$lib/components/investigation/portals/VolumePortal.svelte';
   import CorrelationPortal from '$lib/components/investigation/portals/CorrelationPortal.svelte';
   import TopicsPortal from '$lib/components/investigation/portals/TopicsPortal.svelte';
+  import GeographyPortal from '$lib/components/investigation/portals/GeographyPortal.svelte';
+  import ActorsPortal from '$lib/components/investigation/portals/ActorsPortal.svelte';
 
   export const ssr = false;
 
@@ -95,6 +97,8 @@
     { id: 'volume', label: 'Volume' },
     { id: 'correlation', label: 'Correlation' },
     { id: 'topics', label: 'Topics' },
+    { id: 'geography', label: 'Geography' },
+    { id: 'actors', label: 'Actors' },
   ];
   let portalLayout = getPortalLayout();
   $: visiblePortals = portalLayout.order.filter(id => portalLayout.visible.includes(id));
@@ -837,6 +841,16 @@
               {:else if portalId === 'topics'}
                 <TopicsPortal
                   {keywordData}
+                  height={280}
+                />
+              {:else if portalId === 'geography'}
+                <GeographyPortal
+                  {keywords} {dateStart} {dateEnd}
+                  height={280}
+                />
+              {:else if portalId === 'actors'}
+                <ActorsPortal
+                  {keywords} {dateStart} {dateEnd}
                   height={280}
                 />
               {/if}

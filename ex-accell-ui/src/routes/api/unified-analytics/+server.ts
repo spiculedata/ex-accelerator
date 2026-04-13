@@ -1786,6 +1786,104 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
+    if (type === 'investigation-locations') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+      const limit = parseInt(url.searchParams.get('limit') || '50');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          SELECT actiongeo_fullname AS location,
+            actiongeo_countrycode AS country_code,
+            ROUND(AVG(actiongeo_lat::numeric), 4) AS lat,
+            ROUND(AVG(actiongeo_long::numeric), 4) AS lng,
+            COUNT(*) AS event_count,
+            ROUND(AVG(avgtone::numeric), 2) AS avg_tone,
+            ROUND(AVG(goldsteinscale::numeric), 2) AS avg_goldstein
+          FROM gdelt_events
+          WHERE sqldate::text >= REPLACE($1, '-', '')
+            AND sqldate::text <= REPLACE($2, '-', '')
+            AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[]))
+            AND actiongeo_fullname IS NOT NULL AND actiongeo_fullname != ''
+          GROUP BY actiongeo_fullname, actiongeo_countrycode
+          ORDER BY event_count DESC
+          LIMIT $4
+        `, [dateStart, dateEnd, keywordsArray, limit]);
+
+        return json({ success: true, data: data || [] });
+      } catch (err) {
+        console.error('Investigation locations query failed:', err);
+        return json({ success: true, data: [] });
+      }
+    }
+
+    if (type === 'investigation-actors') {
+      const keywords = url.searchParams.get('keywords') || '';
+      const dateStart = url.searchParams.get('date_start');
+      const dateEnd = url.searchParams.get('date_end');
+      const limit = parseInt(url.searchParams.get('limit') || '30');
+
+      if (!keywords || !dateStart || !dateEnd) {
+        return json({ success: false, error: 'keywords, date_start, and date_end are required' }, { status: 400 });
+      }
+
+      const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
+
+      try {
+        const data = await executeQuery(`
+          WITH actor_mentions AS (
+            SELECT actor1name AS actor, actor1countrycode AS country_code, avgtone, goldsteinscale
+            FROM gdelt_events
+            WHERE sqldate::text >= REPLACE($1, '-', '')
+              AND sqldate::text <= REPLACE($2, '-', '')
+              AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[]))
+              AND actor1name IS NOT NULL AND actor1name != ''
+            UNION ALL
+            SELECT actor2name AS actor, actor2countrycode AS country_code, avgtone, goldsteinscale
+            FROM gdelt_events
+            WHERE sqldate::text >= REPLACE($1, '-', '')
+              AND sqldate::text <= REPLACE($2, '-', '')
+              AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[]))
+              AND actor2name IS NOT NULL AND actor2name != ''
+          )
+          SELECT actor, country_code,
+            COUNT(*) AS mention_count,
+            ROUND(AVG(avgtone::numeric), 2) AS avg_tone,
+            ROUND(AVG(goldsteinscale::numeric), 2) AS avg_goldstein
+          FROM actor_mentions
+          GROUP BY actor, country_code
+          ORDER BY mention_count DESC
+          LIMIT $4
+        `, [dateStart, dateEnd, keywordsArray, limit]);
+
+        // Also get co-occurrence pairs
+        const pairs = await executeQuery(`
+          SELECT actor1name AS source_actor, actor2name AS target_actor, COUNT(*) AS weight
+          FROM gdelt_events
+          WHERE sqldate::text >= REPLACE($1, '-', '')
+            AND sqldate::text <= REPLACE($2, '-', '')
+            AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[]))
+            AND actor1name IS NOT NULL AND actor1name != ''
+            AND actor2name IS NOT NULL AND actor2name != ''
+          GROUP BY actor1name, actor2name
+          ORDER BY weight DESC
+          LIMIT 50
+        `, [dateStart, dateEnd, keywordsArray]);
+
+        return json({ success: true, data: { actors: data || [], pairs: pairs || [] } });
+      } catch (err) {
+        console.error('Investigation actors query failed:', err);
+        return json({ success: true, data: { actors: [], pairs: [] } });
+      }
+    }
+
     // Default response for unsupported query types
     return json({
       success: true,
