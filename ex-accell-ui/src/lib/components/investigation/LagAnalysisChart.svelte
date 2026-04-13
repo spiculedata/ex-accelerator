@@ -20,7 +20,7 @@
 	export let chartHeight: number = 200;
 	const sliderHeight = 40;
 	const totalHeight = chartHeight + sliderHeight + 16;
-	const margin = { top: 20, right: 20, bottom: 36, left: 40 };
+	const margin = { top: 20, right: 20, bottom: 44, left: 48 };
 
 	const sourceLabels: Record<string, string> = {
 		gdelt: 'GDELT Tone',
@@ -125,8 +125,9 @@
 		const yExtent = d3.extent(yArr) as [number, number];
 		const xRange = xExtent[1] - xExtent[0];
 		const yRange = yExtent[1] - yExtent[0];
-		const xPad = xRange > 0 ? xRange * 0.15 : Math.max(Math.abs(xExtent[0]) * 0.3, 1);
-		const yPad = yRange > 0 ? yRange * 0.15 : Math.max(Math.abs(yExtent[0]) * 0.3, 0.5);
+		// Pad proportionally, with a small minimum relative to the data magnitude
+		const xPad = xRange > 0.001 ? xRange * 0.2 : Math.max(Math.abs(xExtent[0]) * 0.5, 0.05);
+		const yPad = yRange > 0.001 ? yRange * 0.2 : Math.max(Math.abs(yExtent[0]) * 0.5, 0.05);
 
 		const xScale = d3
 			.scaleLinear()

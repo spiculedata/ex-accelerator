@@ -86,10 +86,11 @@
 
 		if (data.length === 0) return;
 
+		const maxRadius = Math.min(35, innerHeight / 4);
 		const sizeScale = d3
 			.scaleSqrt()
 			.domain([0, d3.max(data, totalCount) ?? 1])
-			.range([6, 35]);
+			.range([6, maxRadius]);
 
 		const nodes = data.map((d: any) => ({
 			...d,

@@ -1,6 +1,7 @@
 // PostgreSQL with pg_duckdb extension connection service
 // Provides connection pooling and unified query interface for PostgreSQL + DuckDB
 
+import 'dotenv/config';
 import { Pool, type PoolClient, type QueryResult } from 'pg';
 
 interface PostgresConfig {

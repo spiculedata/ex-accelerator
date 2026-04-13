@@ -10,13 +10,17 @@
   let svgEl: SVGSVGElement;
   let tooltipEl: HTMLDivElement;
   let resizeObserver: ResizeObserver;
-  let width = 300;
-  let height = 300;
+  let containerWidth = 300;
+  let containerHeight = 300;
 
-  const margin = 20;
+  const margin = 16;
 
   $: total = data.reduce((sum, d) => sum + d.value, 0);
-  $: radius = Math.min(width, height) / 2 - margin;
+  // Use the full available height for the donut, constrain width to keep it square
+  $: chartSize = Math.min(containerWidth * 0.55, containerHeight - 10);
+  $: width = chartSize;
+  $: height = chartSize;
+  $: radius = chartSize / 2 - margin;
   $: innerRadius = radius * 0.55;
 
   $: if (svgEl && data.length > 0 && radius > 0) {
@@ -122,8 +126,8 @@
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const cr = entry.contentRect;
-        width = cr.width;
-        height = Math.min(cr.width, cr.height - 40, 280);
+        containerWidth = cr.width;
+        containerHeight = cr.height;
       }
     });
     if (containerEl) {
@@ -138,9 +142,9 @@
   });
 </script>
 
-<div bind:this={containerEl} class="relative w-full min-h-[200px]">
+<div bind:this={containerEl} class="relative w-full h-full">
   {#if data.length === 0 || total === 0}
-    <div class="flex flex-col items-center justify-center h-64 text-gray-400">
+    <div class="flex flex-col items-center justify-center h-full text-slate-500">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
@@ -148,26 +152,29 @@
       <p class="text-sm font-medium">No sentiment data</p>
     </div>
   {:else}
-    <svg bind:this={svgEl} class="mx-auto"></svg>
-
-    <!-- Legend -->
-    <div class="flex flex-wrap justify-center gap-4 mt-3">
-      {#each data as segment}
-        <button
-          class="flex items-center gap-1.5 text-xs text-slate-300 hover:text-slate-100 transition-colors"
-          on:click={() => dispatch('segmentClick', { label: segment.label })}
-        >
-          <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: {segment.color}"></span>
-          {segment.label}
-          <span class="text-slate-500">({segment.value.toLocaleString()})</span>
-        </button>
-      {/each}
+    <div class="flex items-center h-full gap-4">
+      <div class="flex-shrink-0">
+        <svg bind:this={svgEl}></svg>
+      </div>
+      <!-- Legend -->
+      <div class="flex flex-col gap-2">
+        {#each data as segment}
+          <button
+            class="flex items-center gap-2 text-xs text-slate-300 hover:text-slate-100 transition-colors"
+            on:click={() => dispatch('segmentClick', { label: segment.label })}
+          >
+            <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: {segment.color}"></span>
+            <span class="font-medium">{segment.label}</span>
+            <span class="text-slate-500 font-mono">{segment.value.toLocaleString()}</span>
+          </button>
+        {/each}
+      </div>
     </div>
 
     <!-- Tooltip -->
     <div
       bind:this={tooltipEl}
-      class="absolute pointer-events-none bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg opacity-0 transition-opacity duration-150 z-50"
+      class="absolute pointer-events-none bg-slate-800 border border-slate-600 text-white text-xs rounded-lg px-3 py-2 shadow-xl opacity-0 transition-opacity duration-150 z-50"
       style="opacity: 0"
     ></div>
   {/if}
