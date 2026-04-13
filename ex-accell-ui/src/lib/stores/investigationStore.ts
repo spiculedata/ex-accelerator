@@ -103,3 +103,42 @@ export const activeFilterCount = derived(investigationSelection, ($s) => {
   if ($s.keywords && $s.keywords.length > 0) count++;
   return count;
 });
+
+// ---- Portal Preferences (localStorage persisted) ----
+
+const PORTAL_VIEWS_KEY = 'investigation-portal-views';
+const PORTAL_LAYOUT_KEY = 'investigation-portal-layout';
+
+function loadJson<T>(key: string, fallback: T): T {
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+
+function saveJson(key: string, value: unknown): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+export function getPortalView(portalId: string, defaultView: string): string {
+  const views = loadJson<Record<string, string>>(PORTAL_VIEWS_KEY, {});
+  return views[portalId] || defaultView;
+}
+
+export function setPortalView(portalId: string, viewId: string): void {
+  const views = loadJson<Record<string, string>>(PORTAL_VIEWS_KEY, {});
+  views[portalId] = viewId;
+  saveJson(PORTAL_VIEWS_KEY, views);
+}
+
+const DEFAULT_PORTALS = ['sentiment', 'volume', 'correlation', 'topics'];
+
+export function getPortalLayout(): { visible: string[]; order: string[] } {
+  return loadJson(PORTAL_LAYOUT_KEY, { visible: DEFAULT_PORTALS, order: DEFAULT_PORTALS });
+}
+
+export function setPortalLayout(layout: { visible: string[]; order: string[] }): void {
+  saveJson(PORTAL_LAYOUT_KEY, layout);
+}

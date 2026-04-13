@@ -9,6 +9,7 @@
     setSentimentFilter,
     setSourceFilter
   } from '$lib/stores/investigationStore';
+  import { getPortalLayout, setPortalLayout } from '$lib/stores/investigationStore';
   import SwimLaneTimeline from '$lib/components/investigation/SwimLaneTimeline.svelte';
   import type { TimelineEntry } from '$lib/components/investigation/SwimLaneTimeline.svelte';
   import SentimentDistribution from '$lib/components/investigation/SentimentDistribution.svelte';
@@ -16,6 +17,10 @@
   import LagAnalysisChart from '$lib/components/investigation/LagAnalysisChart.svelte';
   import KeywordNetwork from '$lib/components/investigation/KeywordNetwork.svelte';
   import WordCloudChart from '$lib/components/investigation/WordCloudChart.svelte';
+  import SentimentPortal from '$lib/components/investigation/portals/SentimentPortal.svelte';
+  import VolumePortal from '$lib/components/investigation/portals/VolumePortal.svelte';
+  import CorrelationPortal from '$lib/components/investigation/portals/CorrelationPortal.svelte';
+  import TopicsPortal from '$lib/components/investigation/portals/TopicsPortal.svelte';
 
   export const ssr = false;
 
@@ -83,6 +88,25 @@
 
   // Tabs
   let activeTab: 'gdelt' | 'radio' | 'social' | 'visualizations' = 'gdelt';
+
+  // Portal configuration
+  const allPortals = [
+    { id: 'sentiment', label: 'Sentiment' },
+    { id: 'volume', label: 'Volume' },
+    { id: 'correlation', label: 'Correlation' },
+    { id: 'topics', label: 'Topics' },
+  ];
+  let portalLayout = getPortalLayout();
+  $: visiblePortals = portalLayout.order.filter(id => portalLayout.visible.includes(id));
+  $: portalCols = visiblePortals.length <= 2 ? visiblePortals.length : visiblePortals.length <= 4 ? 2 : 3;
+
+  function togglePortal(portalId: string) {
+    const visible = portalLayout.visible.includes(portalId)
+      ? portalLayout.visible.filter(id => id !== portalId)
+      : [...portalLayout.visible, portalId];
+    portalLayout = { ...portalLayout, visible };
+    setPortalLayout(portalLayout);
+  }
 
   // Transcript expand
   let expandedTranscriptId: string | number | null = null;
@@ -773,88 +797,50 @@
         {/if}
       {/if}
 
-      <!-- Visualizations Tab -->
+      <!-- Visualizations Tab — Analytical Portals -->
       {#if activeTab === 'visualizations'}
         <div class="h-full overflow-y-auto p-3">
-          <div class="grid grid-cols-2 gap-3">
+          <!-- Portal toggle toolbar -->
+          <div class="flex items-center gap-1.5 mb-3">
+            <span class="text-[9px] uppercase tracking-wider text-slate-600 font-semibold mr-1">Portals</span>
+            {#each allPortals as portal}
+              <button
+                on:click={() => togglePortal(portal.id)}
+                class="px-2 py-0.5 text-[9px] rounded-full transition-colors {portalLayout.visible.includes(portal.id)
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-600 border border-slate-700/30 hover:text-slate-400 hover:border-slate-600'}"
+              >
+                {portal.label}
+              </button>
+            {/each}
+          </div>
 
-            <!-- Sentiment Distribution -->
-            <div class="bg-slate-900 border border-slate-700/30 rounded-lg">
-              <div class="px-3 py-2 border-b border-slate-700/30">
-                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Sentiment Distribution</span>
-                <span class="text-[9px] text-slate-600 ml-2">{totalItems} items</span>
-              </div>
-              <div class="p-3" style="height: 280px;">
-                <SentimentDistribution data={sentimentChartData} on:segmentClick={handleSentimentFilter} />
-              </div>
-            </div>
-
-            <!-- Parallel Coordinates -->
-            <div class="bg-slate-900 border border-slate-700/30 rounded-lg">
-              <div class="px-3 py-2 border-b border-slate-700/30">
-                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Parallel Coordinates</span>
-                <span class="text-[9px] text-slate-600 ml-2">Daily cross-source comparison</span>
-              </div>
-              <div class="p-2">
-                {#if filteredTimelineData.length > 0}
-                  <ParallelCoordinates data={filteredTimelineData} height={280} />
-                {:else}
-                  <div class="flex items-center justify-center h-64 text-slate-600 text-xs">No data</div>
-                {/if}
-              </div>
-            </div>
-
-            <!-- Lag Analysis -->
-            <div class="bg-slate-900 border border-slate-700/30 rounded-lg">
-              <div class="px-3 py-2 border-b border-slate-700/30">
-                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Lag Analysis</span>
-                <span class="text-[9px] text-slate-600 ml-2">GDELT Tone vs Social Sentiment</span>
-              </div>
-              <div class="p-2">
-                {#if filteredTimelineData.length > 2}
-                  <LagAnalysisChart data={filteredTimelineData} sourceA="gdelt" sourceB="social" chartHeight={260} />
-                {:else}
-                  <div class="flex items-center justify-center h-64 text-slate-600 text-xs">Need 3+ days of data</div>
-                {/if}
-              </div>
-            </div>
-
-            <!-- Keywords -->
-            <div class="bg-slate-900 border border-slate-700/30 rounded-lg overflow-hidden">
-              <div class="px-3 py-2 border-b border-slate-700/30">
-                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cross-Source Keywords</span>
-                {#if keywordData.length > 0}
-                  <span class="text-[9px] text-slate-600 ml-2">{keywordData.length} terms</span>
-                {/if}
-              </div>
-              <div class="p-3" style="height: 280px; overflow-y: auto;">
-                {#if keywordData.length > 0}
-                  <!-- Keyword counts table -->
-                  <div class="mb-3 max-h-[120px] overflow-y-auto">
-                    <div class="grid grid-cols-4 gap-1 text-[9px] uppercase tracking-wider text-slate-500 font-medium mb-1 px-1 sticky top-0 bg-slate-900">
-                      <span>Keyword</span>
-                      <span class="text-right text-amber-400/70">GDELT</span>
-                      <span class="text-right text-violet-400/70">Radio</span>
-                      <span class="text-right text-sky-400/70">Social</span>
-                    </div>
-                    {#each keywordData as kw}
-                      <div class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded hover:bg-slate-800/30">
-                        <span class="text-xs text-slate-300 font-medium truncate">{kw.keyword}</span>
-                        <span class="text-right text-xs font-mono text-amber-400">{kw.gdelt_count || 0}</span>
-                        <span class="text-right text-xs font-mono text-violet-400">{kw.radio_count || 0}</span>
-                        <span class="text-right text-xs font-mono text-sky-400">{kw.social_count || 0}</span>
-                      </div>
-                    {/each}
-                  </div>
-                  <KeywordNetwork data={keywordData} height={140} />
-                {:else if wordCloudData.length > 0}
-                  <WordCloudChart words={wordCloudData} height={250} />
-                {:else}
-                  <div class="flex items-center justify-center h-40 text-slate-600 text-xs">No keyword data</div>
-                {/if}
-              </div>
-            </div>
-
+          <!-- Portal grid -->
+          <div class="grid gap-3" style="grid-template-columns: repeat({portalCols}, 1fr);">
+            {#each visiblePortals as portalId (portalId)}
+              {#if portalId === 'sentiment'}
+                <SentimentPortal
+                  timelineData={filteredTimelineData}
+                  {gdeltEvents} {radioSegments} {socialPosts}
+                  height={280}
+                />
+              {:else if portalId === 'volume'}
+                <VolumePortal
+                  timelineData={filteredTimelineData}
+                  height={280}
+                />
+              {:else if portalId === 'correlation'}
+                <CorrelationPortal
+                  timelineData={filteredTimelineData}
+                  height={280}
+                />
+              {:else if portalId === 'topics'}
+                <TopicsPortal
+                  {keywordData}
+                  height={280}
+                />
+              {/if}
+            {/each}
           </div>
         </div>
       {/if}

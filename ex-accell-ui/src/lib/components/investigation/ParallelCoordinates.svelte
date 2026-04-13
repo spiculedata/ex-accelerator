@@ -3,6 +3,7 @@
 	import * as d3 from 'd3';
 
 	export let data: any[] = [];
+	export let height: number = 280;
 
 	const dispatch = createEventDispatcher<{
 		brushChange: { axis: string; range: [number, number] | null };
@@ -13,18 +14,20 @@
 	let tooltipEl: HTMLDivElement;
 	let containerWidth = 800;
 
-	export let height: number = 220;
-
-	const margin = { top: 36, right: 20, bottom: 16, left: 20 };
-
-	const axisConfig: { key: string; label: string; domain: [number, number] | null }[] = [
-		{ key: 'gdelt_events', label: 'Events', domain: null },
-		{ key: 'gdelt_avg_goldstein', label: 'Goldstein', domain: [-10, 10] },
-		{ key: 'radio_volume', label: 'Radio', domain: null },
-		{ key: 'radio_sentiment', label: 'R.Sent', domain: [-1, 1] },
-		{ key: 'social_volume', label: 'Social', domain: null },
-		{ key: 'social_sentiment', label: 'S.Sent', domain: [-1, 1] }
+	const metrics: { key: string; label: string; color: string; source: 'gdelt' | 'radio' | 'social'; unit: string }[] = [
+		{ key: 'gdelt_events', label: 'GDELT Events', color: '#f59e0b', source: 'gdelt', unit: '' },
+		{ key: 'gdelt_avg_goldstein', label: 'Goldstein Scale', color: '#22c55e', source: 'gdelt', unit: '' },
+		{ key: 'radio_volume', label: 'Radio Segments', color: '#a78bfa', source: 'radio', unit: '' },
+		{ key: 'radio_sentiment', label: 'Radio Sentiment', color: '#8b5cf6', source: 'radio', unit: '' },
+		{ key: 'social_volume', label: 'Social Posts', color: '#38bdf8', source: 'social', unit: '' },
+		{ key: 'social_sentiment', label: 'Social Sentiment', color: '#0ea5e9', source: 'social', unit: '' },
 	];
+
+	const sourceColors: Record<string, string> = {
+		gdelt: '#f59e0b',
+		radio: '#a78bfa',
+		social: '#38bdf8',
+	};
 
 	onMount(() => {
 		const ro = new ResizeObserver((entries) => {
@@ -45,225 +48,201 @@
 	}
 
 	function prepareData() {
-		return data.map((d, i) => ({
-			index: i,
+		return data.map((d) => ({
 			date: d.date,
+			parsedDate: d3.timeParse('%Y-%m-%d')(d.date) ?? new Date(d.date),
 			gdelt_events: d.gdelt_events ?? 0,
 			gdelt_avg_goldstein: d.gdelt_avg_goldstein ?? 0,
 			radio_volume: d.radio_segments ?? 0,
-			radio_sentiment: computeSentiment(
-				d.radio_positive ?? 0,
-				d.radio_negative ?? 0,
-				d.radio_segments ?? 0
-			),
+			radio_sentiment: computeSentiment(d.radio_positive ?? 0, d.radio_negative ?? 0, d.radio_segments ?? 0),
 			social_volume: d.social_posts ?? 0,
-			social_sentiment: computeSentiment(
-				d.social_positive ?? 0,
-				d.social_negative ?? 0,
-				d.social_posts ?? 0
-			)
+			social_sentiment: computeSentiment(d.social_positive ?? 0, d.social_negative ?? 0, d.social_posts ?? 0),
 		}));
+	}
+
+	function formatValue(key: string, val: number): string {
+		if (key.includes('sentiment') || key.includes('goldstein')) return val.toFixed(2);
+		return Math.round(val).toLocaleString();
 	}
 
 	function render() {
 		const svgEl = d3.select(svg);
 		svgEl.selectAll('*').remove();
 
-		const innerWidth = effectiveWidth - margin.left - margin.right;
-		const innerHeight = height - margin.top - margin.bottom;
-
 		const prepared = prepareData();
 		if (prepared.length === 0) return;
 
-		const g = svgEl
-			.attr('width', effectiveWidth)
-			.attr('height', height)
-			.append('g')
-			.attr('transform', `translate(${margin.left},${margin.top})`);
+		const cols = 3;
+		const rows = 2;
+		const cellPadding = { top: 18, right: 8, bottom: 14, left: 36 };
+		const cellGapX = 12;
+		const cellGapY = 8;
+		const totalWidth = effectiveWidth;
+		const totalHeight = height;
+		const cellWidth = (totalWidth - (cols - 1) * cellGapX) / cols;
+		const cellHeight = (totalHeight - (rows - 1) * cellGapY) / rows;
+		const sparkW = cellWidth - cellPadding.left - cellPadding.right;
+		const sparkH = cellHeight - cellPadding.top - cellPadding.bottom;
 
-		const colorScale = d3
-			.scaleLinear<string>()
-			.domain([0, prepared.length - 1])
-			.range(['#8b5cf6', '#06d6a0']);
+		svgEl.attr('width', totalWidth).attr('height', totalHeight);
 
-		const xScale = d3
-			.scalePoint<string>()
-			.domain(axisConfig.map((a) => a.key))
-			.range([0, innerWidth])
-			.padding(0.1);
+		const xScale = d3.scaleTime()
+			.domain(d3.extent(prepared, (d) => d.parsedDate) as [Date, Date])
+			.range([0, sparkW]);
 
-		const yScales: Record<string, d3.ScaleLinear<number, number>> = {};
+		const hoverLine = svgEl.append('line')
+			.attr('y1', 0).attr('y2', totalHeight)
+			.attr('stroke', '#475569').attr('stroke-width', 1).attr('stroke-dasharray', '3,3')
+			.attr('pointer-events', 'none').style('opacity', 0);
 
-		for (const axis of axisConfig) {
-			let domain: [number, number];
-			if (axis.domain) {
-				domain = axis.domain;
-			} else {
-				const ext = d3.extent(prepared, (d: any) => d[axis.key]) as [number, number];
-				domain = [Math.min(0, ext[0]), Math.max(1, ext[1])];
+		metrics.forEach((metric, i) => {
+			const col = i % cols;
+			const row = Math.floor(i / cols);
+			const offsetX = col * (cellWidth + cellGapX);
+			const offsetY = row * (cellHeight + cellGapY);
+
+			const cellG = svgEl.append('g')
+				.attr('transform', `translate(${offsetX},${offsetY})`);
+
+			// Cell background
+			cellG.append('rect')
+				.attr('width', cellWidth).attr('height', cellHeight)
+				.attr('fill', '#0f172a').attr('rx', 4).attr('stroke', '#1e293b').attr('stroke-width', 1);
+
+			// Metric label
+			cellG.append('text')
+				.attr('x', 8).attr('y', 13)
+				.attr('fill', '#94a3b8').attr('font-size', '9px').attr('font-weight', '600')
+				.text(metric.label);
+
+			// Current value (last data point)
+			const lastVal = (prepared[prepared.length - 1] as any)[metric.key];
+			cellG.append('text')
+				.attr('x', cellWidth - 8).attr('y', 13)
+				.attr('text-anchor', 'end')
+				.attr('fill', metric.color).attr('font-size', '10px').attr('font-weight', '700').attr('font-family', 'monospace')
+				.text(formatValue(metric.key, lastVal));
+
+			const sparkG = cellG.append('g')
+				.attr('transform', `translate(${cellPadding.left},${cellPadding.top})`);
+
+			// Y scale per metric
+			const vals = prepared.map((d: any) => d[metric.key] as number);
+			const ext = d3.extent(vals) as [number, number];
+			const yPad = (ext[1] - ext[0]) * 0.15 || 0.5;
+			const yScale = d3.scaleLinear()
+				.domain([ext[0] - yPad, ext[1] + yPad])
+				.range([sparkH, 0]);
+
+			// Zero line for sentiment/goldstein
+			if (metric.key.includes('sentiment') || metric.key.includes('goldstein')) {
+				const zeroY = yScale(0);
+				if (zeroY > 0 && zeroY < sparkH) {
+					sparkG.append('line')
+						.attr('x1', 0).attr('x2', sparkW)
+						.attr('y1', zeroY).attr('y2', zeroY)
+						.attr('stroke', '#334155').attr('stroke-width', 1).attr('stroke-dasharray', '2,2');
+				}
 			}
-			yScales[axis.key] = d3.scaleLinear().domain(domain).range([innerHeight, 0]).nice();
-		}
 
-		const lineGenerator = (d: any) => {
-			const points: [number, number][] = axisConfig.map((axis) => [
-				xScale(axis.key)!,
-				yScales[axis.key](d[axis.key])
-			]);
-			return d3.line()(points);
-		};
-
-		const linesGroup = g.append('g').attr('class', 'lines');
-
-		const paths = linesGroup
-			.selectAll('path')
-			.data(prepared)
-			.enter()
-			.append('path')
-			.attr('d', lineGenerator)
-			.attr('fill', 'none')
-			.attr('stroke', (d: any) => colorScale(d.index))
-			.attr('stroke-width', 1.5)
-			.attr('opacity', 0.6)
-			.style('cursor', 'pointer')
-			.on('mouseenter', function (event: MouseEvent, d: any) {
-				d3.select(this).attr('stroke-width', 3).attr('opacity', 1);
-				showTooltip(event, d);
-			})
-			.on('mousemove', (event: MouseEvent) => {
-				moveTooltip(event);
-			})
-			.on('mouseleave', function () {
-				d3.select(this).attr('stroke-width', 1.5).attr('opacity', getOpacity);
-				hideTooltip();
+			// Y axis (2 ticks: min, max)
+			const yAxis = d3.axisLeft(yScale).ticks(3).tickSize(-sparkW).tickFormat((d) => {
+				const v = d as number;
+				if (Math.abs(v) >= 1000) return d3.format('.1s')(v);
+				if (Math.abs(v) < 0.01) return '0';
+				if (Number.isInteger(v)) return String(v);
+				return d3.format('.1f')(v);
 			});
+			sparkG.append('g')
+				.call(yAxis)
+				.call((g) => g.select('.domain').remove())
+				.call((g) => g.selectAll('.tick line').attr('stroke', '#1e293b'))
+				.call((g) => g.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
 
-		const brushes: Record<string, d3.BrushBehavior<unknown>> = {};
-		const brushSelections: Record<string, [number, number] | null> = {};
+			// Area fill
+			const area = d3.area<any>()
+				.x((d) => xScale(d.parsedDate))
+				.y0(sparkH)
+				.y1((d) => yScale(d[metric.key]))
+				.curve(d3.curveMonotoneX);
 
-		function getOpacity(d: any): number {
-			const activeAxes = Object.keys(brushSelections).filter(
-				(k) => brushSelections[k] !== null
-			);
-			if (activeAxes.length === 0) return 0.6;
-			for (const axisKey of activeAxes) {
-				const [y0, y1] = brushSelections[axisKey]!;
-				const val = yScales[axisKey](d[axisKey]);
-				if (val < y0 || val > y1) return 0.05;
-			}
-			return 0.85;
-		}
+			sparkG.append('path')
+				.datum(prepared)
+				.attr('fill', metric.color)
+				.attr('fill-opacity', 0.1)
+				.attr('d', area);
 
-		function updateLines() {
-			paths.attr('opacity', getOpacity).attr('stroke-width', (d: any) => {
-				const activeAxes = Object.keys(brushSelections).filter(
-					(k) => brushSelections[k] !== null
-				);
-				if (activeAxes.length === 0) return 1.5;
-				const op = getOpacity(d);
-				return op > 0.1 ? 2.5 : 1;
-			});
-		}
+			// Line
+			const line = d3.line<any>()
+				.x((d) => xScale(d.parsedDate))
+				.y((d) => yScale(d[metric.key]))
+				.curve(d3.curveMonotoneX);
 
-		for (const axis of axisConfig) {
-			const x = xScale(axis.key)!;
+			sparkG.append('path')
+				.datum(prepared)
+				.attr('fill', 'none')
+				.attr('stroke', metric.color)
+				.attr('stroke-width', 1.5)
+				.attr('d', line);
 
-			const axisG = g
-				.append('g')
-				.attr('transform', `translate(${x},0)`);
+			// Dots
+			sparkG.selectAll('.dot')
+				.data(prepared)
+				.join('circle')
+				.attr('class', 'dot')
+				.attr('cx', (d: any) => xScale(d.parsedDate))
+				.attr('cy', (d: any) => yScale(d[metric.key]))
+				.attr('r', 2.5)
+				.attr('fill', metric.color)
+				.attr('stroke', '#0f172a')
+				.attr('stroke-width', 1);
 
-			axisG
-				.call(d3.axisLeft(yScales[axis.key]).ticks(5).tickSize(-4))
-				.selectAll('text')
-				.attr('fill', '#94a3b8')
-				.attr('font-size', '10px');
+			// Hover overlay for this cell
+			sparkG.append('rect')
+				.attr('width', sparkW).attr('height', sparkH)
+				.attr('fill', 'transparent')
+				.on('mousemove', (event: MouseEvent) => {
+					const [mx] = d3.pointer(event);
+					const hoveredDate = xScale.invert(mx);
+					const bisect = d3.bisector<any, Date>((d) => d.parsedDate).left;
+					const idx = bisect(prepared, hoveredDate, 1);
+					const d0 = prepared[idx - 1];
+					const d1 = prepared[idx];
+					if (!d0) return;
+					const closest = d1 && hoveredDate.getTime() - d0.parsedDate.getTime() > d1.parsedDate.getTime() - hoveredDate.getTime() ? d1 : d0;
 
-			axisG.selectAll('.domain').attr('stroke', '#475569');
-			axisG.selectAll('.tick line').attr('stroke', '#334155');
+					const globalX = offsetX + cellPadding.left + xScale(closest.parsedDate);
+					hoverLine.attr('x1', globalX).attr('x2', globalX).style('opacity', 1);
 
-			axisG
-				.append('text')
-				.attr('y', -14)
-				.attr('x', 0)
-				.attr('text-anchor', 'middle')
-				.attr('fill', '#e2e8f0')
-				.attr('font-size', '9px')
-				.attr('font-weight', '600')
-				.text(axis.label);
-
-			const brushWidth = 24;
-			const brush = d3
-				.brushY()
-				.extent([
-					[-brushWidth / 2, 0],
-					[brushWidth / 2, innerHeight]
-				])
-				.on('brush end', function (event: d3.D3BrushEvent<unknown>) {
-					if (event.selection) {
-						brushSelections[axis.key] = event.selection as [number, number];
-						const yScale = yScales[axis.key];
-						const domainRange: [number, number] = [
-							yScale.invert(event.selection[1] as number),
-							yScale.invert(event.selection[0] as number)
-						];
-						dispatch('brushChange', { axis: axis.key, range: domainRange });
-					} else {
-						brushSelections[axis.key] = null;
-						dispatch('brushChange', { axis: axis.key, range: null });
+					if (tooltipEl) {
+						const dateStr = d3.timeFormat('%b %d')(closest.parsedDate);
+						tooltipEl.innerHTML = `
+							<div class="font-semibold text-white mb-1">${dateStr}</div>
+							<div class="text-slate-300 text-xs">
+								${metric.label}: <span class="font-mono" style="color:${metric.color}">${formatValue(metric.key, (closest as any)[metric.key])}</span>
+							</div>
+						`;
+						tooltipEl.style.display = 'block';
+						const rect = container.getBoundingClientRect();
+						let tx = event.clientX - rect.left + 12;
+						let ty = event.clientY - rect.top - 10;
+						if (tx + 160 > rect.width) tx = tx - 180;
+						tooltipEl.style.left = `${tx}px`;
+						tooltipEl.style.top = `${ty}px`;
 					}
-					updateLines();
+				})
+				.on('mouseleave', () => {
+					hoverLine.style('opacity', 0);
+					if (tooltipEl) tooltipEl.style.display = 'none';
 				});
-
-			brushes[axis.key] = brush;
-
-			axisG
-				.append('g')
-				.attr('class', 'brush')
-				.call(brush)
-				.selectAll('.selection')
-				.attr('fill', '#8b5cf6')
-				.attr('fill-opacity', 0.2)
-				.attr('stroke', '#8b5cf6');
-		}
-	}
-
-	function showTooltip(event: MouseEvent, d: any) {
-		if (!tooltipEl) return;
-		tooltipEl.style.display = 'block';
-		tooltipEl.innerHTML = `
-			<div class="font-semibold text-white mb-1">${d.date}</div>
-			<div class="text-slate-300 text-xs space-y-0.5">
-				<div>GDELT Events: <span class="text-white">${d.gdelt_events}</span></div>
-				<div>Goldstein: <span class="text-white">${d.gdelt_avg_goldstein.toFixed(2)}</span></div>
-				<div>Radio Vol: <span class="text-white">${d.radio_volume}</span></div>
-				<div>Radio Sent: <span class="text-white">${d.radio_sentiment.toFixed(3)}</span></div>
-				<div>Social Vol: <span class="text-white">${d.social_volume}</span></div>
-				<div>Social Sent: <span class="text-white">${d.social_sentiment.toFixed(3)}</span></div>
-			</div>
-		`;
-		moveTooltip(event);
-	}
-
-	function moveTooltip(event: MouseEvent) {
-		if (!tooltipEl || !container) return;
-		const rect = container.getBoundingClientRect();
-		let x = event.clientX - rect.left + 12;
-		let y = event.clientY - rect.top - 10;
-		if (x + 180 > rect.width) x = x - 200;
-		if (y + 120 > rect.height) y = y - 120;
-		tooltipEl.style.left = `${x}px`;
-		tooltipEl.style.top = `${y}px`;
-	}
-
-	function hideTooltip() {
-		if (tooltipEl) tooltipEl.style.display = 'none';
+		});
 	}
 </script>
 
 <div bind:this={container} class="relative w-full">
 	{#if data.length === 0}
 		<div class="flex items-center justify-center h-64 text-slate-500 text-sm">
-			No data available for parallel coordinates
+			No data available
 		</div>
 	{:else}
 		<svg bind:this={svg} class="w-full" {height}></svg>
