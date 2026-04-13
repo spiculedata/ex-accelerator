@@ -316,29 +316,59 @@
 				[innerWidth, innerHeight]
 			])
 			.on('end', (event: d3.D3BrushEvent<unknown>) => {
-				if (!event.selection) return;
+				if (!event.selection) {
+					// Click without drag — find nearest day
+					if (event.sourceEvent) {
+						const [mx] = d3.pointer(event.sourceEvent, g.node());
+						const clickDate = xScale.invert(mx);
+						const idx = bisect(parsedData, clickDate, 1);
+						const d0 = parsedData[idx - 1];
+						const d1 = parsedData[idx];
+						const nearest = d1 && clickDate.getTime() - d0.parsedDate.getTime() > d1.parsedDate.getTime() - clickDate.getTime() ? d1 : d0;
+						if (nearest) dispatch('dayClick', { date: nearest.date });
+					}
+					return;
+				}
 				const [x0, x1] = event.selection as [number, number];
-				const start = xScale.invert(x0);
-				const end = xScale.invert(x1);
-				dispatch('brushChange', { start, end });
-			});
+				const rawStart = xScale.invert(x0);
+				const rawEnd = xScale.invert(x1);
 
-		// ---- HOVER & CLICK OVERLAY (below brush so brush takes priority) ----
-		const overlay = g
-			.append('rect')
-			.attr('width', innerWidth)
-			.attr('height', innerHeight)
-			.attr('fill', 'transparent')
-			.attr('pointer-events', 'all')
-			.style('cursor', 'crosshair');
+				// Snap to day boundaries
+				const start = d3.timeDay.floor(rawStart);
+				let end = d3.timeDay.ceil(rawEnd);
+
+				// If selection spans less than ~12 hours, treat as a single day click
+				const diffHours = (rawEnd.getTime() - rawStart.getTime()) / (1000 * 60 * 60);
+				if (diffHours < 12) {
+					// Find nearest day
+					const nearestIdx = bisect(parsedData, rawStart, 1);
+					const d0 = parsedData[nearestIdx - 1];
+					const d1 = parsedData[nearestIdx];
+					const nearest = d1 && rawStart.getTime() - d0.parsedDate.getTime() > d1.parsedDate.getTime() - rawStart.getTime() ? d1 : d0;
+					if (nearest) {
+						dispatch('dayClick', { date: nearest.date });
+					}
+					// Clear the brush visual
+					brushGroup.call(brush.move, null);
+					return;
+				}
+
+				// Ensure end is at least 1 day after start
+				if (end.getTime() <= start.getTime()) {
+					end = d3.timeDay.offset(start, 1);
+				}
+				dispatch('brushChange', { start, end });
+				// Clear the brush visual (the parent handles the state)
+				brushGroup.call(brush.move, null);
+			});
 
 		const brushGroup = g.append('g').attr('class', 'brush').call(brush);
 
-		// Style brush overlay
+		// Style brush
 		brushGroup.selectAll('.selection').attr('fill', '#3b82f6').attr('fill-opacity', 0.15).attr('stroke', '#3b82f6').attr('stroke-width', 1);
 		brushGroup.selectAll('.overlay').style('cursor', 'crosshair');
 
-		// Vertical hover line
+		// Vertical hover line (above brush, no pointer events)
 		const hoverLine = g
 			.append('line')
 			.attr('y1', 0)
@@ -351,7 +381,8 @@
 
 		const bisect = d3.bisector<(typeof parsedData)[0], Date>((d) => d.parsedDate).left;
 
-		overlay
+		// Attach hover/click to the brush group's overlay (the transparent rect D3 creates)
+		brushGroup.select('.overlay')
 			.on('mousemove', (event: MouseEvent) => {
 				const [mx] = d3.pointer(event);
 				const hoveredDate = xScale.invert(mx);
@@ -411,23 +442,13 @@
 				hoverLine.style('opacity', 0);
 				if (tooltipEl) tooltipEl.style.opacity = '0';
 			})
-			.on('click', (event: MouseEvent) => {
-				const [mx] = d3.pointer(event);
-				const hoveredDate = xScale.invert(mx);
-				const idx = bisect(parsedData, hoveredDate, 1);
-				const d0 = parsedData[idx - 1];
-				const d1 = parsedData[idx];
-				if (!d0) return;
-				const closest =
-					d1 && hoveredDate.getTime() - d0.parsedDate.getTime() > d1.parsedDate.getTime() - hoveredDate.getTime()
-						? d1
-						: d0;
-				dispatch('dayClick', { date: closest.date });
+			.on('click', () => {
+				// Day click is handled by the brush end event (small selection = day click)
 			});
 
-		// Move brush group above lanes but below overlay for visual stacking
+		// Ensure brush and hover line are on top
 		brushGroup.raise();
-		overlay.raise();
+		hoverLine.raise();
 	}
 </script>
 
