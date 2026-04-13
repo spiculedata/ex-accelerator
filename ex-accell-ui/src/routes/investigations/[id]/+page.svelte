@@ -94,6 +94,16 @@
 
   $: investigationId = $page.params.id || '';
 
+  // Filter timeline data to the currently selected time range for visualizations
+  $: filteredTimelineData = (() => {
+    const range = $investigationSelection.timeRange;
+    if (!range || (range.start === dateStart && range.end === dateEnd)) return timelineData;
+    return timelineData.filter((d: any) => {
+      const date = d.date;
+      return date >= range.start && date <= range.end;
+    });
+  })();
+
   $: sentimentChartData = computeSentimentFromAllSources(gdeltEvents, radioSegments, socialPosts);
 
   function computeSentimentFromAllSources(
@@ -283,12 +293,14 @@
     const brushEnd = end.toISOString().split('T')[0];
     setTimeRange(brushStart, brushEnd);
     loadDetailPanels(keywords, brushStart, brushEnd);
+    loadKeywordData(keywords, brushStart, brushEnd);
   }
 
   function handleDayClick(event: CustomEvent<{ date: string }>) {
     const { date } = event.detail;
     setTimeRange(date, date);
     loadDetailPanels(keywords, date, date);
+    loadKeywordData(keywords, date, date);
   }
 
   function handleSentimentFilter(event: CustomEvent<{ label: string }>) {
@@ -305,6 +317,7 @@
     if (dateStart && dateEnd) {
       setTimeRange(dateStart, dateEnd);
       loadDetailPanels(keywords, dateStart, dateEnd);
+      loadKeywordData(keywords, dateStart, dateEnd);
     }
   }
 
@@ -783,8 +796,8 @@
                 <span class="text-[9px] text-slate-600 ml-2">Daily cross-source comparison</span>
               </div>
               <div class="p-2">
-                {#if timelineData.length > 0}
-                  <ParallelCoordinates data={timelineData} height={280} />
+                {#if filteredTimelineData.length > 0}
+                  <ParallelCoordinates data={filteredTimelineData} height={280} />
                 {:else}
                   <div class="flex items-center justify-center h-64 text-slate-600 text-xs">No data</div>
                 {/if}
@@ -798,8 +811,8 @@
                 <span class="text-[9px] text-slate-600 ml-2">GDELT Tone vs Social Sentiment</span>
               </div>
               <div class="p-2">
-                {#if timelineData.length > 2}
-                  <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" chartHeight={260} />
+                {#if filteredTimelineData.length > 2}
+                  <LagAnalysisChart data={filteredTimelineData} sourceA="gdelt" sourceB="social" chartHeight={260} />
                 {:else}
                   <div class="flex items-center justify-center h-64 text-slate-600 text-xs">Need 3+ days of data</div>
                 {/if}

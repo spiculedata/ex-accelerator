@@ -108,7 +108,7 @@
 			.attr('transform', `translate(${margin.left},${margin.top})`)
 			.attr('clip-path', 'url(#timeline-clip)');
 
-		// ---- LANE 1: GDELT ----
+		// ---- LANE 1: GDELT (area chart with Goldstein colour encoding) ----
 		const gdeltY = 0;
 		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 1;
 		const yGdelt = d3.scaleLinear().domain([0, gdeltMaxEvents]).nice().range([laneHeight, 0]);
@@ -123,7 +123,7 @@
 			.attr('fill', '#1e293b')
 			.attr('rx', 4);
 
-		// Lane label: left of lane, vertically centered
+		// Lane label
 		svgEl
 			.append('text')
 			.attr('x', margin.left - 4)
@@ -135,54 +135,52 @@
 			.attr('fill', '#94a3b8')
 			.text('GDELT');
 
-		// Bars — clamp x to 0 so first bar doesn't overflow left
-		gdeltGroup
-			.selectAll('.gdelt-bar')
-			.data(parsedData)
-			.join('rect')
-			.attr('class', 'gdelt-bar')
-			.attr('x', (d) => Math.max(0, xScale(d.parsedDate) - barWidth / 2))
-			.attr('y', (d) => yGdelt(d.gdelt_events ?? 0))
-			.attr('width', barWidth)
-			.attr('height', (d) => Math.max(0, laneHeight - yGdelt(d.gdelt_events ?? 0)))
-			.attr('fill', colors.gdeltBar)
-			.attr('opacity', 0.8)
-			.attr('rx', 1);
+		// Goldstein colour scale: red (negative) → slate → green (positive)
+		const goldsteinColor = d3.scaleLinear<string>()
+			.domain([-10, 0, 10])
+			.range([colors.goldsteinNeg, '#64748b', colors.goldsteinPos])
+			.clamp(true);
 
-		// Goldstein line with gradient coloring
-		const goldsteinExtent = d3.extent(parsedData, (d) => d.gdelt_avg_goldstein) as [number, number];
-		const yGoldstein = d3
-			.scaleLinear()
-			.domain([Math.min(goldsteinExtent[0], -10), Math.max(goldsteinExtent[1], 10)])
-			.range([laneHeight, 0]);
+		// Create per-segment gradient that encodes Goldstein as fill colour
+		for (let i = 0; i < parsedData.length - 1; i++) {
+			const d0 = parsedData[i];
+			const d1 = parsedData[i + 1];
+			const gradId = `gdelt-seg-${i}`;
+			const segGrad = defs
+				.append('linearGradient')
+				.attr('id', gradId)
+				.attr('x1', '0%').attr('x2', '100%');
+			segGrad.append('stop').attr('offset', '0%').attr('stop-color', goldsteinColor(d0.gdelt_avg_goldstein));
+			segGrad.append('stop').attr('offset', '100%').attr('stop-color', goldsteinColor(d1.gdelt_avg_goldstein));
 
-		const goldsteinGradient = defs
-			.append('linearGradient')
-			.attr('id', 'goldstein-gradient')
-			.attr('gradientUnits', 'userSpaceOnUse')
-			.attr('x1', 0)
-			.attr('y1', yGoldstein(-10) + gdeltY + margin.top)
-			.attr('x2', 0)
-			.attr('y2', yGoldstein(10) + gdeltY + margin.top);
+			const segArea = d3.area<(typeof parsedData)[0]>()
+				.x((d) => xScale(d.parsedDate))
+				.y0(laneHeight)
+				.y1((d) => yGdelt(d.gdelt_events))
+				.curve(d3.curveMonotoneX);
 
-		goldsteinGradient.append('stop').attr('offset', '0%').attr('stop-color', colors.goldsteinPos);
-		goldsteinGradient.append('stop').attr('offset', '50%').attr('stop-color', '#a3a3a3');
-		goldsteinGradient.append('stop').attr('offset', '100%').attr('stop-color', colors.goldsteinNeg);
+			gdeltGroup
+				.append('path')
+				.datum([d0, d1])
+				.attr('fill', `url(#${gradId})`)
+				.attr('opacity', 0.75)
+				.attr('d', segArea);
+		}
 
-		const goldsteinLine = d3
-			.line<(typeof parsedData)[0]>()
+		// Top stroke line for shape definition
+		const gdeltLine = d3.line<(typeof parsedData)[0]>()
 			.x((d) => xScale(d.parsedDate))
-			.y((d) => yGoldstein(d.gdelt_avg_goldstein))
-			.curve(d3.curveMonotoneX)
-			.defined((d) => d.gdelt_avg_goldstein != null);
+			.y((d) => yGdelt(d.gdelt_events))
+			.curve(d3.curveMonotoneX);
 
 		gdeltGroup
 			.append('path')
 			.datum(parsedData)
 			.attr('fill', 'none')
-			.attr('stroke', 'url(#goldstein-gradient)')
-			.attr('stroke-width', 2)
-			.attr('d', goldsteinLine);
+			.attr('stroke', '#94a3b8')
+			.attr('stroke-width', 1)
+			.attr('opacity', 0.5)
+			.attr('d', gdeltLine);
 
 		// ---- LANE 2: Radio ----
 		const radioY = laneHeight + laneGap;
