@@ -1529,7 +1529,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         const data = await executeQuery(`
           SELECT id, radio_name, state, segment_start, segment_end, duration_seconds,
-                 LEFT(transcript, 300) as transcript, is_political, is_ad,
+                 transcript, is_political, is_ad,
                  sentiment, emotion, confidence, word_count, topics
           FROM radio_transcripts
           ${whereClause}
@@ -1675,7 +1675,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       try {
         const data = await executeQuery(`
           SELECT id, radio_name, state, segment_start, segment_end, duration_seconds,
-            LEFT(transcript, 300) as transcript, sentiment, emotion, confidence,
+            transcript, sentiment, emotion, confidence,
             is_political, is_ad, word_count
           FROM radio_transcripts
           WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
@@ -1705,7 +1705,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT id, LEFT(text, 300) as text, timestamp, platform,
+          SELECT id, text, timestamp, platform,
             sentiment_category, confidence_score,
             engagement_likes, engagement_shares, engagement_comments
           FROM posts_with_sentiment

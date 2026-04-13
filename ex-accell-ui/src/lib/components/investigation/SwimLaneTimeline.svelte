@@ -309,18 +309,28 @@
 			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
 
 		// ---- BRUSH ----
-		// Floating label that shows date range during drag (outside clip group so it's not clipped)
-		const labelGroup = svgEl.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-		const brushLabel = labelGroup
-			.append('text')
-			.attr('text-anchor', 'middle')
-			.attr('fill', '#e2e8f0')
-			.attr('font-size', '10px')
-			.attr('font-weight', '600')
+		const fmtShort = d3.timeFormat('%b %d');
+
+		// Brush date label — rendered outside clip group, inside a pill background
+		const labelGroup = svgEl.append('g')
 			.attr('pointer-events', 'none')
 			.style('opacity', 0);
 
-		const fmtShort = d3.timeFormat('%b %d');
+		const labelBg = labelGroup
+			.append('rect')
+			.attr('rx', 4)
+			.attr('ry', 4)
+			.attr('fill', '#1e293b')
+			.attr('stroke', '#3b82f6')
+			.attr('stroke-width', 1);
+
+		const brushLabel = labelGroup
+			.append('text')
+			.attr('text-anchor', 'middle')
+			.attr('dominant-baseline', 'middle')
+			.attr('fill', '#e2e8f0')
+			.attr('font-size', '11px')
+			.attr('font-weight', '600');
 
 		const brush = d3
 			.brushX()
@@ -329,25 +339,34 @@
 				[innerWidth, innerHeight]
 			])
 			.on('brush', (event: d3.D3BrushEvent<unknown>) => {
+				// Hide tooltip during brush drag
+				hoverLine.style('opacity', 0);
+				if (tooltipEl) tooltipEl.style.opacity = '0';
+
 				if (!event.selection) {
-					brushLabel.style('opacity', 0);
+					labelGroup.style('opacity', 0);
 					return;
 				}
 				const [x0, x1] = event.selection as [number, number];
 				const s = d3.timeDay.floor(xScale.invert(x0));
 				const e = d3.timeDay.ceil(xScale.invert(x1));
-				const midX = (x0 + x1) / 2;
+				const midX = margin.left + (x0 + x1) / 2;
+				const labelY = margin.top + innerHeight / 2;
 				const label = s.getTime() === e.getTime() || (e.getTime() - s.getTime()) < 86400000
 					? fmtShort(s)
 					: `${fmtShort(s)} – ${fmtShort(e)}`;
-				brushLabel
-					.attr('x', midX)
-					.attr('y', -4)
-					.text(label)
-					.style('opacity', 1);
+				brushLabel.attr('x', midX).attr('y', labelY).text(label);
+				// Size background pill to fit text
+				const bbox = (brushLabel.node() as SVGTextElement).getBBox();
+				labelBg
+					.attr('x', bbox.x - 6)
+					.attr('y', bbox.y - 3)
+					.attr('width', bbox.width + 12)
+					.attr('height', bbox.height + 6);
+				labelGroup.style('opacity', 1);
 			})
 			.on('end', (event: d3.D3BrushEvent<unknown>) => {
-				brushLabel.style('opacity', 0);
+				labelGroup.style('opacity', 0);
 				if (!event.selection) {
 					// Click without drag — find nearest day
 					if (event.sourceEvent) {
