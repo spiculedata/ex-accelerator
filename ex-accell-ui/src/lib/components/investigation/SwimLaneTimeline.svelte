@@ -73,6 +73,17 @@
 
 		const parsedData = data.map((d) => ({
 			...d,
+			gdelt_events: d.gdelt_events ?? 0,
+			gdelt_avg_goldstein: d.gdelt_avg_goldstein ?? 0,
+			gdelt_avg_tone: d.gdelt_avg_tone ?? 0,
+			radio_segments: d.radio_segments ?? 0,
+			radio_positive: d.radio_positive ?? 0,
+			radio_negative: d.radio_negative ?? 0,
+			radio_neutral: d.radio_neutral ?? 0,
+			social_posts: d.social_posts ?? 0,
+			social_positive: d.social_positive ?? 0,
+			social_negative: d.social_negative ?? 0,
+			social_neutral: d.social_neutral ?? 0,
 			parsedDate: d3.timeParse('%Y-%m-%d')(d.date) ?? new Date(d.date)
 		}));
 
@@ -84,13 +95,18 @@
 
 		const barWidth = Math.max(1, innerWidth / parsedData.length - 1);
 
-		// Root group
+		// Root group with clip path to prevent overflow
+		const defs = svgEl.append('defs');
+		defs.append('clipPath')
+			.attr('id', 'timeline-clip')
+			.append('rect')
+			.attr('width', innerWidth)
+			.attr('height', innerHeight);
+
 		const g = svgEl
 			.append('g')
-			.attr('transform', `translate(${margin.left},${margin.top})`);
-
-		// Gradient defs for Goldstein line
-		const defs = svgEl.append('defs');
+			.attr('transform', `translate(${margin.left},${margin.top})`)
+			.attr('clip-path', 'url(#timeline-clip)');
 
 		// ---- LANE 1: GDELT ----
 		const gdeltY = 0;
@@ -119,16 +135,16 @@
 			.attr('fill', '#94a3b8')
 			.text('GDELT');
 
-		// Bars
+		// Bars — clamp x to 0 so first bar doesn't overflow left
 		gdeltGroup
 			.selectAll('.gdelt-bar')
 			.data(parsedData)
 			.join('rect')
 			.attr('class', 'gdelt-bar')
-			.attr('x', (d) => xScale(d.parsedDate) - barWidth / 2)
-			.attr('y', (d) => yGdelt(d.gdelt_events))
+			.attr('x', (d) => Math.max(0, xScale(d.parsedDate) - barWidth / 2))
+			.attr('y', (d) => yGdelt(d.gdelt_events ?? 0))
 			.attr('width', barWidth)
-			.attr('height', (d) => laneHeight - yGdelt(d.gdelt_events))
+			.attr('height', (d) => Math.max(0, laneHeight - yGdelt(d.gdelt_events ?? 0)))
 			.attr('fill', colors.gdeltBar)
 			.attr('opacity', 0.8)
 			.attr('rx', 1);
@@ -356,21 +372,22 @@
 				// Position tooltip
 				if (tooltipEl) {
 					const dateStr = d3.timeFormat('%B %d, %Y')(closest.parsedDate);
-					const goldsteinSign = closest.gdelt_avg_goldstein >= 0 ? '+' : '';
+					const gs = closest.gdelt_avg_goldstein ?? 0;
+					const goldsteinSign = gs >= 0 ? '+' : '';
 					tooltipEl.innerHTML = `
 						<div class="font-semibold text-white mb-1">${dateStr}</div>
 						<div class="text-sm text-slate-300">
 							<div class="flex items-center gap-1.5 mb-0.5">
 								<span class="inline-block w-2 h-2 rounded-sm" style="background:${colors.gdeltBar}"></span>
-								GDELT: ${formatNumber(closest.gdelt_events)} events (Goldstein: ${goldsteinSign}${closest.gdelt_avg_goldstein.toFixed(1)})
+								GDELT: ${formatNumber(closest.gdelt_events ?? 0)} events (Goldstein: ${goldsteinSign}${gs.toFixed(1)})
 							</div>
 							<div class="flex items-center gap-1.5 mb-0.5">
 								<span class="inline-block w-2 h-2 rounded-sm" style="background:${colors.negative}"></span>
-								Radio: ${formatNumber(closest.radio_segments)} segments (${closest.radio_negative} neg, ${closest.radio_neutral} neu, ${closest.radio_positive} pos)
+								Radio: ${formatNumber(closest.radio_segments ?? 0)} segments
 							</div>
 							<div class="flex items-center gap-1.5">
 								<span class="inline-block w-2 h-2 rounded-sm" style="background:${colors.neutral}"></span>
-								Social: ${formatNumber(closest.social_posts)} posts (${formatNumber(closest.social_negative)} neg, ${formatNumber(closest.social_neutral)} neu, ${formatNumber(closest.social_positive)} pos)
+								Social: ${formatNumber(closest.social_posts ?? 0)} posts
 							</div>
 						</div>
 					`;
