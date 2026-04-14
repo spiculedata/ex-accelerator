@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import LagAnalysisChart from '../LagAnalysisChart.svelte';
-  import { getPortalView, setPortalView } from '$lib/stores/investigationStore';
+  import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
+  import { computeTimelineHighlightDays } from '$lib/utils/crossFilterHelpers';
+  import CrossFilterBadge from '../CrossFilterBadge.svelte';
+
+  const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let timelineData: any[] = [];
+  export let gdeltEvents: any[] = [];
   export let height: number = 260;
+  export let crossFilter: CrossFilter | null = null;
 
   let activeView = 'agreement';
   let container: HTMLDivElement;
@@ -58,7 +64,10 @@
     };
   });
 
+  $: highlightDays = computeTimelineHighlightDays(crossFilter, timelineData, gdeltEvents);
+
   $: if (correlationData.length > 0 && svgEl && containerWidth > 0 && activeView !== 'lag') renderChart();
+  $: if (crossFilter !== undefined && activeView !== 'lag' && correlationData.length > 0 && svgEl) renderChart();
 
   function renderChart() {
     if (!svgEl) return;
@@ -89,16 +98,22 @@
 
       const area = d3.area<any>()
         .x(d => xScale(d.parsedDate)).y0(h).y1(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
-      g.append('path').datum(correlationData).attr('fill', 'url(#agree-grad)').attr('fill-opacity', 0.25).attr('d', area);
+      g.append('path').datum(correlationData).attr('fill', 'url(#agree-grad)').attr('fill-opacity', highlightDays ? 0.08 : 0.25).attr('d', area);
 
       const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
-      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', '#22c55e').attr('stroke-width', 2).attr('d', line);
+      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', '#22c55e').attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
 
       g.selectAll('.dot').data(correlationData).join('circle')
         .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d.agreement))
-        .attr('r', 3)
+        .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
         .attr('fill', d => d.agreement > 0.7 ? '#22c55e' : d.agreement > 0.4 ? '#eab308' : '#ef4444')
-        .attr('stroke', '#0f172a').attr('stroke-width', 1);
+        .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
+        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
+        .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
+        .style('cursor', 'pointer')
+        .on('click', (_event: any, d: any) => {
+          dispatch('crossfilter', { dimension: 'date', value: d.date, label: d.date });
+        });
 
       // Threshold lines
       g.append('line').attr('x1', 0).attr('x2', w).attr('y1', yScale(0.7)).attr('y2', yScale(0.7))
@@ -126,10 +141,23 @@
       for (const src of sources) {
         const area = d3.area<any>()
           .x(d => xScale(d.parsedDate)).y0(d => yScale(0)).y1(d => yScale(d[src.key])).curve(d3.curveMonotoneX);
-        g.append('path').datum(correlationData).attr('fill', src.color).attr('fill-opacity', 0.08).attr('d', area);
+        g.append('path').datum(correlationData).attr('fill', src.color).attr('fill-opacity', highlightDays ? 0.03 : 0.08).attr('d', area);
 
         const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d[src.key])).curve(d3.curveMonotoneX);
-        g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', src.color).attr('stroke-width', 1.5).attr('d', line);
+        g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', src.color).attr('stroke-width', 1.5).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
+
+        // Clickable dots
+        g.selectAll(`.overlay-dot-${src.key}`).data(correlationData).join('circle')
+          .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d[src.key]))
+          .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 2.5)
+          .attr('fill', src.color)
+          .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
+          .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
+          .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
+          .style('cursor', 'pointer')
+          .on('click', (_event: any, d: any) => {
+            dispatch('crossfilter', { dimension: 'date', value: d.date, label: d.date });
+          });
       }
 
       // Legend
@@ -152,12 +180,23 @@
       .call(g2 => g2.select('.domain').attr('stroke', '#334155'))
       .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'))
       .call(g2 => g2.selectAll('.tick line').attr('stroke', '#334155'));
+
+    // Cross-filter indicator line for single-day highlights
+    if (highlightDays && highlightDays.size === 1) {
+      const cfDate = d3.timeParse('%Y-%m-%d')([...highlightDays][0]);
+      if (cfDate) {
+        const cx = xScale(cfDate);
+        g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', h)
+          .attr('stroke', '#818cf8').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
+      }
+    }
   }
 </script>
 
 <div class="bg-slate-900 border border-slate-700/30 rounded-lg flex flex-col h-full overflow-hidden">
   <div class="flex items-center justify-between px-3 py-1.5 border-b border-slate-700/30 flex-shrink-0">
     <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Correlation</span>
+    <CrossFilterBadge {crossFilter} nativeDimensions={['date']} />
     <div class="flex items-center gap-0.5">
       {#each views as view}
         <button on:click={() => selectView(view.id)}
@@ -171,7 +210,7 @@
 
   <div bind:this={container} class="flex-1 min-h-0 p-2">
     {#if activeView === 'lag'}
-      <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" chartHeight={height - 40} />
+      <LagAnalysisChart data={timelineData} sourceA="gdelt" sourceB="social" chartHeight={height - 40} {crossFilter} {highlightDays} on:crossfilter />
     {:else}
       <svg bind:this={svgEl} class="w-full"></svg>
     {/if}

@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
+	import type { CrossFilter } from '$lib/stores/investigationStore';
 
 	export let data: any[] = [];
+	export let crossFilter: CrossFilter | null = null;
+	export let highlightedKeywords: Set<string> = new Set();
 
 	const dispatch = createEventDispatcher<{
 		keywordClick: { keyword: string; gdelt_count: number; radio_count: number; social_count: number };
+		crossfilter: CrossFilter;
 	}>();
 
 	let container: HTMLDivElement;
@@ -36,6 +40,7 @@
 
 	$: effectiveWidth = containerWidth;
 	$: if (data.length > 0 && effectiveWidth > 0 && svg) render();
+	$: if (highlightedKeywords !== undefined && data.length > 0 && svg) render();
 
 	function sourceColor(d: any): string {
 		const hasGdelt = (d.gdelt_count ?? 0) > 0;
@@ -132,6 +137,8 @@
 			.force('x', d3.forceX(innerWidth / 2).strength(0.05))
 			.force('y', d3.forceY(innerHeight / 2).strength(0.05));
 
+		const hasHL = highlightedKeywords.size > 0;
+
 		const linkElements = g
 			.append('g')
 			.selectAll('line')
@@ -172,9 +179,9 @@
 			.append('circle')
 			.attr('r', (d: any) => d.radius)
 			.attr('fill', sourceColor)
-			.attr('stroke', '#0f172a')
-			.attr('stroke-width', 1.5)
-			.attr('opacity', 0.85);
+			.attr('stroke', (d: any) => hasHL && highlightedKeywords.has(d.keyword) ? '#818cf8' : '#0f172a')
+			.attr('stroke-width', (d: any) => hasHL && highlightedKeywords.has(d.keyword) ? 2.5 : 1.5)
+			.attr('opacity', (d: any) => hasHL ? (highlightedKeywords.has(d.keyword) ? 1 : 0.25) : 0.85);
 
 		nodeGroup
 			.append('text')
@@ -185,6 +192,7 @@
 			.attr('text-anchor', 'middle')
 			.attr('dy', '0.35em')
 			.attr('fill', '#f1f5f9')
+			.attr('opacity', (d: any) => hasHL ? (highlightedKeywords.has(d.keyword) ? 1 : 0.15) : 1)
 			.attr('font-size', (d: any) => Math.max(9, Math.min(13, d.radius * 0.6)) + 'px')
 			.attr('font-weight', '500')
 			.attr('pointer-events', 'none');
@@ -206,6 +214,7 @@
 					radio_count: d.radio_count ?? 0,
 					social_count: d.social_count ?? 0
 				});
+				dispatch('crossfilter', { dimension: 'keyword', value: d.keyword, label: d.keyword });
 			});
 
 		simulation.on('tick', () => {
@@ -213,7 +222,11 @@
 				.attr('x1', (d: any) => clamp(d.source.x, 0, innerWidth))
 				.attr('y1', (d: any) => clamp(d.source.y, 0, innerHeight))
 				.attr('x2', (d: any) => clamp(d.target.x, 0, innerWidth))
-				.attr('y2', (d: any) => clamp(d.target.y, 0, innerHeight));
+				.attr('y2', (d: any) => clamp(d.target.y, 0, innerHeight))
+				.attr('stroke-opacity', (d: any) => {
+					if (!hasHL) return 0.4;
+					return (highlightedKeywords.has(d.source?.keyword) || highlightedKeywords.has(d.target?.keyword)) ? 0.5 : 0.06;
+				});
 
 			nodeGroup.attr('transform', (d: any) => {
 				d.x = clamp(d.x, d.radius, innerWidth - d.radius);

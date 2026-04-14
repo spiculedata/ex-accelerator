@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import ParallelCoordinates from '../ParallelCoordinates.svelte';
-  import { getPortalView, setPortalView } from '$lib/stores/investigationStore';
+  import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
+  import { computeTimelineHighlightDays } from '$lib/utils/crossFilterHelpers';
+  import CrossFilterBadge from '../CrossFilterBadge.svelte';
+
+  const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let timelineData: any[] = [];
+  export let gdeltEvents: any[] = [];
   export let height: number = 260;
+  export let crossFilter: CrossFilter | null = null;
 
   let activeView = 'attention';
   let container: HTMLDivElement;
@@ -57,7 +63,10 @@
     });
   })();
 
+  $: highlightDays = computeTimelineHighlightDays(crossFilter, timelineData, gdeltEvents);
+
   $: if (attentionData.length > 0 && svgEl && containerWidth > 0 && activeView !== 'sparklines') renderChart();
+  $: if (crossFilter !== undefined && activeView !== 'sparklines' && attentionData.length > 0 && svgEl) renderChart();
 
   function renderChart() {
     if (!svgEl) return;
@@ -81,11 +90,11 @@
       // Attention index area
       const area = d3.area<any>()
         .x(d => xScale(d.parsedDate)).y0(h).y1(d => yScale(d.index)).curve(d3.curveMonotoneX);
-      g.append('path').datum(attentionData).attr('fill', '#6366f1').attr('fill-opacity', 0.15).attr('d', area);
+      g.append('path').datum(attentionData).attr('fill', '#6366f1').attr('fill-opacity', highlightDays ? 0.05 : 0.15).attr('d', area);
 
       // Attention line
       const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d.index)).curve(d3.curveMonotoneX);
-      g.append('path').datum(attentionData).attr('fill', 'none').attr('stroke', '#818cf8').attr('stroke-width', 2).attr('d', line);
+      g.append('path').datum(attentionData).attr('fill', 'none').attr('stroke', '#818cf8').attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
 
       // Source contribution bars (thin stacked bars at each data point)
       const barW = Math.max(2, w / attentionData.length * 0.4);
@@ -100,16 +109,25 @@
         ];
         for (const seg of segments) {
           const segH = (seg.val / total) * (h - yScale(d.index));
+          const barOpacity = highlightDays ? (highlightDays.has(d.date) ? 0.6 : 0.08) : 0.4;
           g.append('rect').attr('x', x).attr('y', cy - segH).attr('width', barW).attr('height', segH)
-            .attr('fill', seg.color).attr('opacity', 0.4);
+            .attr('fill', seg.color).attr('opacity', barOpacity);
           cy -= segH;
         }
       });
 
-      // Dots
+      // Dots — clickable, highlight/dim based on cross-filter
       g.selectAll('.dot').data(attentionData).join('circle')
         .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d.index))
-        .attr('r', 3).attr('fill', '#818cf8').attr('stroke', '#0f172a').attr('stroke-width', 1);
+        .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
+        .attr('fill', '#818cf8')
+        .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
+        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+        .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
+        .style('cursor', 'pointer')
+        .on('click', (_event: any, d: any) => {
+          dispatch('crossfilter', { dimension: 'date', value: d.date, label: d.date });
+        });
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w))
         .call(g2 => g2.select('.domain').remove())
@@ -132,8 +150,25 @@
         .x(d => xScale(d.data.parsedDate)).y0(d => yScale(d[0])).y1(d => yScale(d[1])).curve(d3.curveMonotoneX);
 
       stacked.forEach(series => {
-        g.append('path').datum(series).attr('fill', colors[series.key]).attr('opacity', 0.6).attr('d', area);
+        g.append('path').datum(series).attr('fill', colors[series.key]).attr('opacity', highlightDays ? 0.2 : 0.6).attr('d', area);
       });
+
+      // Clickable dots at each data point on top of stack
+      const topSeries = stacked[stacked.length - 1];
+      if (topSeries) {
+        g.selectAll('.stack-dot').data(topSeries).join('circle')
+          .attr('cx', (d: any) => xScale(d.data.parsedDate))
+          .attr('cy', (d: any) => yScale(d[1]))
+          .attr('r', (d: any) => highlightDays?.has(d.data.date) ? 5 : 3)
+          .attr('fill', '#818cf8')
+          .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.data.date) ? 1 : 0.15) : 1)
+          .attr('stroke', (d: any) => highlightDays?.has(d.data.date) ? '#e0e7ff' : '#0f172a')
+          .attr('stroke-width', (d: any) => highlightDays?.has(d.data.date) ? 2 : 1)
+          .style('cursor', 'pointer')
+          .on('click', (_event: any, d: any) => {
+            dispatch('crossfilter', { dimension: 'date', value: d.data.date, label: d.data.date });
+          });
+      }
 
       // Legend
       let lx = w - 10;
@@ -156,12 +191,23 @@
       .call(g2 => g2.select('.domain').attr('stroke', '#334155'))
       .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'))
       .call(g2 => g2.selectAll('.tick line').attr('stroke', '#334155'));
+
+    // Cross-filter indicator line for single-day highlights
+    if (highlightDays && highlightDays.size === 1) {
+      const cfDate = d3.timeParse('%Y-%m-%d')([...highlightDays][0]);
+      if (cfDate) {
+        const cx = xScale(cfDate);
+        g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', h)
+          .attr('stroke', '#818cf8').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
+      }
+    }
   }
 </script>
 
 <div class="bg-slate-900 border border-slate-700/30 rounded-lg flex flex-col h-full overflow-hidden">
   <div class="flex items-center justify-between px-3 py-1.5 border-b border-slate-700/30 flex-shrink-0">
     <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Volume</span>
+    <CrossFilterBadge {crossFilter} nativeDimensions={['date']} />
     <div class="flex items-center gap-0.5">
       {#each views as view}
         <button on:click={() => selectView(view.id)}
@@ -175,7 +221,7 @@
 
   <div bind:this={container} class="flex-1 min-h-0 p-2">
     {#if activeView === 'sparklines'}
-      <ParallelCoordinates data={timelineData} {height} />
+      <ParallelCoordinates data={timelineData} {height} {crossFilter} {highlightDays} on:crossfilter />
     {:else}
       <svg bind:this={svgEl} class="w-full"></svg>
     {/if}

@@ -1,5 +1,11 @@
 import { writable, derived } from 'svelte/store';
 
+export interface CrossFilter {
+  dimension: 'actor' | 'location' | 'keyword' | 'sentiment' | 'date' | 'source';
+  value: string;
+  label?: string; // Human-readable label for the filter pill
+}
+
 export interface InvestigationSelection {
   timeRange: { start: string; end: string } | null;
   sentiment: string[] | null;
@@ -7,6 +13,7 @@ export interface InvestigationSelection {
   selectedIds: Set<string>;
   keywords: string[] | null;
   hoveredId: string | null;
+  crossFilter: CrossFilter | null;
 }
 
 export const investigationSelection = writable<InvestigationSelection>({
@@ -15,7 +22,8 @@ export const investigationSelection = writable<InvestigationSelection>({
   sources: null,
   selectedIds: new Set(),
   keywords: null,
-  hoveredId: null
+  hoveredId: null,
+  crossFilter: null
 });
 
 /**
@@ -78,6 +86,27 @@ export function setKeywords(keywords: string[]): void {
 }
 
 /**
+ * Set a cross-filter (click on an actor, location, keyword, etc. in one portal → filters others)
+ * Toggle behavior: clicking the same value again clears the filter.
+ */
+export function setCrossFilter(filter: CrossFilter): void {
+  investigationSelection.update(s => {
+    // Toggle: if same dimension+value, clear it
+    if (s.crossFilter?.dimension === filter.dimension && s.crossFilter?.value === filter.value) {
+      return { ...s, crossFilter: null };
+    }
+    return { ...s, crossFilter: filter };
+  });
+}
+
+/**
+ * Clear the active cross-filter
+ */
+export function clearCrossFilter(): void {
+  investigationSelection.update(s => ({ ...s, crossFilter: null }));
+}
+
+/**
  * Reset all filters and selections to their defaults
  */
 export function clearSelection(): void {
@@ -87,7 +116,8 @@ export function clearSelection(): void {
     sources: null,
     selectedIds: new Set(),
     keywords: null,
-    hoveredId: null
+    hoveredId: null,
+    crossFilter: null
   });
 }
 
@@ -101,6 +131,7 @@ export const activeFilterCount = derived(investigationSelection, ($s) => {
   if ($s.sources && $s.sources.length > 0) count++;
   if ($s.selectedIds.size > 0) count++;
   if ($s.keywords && $s.keywords.length > 0) count++;
+  if ($s.crossFilter) count++;
   return count;
 });
 

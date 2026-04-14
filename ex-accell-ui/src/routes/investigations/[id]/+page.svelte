@@ -7,7 +7,10 @@
     clearSelection,
     setTimeRange,
     setSentimentFilter,
-    setSourceFilter
+    setSourceFilter,
+    setCrossFilter,
+    clearCrossFilter,
+    type CrossFilter
   } from '$lib/stores/investigationStore';
   import { getPortalLayout, setPortalLayout, getPortalGrid, setPortalGrid, resetPortalGrid, type PortalGridItem } from '$lib/stores/investigationStore';
   import SwimLaneTimeline from '$lib/components/investigation/SwimLaneTimeline.svelte';
@@ -230,6 +233,95 @@
       const date = d.date;
       return date >= range.start && date <= range.end;
     });
+  })();
+
+  // Cross-filter: active filter from portal clicks
+  $: activeCrossFilter = $investigationSelection.crossFilter;
+
+  function handleCrossFilter(event: CustomEvent<CrossFilter>) {
+    setCrossFilter(event.detail);
+  }
+
+  // Apply cross-filter to detail data for portals that consume raw records
+  $: crossFilteredGdelt = (() => {
+    if (!activeCrossFilter) return gdeltEvents;
+    const cf = activeCrossFilter;
+    switch (cf.dimension) {
+      case 'actor':
+        return gdeltEvents.filter((e: any) =>
+          (e.actor1name || '').toLowerCase().includes(cf.value.toLowerCase()) ||
+          (e.actor2name || '').toLowerCase().includes(cf.value.toLowerCase())
+        );
+      case 'location':
+        return gdeltEvents.filter((e: any) =>
+          (e.actiongeo_fullname || '').toLowerCase().includes(cf.value.toLowerCase())
+        );
+      case 'keyword':
+        return gdeltEvents.filter((e: any) => {
+          const text = `${e.actor1name || ''} ${e.actor2name || ''} ${e.actiongeo_fullname || ''}`.toLowerCase();
+          return text.includes(cf.value.toLowerCase());
+        });
+      case 'sentiment': {
+        return gdeltEvents.filter((e: any) => {
+          const tone = e.avgtone ?? e.avg_tone ?? 0;
+          if (cf.value === 'positive') return tone > 1;
+          if (cf.value === 'negative') return tone < -1;
+          return tone >= -1 && tone <= 1; // neutral
+        });
+      }
+      case 'date':
+        return gdeltEvents.filter((e: any) => {
+          const s = String(e.sqldate);
+          const eventDate = s.length === 8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+          return eventDate === cf.value;
+        });
+      default:
+        return gdeltEvents;
+    }
+  })();
+
+  $: crossFilteredRadio = (() => {
+    if (!activeCrossFilter) return radioSegments;
+    const cf = activeCrossFilter;
+    switch (cf.dimension) {
+      case 'keyword':
+        return radioSegments.filter((s: any) =>
+          (s.transcript || '').toLowerCase().includes(cf.value.toLowerCase())
+        );
+      case 'sentiment':
+        return radioSegments.filter((s: any) =>
+          (s.sentiment || '').toLowerCase() === cf.value
+        );
+      case 'date':
+        return radioSegments.filter((s: any) => {
+          const d = (s.segment_start || '').split('T')[0];
+          return d === cf.value;
+        });
+      default:
+        return radioSegments;
+    }
+  })();
+
+  $: crossFilteredSocial = (() => {
+    if (!activeCrossFilter) return socialPosts;
+    const cf = activeCrossFilter;
+    switch (cf.dimension) {
+      case 'keyword':
+        return socialPosts.filter((p: any) =>
+          (p.text || '').toLowerCase().includes(cf.value.toLowerCase())
+        );
+      case 'sentiment':
+        return socialPosts.filter((p: any) =>
+          (p.sentiment_category || '').toLowerCase() === cf.value
+        );
+      case 'date':
+        return socialPosts.filter((p: any) => {
+          const d = (p.timestamp || '').split('T')[0];
+          return d === cf.value;
+        });
+      default:
+        return socialPosts;
+    }
   })();
 
   $: sentimentChartData = computeSentimentFromAllSources(gdeltEvents, radioSegments, socialPosts);
@@ -568,14 +660,14 @@
     URL.revokeObjectURL(url);
   }
 
-  $: totalItems = gdeltEvents.length + radioSegments.length + socialPosts.length;
+  $: totalItems = crossFilteredGdelt.length + crossFilteredRadio.length + crossFilteredSocial.length;
 
-  // Tab counts
+  // Tab counts — reflect cross-filter
   $: tabCounts = {
-    gdelt: gdeltEvents.length,
-    radio: radioSegments.length,
-    social: socialPosts.length,
-    visualizations: totalItems
+    gdelt: crossFilteredGdelt.length,
+    radio: crossFilteredRadio.length,
+    social: crossFilteredSocial.length,
+    visualizations: gdeltEvents.length + radioSegments.length + socialPosts.length
   };
 </script>
 
@@ -714,6 +806,22 @@
 
     <!-- ============ TABS ============ -->
     <div class="h-8 flex-shrink-0 bg-slate-900 border-b border-slate-700/50 flex items-end px-2 gap-0">
+      <!-- Global cross-filter pill — visible on all tabs -->
+      {#if activeCrossFilter}
+        <div class="flex items-center gap-1.5 px-2 py-0.5 mb-0.5 mr-2 bg-indigo-500/15 border border-indigo-500/30 rounded-full self-center">
+          <span class="text-[8px] text-indigo-400/70 uppercase tracking-wider">{activeCrossFilter.dimension}</span>
+          <span class="text-[9px] text-indigo-300 font-medium max-w-[100px] truncate">{activeCrossFilter.label || activeCrossFilter.value}</span>
+          <button
+            on:click={() => clearCrossFilter()}
+            class="text-indigo-400/50 hover:text-indigo-300 transition-colors"
+            title="Clear filter"
+          >
+            <svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3l6 6M9 3l-6 6" />
+            </svg>
+          </button>
+        </div>
+      {/if}
       <button
         on:click={() => activeTab = 'gdelt'}
         class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'gdelt' ? 'text-amber-400 border-amber-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
@@ -770,7 +878,7 @@
                 </tr>
               </thead>
               <tbody>
-                {#each gdeltEvents as event}
+                {#each crossFilteredGdelt as event}
                   {@const expanded = expandedGdeltId === event.globaleventid}
                   <tr
                     class="border-b border-slate-800/40 hover:bg-slate-800/40 transition-colors cursor-pointer"
@@ -778,10 +886,11 @@
                   >
                     <td class="px-3 py-1.5 text-slate-400 font-mono whitespace-nowrap">{formatGdeltDate(event.sqldate)}</td>
                     <td class="px-3 py-1.5 text-slate-300">
-                      <span class="font-medium">{event.actor1name || '-'}</span>
+                      {#if event.actor1name}<!-- svelte-ignore a11y-click-events-have-key-events --><span class="font-medium cursor-pointer hover:text-indigo-300 transition-colors" on:click|stopPropagation={() => setCrossFilter({ dimension: 'actor', value: event.actor1name, label: event.actor1name })} role="button" tabindex="0">{event.actor1name}</span>{:else}<span>-</span>{/if}
                       {#if event.actor2name}
                         <span class="text-slate-600 mx-1">&rarr;</span>
-                        <span class="text-slate-400">{event.actor2name}</span>
+                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                        <span class="text-slate-400 cursor-pointer hover:text-indigo-300 transition-colors" on:click|stopPropagation={() => setCrossFilter({ dimension: 'actor', value: event.actor2name, label: event.actor2name })} role="button" tabindex="0">{event.actor2name}</span>
                       {/if}
                     </td>
                     <td class="px-3 py-1.5 text-center">
@@ -797,7 +906,9 @@
                         <span class="text-[10px] font-mono text-slate-500">{event.avgtone.toFixed(1)}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-1.5 text-slate-500 truncate max-w-[200px]" title={event.actiongeo_fullname}>{event.actiongeo_fullname || '-'}</td>
+                    <td class="px-3 py-1.5 truncate max-w-[200px]" title={event.actiongeo_fullname}>
+                      {#if event.actiongeo_fullname}<!-- svelte-ignore a11y-click-events-have-key-events --><span class="text-slate-500 cursor-pointer hover:text-indigo-300 transition-colors" on:click|stopPropagation={() => setCrossFilter({ dimension: 'location', value: event.actiongeo_fullname, label: event.actiongeo_fullname })} role="button" tabindex="0">{event.actiongeo_fullname}</span>{:else}<span class="text-slate-600">-</span>{/if}
+                    </td>
                     <td class="px-3 py-1.5 text-right font-mono text-slate-500">{event.numarticles || '-'}</td>
                   </tr>
                   {#if expanded}
@@ -819,7 +930,12 @@
                           </div>
                           <div>
                             <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Location</span>
-                            <span class="text-slate-300">{event.actiongeo_fullname || 'Unknown'}</span>
+                            {#if event.actiongeo_fullname}
+                              <!-- svelte-ignore a11y-click-events-have-key-events -->
+                              <span class="text-slate-300 cursor-pointer hover:text-indigo-300 transition-colors {activeCrossFilter?.dimension === 'location' && activeCrossFilter?.value === event.actiongeo_fullname ? 'text-indigo-300 underline' : ''}" on:click|stopPropagation={() => setCrossFilter({ dimension: 'location', value: event.actiongeo_fullname, label: event.actiongeo_fullname })} role="button" tabindex="0">{event.actiongeo_fullname}</span>
+                            {:else}
+                              <span class="text-slate-500">Unknown</span>
+                            {/if}
                             {#if event.actiongeo_lat && event.actiongeo_long}
                               <span class="text-[9px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
                             {/if}
@@ -827,8 +943,8 @@
                           <div>
                             <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Actors</span>
                             <div class="text-slate-300">
-                              {#if event.actor1name}<span class="font-medium">{event.actor1name}</span>{#if event.actor1countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor1countrycode})</span>{/if}{/if}
-                              {#if event.actor2name}<span class="text-slate-600 mx-1">&rarr;</span><span>{event.actor2name}</span>{#if event.actor2countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor2countrycode})</span>{/if}{/if}
+                              {#if event.actor1name}<!-- svelte-ignore a11y-click-events-have-key-events --><span class="font-medium cursor-pointer hover:text-indigo-300 transition-colors {activeCrossFilter?.dimension === 'actor' && activeCrossFilter?.value === event.actor1name ? 'text-indigo-300 underline' : ''}" on:click|stopPropagation={() => setCrossFilter({ dimension: 'actor', value: event.actor1name, label: event.actor1name })} role="button" tabindex="0">{event.actor1name}</span>{#if event.actor1countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor1countrycode})</span>{/if}{/if}
+                              {#if event.actor2name}<span class="text-slate-600 mx-1">&rarr;</span><!-- svelte-ignore a11y-click-events-have-key-events --><span class="cursor-pointer hover:text-indigo-300 transition-colors {activeCrossFilter?.dimension === 'actor' && activeCrossFilter?.value === event.actor2name ? 'text-indigo-300 underline' : ''}" on:click|stopPropagation={() => setCrossFilter({ dimension: 'actor', value: event.actor2name, label: event.actor2name })} role="button" tabindex="0">{event.actor2name}</span>{#if event.actor2countrycode}<span class="text-[9px] text-slate-500 ml-1">({event.actor2countrycode})</span>{/if}{/if}
                             </div>
                           </div>
                         </div>
@@ -853,12 +969,12 @@
       {#if activeTab === 'radio'}
         {#if radioLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
-        {:else if radioSegments.length === 0}
+        {:else if crossFilteredRadio.length === 0}
           <div class="flex items-center justify-center h-full text-slate-500 text-sm">No radio transcripts found</div>
         {:else}
           <div class="h-full overflow-y-auto">
             <div class="divide-y divide-slate-800/50">
-              {#each radioSegments as segment}
+              {#each crossFilteredRadio as segment}
                 <div
                   class="px-4 py-2.5 hover:bg-slate-800/30 transition-colors cursor-pointer"
                   on:click={() => expandedTranscriptId = expandedTranscriptId === segment.id ? null : segment.id}
@@ -868,7 +984,8 @@
                 >
                   <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center gap-2">
-                      <span class="w-2 h-2 rounded-full {sentimentDotColor(segment.sentiment)}"></span>
+                      <!-- svelte-ignore a11y-click-events-have-key-events -->
+                      <span class="w-2 h-2 rounded-full cursor-pointer hover:ring-2 hover:ring-indigo-400/40 {sentimentDotColor(segment.sentiment)}" on:click|stopPropagation={() => { if (segment.sentiment) setCrossFilter({ dimension: 'sentiment', value: segment.sentiment.toLowerCase(), label: segment.sentiment }); }} role="button" tabindex="0"></span>
                       <span class="text-xs font-semibold text-slate-200">{segment.radio_name}</span>
                       {#if segment.state}
                         <span class="text-[10px] text-slate-500">{segment.state}</span>
@@ -913,12 +1030,12 @@
       {#if activeTab === 'social'}
         {#if socialLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-sky-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
-        {:else if socialPosts.length === 0}
+        {:else if crossFilteredSocial.length === 0}
           <div class="flex items-center justify-center h-full text-slate-500 text-sm">No social posts found</div>
         {:else}
           <div class="h-full overflow-y-auto">
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-slate-800/30 p-1">
-              {#each socialPosts as post}
+              {#each crossFilteredSocial as post}
                 {@const isExpanded = expandedSocialId === post.id}
                 {@const likes = Number(post.engagement_likes || 0)}
                 {@const shares = Number(post.engagement_shares || 0)}
@@ -938,7 +1055,14 @@
                         <span class="text-[10px] font-medium text-sky-400">{post.platform}</span>
                       {/if}
                       {#if post.sentiment_category}
-                        <span class="text-[9px] px-1 py-0 rounded {post.sentiment_category?.toLowerCase() === 'positive' || post.sentiment_category?.toLowerCase() === 'very positive' ? 'bg-emerald-500/15 text-emerald-400' : post.sentiment_category?.toLowerCase() === 'negative' || post.sentiment_category?.toLowerCase() === 'very negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}">{post.sentiment_category}</span>
+                        {@const sentNorm = (post.sentiment_category || '').toLowerCase().includes('positive') ? 'positive' : (post.sentiment_category || '').toLowerCase().includes('negative') ? 'negative' : 'neutral'}
+                        <!-- svelte-ignore a11y-click-events-have-key-events -->
+                        <span
+                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-emerald-500/15 text-emerald-400' : sentNorm === 'negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}"
+                          on:click|stopPropagation={() => setCrossFilter({ dimension: 'sentiment', value: sentNorm, label: post.sentiment_category || sentNorm })}
+                          role="button"
+                          tabindex="0"
+                        >{post.sentiment_category}</span>
                       {/if}
                     </div>
                     <div class="flex items-center gap-2">
@@ -1018,6 +1142,24 @@
                 {portal.label}
               </button>
             {/each}
+
+            <!-- Active cross-filter pill -->
+            {#if activeCrossFilter}
+              <div class="ml-2 flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full">
+                <span class="text-[9px] text-indigo-400/70 uppercase tracking-wider">{activeCrossFilter.dimension}</span>
+                <span class="text-[10px] text-indigo-300 font-medium max-w-[120px] truncate">{activeCrossFilter.label || activeCrossFilter.value}</span>
+                <button
+                  on:click={() => clearCrossFilter()}
+                  class="text-indigo-400/50 hover:text-indigo-300 transition-colors ml-0.5"
+                  title="Clear filter"
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3l6 6M9 3l-6 6" />
+                  </svg>
+                </button>
+              </div>
+            {/if}
+
             <div class="flex-1"></div>
             <button on:click={handleResetGrid}
               class="px-2 py-0.5 text-[9px] text-slate-600 hover:text-slate-400 transition-colors"
@@ -1054,17 +1196,59 @@
                 </div>
 
                 {#if portalId === 'sentiment'}
-                  <SentimentPortal timelineData={filteredTimelineData} {gdeltEvents} {radioSegments} {socialPosts} height={portalHeight(item)} />
+                  <SentimentPortal
+                    timelineData={filteredTimelineData}
+                    gdeltEvents={crossFilteredGdelt}
+                    radioSegments={crossFilteredRadio}
+                    socialPosts={crossFilteredSocial}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {:else if portalId === 'volume'}
-                  <VolumePortal timelineData={filteredTimelineData} height={portalHeight(item)} />
+                  <VolumePortal
+                    timelineData={filteredTimelineData}
+                    gdeltEvents={crossFilteredGdelt}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {:else if portalId === 'correlation'}
-                  <CorrelationPortal timelineData={filteredTimelineData} height={portalHeight(item)} />
+                  <CorrelationPortal
+                    timelineData={filteredTimelineData}
+                    gdeltEvents={crossFilteredGdelt}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {:else if portalId === 'topics'}
-                  <TopicsPortal {keywordData} height={portalHeight(item)} />
+                  <TopicsPortal
+                    {keywordData}
+                    gdeltEvents={crossFilteredGdelt}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {:else if portalId === 'geography'}
-                  <GeographyPortal {keywords} {dateStart} {dateEnd} height={portalHeight(item)} />
+                  <GeographyPortal
+                    {keywords}
+                    {dateStart}
+                    {dateEnd}
+                    gdeltEvents={crossFilteredGdelt}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {:else if portalId === 'actors'}
-                  <ActorsPortal {keywords} {dateStart} {dateEnd} height={portalHeight(item)} />
+                  <ActorsPortal
+                    {keywords}
+                    {dateStart}
+                    {dateEnd}
+                    gdeltEvents={crossFilteredGdelt}
+                    height={portalHeight(item)}
+                    crossFilter={activeCrossFilter}
+                    on:crossfilter={handleCrossFilter}
+                  />
                 {/if}
               </div>
             {/each}

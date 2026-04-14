@@ -2,9 +2,15 @@
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
 
-  export let data: { label: string; value: number; color: string }[] = [];
+  import type { CrossFilter } from '$lib/stores/investigationStore';
 
-  const dispatch = createEventDispatcher<{ segmentClick: { label: string } }>();
+  export let data: { label: string; value: number; color: string }[] = [];
+  export let crossFilter: CrossFilter | null = null;
+
+  const dispatch = createEventDispatcher<{
+    segmentClick: { label: string };
+    crossfilter: CrossFilter;
+  }>();
 
   let containerEl: HTMLDivElement;
   let svgEl: SVGSVGElement;
@@ -26,6 +32,7 @@
   $: if (svgEl && data.length > 0 && radius > 0) {
     drawChart();
   }
+  $: if (crossFilter !== undefined && svgEl && data.length > 0) drawChart();
 
   function drawChart() {
     const svg = d3.select(svgEl);
@@ -57,15 +64,27 @@
       .data(pie(data))
       .enter()
       .append('path')
-      .attr('fill', (d) => d.data.color)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
+      .attr('fill', (d) => {
+        if (crossFilter?.dimension === 'sentiment') {
+          return d.data.label.toLowerCase() === crossFilter.value ? d.data.color : '#334155';
+        }
+        return d.data.color;
+      })
+      .attr('stroke', (d) => crossFilter?.dimension === 'sentiment' && d.data.label.toLowerCase() === crossFilter?.value ? '#818cf8' : 'white')
+      .attr('stroke-width', (d) => crossFilter?.dimension === 'sentiment' && d.data.label.toLowerCase() === crossFilter?.value ? 3 : 2)
+      .attr('opacity', (d) => {
+        if (crossFilter?.dimension === 'sentiment') {
+          return d.data.label.toLowerCase() === crossFilter.value ? 1 : 0.4;
+        }
+        return 1;
+      })
       .attr('cursor', 'pointer')
       .each(function (d) {
         (this as any)._current = { startAngle: d.startAngle, endAngle: d.startAngle };
       })
       .on('click', (_event, d) => {
         dispatch('segmentClick', { label: d.data.label });
+        dispatch('crossfilter', { dimension: 'sentiment', value: d.data.label.toLowerCase(), label: d.data.label });
       })
       .on('mouseenter', function (_event, d) {
         d3.select(this).transition().duration(150).attr('d', arcHover as any);
@@ -161,7 +180,7 @@
         {#each data as segment}
           <button
             class="flex items-center gap-2 text-xs text-slate-300 hover:text-slate-100 transition-colors"
-            on:click={() => dispatch('segmentClick', { label: segment.label })}
+            on:click={() => { dispatch('segmentClick', { label: segment.label }); dispatch('crossfilter', { dimension: 'sentiment', value: segment.label.toLowerCase(), label: segment.label }); }}
           >
             <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: {segment.color}"></span>
             <span class="font-medium">{segment.label}</span>

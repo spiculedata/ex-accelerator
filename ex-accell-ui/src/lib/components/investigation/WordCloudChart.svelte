@@ -3,10 +3,15 @@
 	import * as d3 from 'd3';
 	import cloud from 'd3-cloud';
 
+	import type { CrossFilter } from '$lib/stores/investigationStore';
+
 	export let words: { text: string; size: number }[] = [];
+	export let crossFilter: CrossFilter | null = null;
+	export let highlightedKeywords: Set<string> = new Set();
 
 	const dispatch = createEventDispatcher<{
 		wordClick: { text: string; size: number };
+		crossfilter: CrossFilter;
 	}>();
 
 	let container: HTMLDivElement;
@@ -29,6 +34,7 @@
 
 	$: effectiveWidth = containerWidth;
 	$: if (words.length > 0 && effectiveWidth > 0 && svg) render();
+	$: if (highlightedKeywords !== undefined && words.length > 0 && svg) render();
 
 	function render() {
 		const svgEl = d3.select(svg);
@@ -83,8 +89,8 @@
 				.attr('font-size', (d: any) => d.size + 'px')
 				.attr('font-family', 'Inter, system-ui, sans-serif')
 				.attr('font-weight', (d: any) => (d.size > 36 ? '700' : '500'))
-				.attr('fill', (d: any) => colorScale(d.text))
-				.attr('opacity', 0.9)
+				.attr('fill', (d: any) => highlightedKeywords.size > 0 && highlightedKeywords.has(d.text) ? '#818cf8' : colorScale(d.text))
+				.attr('opacity', (d: any) => highlightedKeywords.size > 0 ? (highlightedKeywords.has(d.text) ? 1 : 0.25) : 0.9)
 				.attr('stroke', 'none')
 				.style('cursor', 'pointer')
 				.text((d: any) => d.text)
@@ -101,6 +107,7 @@
 				})
 				.on('click', (_: MouseEvent, d: any) => {
 					dispatch('wordClick', { text: d.text, size: d.rawSize });
+					dispatch('crossfilter', { dimension: 'keyword', value: d.text, label: d.text });
 				});
 		}
 	}

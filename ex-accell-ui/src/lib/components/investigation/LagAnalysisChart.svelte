@@ -2,12 +2,17 @@
 	import { onMount, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
 
+	import type { CrossFilter } from '$lib/stores/investigationStore';
+
 	export let data: any[] = [];
 	export let sourceA: string = 'gdelt';
 	export let sourceB: string = 'social';
+	export let crossFilter: CrossFilter | null = null;
+	export let highlightDays: Set<string> | null = null;
 
 	const dispatch = createEventDispatcher<{
 		dayClick: { date: string };
+		crossfilter: CrossFilter;
 	}>();
 
 	let container: HTMLDivElement;
@@ -41,6 +46,7 @@
 	$: effectiveWidth = containerWidth;
 	$: if (data.length > 0 && effectiveWidth > 0 && svg) render();
 	$: if (data.length > 0 && svg) render(), lagHours;
+	$: if (highlightDays !== undefined && data.length > 0 && svg) render();
 
 	function getMetric(d: any, source: string): number {
 		switch (source) {
@@ -209,11 +215,11 @@
 			.append('circle')
 			.attr('cx', (d: any) => xScale(d.a))
 			.attr('cy', (d: any) => yScale(d.b))
-			.attr('r', 6)
-			.attr('fill', (_: any, i: number) => colorScale(i))
-			.attr('stroke', '#0f172a')
-			.attr('stroke-width', 1.5)
-			.attr('opacity', 0.85)
+			.attr('r', (d: any) => highlightDays?.has(d.date) ? 8 : 6)
+			.attr('fill', (d: any, i: number) => highlightDays?.has(d.date) ? '#818cf8' : colorScale(i))
+			.attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+			.attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2.5 : 1.5)
+			.attr('opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.25) : 0.85)
 			.style('cursor', 'pointer')
 			.on('mouseenter', function (event: MouseEvent, d: any) {
 				d3.select(this).attr('r', 8).attr('opacity', 1);
@@ -226,6 +232,7 @@
 			})
 			.on('click', (_: MouseEvent, d: any) => {
 				dispatch('dayClick', { date: d.date });
+				dispatch('crossfilter', { dimension: 'date', value: d.date, label: d.date });
 			});
 
 		const hasValidCorr = !isNaN(correlation);

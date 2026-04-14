@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
-  import { getPortalView, setPortalView } from '$lib/stores/investigationStore';
+  import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
+  import { computeHighlightSet } from '$lib/utils/crossFilterHelpers';
+  import CrossFilterBadge from '../CrossFilterBadge.svelte';
+
+  const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let keywords: string[] = [];
   export let dateStart: string = '';
   export let dateEnd: string = '';
   export let height: number = 260;
+  export let crossFilter: CrossFilter | null = null;
+  export let gdeltEvents: any[] = [];
 
   let activeView = 'players';
   let container: HTMLDivElement;
@@ -81,6 +87,13 @@
 
   $: maxMentions = d3.max(actorData, (d: any) => Number(d.mention_count)) ?? 1;
 
+  // Cross-dimensional highlight set: highlights actors related to any active cross-filter
+  $: highlightedActors = computeHighlightSet(crossFilter, gdeltEvents, 'actor');
+  $: hasHighlight = highlightedActors.size > 0;
+
+  // Re-render network when cross-filter changes
+  $: if (crossFilter !== undefined && activeView === 'network' && actorData.length > 0 && svgEl) renderNetwork();
+
   function renderNetwork() {
     if (!svgEl || actorData.length === 0) return;
     const svg = d3.select(svgEl);
@@ -138,6 +151,12 @@
       .attr('x2', (d: any) => nodes[d.target]?.x ?? 0)
       .attr('y2', (d: any) => nodes[d.target]?.y ?? 0)
       .attr('stroke', '#334155')
+      .attr('opacity', (d: any) => {
+        if (!hasHighlight) return 1;
+        const srcNode = nodes[d.source];
+        const tgtNode = nodes[d.target];
+        return (highlightedActors.has(srcNode?.id) || highlightedActors.has(tgtNode?.id)) ? 1 : 0.15;
+      })
       .attr('stroke-width', (d: any) => Math.max(0.5, Math.min(3, d.weight / 5)));
 
     // Draw nodes
@@ -147,13 +166,18 @@
     nodeG.append('circle')
       .attr('r', (d: any) => d.radius)
       .attr('fill', (d: any) => toneColor(d.tone))
-      .attr('fill-opacity', 0.2)
-      .attr('stroke', (d: any) => toneColor(d.tone))
-      .attr('stroke-width', 1.5);
+      .attr('fill-opacity', (d: any) => hasHighlight ? (highlightedActors.has(d.id) ? 0.5 : 0.08) : 0.2)
+      .attr('stroke', (d: any) => highlightedActors.has(d.id) ? '#818cf8' : toneColor(d.tone))
+      .attr('stroke-width', (d: any) => highlightedActors.has(d.id) ? 2.5 : 1.5)
+      .style('cursor', 'pointer')
+      .on('click', (_event: any, d: any) => {
+        dispatch('crossfilter', { dimension: 'actor', value: d.id, label: d.id });
+      });
 
     nodeG.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
       .attr('fill', '#e2e8f0')
+      .attr('opacity', (d: any) => hasHighlight ? (highlightedActors.has(d.id) ? 1 : 0.2) : 1)
       .attr('font-size', (d: any) => Math.max(7, Math.min(10, d.radius * 0.45)) + 'px')
       .attr('font-weight', '500')
       .text((d: any) => d.id.substring(0, 10));
@@ -167,6 +191,7 @@
       {#if actorData.length > 0}
         <span class="text-[9px] text-slate-600">{actorData.length} entities</span>
       {/if}
+      <CrossFilterBadge {crossFilter} nativeDimensions={['actor']} />
     </div>
     <div class="flex items-center gap-0.5">
       {#each views as view}
@@ -194,7 +219,14 @@
             {@const mentions = Number(actor.mention_count)}
             {@const pct = (mentions / maxMentions) * 100}
             {@const tone = Number(actor.avg_tone)}
-            <div class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-800/30">
+            {@const isSelected = hasHighlight && highlightedActors.has(actor.actor)}
+            {@const isDimmed = hasHighlight && !highlightedActors.has(actor.actor)}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div
+              class="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer transition-all {isSelected ? 'bg-indigo-500/20 ring-1 ring-indigo-400/40' : 'hover:bg-slate-800/30'} {isDimmed ? 'opacity-40' : ''}"
+              on:click={() => dispatch('crossfilter', { dimension: 'actor', value: actor.actor, label: actor.actor })}
+              role="button"
+              tabindex="0">
               <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {toneColor(tone)}"></span>
               <span class="text-xs text-slate-300 font-medium truncate flex-1" title={actor.actor}>{actor.actor}</span>
               <span class="text-[9px] font-mono text-slate-500 flex-shrink-0">{actor.country_code || ''}</span>

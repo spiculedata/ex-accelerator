@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import KeywordNetwork from '../KeywordNetwork.svelte';
   import WordCloudChart from '../WordCloudChart.svelte';
-  import { getPortalView, setPortalView } from '$lib/stores/investigationStore';
+  import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
+  import { computeHighlightSet } from '$lib/utils/crossFilterHelpers';
+  import CrossFilterBadge from '../CrossFilterBadge.svelte';
+
+  const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let keywordData: any[] = [];
   export let height: number = 260;
+  export let crossFilter: CrossFilter | null = null;
+  export let gdeltEvents: any[] = [];
 
   let activeView = 'shared';
   let container: HTMLDivElement;
@@ -58,7 +64,13 @@
     size: (k.gdelt_count || 0) + (k.radio_count || 0) + (k.social_count || 0)
   })).filter((w: any) => w.size > 0);
 
+  // Cross-dimensional highlight set
+  $: highlightedKeywords = computeHighlightSet(crossFilter, gdeltEvents, 'keyword');
+  $: hasHighlight = highlightedKeywords.size > 0;
+
   $: if (classified.length > 0 && svgEl && containerWidth > 0 && activeView === 'shared') renderShared();
+  // Re-render when cross-filter changes
+  $: if (crossFilter !== undefined && activeView === 'shared' && classified.length > 0 && svgEl) renderShared();
 
   function renderShared() {
     if (!svgEl) return;
@@ -119,9 +131,16 @@
     bubbles.append('circle')
       .attr('r', d => d.radius)
       .attr('fill', d => d.category === 'shared' ? '#f59e0b' : d.color)
-      .attr('fill-opacity', d => d.category === 'shared' ? 0.3 : 0.15)
-      .attr('stroke', d => d.category === 'shared' ? '#f59e0b' : d.color)
-      .attr('stroke-width', d => d.category === 'shared' ? 1.5 : 0.5);
+      .attr('fill-opacity', d => {
+        if (hasHighlight) return highlightedKeywords.has(d.keyword) ? 0.5 : 0.06;
+        return d.category === 'shared' ? 0.3 : 0.15;
+      })
+      .attr('stroke', d => highlightedKeywords.has(d.keyword) ? '#818cf8' : (d.category === 'shared' ? '#f59e0b' : d.color))
+      .attr('stroke-width', d => highlightedKeywords.has(d.keyword) ? 2.5 : (d.category === 'shared' ? 1.5 : 0.5))
+      .style('cursor', 'pointer')
+      .on('click', (_event: any, d: any) => {
+        dispatch('crossfilter', { dimension: 'keyword', value: d.keyword, label: d.keyword });
+      });
 
     // Source indicator dots for shared terms
     bubbles.filter(d => d.category === 'shared').each(function (d) {
@@ -139,6 +158,7 @@
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
       .attr('fill', '#e2e8f0')
+      .attr('opacity', d => hasHighlight ? (highlightedKeywords.has(d.keyword) ? 1 : 0.15) : 1)
       .attr('font-size', d => Math.max(8, Math.min(12, d.radius * 0.5)) + 'px')
       .attr('font-weight', d => d.category === 'shared' ? '600' : '400')
       .text(d => d.keyword);
@@ -164,6 +184,7 @@
       {#if keywordData.length > 0}
         <span class="text-[9px] text-slate-600">{keywordData.length} terms</span>
       {/if}
+      <CrossFilterBadge {crossFilter} nativeDimensions={['keyword']} />
     </div>
     <div class="flex items-center gap-0.5">
       {#each views as view}
@@ -189,7 +210,14 @@
             <span class="text-right text-sky-400/70">Social</span>
           </div>
           {#each keywordData as kw}
-            <div class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded hover:bg-slate-800/30">
+            {@const isSelected = hasHighlight && highlightedKeywords.has(kw.keyword)}
+            {@const isDimmed = hasHighlight && !highlightedKeywords.has(kw.keyword)}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div
+              class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded cursor-pointer transition-all {isSelected ? 'bg-indigo-500/20 ring-1 ring-indigo-400/40' : 'hover:bg-slate-800/30'} {isDimmed ? 'opacity-40' : ''}"
+              on:click={() => dispatch('crossfilter', { dimension: 'keyword', value: kw.keyword, label: kw.keyword })}
+              role="button"
+              tabindex="0">
               <span class="text-xs text-slate-300 font-medium truncate">{kw.keyword}</span>
               <span class="text-right text-xs font-mono text-amber-400">{kw.gdelt_count || 0}</span>
               <span class="text-right text-xs font-mono text-violet-400">{kw.radio_count || 0}</span>
@@ -197,13 +225,13 @@
             </div>
           {/each}
         </div>
-        <KeywordNetwork data={keywordData} height={140} />
+        <KeywordNetwork data={keywordData} height={140} {crossFilter} {highlightedKeywords} on:crossfilter />
       {:else}
         <div class="flex items-center justify-center h-full text-slate-600 text-xs">No keyword data</div>
       {/if}
     {:else if activeView === 'cloud'}
       {#if wordCloudData.length > 0}
-        <WordCloudChart words={wordCloudData} height={height - 10} />
+        <WordCloudChart words={wordCloudData} height={height - 10} {crossFilter} {highlightedKeywords} on:crossfilter />
       {:else}
         <div class="flex items-center justify-center h-full text-slate-600 text-xs">No keyword data</div>
       {/if}

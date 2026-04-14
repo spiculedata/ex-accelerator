@@ -2,11 +2,16 @@
 	import { onMount, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
 
+	import type { CrossFilter } from '$lib/stores/investigationStore';
+
 	export let data: any[] = [];
 	export let height: number = 280;
+	export let crossFilter: CrossFilter | null = null;
+	export let highlightDays: Set<string> | null = null;
 
 	const dispatch = createEventDispatcher<{
 		brushChange: { axis: string; range: [number, number] | null };
+		crossfilter: CrossFilter;
 	}>();
 
 	let container: HTMLDivElement;
@@ -41,6 +46,8 @@
 
 	$: effectiveWidth = containerWidth;
 	$: if (data.length > 0 && effectiveWidth > 0 && svg) render();
+	$: if (crossFilter !== undefined && data.length > 0 && svg) render();
+	$: if (highlightDays !== undefined && data.length > 0 && svg) render();
 
 	function computeSentiment(positive: number, negative: number, total: number): number {
 		if (total <= 0) return 0;
@@ -183,19 +190,35 @@
 				.attr('fill', 'none')
 				.attr('stroke', metric.color)
 				.attr('stroke-width', 1.5)
+				.attr('opacity', highlightDays ? 0.3 : 1)
 				.attr('d', line);
 
-			// Dots
+			// Dots — clickable, highlight/dim based on any cross-filter
 			sparkG.selectAll('.dot')
 				.data(prepared)
 				.join('circle')
 				.attr('class', 'dot')
 				.attr('cx', (d: any) => xScale(d.parsedDate))
 				.attr('cy', (d: any) => yScale(d[metric.key]))
-				.attr('r', 2.5)
-				.attr('fill', metric.color)
-				.attr('stroke', '#0f172a')
-				.attr('stroke-width', 1);
+				.attr('r', (d: any) => highlightDays?.has(d.date) ? 4.5 : 2.5)
+				.attr('fill', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : metric.color)
+				.attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
+				.attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+				.attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
+				.style('cursor', 'pointer')
+				.on('click', (_event: any, d: any) => {
+					dispatch('crossfilter', { dimension: 'date', value: d.date, label: d.date });
+				});
+
+			// Cross-filter indicator line for single-day highlight
+			if (highlightDays && highlightDays.size === 1) {
+				const cfDate = d3.timeParse('%Y-%m-%d')([...highlightDays][0]);
+				if (cfDate) {
+					const cx = xScale(cfDate);
+					sparkG.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', sparkH)
+						.attr('stroke', '#818cf8').attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('opacity', 0.6);
+				}
+			}
 
 			// Hover overlay for this cell
 			sparkG.append('rect')

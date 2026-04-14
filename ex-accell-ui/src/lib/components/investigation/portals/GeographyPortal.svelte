@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
-  import { getPortalView, setPortalView } from '$lib/stores/investigationStore';
+  import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
+  import { computeHighlightSet } from '$lib/utils/crossFilterHelpers';
+  import CrossFilterBadge from '../CrossFilterBadge.svelte';
+
+  const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let keywords: string[] = [];
   export let dateStart: string = '';
   export let dateEnd: string = '';
   export let height: number = 260;
+  export let crossFilter: CrossFilter | null = null;
+  export let gdeltEvents: any[] = [];
 
   let activeView = 'hotspots';
   let container: HTMLDivElement;
@@ -71,12 +77,18 @@
   }
 
   $: if (locationData.length > 0 && svgEl && containerWidth > 0 && activeView === 'hotspots') renderChart();
+  // Re-render when cross-filter changes
+  $: if (crossFilter !== undefined && activeView === 'hotspots' && locationData.length > 0 && svgEl) renderChart();
 
   function toneColor(tone: number): string {
     if (tone > 1) return '#22c55e';
     if (tone > -1) return '#eab308';
     return '#ef4444';
   }
+
+  // Cross-dimensional highlight set
+  $: highlightedLocations = computeHighlightSet(crossFilter, gdeltEvents, 'location');
+  $: hasHighlight = highlightedLocations.size > 0;
 
   function renderChart() {
     if (!svgEl) return;
@@ -128,13 +140,18 @@
     bubbles.append('circle')
       .attr('r', (d: any) => d.radius)
       .attr('fill', (d: any) => toneColor(d.avg_tone))
-      .attr('fill-opacity', 0.25)
-      .attr('stroke', (d: any) => toneColor(d.avg_tone))
-      .attr('stroke-width', 1.5);
+      .attr('fill-opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 0.5 : 0.08) : 0.25)
+      .attr('stroke', (d: any) => highlightedLocations.has(d.location) ? '#818cf8' : toneColor(d.avg_tone))
+      .attr('stroke-width', (d: any) => highlightedLocations.has(d.location) ? 2.5 : 1.5)
+      .style('cursor', 'pointer')
+      .on('click', (_event: any, d: any) => {
+        dispatch('crossfilter', { dimension: 'location', value: d.location, label: d.location });
+      });
 
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
       .attr('fill', '#e2e8f0')
+      .attr('opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 1 : 0.2) : 1)
       .attr('font-size', (d: any) => Math.max(7, Math.min(11, d.radius * 0.4)) + 'px')
       .text((d: any) => {
         const name = d.location || '';
@@ -145,6 +162,7 @@
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('y', (d: any) => d.radius * 0.35)
       .attr('fill', '#94a3b8')
+      .attr('opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 1 : 0.2) : 1)
       .attr('font-size', '7px').attr('font-family', 'monospace')
       .text((d: any) => d.event_count.toLocaleString());
   }
@@ -157,6 +175,7 @@
       {#if locationData.length > 0}
         <span class="text-[9px] text-slate-600">{locationData.length} locations</span>
       {/if}
+      <CrossFilterBadge {crossFilter} nativeDimensions={['location']} />
     </div>
     <div class="flex items-center gap-0.5">
       {#each views as view}
@@ -188,7 +207,14 @@
           <span class="text-right">Goldstein</span>
         </div>
         {#each locationData as loc}
-          <div class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded hover:bg-slate-800/30">
+          {@const isSelected = hasHighlight && highlightedLocations.has(loc.location)}
+          {@const isDimmed = hasHighlight && !highlightedLocations.has(loc.location)}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <div
+            class="grid grid-cols-4 gap-1 px-1 py-0.5 rounded cursor-pointer transition-all {isSelected ? 'bg-indigo-500/20 ring-1 ring-indigo-400/40' : 'hover:bg-slate-800/30'} {isDimmed ? 'opacity-40' : ''}"
+            on:click={() => dispatch('crossfilter', { dimension: 'location', value: loc.location, label: loc.location })}
+            role="button"
+            tabindex="0">
             <span class="text-xs text-slate-300 truncate" title={loc.location}>{loc.location}</span>
             <span class="text-right text-xs font-mono text-slate-400">{Number(loc.event_count).toLocaleString()}</span>
             <span class="text-right text-xs font-mono" style="color: {toneColor(Number(loc.avg_tone))}">{Number(loc.avg_tone).toFixed(1)}</span>
