@@ -28,7 +28,9 @@
     date_end: string;
     sources: ProjectSource;
     event_count: number;
+    workspace_count: number;
     investigation_count: number;
+    project_type: string;
     last_activity: string;
     sparkline: number[];
     avg_sentiment: number;
@@ -224,7 +226,7 @@
               <button
                 type="button"
                 class="bg-white rounded-xl shadow-sm p-5 text-left transition-shadow hover:shadow-md cursor-pointer {project.anomaly ? 'border-l-[3px] border-l-amber-400' : 'border border-transparent'}"
-                onclick={() => goto(`/investigations/${project.id}`)}
+                onclick={() => goto(`/projects/${project.id}`)}
               >
                 <!-- Top row: name + source dots -->
                 <div class="flex items-center justify-between gap-2 mb-1.5">
@@ -280,10 +282,13 @@
 
                 <!-- Bottom row -->
                 <div class="flex items-center justify-between">
+                  {#if project.workspace_count > 0}
+                    <span class="text-xs text-slate-500">{project.workspace_count} workspace{project.workspace_count !== 1 ? 's' : ''}</span>
+                  {/if}
                   {#if project.investigation_count > 0}
-                    <span class="text-xs text-slate-500">{project.investigation_count} investigation{project.investigation_count !== 1 ? 's' : ''}</span>
-                  {:else}
-                    <span class="text-xs text-slate-400">No investigations</span>
+                    <span class="text-xs text-slate-500">{project.workspace_count > 0 ? ' · ' : ''}{project.investigation_count} investigation{project.investigation_count !== 1 ? 's' : ''}</span>
+                  {:else if project.workspace_count === 0}
+                    <span class="text-xs text-slate-400">No workspaces</span>
                   {/if}
                   <span class="text-xs font-medium text-indigo-600">View</span>
                 </div>

@@ -8,38 +8,83 @@ import { postgresPool } from '$lib/services/postgres';
 
 export const GET: RequestHandler = async () => {
   try {
-    // Get all investigations grouped by their keywords/date config
+    // Get all projects with workspace/investigation/data source counts
     const projects = await postgresPool.query(`
       SELECT
-        i.id,
-        i.name,
-        i.description,
-        i.query_config,
-        i.created_at,
-        i.updated_at,
-        (SELECT COUNT(*) FROM investigations sub WHERE sub.workspace_id = i.workspace_id) as investigation_count
+        p.id,
+        p.name,
+        p.description,
+        p.project_type,
+        p.status,
+        p.created_at,
+        p.updated_at,
+        COALESCE(ws.workspace_count, 0) AS workspace_count,
+        COALESCE(inv.investigation_count, 0) AS investigation_count,
+        COALESCE(ds.total_records, 0) AS total_records,
+        COALESCE(ds.source_types, '{}') AS source_types
+      FROM projects p
+      LEFT JOIN (
+        SELECT project_id, COUNT(*) AS workspace_count FROM workspaces GROUP BY project_id
+      ) ws ON ws.project_id = p.id
+      LEFT JOIN (
+        SELECT w.project_id, COUNT(*) AS investigation_count
+        FROM investigations i JOIN workspaces w ON i.workspace_id = w.id
+        GROUP BY w.project_id
+      ) inv ON inv.project_id = p.id
+      LEFT JOIN (
+        SELECT w.project_id,
+          SUM(ds.record_count) AS total_records,
+          ARRAY_AGG(DISTINCT ds.source_type) AS source_types
+        FROM workspace_data_sources ds JOIN workspaces w ON ds.workspace_id = w.id
+        WHERE ds.status = 'active'
+        GROUP BY w.project_id
+      ) ds ON ds.project_id = p.id
+      ORDER BY p.updated_at DESC
+    `);
+
+    // Get all investigations to find keywords for sparkline queries
+    const investigations = await postgresPool.query(`
+      SELECT i.id, i.query_config, w.project_id
       FROM investigations i
-      ORDER BY i.updated_at DESC
+      LEFT JOIN workspaces w ON i.workspace_id = w.id
     `);
 
     // For each project, compute sparkline + sentiment + anomaly
     const enrichedProjects = await Promise.all(
       projects.map(async (p: any) => {
-        const config = p.query_config || {};
-        const keywords: string[] = config.keywords || [];
-        const dateStart: string = config.dateStart || '';
-        const dateEnd: string = config.dateEnd || '';
+        // Collect keywords from all investigations belonging to this project
+        const projectInvestigations = investigations.filter((i: any) => i.project_id === p.id);
+        const allKeywords = new Set<string>();
+        let dateStart = '';
+        let dateEnd = '';
+        for (const inv of projectInvestigations) {
+          const config = inv.query_config || {};
+          for (const kw of (config.keywords || [])) allKeywords.add(kw);
+          if (!dateStart || (config.dateStart && config.dateStart < dateStart)) dateStart = config.dateStart || '';
+          if (!dateEnd || (config.dateEnd && config.dateEnd > dateEnd)) dateEnd = config.dateEnd || '';
+        }
+        const keywords = [...allKeywords];
+
+        // Source presence from data source types
+        const sourceTypes: string[] = Array.isArray(p.source_types) ? p.source_types : [];
+        const hasGdeltSource = sourceTypes.some((t: string) => t === 'gdelt');
+        const hasRadioSource = sourceTypes.some((t: string) => t === 'radio');
+        const hasSocialSource = sourceTypes.some((t: string) =>
+          ['twitter', 'reddit', 'telegram', 'youtube', 'facebook', 'instagram', 'bluesky', 'social'].includes(t)
+        );
 
         if (!keywords.length || !dateStart || !dateEnd) {
           return {
             id: p.id,
             name: p.name,
             description: p.description,
+            project_type: p.project_type,
             keywords,
             date_start: dateStart,
             date_end: dateEnd,
-            sources: { gdelt: false, radio: false, social: false },
-            event_count: 0,
+            sources: { gdelt: hasGdeltSource, radio: hasRadioSource, social: hasSocialSource },
+            event_count: Number(p.total_records || 0),
+            workspace_count: Number(p.workspace_count || 0),
             investigation_count: Number(p.investigation_count || 0),
             last_activity: p.updated_at,
             sparkline: [],
@@ -65,8 +110,8 @@ export const GET: RequestHandler = async () => {
             SELECT TO_DATE(sqldate::text, 'YYYYMMDD') AS d,
               COUNT(*) AS cnt, AVG(avgtone) AS avg_tone
             FROM gdelt_events
-            WHERE sqldate >= CAST(REPLACE(GREATEST($1::date, CURRENT_DATE - INTERVAL '13 days')::text, '-', '') AS INTEGER)
-              AND sqldate <= CAST(REPLACE(LEAST($2::date, CURRENT_DATE)::text, '-', '') AS INTEGER)
+            WHERE sqldate >= CAST(TO_CHAR(GREATEST($1::date, CURRENT_DATE - INTERVAL '13 days')::date, 'YYYYMMDD') AS INTEGER)
+              AND sqldate <= CAST(TO_CHAR(LEAST($2::date, CURRENT_DATE)::date, 'YYYYMMDD') AS INTEGER)
               AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
                    OR actiongeo_fullname ILIKE ANY($3::text[]))
             GROUP BY 1
@@ -182,11 +227,13 @@ export const GET: RequestHandler = async () => {
           id: p.id,
           name: p.name,
           description: p.description,
+          project_type: p.project_type,
           keywords,
           date_start: dateStart,
           date_end: dateEnd,
-          sources: { gdelt: hasGdelt, radio: hasRadio, social: hasSocial },
-          event_count: totalEvents,
+          sources: { gdelt: hasGdelt || hasGdeltSource, radio: hasRadio || hasRadioSource, social: hasSocial || hasSocialSource },
+          event_count: totalEvents || Number(p.total_records || 0),
+          workspace_count: Number(p.workspace_count || 0),
           investigation_count: Number(p.investigation_count || 0),
           last_activity: p.updated_at,
           sparkline,
@@ -236,7 +283,7 @@ async function buildActivityFeed() {
     const gdeltActivity = await postgresPool.query(`
       SELECT TO_DATE(sqldate::text, 'YYYYMMDD') AS event_date, COUNT(*) AS cnt
       FROM gdelt_events
-      WHERE sqldate >= CAST(REPLACE((CURRENT_DATE - INTERVAL '7 days')::text, '-', '') AS INTEGER)
+      WHERE sqldate >= CAST(TO_CHAR((CURRENT_DATE - INTERVAL '7 days')::date, 'YYYYMMDD') AS INTEGER)
       GROUP BY 1
       ORDER BY 1 DESC
       LIMIT 7

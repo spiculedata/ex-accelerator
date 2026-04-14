@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --host 0.0.0.0",
 		"dev:jupyter": "./scripts/start-dev.sh",
 		"dev:dapr": "dapr run -f ./dapr.yaml 2>&1 | node scripts/tee-monitor.cjs",
 		"dev:dapr:verbose": "dapr run -f ./dapr.yaml 2>&1 | node scripts/monitor-crawler-logs.cjs",
