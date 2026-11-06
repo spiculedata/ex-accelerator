@@ -27,3 +27,6 @@ vite.config.ts.timestamp-*
 /playwright-report
 /test-results
 /blob-report
+
+# Playwright generated auth state
+tests/.auth/
