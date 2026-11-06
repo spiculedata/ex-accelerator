@@ -1,6 +1,8 @@
 // Base Database Service Class
 // Provides common functionality for all database services with type safety and error handling
 
+import { clearApiError, reportApiError } from '$lib/stores/apiErrors';
+
 /**
  * Generic query result type - can be extended by specific services
  */
@@ -60,6 +62,15 @@ export interface DatabaseServiceConfig {
  * }
  * ```
  */
+/** Plain-language wording for the failures users are most likely to hit. */
+function friendlyMessage(error: unknown): string {
+  if (error instanceof Error && error.name === 'AbortError') return 'The request timed out';
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^HTTP 401\b/.test(message)) return 'Your session has expired. Please sign in again.';
+  if (/^HTTP 403\b/.test(message)) return 'You do not have permission to load this data.';
+  return message;
+}
+
 export abstract class BaseDatabaseService {
   protected initialized = false;
   protected config: Required<DatabaseServiceConfig>;
@@ -173,6 +184,7 @@ export abstract class BaseDatabaseService {
           throw new Error(result.error || result.message || 'Query failed');
         }
 
+        this.clearFailure(this.requestKey(endpoint, params));
         return result.data || [];
 
       } catch (fetchError) {
@@ -183,8 +195,10 @@ export abstract class BaseDatabaseService {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log('error', `Query failed for endpoint '${endpoint}': ${errorMsg}`);
+      this.reportFailure(this.requestKey(endpoint, params), friendlyMessage(error));
 
-      // Return empty array instead of throwing to prevent UI crashes
+      // Return empty array instead of throwing to prevent UI crashes; the failure is surfaced to the
+      // user through the error banner rather than silently looking like "no data".
       return [];
     }
   }
@@ -219,11 +233,13 @@ export abstract class BaseDatabaseService {
         throw new Error(result.error || 'Query execution failed');
       }
 
+      this.clearFailure('SQL query');
       return result.data || [];
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log('error', `SQL query failed: ${errorMsg}`);
+      this.reportFailure('SQL query', friendlyMessage(error));
       return [];
     }
   }
@@ -264,6 +280,28 @@ export abstract class BaseDatabaseService {
         return [];
       }
     });
+  }
+
+  /** Identifies one request (endpoint plus parameters) so a different request cannot clear its error. */
+  private requestKey(endpoint: string, params: Record<string, unknown> = {}): string {
+    const query = Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `${key}=${String(value)}`)
+      .join('&');
+    return query ? `${endpoint} (${query})` : endpoint;
+  }
+
+  private failureSource(what: string): string {
+    return `${this.config.serviceName}: ${what}`;
+  }
+
+  // Services only run in the browser; guard so server rendering never shares error state between users
+  private reportFailure(what: string, message: string): void {
+    if (typeof window !== 'undefined') reportApiError(this.failureSource(what), message);
+  }
+
+  private clearFailure(what: string): void {
+    if (typeof window !== 'undefined') clearApiError(this.failureSource(what));
   }
 
   /**

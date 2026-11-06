@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseDatabaseService } from './baseDatabaseService';
 import type { DatabaseServiceConfig, QueryOptions } from './baseDatabaseService';
 import { createFetchMock, createFetchError, createNetworkError } from '../../test/mocks/fetchMock';
+import { get } from 'svelte/store';
+import { apiErrors, dismissApiErrors } from '$lib/stores/apiErrors';
 
 // Concrete subclass for testing the abstract base class
 class TestService extends BaseDatabaseService {
@@ -249,6 +251,90 @@ describe('BaseDatabaseService', () => {
       await service.connect();
       const result = await service.publicQueryAPI({ endpoint: 'no-data' });
       expect(result).toEqual([]);
+    });
+
+    describe('reporting failures to the user', () => {
+      beforeEach(() => dismissApiErrors());
+
+      it('reports an HTTP failure so the UI can tell the user', async () => {
+        vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'failing' });
+
+        expect(get(apiErrors)).toEqual([
+          expect.objectContaining({ source: 'TestService: failing', message: expect.stringContaining('500') })
+        ]);
+      });
+
+      it('reports a failure returned in the response body', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ success: false, error: 'Query failed' }) })));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'bad-query' });
+
+        expect(get(apiErrors)[0]).toMatchObject({ source: 'TestService: bad-query', message: 'Query failed' });
+      });
+
+      it('clears the report once the same query succeeds again', async () => {
+        vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'flaky' });
+        expect(get(apiErrors)).toHaveLength(1);
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ success: true, data: [{ id: 1 }] }) })));
+        await service.publicQueryAPI({ endpoint: 'flaky' });
+
+        expect(get(apiErrors)).toEqual([]);
+      });
+
+      it('does not report an unavailable module (an empty, flagged success) as an error', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ success: true, data: [], meta: { unavailable: true } }) })));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'unused-module' });
+
+        expect(get(apiErrors)).toEqual([]);
+      });
+
+      it('does not clear one request\'s error when the same endpoint succeeds with different parameters', async () => {
+        vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'trends', params: { range: '7d' } });
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ success: true, data: [] }) })));
+        await service.publicQueryAPI({ endpoint: 'trends', params: { range: '30d' } });
+
+        expect(get(apiErrors)).toHaveLength(1);
+        expect(get(apiErrors)[0].source).toContain('range=7d');
+      });
+
+      it('words a timeout in plain language', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(Object.assign(new Error('signal is aborted without reason'), { name: 'AbortError' })));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'slow' });
+
+        expect(get(apiErrors)[0].message).toBe('The request timed out');
+      });
+
+      it('tells the user to sign in again when the session has expired', async () => {
+        vi.stubGlobal('fetch', createFetchError(401, 'Unauthorized'));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'private' });
+
+        expect(get(apiErrors)[0].message).toMatch(/sign in again/i);
+      });
+
+      it('reports a failed raw SQL query too', async () => {
+        vi.stubGlobal('fetch', createNetworkError());
+
+        await service.connect();
+        await service.publicExecuteQuery('SELECT 1');
+
+        expect(get(apiErrors)[0]).toMatchObject({ source: 'TestService: SQL query' });
+      });
     });
 
     it('should auto-connect if not initialized', async () => {

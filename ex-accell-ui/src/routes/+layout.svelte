@@ -1,7 +1,13 @@
 <script>
   import '../app.css';
   import { page } from '$app/stores';
+  import { beforeNavigate } from '$app/navigation';
+  import { dismissApiErrors } from '$lib/stores/apiErrors';
   import Navigation from '$lib/components/Navigation.svelte';
+  import ApiErrorBanner from '$lib/components/ApiErrorBanner.svelte';
+
+  // Failures belong to the page that requested the data; don't carry them to the next one
+  beforeNavigate(() => dismissApiErrors());
 
   // Hide nav on full-screen investigation workbench and the login page
   $: isFullScreen = $page.url.pathname.match(/^\/investigations\/\d+/) || $page.url.pathname === '/login';
@@ -13,5 +19,6 @@
 {/if}
 
 <main id="main-content">
+  {#if !isFullScreen}<ApiErrorBanner />{/if}
   <slot />
 </main>
