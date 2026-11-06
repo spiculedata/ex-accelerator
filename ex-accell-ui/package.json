@@ -28,7 +28,9 @@
 		"dapr:setup": "./scripts/setup-deployment.sh",
 		"dapr:stop": "dapr stop --app-id ex-accell-ui; dapr stop --app-id telegram-scraper; pkill -f 'vite dev' || true; pkill -f 'telegram-scraper' || true; pkill -f 'daprd' || true",
 		"dapr:logs": "tail -f dapr-run.log",
-		"test:integration": "node scripts/test-dapr-job-integration.js"
+		"test:integration": "node scripts/test-dapr-job-integration.js",
+		"seed:demo": "tsx scripts/seed-demo.ts",
+		"docs:screenshots": "playwright test -c playwright.screenshots.config.ts"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.59.1",
@@ -48,6 +50,7 @@
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
 		"tailwindcss": "^4.1.11",
+		"tsx": "^4.23.15",
 		"typescript": "^5.0.0",
 		"vite": "^7.0.4",
 		"vitest": "^4.1.3"
