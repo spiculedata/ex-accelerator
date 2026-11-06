@@ -79,3 +79,26 @@ describe('safeRedirectTarget', () => {
     }
   );
 });
+
+describe('decideAccess: admin-only bypass attempts', () => {
+  it.each([
+    '/api/unified-analytics/query',
+    '/api/unified-analytics/seed',
+    '/api/%64eploy-workflow',
+    '/api/deploy%2Dworkflow',
+    '/api/deploy-workflow/',
+    '/api//deploy-workflow',
+    '/api/workflows/abc/%65xecute',
+    '/api/jupyter/%73tart'
+  ])('forbids a non-admin from %s', (path) => {
+    expect(req(path, 'POST', member).action).toBe('forbidden');
+  });
+
+  it('still allows an admin to use the raw SQL endpoint', () => {
+    expect(req('/api/unified-analytics/query', 'POST', admin).action).toBe('allow');
+  });
+
+  it('still allows ordinary analytics reads for members', () => {
+    expect(req('/api/unified-analytics', 'GET', member).action).toBe('allow');
+  });
+});

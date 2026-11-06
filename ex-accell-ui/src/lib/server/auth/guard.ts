@@ -23,8 +23,27 @@ const ADMIN_ONLY_PATTERNS = [
   /^\/api\/deploy-workflow(\/|$)/,
   /^\/api\/generate-python-workflow(\/|$)/,
   /^\/api\/jupyter(\/|$)/,
-  /^\/api\/workflows\/[^/]+\/execute(\/|$)/
+  /^\/api\/workflows\/[^/]+\/execute(\/|$)/,
+  // Raw SQL and destructive seeding run with the app's full database rights
+  /^\/api\/unified-analytics\/(query|seed)(\/|$)/
 ];
+
+/**
+ * `event.url.pathname` stays percent-encoded while SvelteKit routes on the decoded path, so
+ * `/api/%64eploy-workflow` reaches the deploy handler. Match the patterns against the decoded,
+ * slash-collapsed form as well as the raw one.
+ */
+function pathVariants(pathname: string): string[] {
+  try {
+    return [pathname, decodeURIComponent(pathname).replace(/\/{2,}/g, '/')];
+  } catch {
+    return [pathname];
+  }
+}
+
+function isAdminOnly(pathname: string): boolean {
+  return pathVariants(pathname).some((path) => ADMIN_ONLY_PATTERNS.some((pattern) => pattern.test(path)));
+}
 
 function isPublic(pathname: string): boolean {
   if (pathname.includes('..')) return false;
@@ -50,7 +69,7 @@ export function decideAccess({ pathname, search, method, user }: AccessRequest):
   }
 
   if (pathname === LOGIN_PATH) return { action: 'redirect', location: '/' };
-  if (user.role !== 'admin' && ADMIN_ONLY_PATTERNS.some((pattern) => pattern.test(pathname))) {
+  if (user.role !== 'admin' && isAdminOnly(pathname)) {
     return { action: 'forbidden' };
   }
   if (user.role === 'viewer' && !READ_METHODS.has(verb) && !isPublic(pathname)) {
