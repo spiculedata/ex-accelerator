@@ -2,6 +2,7 @@
   import '../app.css';
   import { page } from '$app/stores';
   import Navigation from '$lib/components/Navigation.svelte';
+  import ApiErrorBanner from '$lib/components/ApiErrorBanner.svelte';
 
   // Hide nav on full-screen investigation workbench and the login page
   $: isFullScreen = $page.url.pathname.match(/^\/investigations\/\d+/) || $page.url.pathname === '/login';
@@ -13,5 +14,6 @@
 {/if}
 
 <main id="main-content">
+  <ApiErrorBanner />
   <slot />
 </main>

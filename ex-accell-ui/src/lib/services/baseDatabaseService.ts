@@ -1,6 +1,8 @@
 // Base Database Service Class
 // Provides common functionality for all database services with type safety and error handling
 
+import { clearApiError, reportApiError } from '$lib/stores/apiErrors';
+
 /**
  * Generic query result type - can be extended by specific services
  */
@@ -173,6 +175,7 @@ export abstract class BaseDatabaseService {
           throw new Error(result.error || result.message || 'Query failed');
         }
 
+        this.clearFailure(endpoint);
         return result.data || [];
 
       } catch (fetchError) {
@@ -183,8 +186,10 @@ export abstract class BaseDatabaseService {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log('error', `Query failed for endpoint '${endpoint}': ${errorMsg}`);
+      this.reportFailure(endpoint, errorMsg);
 
-      // Return empty array instead of throwing to prevent UI crashes
+      // Return empty array instead of throwing to prevent UI crashes; the failure is surfaced to the
+      // user through the error banner rather than silently looking like "no data".
       return [];
     }
   }
@@ -219,11 +224,13 @@ export abstract class BaseDatabaseService {
         throw new Error(result.error || 'Query execution failed');
       }
 
+      this.clearFailure('SQL query');
       return result.data || [];
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.log('error', `SQL query failed: ${errorMsg}`);
+      this.reportFailure('SQL query', errorMsg);
       return [];
     }
   }
@@ -264,6 +271,19 @@ export abstract class BaseDatabaseService {
         return [];
       }
     });
+  }
+
+  private failureSource(what: string): string {
+    return `${this.config.serviceName}: ${what}`;
+  }
+
+  // Services only run in the browser; guard so server rendering never shares error state between users
+  private reportFailure(what: string, message: string): void {
+    if (typeof window !== 'undefined') reportApiError(this.failureSource(what), message);
+  }
+
+  private clearFailure(what: string): void {
+    if (typeof window !== 'undefined') clearApiError(this.failureSource(what));
   }
 
   /**
