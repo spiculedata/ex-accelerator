@@ -23,6 +23,9 @@ Start only what you need by naming services:
 docker compose up -d --build postgres redis dapr-placement ui ui-dapr
 ```
 
+Running `docker compose up -d` with no service names starts everything except `etl`, including
+Ollama, Jupyter, WavePulse and the image worker.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and set at least:
@@ -40,9 +43,13 @@ See [Configuration](/guide/configuration) for every variable the application rea
 ## HTTPS and reverse proxies
 
 The web app speaks plain HTTP on port 3000. Put a reverse proxy (Caddy, nginx, Traefik) in front of
-it to terminate TLS, and set `COOKIE_SECURE=true`. Behind a proxy, set SvelteKit's
-`ADDRESS_HEADER` (for example `X-Forwarded-For`) and `XFF_DEPTH` so the login throttle sees real
-client addresses instead of the proxy's.
+it to terminate TLS, and set `COOKIE_SECURE=true`.
+
+Behind a proxy, set SvelteKit's `ADDRESS_HEADER` (for example `X-Forwarded-For`) and `XFF_DEPTH` in
+`.env` so the login throttle sees real client addresses instead of the proxy's. Only do this when
+port 3000 is reachable **only** through the proxy (change the `ui` port mapping to
+`127.0.0.1:3000:3000`). Otherwise a client can send its own `X-Forwarded-For` header and pick the
+address the throttle sees.
 
 Do not publish the Postgres, Redis, Ollama or Jupyter ports to the internet. The compose file maps
 them to the host for convenience; bind them to `127.0.0.1` or remove the mappings on a server.
@@ -52,8 +59,11 @@ them to the host for convenience; bind them to `127.0.0.1` or remove the mapping
 Postgres is the only service whose data you cannot recreate. Take regular dumps:
 
 ```bash
-docker compose exec -T postgres pg_dump -U postgres analytics | gzip > analytics-$(date +%F).sql.gz
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > analytics-$(date +%F).sql.gz
 ```
+
+Restore into an empty database with
+`gunzip -c analytics-YYYY-MM-DD.sql.gz | docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'`.
 
 Also back up `DATA_DIR` if you use the optional services (recordings, models, notebooks).
 

@@ -1,6 +1,12 @@
 # Crawler
 
-`crawler/` is a Go service that collects posts and writes them as JSONL for the data pipelines.
+The crawler is a Go service that collects posts and writes them as JSONL for the data pipelines.
+
+::: warning Source not yet in this repository
+The crawler lives in a separate repository and its source is not part of this checkout yet. The
+`crawler` service in `docker-compose.yml` builds from `./crawler`, so it needs that source (or an
+image) before it will start. The core app does not depend on it.
+:::
 
 ## Platforms
 
@@ -20,7 +26,7 @@ Keep these credentials in your environment or secret store. Never commit them.
 | `dapr-job` | Runs scheduled jobs delivered by the Dapr Jobs API |
 | `orchestrator` / `worker` | Distributed crawling coordinated over Dapr pub/sub |
 
-Run `crawler --help` for the full flag list.
+Run `docker compose run --rm crawler --help` for the full flag list (the binary is `socialexplorer-crawler`).
 
 ## Scheduling from the web app
 

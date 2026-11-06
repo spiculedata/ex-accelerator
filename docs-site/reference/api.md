@@ -21,9 +21,11 @@ curl -b cookies.txt http://localhost:3000/api/auth/me
 { "success": true, "data": [], "error": null }
 ```
 
-Errors set `success` to `false` and return a message in `error` with a matching HTTP status.
+Errors set `success` to `false` and return a message in `error` with a matching HTTP status. Some endpoints add an optional `meta` object (for example `meta.unavailable` below).
 
 ## Endpoint groups
+
+The main groups; others (GDELT, image processing, data sharing, overview and monitoring endpoints) follow the same rules.
 
 | Prefix | Purpose | Role |
 |--------|---------|------|
@@ -36,7 +38,7 @@ Errors set `success` to `false` and return a message in `error` with a matching 
 | `/api/unified-analytics/query`, `/api/unified-analytics/seed` | Raw SQL and destructive seeding | admin |
 | `/api/deploy-workflow`, `/api/generate-python-workflow`, `/api/workflows/:id/execute`, `/api/jupyter/*` | Generate, deploy and run code | admin |
 
-Viewers are read-only: any non-`GET` request from a viewer returns `403`.
+Viewers are read-only: requests other than `GET`, `HEAD` and `OPTIONS` return `403` (except the public auth routes, so a viewer can still sign out).
 
 ## Analytics errors
 
