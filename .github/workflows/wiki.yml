@@ -1,0 +1,54 @@
+name: Wiki sync
+
+# Mirrors docs-site/ into the repository wiki. The wiki is generated: edit the docs, not the wiki.
+#
+# Off by default. To enable: create the first wiki page once in the GitHub UI (this creates the wiki
+# repository), then set the repository variable WIKI_SYNC=true.
+on:
+  push:
+    branches: [main]
+    paths: ['docs-site/**', '.github/workflows/wiki.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write # pushing to the wiki repository uses the repository token
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync docs to the wiki
+    if: vars.WIKI_SYNC == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Build wiki pages from docs-site
+        run: node docs-site/scripts/wiki.mjs "$RUNNER_TEMP/wiki-out"
+
+      - name: Publish to the wiki repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.wiki.git" "$RUNNER_TEMP/wiki"
+          cd "$RUNNER_TEMP/wiki"
+          # Replace everything with the generated pages so deleted docs disappear from the wiki
+          git rm -r -q --ignore-unmatch . >/dev/null
+          cp -R "$RUNNER_TEMP/wiki-out/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "docs: sync from docs-site@${GITHUB_SHA::7}"
+          git push origin HEAD
