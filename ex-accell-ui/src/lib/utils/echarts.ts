@@ -3,44 +3,22 @@
 type EChartsInstance = any;
 type EChartsStatic = any;
 
+let loading: Promise<EChartsStatic> | null = null;
+
 /**
- * Wait for ECharts to load from CDN with exponential backoff.
- * Rejects after ~10 seconds if not available.
+ * Load ECharts (bundled from npm, code-split) and expose it on `window.echarts` for the helpers
+ * below. Safe to call repeatedly; browser only.
  */
-export function waitForEcharts(): Promise<EChartsStatic> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') {
-      reject(new Error('Not in browser environment'));
-      return;
-    }
+export async function waitForEcharts(): Promise<EChartsStatic> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
 
-    const echarts = (window as any).echarts;
-    if (echarts) {
-      resolve(echarts);
-      return;
-    }
-
-    let attempts = 0;
-    const maxAttempts = 20;
-    const baseDelay = 100;
-
-    function poll() {
-      attempts++;
-      const echarts = (window as any).echarts;
-      if (echarts) {
-        resolve(echarts);
-        return;
-      }
-      if (attempts >= maxAttempts) {
-        reject(new Error('ECharts failed to load from CDN after 10 seconds'));
-        return;
-      }
-      const delay = Math.min(baseDelay * Math.pow(1.5, attempts), 2000);
-      requestAnimationFrame(() => setTimeout(poll, delay));
-    }
-
-    requestAnimationFrame(poll);
+  loading ??= import('echarts').catch((error: unknown) => {
+    loading = null; // allow a retry after a failed (for example offline) load
+    throw error;
   });
+  const echarts = await loading;
+  (window as any).echarts ??= echarts;
+  return echarts;
 }
 
 /**
