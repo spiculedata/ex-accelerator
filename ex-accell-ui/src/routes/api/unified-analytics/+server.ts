@@ -6,9 +6,10 @@ import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
 import { languageQueries } from '$lib/server/languageQueries';
+import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
 import { computeTrigrams } from '$lib/server/trigrams';
-import { queryErrorResponse } from '$lib/server/queryErrors';
+import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
 /**
@@ -1481,6 +1482,27 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       } catch (error) {
         console.error('GDELT refresh views failed:', error);
         return json({ success: false, error: 'Failed to refresh materialized views' }, { status: 500 });
+      }
+    }
+
+    if (type === 'workflow-datasets') {
+      try {
+        // The counts are independent, so run them together; a module whose table does not exist yet has no data
+        const entries = await Promise.all(
+          Object.entries(WORKFLOW_DATASET_COUNT_QUERIES).map(async ([key, sql]) => {
+            try {
+              const [row] = await executeQuery(sql);
+              return [key, Number(row?.count) || 0] as const;
+            } catch (error) {
+              if (!isMissingRelationError(error)) throw error;
+              return [key, 0] as const;
+            }
+          })
+        );
+        const counts = Object.fromEntries(entries) as unknown as WorkflowDatasetCounts;
+        return json({ success: true, data: buildWorkflowDatasets(counts) });
+      } catch (error) {
+        return queryErrorResponse('Workflow datasets', error, []);
       }
     }
 

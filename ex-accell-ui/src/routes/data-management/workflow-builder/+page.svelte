@@ -17,7 +17,6 @@
   import { workflowBuilder, type Dataset } from '$lib/stores/workflowBuilderStore';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount, onDestroy } from 'svelte';
-  import { unifiedDb } from '$lib/services/duckdb';
 
   // ===================================================================
   // Type Definitions
@@ -109,144 +108,17 @@
 
     try {
       loadingDatasets = true;
-      await unifiedDb.connect();
-
-      if (!mounted) return;
-
-      const datasets: Dataset[] = [];
-
-      // Check for posts data (main social media data)
-      try {
-        const postsCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM posts
-          WHERE created_at >= '2024-01-01'
-        `);
-        if (mounted && postsCount[0]?.count > 0) {
-          datasets.push({
-            id: 'social_posts',
-            name: 'Social Media Posts',
-            description: `${postsCount[0].count.toLocaleString()} posts from social platforms`,
-            table: 'posts',
-            type: 'social_media'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for sentiment analysis data
-      try {
-        const sentimentCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM sentiment_classifications
-        `);
-        if (mounted && sentimentCount[0]?.count > 0) {
-          datasets.push({
-            id: 'sentiment_data',
-            name: 'Sentiment Analysis Results',
-            description: `${sentimentCount[0].count.toLocaleString()} sentiment classifications`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for topic modeling data
-      try {
-        const topicsCount = await unifiedDb.query(`
-          SELECT COUNT(DISTINCT topic_id) as count
-          FROM topics
-        `);
-        if (mounted && topicsCount[0]?.count > 0) {
-          datasets.push({
-            id: 'topic_data',
-            name: 'Topic Modeling Results',
-            description: `${topicsCount[0].count} discovered topics`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for language detection data
-      try {
-        const languageCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM language_detection
-        `);
-        if (mounted && languageCount[0]?.count > 0) {
-          datasets.push({
-            id: 'language_data',
-            name: 'Language Detection Results',
-            description: `${languageCount[0].count.toLocaleString()} language classifications`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for engagement analysis data
-      try {
-        const engagementCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM post_engagement
-        `);
-        if (mounted && engagementCount[0]?.count > 0) {
-          datasets.push({
-            id: 'engagement_data',
-            name: 'Engagement Analysis Results',
-            description: `${engagementCount[0].count.toLocaleString()} engagement records`,
-            table: 'post_engagement',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for Android analytics data
-      try {
-        const androidCount = await unifiedDb.query(`
-          SELECT COUNT(DISTINCT device_id) as count
-          FROM android_devices
-        `);
-        if (mounted && androidCount[0]?.count > 0) {
-          datasets.push({
-            id: 'android_data',
-            name: 'Android Analytics Data',
-            description: `${androidCount[0].count} devices tracked`,
-            table: 'android_app_usage',
-            type: 'mobile_analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Add unified analysis view (combines all analytics)
-      if (mounted && datasets.length > 0) {
-        datasets.unshift({
-          id: 'unified_analysis',
-          name: 'Unified Post Analysis',
-          description: 'Combined view of all analytics (sentiment, topics, language, engagement)',
-          table: 'unified_post_analysis',
-          type: 'unified'
-        });
-      }
+      const response = await fetch('/api/unified-analytics?type=workflow-datasets');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.success) throw new Error(body.error || `Request failed (${response.status})`);
 
       if (mounted) {
-        availableDatasets = datasets;
+        availableDatasets = body.data;
       }
     } catch (error) {
       if (mounted) {
         console.error('Error loading datasets:', error);
+        availableDatasets = [];
       }
     } finally {
       if (mounted) {

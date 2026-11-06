@@ -2,7 +2,6 @@
 // Handles workflow operations on the server with PostgreSQL persistence
 
 import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
-import { daprWorkflowExecutor } from './daprWorkflowExecutor';
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
 import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
 import { postgresPool } from './postgres';
