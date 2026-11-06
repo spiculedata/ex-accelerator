@@ -68,8 +68,8 @@ The command above starts only the core stack. The remaining services in `docker-
 (Ollama, Jupyter, WavePulse, the crawler, ETL) are optional and need extra setup; see the
 documentation.
 
-A fresh database is empty, so dashboards show empty states until you load data. Sample data and
-guided tutorials are tracked in the issue tracker.
+The first sign-in creates the database schema. A fresh database has no data, so dashboards show
+empty states until you load some. Sample data and guided tutorials are tracked in the issue tracker.
 
 ### Troubleshooting
 

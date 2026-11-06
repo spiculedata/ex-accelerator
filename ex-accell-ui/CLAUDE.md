@@ -44,7 +44,9 @@ set `DATABASE_URL`, `SESSION_SECRET` (32+ chars) and, for the first login, `ADMI
   clients, workflow generators/executors)
 - `src/lib/utils/` pure helpers (`pathSafety.ts`, `highlight.ts`)
 - `src/lib/components/`, `src/lib/stores/`, `src/lib/composables/` UI
-- `sql/` schemas and migrations; `deploy/components/` (repo root) holds Dapr components for compose
+- `db/migrations/NNNN_name.sql` schema migrations (DDL only), applied once each by
+  `src/lib/server/migrations/` on first sign-in; `db/seed/` holds sample rows; `sql/` is legacy
+  reference. `deploy/components/` (repo root) holds Dapr components for compose
 
 ## Data access
 
