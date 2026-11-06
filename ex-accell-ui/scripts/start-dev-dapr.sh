@@ -9,7 +9,7 @@ poetry install
 
 # Bootstrap the notebook environment
 echo "📚 Bootstrapping notebook environment..."
-poetry run python bootstrap_notebooks.py
+poetry run python scripts/bootstrap_notebooks.py
 
 # Start Jupyter Lab in the background
 echo "🔬 Starting Jupyter Lab server..."
