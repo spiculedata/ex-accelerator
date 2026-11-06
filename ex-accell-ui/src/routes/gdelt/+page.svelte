@@ -1,4 +1,8 @@
 <script lang="ts">
+  // Tailwind-only styling for the dual-handle range sliders (thumb and track pseudo-elements)
+  const rangeSliderClass =
+    'absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-violet-500 [&::-webkit-slider-thumb]:to-purple-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-linear-to-br [&::-moz-range-thumb]:from-violet-500 [&::-moz-range-thumb]:to-purple-500 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-webkit-slider-track]:h-1.5 [&::-webkit-slider-track]:bg-gray-300 [&::-webkit-slider-track]:rounded-sm [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-gray-300 [&::-moz-range-track]:rounded-sm';
+
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { getCountryNameWithFallback, getAllCountries } from '$lib/countryMapping';
@@ -1094,42 +1098,6 @@
 <svelte:head>
 	<title>GDELT World Events Dashboard</title>
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-	<style>
-		.range-slider {
-			-webkit-appearance: none;
-			appearance: none;
-		}
-		.range-slider::-webkit-slider-thumb {
-			-webkit-appearance: none;
-			appearance: none;
-			height: 16px;
-			width: 16px;
-			border-radius: 50%;
-			background: linear-gradient(135deg, #8b5cf6, #a855f7);
-			border: 2px solid white;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-			cursor: pointer;
-		}
-		.range-slider::-moz-range-thumb {
-			height: 16px;
-			width: 16px;
-			border-radius: 50%;
-			background: linear-gradient(135deg, #8b5cf6, #a855f7);
-			border: 2px solid white;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-			cursor: pointer;
-		}
-		.range-slider::-webkit-slider-track {
-			height: 6px;
-			background: #d1d5db;
-			border-radius: 3px;
-		}
-		.range-slider::-moz-range-track {
-			height: 6px;
-			background: #d1d5db;
-			border-radius: 3px;
-		}
-	</style>
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
@@ -1415,7 +1383,7 @@
 										step="0.1"
 										bind:value={goldsteinRange[0]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1425,7 +1393,7 @@
 										step="0.1"
 										bind:value={goldsteinRange[1]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 3; pointer-events: auto;"
 									/>
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
@@ -1505,7 +1473,7 @@
 										step="0.5"
 										bind:value={toneRange[0]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1515,7 +1483,7 @@
 										step="0.5"
 										bind:value={toneRange[1]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 3; pointer-events: auto;"
 									/>
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>

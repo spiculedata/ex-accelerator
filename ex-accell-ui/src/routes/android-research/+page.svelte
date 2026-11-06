@@ -1082,10 +1082,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  :global(.project-switcher) {
-    position: relative;
-    z-index: 50;
-  }
-</style>

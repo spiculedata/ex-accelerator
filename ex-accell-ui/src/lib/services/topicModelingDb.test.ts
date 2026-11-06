@@ -270,8 +270,8 @@ describe('getTopicDocuments', () => {
     expect(docs[0].topic).toBe('Topic 5');
     expect(docs[0].platform).toBe('twitter');
     expect(docs[0].sentiment).toBe('positive');
-    expect(docs[0].topicProbability).toBeGreaterThanOrEqual(0);
-    expect(docs[0].topicProbability).toBeLessThanOrEqual(1);
+    // The API does not provide per-document probabilities; never fabricate one
+    expect(docs[0].topicProbability).toBeNull();
   });
 
   it('passes limit parameter', async () => {

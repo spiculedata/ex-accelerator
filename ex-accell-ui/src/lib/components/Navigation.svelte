@@ -438,7 +438,7 @@
         {#if $currentProject || availableProjects.length > 0}
           <div class="hidden md:flex items-center bg-gray-50 rounded-lg border border-gray-200 divide-x divide-gray-200">
             <!-- Project Switcher -->
-            <div class="relative project-switcher">
+            <div class="relative z-50 project-switcher">
               <button
                 on:click={() => projectSwitcherOpen = !projectSwitcherOpen}
                 aria-expanded={projectSwitcherOpen}

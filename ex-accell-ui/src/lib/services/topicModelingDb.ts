@@ -27,7 +27,7 @@ interface TopicDocument {
   id: string | number;
   content: string;
   topic: string;
-  topicProbability: number;
+  topicProbability: number | null;
   platform: string;
   timestamp: string;
   sentiment: string;
@@ -277,7 +277,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
         id: post.id,
         content: post.text,
         topic: `Topic ${topicId}`,
-        topicProbability: Math.round(Math.random() * 100) / 100, // TODO: Get actual probability from database
+        topicProbability: null, // per-document probabilities are not provided by the API
         platform: post.platform,
         timestamp: post.timestamp,
         sentiment: post.sentiment

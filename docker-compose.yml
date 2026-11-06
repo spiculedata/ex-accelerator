@@ -11,7 +11,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - /data/pgdata:/var/lib/postgresql/data
+      - ${DATA_DIR:-/data}/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -65,8 +65,8 @@ services:
       IPFS_DATASTORE_PATH: /data/ipfs/datastore
       PACKAGES_DIR: /data/packages
     volumes:
-      - /data/ipfs:/data/ipfs
-      - /data/packages:/data/packages
+      - ${DATA_DIR:-/data}/ipfs:/data/ipfs
+      - ${DATA_DIR:-/data}/packages:/data/packages
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,7 +102,7 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - /data/ollama:/root/.ollama
+      - ${DATA_DIR:-/data}/ollama:/root/.ollama
     environment:
       OLLAMA_HOST: "0.0.0.0"
       OLLAMA_KEEP_ALIVE: "10m"
@@ -132,7 +132,7 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
       OLLAMA_HOST: http://ollama:11434
     volumes:
-      - /data/notebooks:/app/notebooks
+      - ${DATA_DIR:-/data}/notebooks:/app/notebooks
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,7 +162,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       WAVEPULSE_PORT: "8890"
     volumes:
-      - /data/wavepulse:/app/data
+      - ${DATA_DIR:-/data}/wavepulse:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,7 +185,7 @@ services:
       TG_API_ID: ${TG_API_ID:-}
       TG_API_HASH: ${TG_API_HASH:-}
     volumes:
-      - /data/crawls:/data/crawls
+      - ${DATA_DIR:-/data}/crawls:/data/crawls
     depends_on:
       - redis
     restart: "no"
@@ -204,7 +204,7 @@ services:
       PGUSER: ${POSTGRES_USER:-postgres}
       PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
-      - /data/gdelt_raw:/app/data/gdelt_raw
+      - ${DATA_DIR:-/data}/gdelt_raw:/app/data/gdelt_raw
     depends_on:
       postgres:
         condition: service_healthy
