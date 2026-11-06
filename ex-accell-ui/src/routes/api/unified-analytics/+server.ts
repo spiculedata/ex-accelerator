@@ -6,9 +6,10 @@ import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
 import { languageQueries } from '$lib/server/languageQueries';
+import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
 import { computeTrigrams } from '$lib/server/trigrams';
-import { queryErrorResponse } from '$lib/server/queryErrors';
+import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
 /**
@@ -1500,6 +1501,25 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       });
     }
     
+    if (type === 'workflow-datasets') {
+      try {
+        const counts = {} as WorkflowDatasetCounts;
+        for (const [key, sql] of Object.entries(WORKFLOW_DATASET_COUNT_QUERIES)) {
+          try {
+            const [row] = await executeQuery(sql);
+            counts[key as keyof WorkflowDatasetCounts] = Number(row?.count) || 0;
+          } catch (error) {
+            // A module whose table does not exist yet simply has no data
+            if (!isMissingRelationError(error)) throw error;
+            counts[key as keyof WorkflowDatasetCounts] = 0;
+          }
+        }
+        return json({ success: true, data: buildWorkflowDatasets(counts) });
+      } catch (error) {
+        return queryErrorResponse('Workflow datasets', error, []);
+      }
+    }
+
     // ========== Radio Analytics Handlers ==========
 
     if (type === 'radio-overview') {

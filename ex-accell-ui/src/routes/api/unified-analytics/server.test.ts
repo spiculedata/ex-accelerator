@@ -329,3 +329,31 @@ describe('GET /api/unified-analytics trigrams', () => {
     expect(body.data).toHaveLength(1);
   });
 });
+
+describe('GET /api/unified-analytics workflow-datasets', () => {
+  const get = () => GET({ url: new URL('http://localhost/api/unified-analytics?type=workflow-datasets') } as Parameters<typeof GET>[0]);
+
+  it('lists the datasets whose tables have data', async () => {
+    duckdbQuery.mockImplementation(async (sql: string) => [{ count: /FROM posts\b/.test(sql) ? '1500' : '0' }]);
+
+    const body = await (await get()).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.map((d: { id: string }) => d.id)).toEqual(['unified_analysis', 'social_posts']);
+  });
+
+  it('treats a missing table as empty rather than failing', async () => {
+    duckdbQuery.mockRejectedValue(Object.assign(new Error('relation "android_devices" does not exist'), { code: '42P01' }));
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual([]);
+  });
+
+  it('returns a 500 for a real failure', async () => {
+    duckdbQuery.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    expect((await get()).status).toBe(500);
+  });
+});
