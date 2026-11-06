@@ -70,3 +70,24 @@ describe('initChart', () => {
     expect(existing.dispose).toHaveBeenCalled();
   });
 });
+
+describe('waitForEcharts after a failed load', () => {
+  it('retries the import on the next call instead of caching the failure', async () => {
+    vi.resetModules();
+    let attempts = 0;
+    vi.doMock('echarts', () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('offline');
+      return fakeEcharts;
+    });
+    delete (window as any).echarts;
+    const fresh = await import('./echarts');
+
+    await expect(fresh.waitForEcharts()).rejects.toThrow(); // Vitest wraps the factory error
+    const echarts = await fresh.waitForEcharts();
+
+    expect(echarts.init).toBe(fakeEcharts.init);
+    expect(attempts).toBe(2);
+    vi.doUnmock('echarts');
+  });
+});

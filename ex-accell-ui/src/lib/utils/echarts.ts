@@ -1,4 +1,4 @@
-// ECharts utility — resilient initialization without setTimeout hacks
+// ECharts utilities: lazy loading of the bundled package plus safe init, dispose and resize helpers
 
 type EChartsInstance = any;
 type EChartsStatic = any;
