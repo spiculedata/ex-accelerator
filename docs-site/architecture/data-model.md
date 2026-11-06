@@ -12,7 +12,13 @@ file runs once. A database that already contains the core tables (an install fro
 existed) is recorded as up to date without running anything, so existing data is never touched.
 
 To change the schema, add the next numbered file (for example `0004_add_thing.sql`). Keep migrations
-to DDL; sample data belongs in `ex-accell-ui/db/seed/`.
+to non-destructive DDL (no `DROP TABLE`, `DROP COLUMN`, `DELETE` or `INSERT`); sample data belongs in
+`ex-accell-ui/db/seed/`. Each migration runs in a transaction, so statements that cannot (such as
+`CREATE INDEX CONCURRENTLY`) do not belong in one.
+
+The database role the app connects with needs permission to create tables and the `pg_trgm`
+extension (`CREATE` on the database). The default compose setup uses the `postgres` superuser, so
+this only matters if you provision a restricted role.
 
 Tables for optional pipelines (GDELT, radio, image processing) are created by their ETL jobs, not by
 migrations. Until a table exists, the related dashboards show an empty state.

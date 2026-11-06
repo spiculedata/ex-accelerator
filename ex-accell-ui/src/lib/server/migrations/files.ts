@@ -11,5 +11,5 @@ const files = import.meta.glob('/db/migrations/*.sql', {
 export function bundledMigrations(): Migration[] {
   return Object.entries(files)
     .map(([path, sql]) => ({ name: path.split('/').pop()!.replace(/\.sql$/, ''), sql }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
