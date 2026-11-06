@@ -21,6 +21,8 @@ npm run check             # svelte-check (has pre-existing type errors; do not a
 npm run test:unit         # Vitest
 npm run test:e2e          # Playwright (needs `npx playwright install chromium`)
 npm run dev:dapr          # dev server plus Dapr sidecars from dapr.yaml
+npm run seed:demo         # load the synthetic demo dataset into an empty database
+npm run docs:screenshots  # recapture docs screenshots from a running stack with demo data
 ```
 
 Local database for development:
