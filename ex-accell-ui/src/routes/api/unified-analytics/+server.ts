@@ -6,6 +6,8 @@ import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
 import { languageQueries } from '$lib/server/languageQueries';
+import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
+import { computeTrigrams } from '$lib/server/trigrams';
 import { queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
@@ -54,6 +56,15 @@ async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
  * GET /api/unified-analytics
  * Test connection and basic queries for unified analytics
  */
+interface TrigramPostRow {
+  id: number | string;
+  text: string | null;
+  platform: string;
+  created_at: string | Date;
+  sentiment_category: string | null;
+  engagement_rate: string | number | null;
+}
+
 interface HashtagPostSource {
   from: string;
   idColumn: string;
@@ -1287,10 +1298,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       try {
         const wsId = url.searchParams.get('workspace_id');
         let platforms: string[] = [];
-        if (wsId) {
-          const scope = await resolveWorkspaceScope(url);
-          if (scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
-        }
+        if (wsId && scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
         const filter = platforms.length > 0;
         const params: any[] = filter ? [platforms] : [];
         const limitParam = `$${params.length + 1}`;
@@ -1312,6 +1320,60 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Engagement analysis', error, []);
+      }
+    }
+
+    if (type === 'trigrams') {
+      try {
+        const intParam = (name: string, fallback: number, min: number, max: number): number => {
+          const parsed = parseInt(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+        };
+        const sentimentParam = (name: string, fallback: number): number => {
+          const parsed = parseFloat(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? Math.min(Math.max(parsed, -1), 1) : fallback;
+        };
+
+        const days = TRIGRAM_TIME_RANGE_DAYS[url.searchParams.get('timeRange') || ''] ?? TRIGRAM_DEFAULT_DAYS;
+        const platform = url.searchParams.get('platform');
+        const filterByPlatform = !!platform && platform !== 'all';
+        const workspacePlatforms = scope?.hasSocialMedia && scope.socialPlatforms.length > 0 ? scope.socialPlatforms : [];
+
+        const params: any[] = [];
+        if (workspacePlatforms.length > 0) params.push(workspacePlatforms);
+        if (filterByPlatform) params.push(platform);
+
+        const rows: TrigramPostRow[] = await executeQuery(
+          trigramPostsQuery({ workspacePlatforms: workspacePlatforms.length > 0, platform: filterByPlatform }, days),
+          params
+        );
+        const posts = rows.map((row) => ({
+          id: row.id,
+          text: String(row.text ?? ''),
+          platform: String(row.platform),
+          createdAt: new Date(row.created_at),
+          sentiment: row.sentiment_category ?? null,
+          engagementRate: Number(row.engagement_rate) || 0
+        }));
+
+        // When the scan hit its cap, the oldest posts were dropped: measure trends from the oldest one kept
+        const now = new Date();
+        const truncated = rows.length >= TRIGRAM_MAX_POSTS;
+        const nominalStart = new Date(now.getTime() - days * 86_400_000);
+        const oldestKept = posts.reduce((oldest, p) => Math.min(oldest, p.createdAt.getTime()), now.getTime());
+        const windowStart = truncated ? new Date(oldestKept) : nominalStart;
+
+        const data = computeTrigrams(posts, {
+          now,
+          windowStart,
+          minFrequency: intParam('minFrequency', 1, 1, 1000),
+          maxResults: intParam('maxResults', 100, 1, 500),
+          search: url.searchParams.get('search') || undefined,
+          sentimentRange: [sentimentParam('minSentiment', -1), sentimentParam('maxSentiment', 1)]
+        });
+        return json({ success: true, data, meta: { truncated, scannedPosts: rows.length } });
+      } catch (error) {
+        return queryErrorResponse('Trigram analysis', error, []);
       }
     }
 

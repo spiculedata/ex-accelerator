@@ -1,274 +1,147 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { summarizeTrigrams, trigramsDb, type TrigramData } from './trigramsDb';
 
-// Mock the duckdb module before importing trigramsDb
-const mockQuery = vi.fn();
-const mockConnect = vi.fn();
+const trigram = (overrides: Partial<TrigramData> = {}): TrigramData => ({
+  trigram: 'new tram timetable', frequency: 10, sentiment: 0.5, platforms: ['telegram'], trend: 'stable',
+  firstSeen: '2026-06-01T00:00:00.000Z', lastSeen: '2026-06-10T00:00:00.000Z', averageEngagement: 4.25, topPosts: [], ...overrides
+});
 
-vi.mock('./duckdb', () => ({
-  unifiedDb: {
-    connect: mockConnect,
-    query: mockQuery
-  }
-}));
+function mockFetch(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+  const fetchMock = vi.fn(async () => ({ ok: init.ok ?? true, status: init.status ?? 200, json: async () => body }));
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
 
-// Import after mocking
-const { trigramsDb } = await import('./trigramsDb');
+const requestedUrl = (fetchMock: ReturnType<typeof mockFetch>) => new URL(String((fetchMock.mock.calls[0] as unknown[])[0]), 'http://localhost');
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  // Reset initialized state
-  (trigramsDb as any).initialized = false;
-  // Make ensureTablesExist succeed
-  mockConnect.mockResolvedValue(undefined);
-  mockQuery.mockResolvedValue([]);
+  vi.unstubAllGlobals();
 });
-
-// ─── connect ───────────────────────────────────────────────────────────────
-
-describe('connect', () => {
-  it('connects to unified db and creates tables', async () => {
-    await trigramsDb.connect();
-
-    expect(mockConnect).toHaveBeenCalled();
-    // Should have called query multiple times for CREATE TABLE and CREATE INDEX
-    expect(mockQuery).toHaveBeenCalled();
-    expect((trigramsDb as any).initialized).toBe(true);
-  });
-
-  it('does not reconnect if already initialized', async () => {
-    (trigramsDb as any).initialized = true;
-    await trigramsDb.connect();
-
-    expect(mockConnect).not.toHaveBeenCalled();
-  });
-});
-
-// ─── getTrigramsData ───────────────────────────────────────────────────────
 
 describe('getTrigramsData', () => {
-  it('returns transformed data from database query', async () => {
-    const dbRows = [
-      {
-        trigram: 'social media marketing',
-        frequency: 100,
-        sentiment: 0.72,
-        platforms: '["twitter","facebook"]',
-        trend: 'up',
-        first_seen: '2024-01-01',
-        last_seen: '2024-01-08',
-        average_engagement: 4.2
-      }
-    ];
-    // First queries are from ensureTablesExist, last is the actual data query
-    mockQuery.mockResolvedValue(dbRows);
+  it('escapes quotes in exported fields', async () => {
+    mockFetch({ success: true, data: [trigram({ trigram: 'say "hi" now', platforms: ['a"b'] })] });
+
+    const csv = await trigramsDb.exportTrigramsData();
+
+    expect(csv).toContain('"say ""hi"" now"');
+    expect(csv).toContain('"a""b"');
+  });
+
+  it('returns the phrases computed by the server', async () => {
+    mockFetch({ success: true, data: [trigram()] });
 
     const data = await trigramsDb.getTrigramsData();
 
-    expect(data).toHaveLength(1);
-    expect(data[0].trigram).toBe('social media marketing');
-    expect(data[0].frequency).toBe(100);
-    expect(data[0].sentiment).toBe(0.72);
-    expect(data[0].platforms).toEqual(['twitter', 'facebook']);
-    expect(data[0].trend).toBe('up');
-    expect(data[0].firstSeen).toBe('2024-01-01');
-    expect(data[0].lastSeen).toBe('2024-01-08');
-    expect(data[0].averageEngagement).toBe(4.2);
-    expect(data[0].topPosts).toEqual([]);
+    expect(data).toEqual([trigram()]);
   });
 
-  it('returns fallback data on query error', async () => {
-    // Connect succeeds but data query throws
-    let callCount = 0;
-    mockQuery.mockImplementation(() => {
-      callCount++;
-      // The first several calls are from ensureTablesExist, let those pass
-      if (callCount > 5) {
-        throw new Error('Database error');
-      }
-      return Promise.resolve([]);
+  it('sends the filters as query parameters, never as SQL', async () => {
+    const fetchMock = mockFetch({ success: true, data: [] });
+
+    await trigramsDb.getTrigramsData(
+      { platform: 'youtube', timeRange: '30d', minFrequency: 3, maxResults: 20, searchQuery: "x'; DROP TABLE posts; --", sentimentRange: [-0.5, 0.5] },
+      '7'
+    );
+
+    const url = requestedUrl(fetchMock);
+    expect(url.pathname).toBe('/api/unified-analytics');
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      type: 'trigrams', platform: 'youtube', timeRange: '30d', minFrequency: '3', maxResults: '20',
+      search: "x'; DROP TABLE posts; --", minSentiment: '-0.5', maxSentiment: '0.5', workspace_id: '7'
     });
-
-    const data = await trigramsDb.getTrigramsData();
-
-    // Should return fallback data
-    expect(data.length).toBeGreaterThan(0);
-    expect(data[0].trigram).toBe('social media marketing');
   });
 
-  it('handles null platforms field', async () => {
-    mockQuery.mockResolvedValue([
-      { trigram: 'test trigram', frequency: 10, sentiment: 0, platforms: null, trend: 'stable', first_seen: '2024-01-01', last_seen: '2024-01-02', average_engagement: 0 }
-    ]);
-
-    const data = await trigramsDb.getTrigramsData();
-
-    expect(data[0].platforms).toEqual([]);
-  });
-
-  it('applies minFrequency filter', async () => {
-    mockQuery.mockResolvedValue([]);
-
-    await trigramsDb.getTrigramsData({ minFrequency: 50 });
-
-    // Find the SELECT query call (last call to mockQuery)
-    const lastCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
-    expect(lastCall[0]).toContain('frequency >= 50');
-  });
-
-  it('applies platform filter', async () => {
-    mockQuery.mockResolvedValue([]);
-
-    await trigramsDb.getTrigramsData({ platform: 'twitter' });
-
-    const lastCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
-    expect(lastCall[0]).toContain('twitter');
-  });
-
-  it('applies searchQuery filter', async () => {
-    mockQuery.mockResolvedValue([]);
-
-    await trigramsDb.getTrigramsData({ searchQuery: 'social' });
-
-    const lastCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
-    expect(lastCall[0]).toContain('social');
-  });
-
-  it('applies maxResults limit', async () => {
-    mockQuery.mockResolvedValue([]);
-
-    await trigramsDb.getTrigramsData({ maxResults: 25 });
-
-    const lastCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
-    expect(lastCall[0]).toContain('LIMIT 25');
-  });
-
-  it('defaults to 100 max results', async () => {
-    mockQuery.mockResolvedValue([]);
+  it('omits filters that were not set', async () => {
+    const fetchMock = mockFetch({ success: true, data: [] });
 
     await trigramsDb.getTrigramsData();
 
-    const lastCall = mockQuery.mock.calls[mockQuery.mock.calls.length - 1];
-    expect(lastCall[0]).toContain('LIMIT 100');
+    expect([...requestedUrl(fetchMock).searchParams.keys()]).toEqual(['type']);
+  });
+
+  it('throws when the API reports a failure instead of returning made-up data', async () => {
+    mockFetch({ success: false, error: 'Trigram analysis failed' }, { ok: false, status: 500 });
+
+    await expect(trigramsDb.getTrigramsData()).rejects.toThrow(/Trigram analysis failed/);
+  });
+
+  it('reports an HTTP error even when the body is not JSON (for example a proxy error page)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } })));
+
+    await expect(trigramsDb.getTrigramsData()).rejects.toThrow('Trigram request failed (502)');
+  });
+
+  it('throws on a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+    await expect(trigramsDb.getTrigramsData()).rejects.toThrow('network down');
   });
 });
 
-// ─── getTrigramStats ───────────────────────────────────────────────────────
+describe('getTrigramsResult', () => {
+  it('returns the phrases with the server\'s truncation flag', async () => {
+    mockFetch({ success: true, data: [trigram()], meta: { truncated: true, scannedPosts: 20000 } });
 
-describe('getTrigramStats', () => {
-  it('returns zero stats when no data', async () => {
-    mockQuery.mockResolvedValue([]);
+    const result = await trigramsDb.getTrigramsResult();
 
-    // getTrigramStats has a bug referencing `trigramData` instead of `trigramsData`
-    // so it will hit the catch block and return defaults
-    const stats = await trigramsDb.getTrigramStats();
+    expect(result).toEqual({ data: [trigram()], truncated: true });
+  });
 
-    expect(stats.totalTrigrams).toBe(0);
-    expect(stats.uniqueTrigrams).toBe(0);
-    expect(stats.averageFrequency).toBe(0);
-    expect(stats.topCategories).toEqual([]);
-    expect(stats.sentimentDistribution).toEqual({ positive: 0, neutral: 0, negative: 0 });
-    expect(stats.trendDistribution).toEqual({ up: 0, stable: 0, down: 0 });
+  it('defaults to not truncated when the server sends no meta', async () => {
+    mockFetch({ success: true, data: [] });
+
+    expect((await trigramsDb.getTrigramsResult()).truncated).toBe(false);
   });
 });
 
-// ─── exportTrigramsData ────────────────────────────────────────────────────
+describe('summarizeTrigrams', () => {
+  it('returns zeros for no data', () => {
+    expect(summarizeTrigrams([])).toEqual({
+      totalTrigrams: 0, uniqueTrigrams: 0, averageFrequency: 0,
+      sentimentDistribution: { positive: 0, neutral: 0, negative: 0 },
+      trendDistribution: { up: 0, stable: 0, down: 0 }
+    });
+  });
+
+  it('totals frequencies and buckets sentiment and trend', () => {
+    const stats = summarizeTrigrams([
+      trigram({ frequency: 10, sentiment: 0.6, trend: 'up' }),
+      trigram({ frequency: 4, sentiment: 0, trend: 'stable' }),
+      trigram({ frequency: 1, sentiment: -0.6, trend: 'down' })
+    ]);
+
+    expect(stats).toEqual({
+      totalTrigrams: 15, uniqueTrigrams: 3, averageFrequency: 5,
+      sentimentDistribution: { positive: 1, neutral: 1, negative: 1 },
+      trendDistribution: { up: 1, stable: 1, down: 1 }
+    });
+  });
+});
 
 describe('exportTrigramsData', () => {
-  it('returns CSV formatted string', async () => {
-    mockQuery.mockResolvedValue([
-      {
-        trigram: 'social media marketing',
-        frequency: 100,
-        sentiment: 0.72,
-        platforms: '["twitter"]',
-        trend: 'up',
-        first_seen: '2024-01-01',
-        last_seen: '2024-01-08',
-        average_engagement: 4.2
-      }
-    ]);
+  it('returns a CSV with a header and one row per phrase', async () => {
+    mockFetch({ success: true, data: [trigram({ platforms: ['telegram', 'youtube'] })] });
 
     const csv = await trigramsDb.exportTrigramsData();
 
-    expect(csv).toContain('Trigram,Frequency,Sentiment');
-    expect(csv).toContain('"social media marketing"');
-    expect(csv).toContain('100');
-    expect(csv).toContain('Positive'); // 0.72 > 0.3
-    expect(csv).toContain('up');
+    const [header, row] = csv.split('\n');
+    expect(header).toBe('Trigram,Frequency,Sentiment,Sentiment Label,Platforms,Trend,First Seen,Last Seen,Average Engagement');
+    expect(row).toBe('"new tram timetable",10,0.50,Positive,"telegram; youtube",stable,2026-06-01T00:00:00.000Z,2026-06-10T00:00:00.000Z,4.3');
   });
 
-  it('returns only header for empty data (fallback data)', async () => {
-    // Will return fallback data due to error, but let's test with actual empty
-    // We need all queries to succeed but return empty
-    let queryCallCount = 0;
-    mockQuery.mockImplementation(() => {
-      queryCallCount++;
-      // ensureTablesExist calls return empty, then the actual query throws to get fallback
-      return Promise.resolve([]);
-    });
+  it('labels sentiment by threshold', async () => {
+    mockFetch({ success: true, data: [trigram({ sentiment: -0.4 }), trigram({ sentiment: 0.1 })] });
 
     const csv = await trigramsDb.exportTrigramsData();
 
-    // Should at minimum have the header row
-    expect(csv).toContain('Trigram,Frequency,Sentiment');
+    expect(csv).toContain(',Negative,');
+    expect(csv).toContain(',Neutral,');
   });
 
-  it('labels sentiment correctly based on threshold', async () => {
-    mockQuery.mockResolvedValue([
-      { trigram: 'positive one', frequency: 10, sentiment: 0.5, platforms: '[]', trend: 'up', first_seen: '2024-01-01', last_seen: '2024-01-02', average_engagement: 1 },
-      { trigram: 'negative one', frequency: 10, sentiment: -0.5, platforms: '[]', trend: 'down', first_seen: '2024-01-01', last_seen: '2024-01-02', average_engagement: 1 },
-      { trigram: 'neutral one', frequency: 10, sentiment: 0.1, platforms: '[]', trend: 'stable', first_seen: '2024-01-01', last_seen: '2024-01-02', average_engagement: 1 }
-    ]);
+  it('returns only the header when there is no data', async () => {
+    mockFetch({ success: true, data: [] });
 
-    const csv = await trigramsDb.exportTrigramsData();
-    const lines = csv.split('\n');
-
-    // line 1: positive (sentiment 0.5 > 0.3)
-    expect(lines[1]).toContain('Positive');
-    // line 2: negative (sentiment -0.5 < -0.3)
-    expect(lines[2]).toContain('Negative');
-    // line 3: neutral (sentiment 0.1 between -0.3 and 0.3)
-    expect(lines[3]).toContain('Neutral');
-  });
-});
-
-// ─── seedTrigramsData ──────────────────────────────────────────────────────
-
-describe('seedTrigramsData', () => {
-  it('skips seeding if data already exists', async () => {
-    mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes('SELECT COUNT')) {
-        return Promise.resolve([{ count: 10 }]);
-      }
-      return Promise.resolve([]);
-    });
-
-    await trigramsDb.seedTrigramsData();
-
-    // Should not have called fetch for sample-posts
-    const insertCalls = mockQuery.mock.calls.filter(
-      (call: any[]) => typeof call[0] === 'string' && call[0].includes('INSERT INTO trigrams')
-    );
-    expect(insertCalls).toHaveLength(0);
-  });
-
-  it('attempts to seed from API when table is empty', async () => {
-    mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes('SELECT COUNT')) {
-        return Promise.resolve([{ count: 0 }]);
-      }
-      return Promise.resolve([]);
-    });
-
-    // Mock fetch for the API call
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ success: true, data: [] })
-    })));
-
-    await trigramsDb.seedTrigramsData();
-
-    // fetch should have been called for sample-posts
-    expect(fetch).toHaveBeenCalled();
+    expect((await trigramsDb.exportTrigramsData()).split('\n')).toHaveLength(1);
   });
 });

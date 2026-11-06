@@ -91,6 +91,13 @@ together.
 
 ![Hashtag analysis dashboard](/screenshots/hashtag-analysis.png)
 
+### Trigram analysis
+
+Under **Social Analytics → Trigram Analysis**, see the three-word phrases that recur in posts, how
+positive or negative the posts containing them are, and whether each phrase is rising or fading.
+
+![Trigram analysis dashboard](/screenshots/trigram-analysis.png)
+
 ## What the demo does not cover
 
 The demo fills the core analytics tables. Pages backed by optional pipelines (GDELT events, radio
