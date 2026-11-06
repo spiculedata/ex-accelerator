@@ -96,6 +96,7 @@ async function existingLegacyTables(client: MigrationClient): Promise<string[]> 
 async function applyOne(client: MigrationClient, migration: Migration): Promise<void> {
   await client.query('BEGIN');
   try {
+    // No parameters on purpose: that uses the simple protocol, which allows multi-statement files
     await client.query(migration.sql);
     await client.query(RECORD_SQL, [migration.name, false]);
     await client.query('COMMIT');
