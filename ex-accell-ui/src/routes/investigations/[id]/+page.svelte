@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { highlightKeywords } from '$lib/utils/highlight';
   import { goto } from '$app/navigation';
   import {
     investigationSelection,
@@ -598,12 +599,6 @@
     return 'bg-slate-500';
   }
 
-  function highlightKeywords(text: string): string {
-    if (!keywords.length) return text;
-    const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
-    return text.replace(regex, '<mark class="bg-amber-500/30 text-amber-200 rounded px-0.5">$1</mark>');
-  }
 
   // Annotations
   let annotations: { id: string; text: string; timestamp: string }[] = [];
@@ -1014,7 +1009,7 @@
                         <span class="text-[10px] font-semibold text-slate-300">Full Transcript</span>
                         <span class="text-[9px] text-slate-500">{segment.transcript.length} characters</span>
                       </div>
-                      <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{@html highlightKeywords(segment.transcript)}</p>
+                      <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{@html highlightKeywords(segment.transcript, keywords)}</p>
                     </div>
                   {:else}
                     <p class="text-xs text-slate-400 leading-snug line-clamp-2">{segment.transcript}</p>
