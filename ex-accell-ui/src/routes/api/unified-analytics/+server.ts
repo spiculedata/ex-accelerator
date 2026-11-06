@@ -6,6 +6,8 @@ import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
 import { languageQueries } from '$lib/server/languageQueries';
+import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
+import { computeTrigrams } from '$lib/server/trigrams';
 import { queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
@@ -1312,6 +1314,45 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Engagement analysis', error, []);
+      }
+    }
+
+    if (type === 'trigrams') {
+      try {
+        const intParam = (name: string, fallback: number, min: number, max: number): number => {
+          const parsed = parseInt(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+        };
+        const floatParam = (name: string, fallback: number): number => {
+          const parsed = parseFloat(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+
+        const days = TRIGRAM_TIME_RANGE_DAYS[url.searchParams.get('timeRange') || ''] ?? TRIGRAM_DEFAULT_DAYS;
+        const platform = url.searchParams.get('platform');
+        const filterByPlatform = !!platform && platform !== 'all';
+
+        const rows = await executeQuery(trigramPostsQuery(filterByPlatform, days), filterByPlatform ? [platform] : []);
+        const posts = rows.map((row: any) => ({
+          id: row.id,
+          text: String(row.text ?? ''),
+          platform: String(row.platform),
+          createdAt: new Date(row.created_at),
+          sentiment: row.sentiment_category ?? null,
+          engagementRate: Number(row.engagement_rate) || 0
+        }));
+
+        const data = computeTrigrams(posts, {
+          now: new Date(),
+          days,
+          minFrequency: intParam('minFrequency', 1, 1, 1000),
+          maxResults: intParam('maxResults', 100, 1, 500),
+          search: url.searchParams.get('search') || undefined,
+          sentimentRange: [floatParam('minSentiment', -1), floatParam('maxSentiment', 1)]
+        });
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Trigram analysis', error, []);
       }
     }
 

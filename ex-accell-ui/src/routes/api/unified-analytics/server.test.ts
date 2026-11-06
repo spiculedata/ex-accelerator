@@ -226,3 +226,66 @@ describe('GET /api/unified-analytics hashtag-analysis limit', () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe('GET /api/unified-analytics trigrams', () => {
+  const get = (query = '') =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?type=trigrams${query ? `&${query}` : ''}`) } as Parameters<typeof GET>[0]);
+
+  const row = (id: number, text: string, extra: Record<string, unknown> = {}) => ({
+    id, text, platform: 'telegram', created_at: new Date(), sentiment_category: 'Negative', engagement_rate: '6.5', ...extra
+  });
+
+  it('computes phrases from the posts the database returns', async () => {
+    duckdbQuery.mockResolvedValue([row(1, 'fare increase unfair'), row(2, 'fare increase unfair')]);
+
+    const response = await get('minFrequency=2');
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]).toMatchObject({ trigram: 'fare increase unfair', frequency: 2, sentiment: -0.5, averageEngagement: 6.5, platforms: ['telegram'] });
+  });
+
+  it('keeps the search text out of the SQL', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get(`search=${encodeURIComponent("'; DROP TABLE posts; --")}`);
+
+    expect(String(duckdbQuery.mock.calls[0][0])).not.toContain('DROP TABLE');
+  });
+
+  it('applies the platform filter as a parameter and the time range from a whitelist', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('platform=youtube&timeRange=30d');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('ds.platform = $1');
+    expect(String(sql)).toContain("INTERVAL '30 days'");
+    expect(params).toEqual(['youtube']);
+  });
+
+  it('falls back to a 7 day window for an unknown time range', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('timeRange=1000%20years');
+
+    expect(String(duckdbQuery.mock.calls[0][0])).toContain("INTERVAL '7 days'");
+  });
+
+  it('clamps maxResults and ignores non-numeric filters', async () => {
+    duckdbQuery.mockResolvedValue(Array.from({ length: 5 }, (_, i) => row(i, `phrase number ${i} here`)));
+
+    const body = await (await get('maxResults=abc&minFrequency=xyz')).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
+  it('returns a 500 when the query fails', async () => {
+    duckdbQuery.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    expect((await get()).status).toBe(500);
+  });
+});

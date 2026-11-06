@@ -3,7 +3,7 @@
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
-  import { trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
+  import { summarizeTrigrams, trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
   import { getTrendColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
 
@@ -18,7 +18,6 @@
     totalTrigrams: 0,
     uniqueTrigrams: 0,
     averageFrequency: 0,
-    topCategories: [],
     sentimentDistribution: { positive: 0, neutral: 0, negative: 0 },
     trendDistribution: { up: 0, stable: 0, down: 0 }
   };
@@ -47,19 +46,17 @@
         searchQuery
       };
       
-      // Load trigrams data and stats from database
-      const [data, stats] = await Promise.all([
-        trigramsDb.getTrigramsData(filters, workspaceId || undefined),
-        trigramsDb.getTrigramStats(filters, workspaceId || undefined)
-      ]);
-      
+      errorMessage = '';
+      const data = await trigramsDb.getTrigramsData(filters, workspaceId || undefined);
+
       trigramsData = data;
-      trigramStats = stats;
+      trigramStats = summarizeTrigrams(data);
       filteredTrigrams = data;
-      
-      console.log('Trigrams data loaded successfully from database');
     } catch (error) {
       console.error('Error loading trigrams data:', error);
+      trigramsData = [];
+      filteredTrigrams = [];
+      trigramStats = summarizeTrigrams([]);
       errorMessage = 'Failed to load trigrams data. Please try again.';
     } finally {
       loading = false;
@@ -77,6 +74,12 @@
       return matchesSearch && matchesFreq && matchesPlatform;
     });
   }
+
+  // Highlights computed from the phrases currently shown
+  $: risingTrigrams = filteredTrigrams.filter((t) => t.trend === 'up').slice(0, 5);
+  $: mostPositive = filteredTrigrams.reduce<TrigramData | null>((best, t) => (t.sentiment > (best?.sentiment ?? 0) ? t : best), null);
+  $: mostCritical = filteredTrigrams.reduce<TrigramData | null>((worst, t) => (t.sentiment < (worst?.sentiment ?? 0) ? t : worst), null);
+  const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
 
   function getSentimentColor(sentiment: number) {
     if (sentiment > 0.3) return 'text-green-600';
@@ -325,15 +328,17 @@
           </div>
         </div>
 
-        <!-- Top Categories -->
+        <!-- Rising phrases -->
         <div class="bg-white rounded-xl shadow-lg p-6">
-          <h3 class="text-lg font-bold text-gray-900 mb-4">Trending Topics</h3>
+          <h3 class="text-lg font-bold text-gray-900 mb-4">Rising Phrases</h3>
           <div class="space-y-3">
-            {#each trigramStats.topCategories as category}
+            {#each risingTrigrams as rising}
               <div class="flex justify-between items-center">
-                <span class="text-sm text-gray-700">{category.category}</span>
-                <span class="text-sm font-medium text-purple-600">{category.percentage}%</span>
+                <span class="text-sm text-gray-700">{rising.trigram}</span>
+                <span class="text-sm font-medium text-purple-600">{rising.frequency}</span>
               </div>
+            {:else}
+              <p class="text-sm text-gray-500">No rising phrases in this period.</p>
             {/each}
           </div>
         </div>
@@ -342,27 +347,23 @@
         <div class="bg-white rounded-xl shadow-lg p-6">
           <h3 class="text-lg font-bold text-gray-900 mb-4">Pattern Insights</h3>
           <div class="space-y-4">
-            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div class="flex items-center mb-2">
-                <svg class="w-4 h-4 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                </svg>
+            {#if mostPositive}
+              <div class="bg-green-50 border border-green-200 rounded-lg p-3">
                 <span class="text-sm font-medium text-green-800">Most Positive</span>
+                <p class="text-sm text-green-700">"{mostPositive.trigram}"</p>
+                <p class="text-xs text-green-600 mt-1">{signed(mostPositive.sentiment)} sentiment score</p>
               </div>
-              <p class="text-sm text-green-700">"sustainable energy solutions"</p>
-              <p class="text-xs text-green-600 mt-1">+0.78 sentiment score</p>
-            </div>
-            
-            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-              <div class="flex items-center mb-2">
-                <svg class="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                </svg>
+            {/if}
+            {#if mostCritical}
+              <div class="bg-red-50 border border-red-200 rounded-lg p-3">
                 <span class="text-sm font-medium text-red-800">Most Critical</span>
+                <p class="text-sm text-red-700">"{mostCritical.trigram}"</p>
+                <p class="text-xs text-red-600 mt-1">{signed(mostCritical.sentiment)} sentiment score</p>
               </div>
-              <p class="text-sm text-red-700">"data privacy concerns"</p>
-              <p class="text-xs text-red-600 mt-1">-0.34 sentiment score</p>
-            </div>
+            {/if}
+            {#if !mostPositive && !mostCritical}
+              <p class="text-sm text-gray-500">No clearly positive or negative phrases in this period.</p>
+            {/if}
           </div>
         </div>
       </div>
