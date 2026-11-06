@@ -19,6 +19,15 @@ beforeEach(() => {
 });
 
 describe('getTrigramsData', () => {
+  it('escapes quotes in exported fields', async () => {
+    mockFetch({ success: true, data: [trigram({ trigram: 'say "hi" now', platforms: ['a"b'] })] });
+
+    const csv = await trigramsDb.exportTrigramsData();
+
+    expect(csv).toContain('"say ""hi"" now"');
+    expect(csv).toContain('"a""b"');
+  });
+
   it('returns the phrases computed by the server', async () => {
     mockFetch({ success: true, data: [trigram()] });
 
@@ -57,10 +66,32 @@ describe('getTrigramsData', () => {
     await expect(trigramsDb.getTrigramsData()).rejects.toThrow(/Trigram analysis failed/);
   });
 
+  it('reports an HTTP error even when the body is not JSON (for example a proxy error page)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } })));
+
+    await expect(trigramsDb.getTrigramsData()).rejects.toThrow('Trigram request failed (502)');
+  });
+
   it('throws on a network error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
     await expect(trigramsDb.getTrigramsData()).rejects.toThrow('network down');
+  });
+});
+
+describe('getTrigramsResult', () => {
+  it('returns the phrases with the server\'s truncation flag', async () => {
+    mockFetch({ success: true, data: [trigram()], meta: { truncated: true, scannedPosts: 20000 } });
+
+    const result = await trigramsDb.getTrigramsResult();
+
+    expect(result).toEqual({ data: [trigram()], truncated: true });
+  });
+
+  it('defaults to not truncated when the server sends no meta', async () => {
+    mockFetch({ success: true, data: [] });
+
+    expect((await trigramsDb.getTrigramsResult()).truncated).toBe(false);
   });
 });
 

@@ -30,6 +30,15 @@ export interface TrigramStats {
 const SENTIMENT_THRESHOLD = 0.3;
 const API_URL = '/api/unified-analytics';
 
+/** Quotes a CSV field, doubling any embedded quote. */
+const csvField = (value: string): string => `"${value.replace(/"/g, '""')}"`;
+
+export interface TrigramsResult {
+  data: TrigramData[];
+  /** True when the server stopped scanning at its post limit, so older posts are not reflected. */
+  truncated: boolean;
+}
+
 const sentimentLabel = (sentiment: number): string =>
   sentiment > SENTIMENT_THRESHOLD ? 'Positive' : sentiment < -SENTIMENT_THRESHOLD ? 'Negative' : 'Neutral';
 
@@ -57,6 +66,10 @@ export function summarizeTrigrams(data: readonly TrigramData[]): TrigramStats {
 /** Client for the server-side trigram analysis. Failures throw so the page can show an error. */
 class TrigramsDatabase {
   async getTrigramsData(filters: TrigramFilters = {}, workspaceId?: string): Promise<TrigramData[]> {
+    return (await this.getTrigramsResult(filters, workspaceId)).data;
+  }
+
+  async getTrigramsResult(filters: TrigramFilters = {}, workspaceId?: string): Promise<TrigramsResult> {
     const params = new URLSearchParams({ type: 'trigrams' });
     const optional: Record<string, string | number | undefined> = {
       platform: filters.platform,
@@ -73,9 +86,10 @@ class TrigramsDatabase {
     }
 
     const response = await fetch(`${API_URL}?${params}`);
-    const body = await response.json();
+    // An error page from a proxy is not JSON; report the status instead of a parse error
+    const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) throw new Error(body.error || `Trigram request failed (${response.status})`);
-    return body.data as TrigramData[];
+    return { data: body.data as TrigramData[], truncated: body.meta?.truncated === true };
   }
 
   async exportTrigramsData(filters: TrigramFilters = {}, workspaceId?: string): Promise<string> {
@@ -83,11 +97,11 @@ class TrigramsDatabase {
     const header = 'Trigram,Frequency,Sentiment,Sentiment Label,Platforms,Trend,First Seen,Last Seen,Average Engagement';
     const rows = data.map((item) =>
       [
-        `"${item.trigram}"`,
+        csvField(item.trigram),
         item.frequency,
         item.sentiment.toFixed(2),
         sentimentLabel(item.sentiment),
-        `"${item.platforms.join('; ')}"`,
+        csvField(item.platforms.join('; ')),
         item.trend,
         item.firstSeen,
         item.lastSeen,

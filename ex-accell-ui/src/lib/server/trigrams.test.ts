@@ -13,7 +13,7 @@ const post = (overrides: Partial<TrigramPost> & { text: string }): TrigramPost =
   ...overrides
 });
 
-const options = { now: NOW, days: 10, minFrequency: 1, maxResults: 50 };
+const options = { now: NOW, windowStart: new Date(NOW.getTime() - 10 * DAY), minFrequency: 1, maxResults: 50 };
 
 describe('tokenize', () => {
   it('lowercases, strips punctuation, urls and hash/mention marks', () => {
@@ -135,5 +135,28 @@ describe('computeTrigrams', () => {
 
   it('returns nothing for no posts', () => {
     expect(computeTrigrams([], options)).toEqual([]);
+  });
+
+  it('applies the sentiment filter before limiting results', () => {
+    const posts = [
+      ...[1, 2, 3].map((id) => post({ id, text: 'fare increase unfair', sentiment: 'Negative' })),
+      post({ id: 9, text: 'tram timetable improvement', sentiment: 'Very Positive' })
+    ];
+
+    const result = computeTrigrams(posts, { ...options, maxResults: 1, sentimentRange: [0.5, 1] });
+
+    expect(result.map((r) => r.trigram)).toEqual(['tram timetable improvement']);
+  });
+
+  it('measures the trend from the window start it is given (for example a truncated scan)', () => {
+    // Window really starts 4 days ago (older posts were cut off), so 2 days ago is the early half
+    const windowStart = new Date(NOW.getTime() - 4 * DAY);
+    const early = post({ id: 1, text: 'water advisory update', createdAt: new Date(NOW.getTime() - 3 * DAY) });
+    const late = post({ id: 2, text: 'water advisory update', createdAt: new Date(NOW.getTime() - 3 * DAY) });
+    const later = [3, 4, 5].map((id) => post({ id, text: 'water advisory update', createdAt: new Date(NOW.getTime() - 1 * DAY) }));
+
+    const [row] = computeTrigrams([early, late, ...later], { ...options, windowStart });
+
+    expect(row.trend).toBe('stable'); // 2 early vs 3 recent is not a clear rise
   });
 });

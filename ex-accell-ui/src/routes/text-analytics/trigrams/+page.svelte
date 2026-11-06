@@ -10,6 +10,7 @@
   $: workspaceId = $page.url.searchParams.get('workspace');
   
   let errorMessage = '';
+  let truncated = false;
 
   // Trigrams analysis data
   let loading = true;
@@ -47,7 +48,8 @@
       };
       
       errorMessage = '';
-      const data = await trigramsDb.getTrigramsData(filters, workspaceId || undefined);
+      const { data, truncated: wasTruncated } = await trigramsDb.getTrigramsResult(filters, workspaceId || undefined);
+      truncated = wasTruncated;
 
       trigramsData = data;
       trigramStats = summarizeTrigrams(data);
@@ -229,6 +231,11 @@
   <!-- Main Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+    {#if truncated}
+      <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        This period has more posts than can be analysed at once, so only the most recent ones are included. Choose a shorter time range for complete results.
+      </p>
+    {/if}
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Trigrams List -->
       <div class="lg:col-span-3">

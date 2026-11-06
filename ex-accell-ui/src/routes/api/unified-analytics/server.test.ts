@@ -288,4 +288,44 @@ describe('GET /api/unified-analytics trigrams', () => {
 
     expect((await get()).status).toBe(500);
   });
+
+  it('limits the scan to the workspace platforms and combines them with the platform filter', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram', 'bluesky'] });
+    duckdbQuery.mockResolvedValue([]);
+
+    try {
+      await get('platform=bluesky&workspace_id=3');
+    } finally {
+      resolveWorkspaceScope.mockResolvedValue(null);
+    }
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('ds.platform = ANY($1)');
+    expect(String(sql)).toContain('ds.platform = $2');
+    expect(params).toEqual([['telegram', 'bluesky'], 'bluesky']);
+  });
+
+  it('flags a truncated scan so the UI can say so', async () => {
+    duckdbQuery.mockResolvedValue(Array.from({ length: 20_000 }, (_, i) => row(i, `water advisory update ${i % 3}`)));
+
+    const body = await (await get()).json();
+
+    expect(body.meta).toMatchObject({ truncated: true, scannedPosts: 20_000 });
+  });
+
+  it('does not flag a complete scan', async () => {
+    duckdbQuery.mockResolvedValue([row(1, 'fare increase unfair')]);
+
+    const body = await (await get()).json();
+
+    expect(body.meta).toMatchObject({ truncated: false, scannedPosts: 1 });
+  });
+
+  it('clamps sentiment bounds to -1..1', async () => {
+    duckdbQuery.mockResolvedValue([row(1, 'fare increase unfair', { sentiment_category: 'Very Negative' })]);
+
+    const body = await (await get('minSentiment=-50&maxSentiment=50')).json();
+
+    expect(body.data).toHaveLength(1);
+  });
 });

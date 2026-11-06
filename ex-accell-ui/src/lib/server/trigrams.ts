@@ -23,14 +23,14 @@ export interface TrigramResult {
 
 export interface TrigramOptions {
   now: Date;
-  days: number;
+  /** Start of the period the posts cover; the trend compares its two halves. */
+  windowStart: Date;
   minFrequency: number;
   maxResults: number;
   search?: string;
   sentimentRange?: readonly [number, number];
 }
 
-const DAY_MS = 86_400_000;
 const TOP_POST_COUNT = 3;
 const TREND_RATIO = 1.5;
 
@@ -49,7 +49,7 @@ const STOP_WORDS = new Set(
 );
 
 export function sentimentScore(category: string | null): number {
-  return (category !== null && SENTIMENT_SCORES[category]) || 0;
+  return (category !== null ? SENTIMENT_SCORES[category] : undefined) ?? 0;
 }
 
 export function tokenize(text: string): string[] {
@@ -57,7 +57,10 @@ export function tokenize(text: string): string[] {
   return withoutUrls.match(/[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu) ?? [];
 }
 
-/** Distinct phrases in a text whose first and last words are meaningful. */
+/**
+ * Distinct phrases in a text. Only the first and last word must be meaningful, so phrases such as
+ * "state of emergency" survive while "this is the" does not.
+ */
 function phrasesIn(text: string): Set<string> {
   const tokens = tokenize(text);
   const phrases = new Set<string>();
@@ -68,15 +71,11 @@ function phrasesIn(text: string): Set<string> {
   return phrases;
 }
 
-interface Accumulator {
-  posts: TrigramPost[];
-}
-
 const mean = (values: number[]): number => (values.length === 0 ? 0 : values.reduce((sum, v) => sum + v, 0) / values.length);
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-function trendOf(posts: TrigramPost[], now: Date, days: number): 'up' | 'down' | 'stable' {
-  const midpoint = now.getTime() - (days * DAY_MS) / 2;
+function trendOf(posts: TrigramPost[], windowStart: Date, now: Date): 'up' | 'down' | 'stable' {
+  const midpoint = windowStart.getTime() + (now.getTime() - windowStart.getTime()) / 2;
   const recent = posts.filter((p) => p.createdAt.getTime() >= midpoint).length;
   const early = posts.length - recent;
   if (recent - early >= 1 && recent > early * TREND_RATIO) return 'up';
@@ -84,15 +83,15 @@ function trendOf(posts: TrigramPost[], now: Date, days: number): 'up' | 'down' |
   return 'stable';
 }
 
-function summarise(trigram: string, { posts }: Accumulator, options: TrigramOptions): TrigramResult {
+function summarise(trigram: string, posts: TrigramPost[], options: TrigramOptions): TrigramResult {
   const times = posts.map((p) => p.createdAt.getTime());
   const byEngagement = [...posts].sort((a, b) => b.engagementRate - a.engagementRate);
   return {
     trigram,
     frequency: posts.length,
-    sentiment: round2(mean(posts.map((p) => sentimentScore(p.sentiment)))),
+    sentiment: meanSentiment(posts),
     platforms: [...new Set(posts.map((p) => p.platform))].sort(),
-    trend: trendOf(posts, options.now, options.days),
+    trend: trendOf(posts, options.windowStart, options.now),
     firstSeen: new Date(Math.min(...times)).toISOString(),
     lastSeen: new Date(Math.max(...times)).toISOString(),
     averageEngagement: round2(mean(posts.map((p) => p.engagementRate))),
@@ -100,23 +99,29 @@ function summarise(trigram: string, { posts }: Accumulator, options: TrigramOpti
   };
 }
 
+const meanSentiment = (posts: TrigramPost[]): number => round2(mean(posts.map((p) => sentimentScore(p.sentiment))));
+
 export function computeTrigrams(posts: readonly TrigramPost[], options: TrigramOptions): TrigramResult[] {
-  const groups = new Map<string, Accumulator>();
+  const groups = new Map<string, TrigramPost[]>();
   for (const post of posts) {
     for (const phrase of phrasesIn(post.text)) {
-      const group = groups.get(phrase) ?? { posts: [] };
-      group.posts.push(post);
-      groups.set(phrase, group);
+      const group = groups.get(phrase);
+      if (group) group.push(post);
+      else groups.set(phrase, [post]);
     }
   }
 
   const search = options.search?.trim().toLowerCase();
   const [minSentiment, maxSentiment] = options.sentimentRange ?? [-1, 1];
 
+  // Cheap filters first; the full summary is built only for the rows that are returned
   return [...groups.entries()]
-    .filter(([trigram, group]) => group.posts.length >= options.minFrequency && (!search || trigram.includes(search)))
-    .map(([trigram, group]) => summarise(trigram, group, options))
-    .filter((row) => row.sentiment >= minSentiment && row.sentiment <= maxSentiment)
-    .sort((a, b) => b.frequency - a.frequency || a.trigram.localeCompare(b.trigram))
-    .slice(0, options.maxResults);
+    .filter(([trigram, group]) => group.length >= options.minFrequency && (!search || trigram.includes(search)))
+    .filter(([, group]) => {
+      const sentiment = meanSentiment(group);
+      return sentiment >= minSentiment && sentiment <= maxSentiment;
+    })
+    .sort(([nameA, a], [nameB, b]) => b.length - a.length || nameA.localeCompare(nameB))
+    .slice(0, options.maxResults)
+    .map(([trigram, group]) => summarise(trigram, group, options));
 }
