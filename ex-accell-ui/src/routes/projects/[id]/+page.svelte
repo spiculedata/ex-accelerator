@@ -62,6 +62,8 @@
   $: projectId = $page.params.id;
   let loading = true;
   let error = '';
+  // Shown inline when a workspace was created but some datasets could not be linked
+  let workspaceNotice = '';
   let project: ProjectData | null = null;
   let workspaces: Workspace[] = [];
   let activity: Activity[] = [];
@@ -190,29 +192,32 @@
           project_id: parseInt(projectId ?? '0'),
           name: newWorkspaceName,
           description: newWorkspaceDescription,
-          workspace_type: newWorkspaceType,
-          created_by: 'current_user@example.com'
+          workspace_type: newWorkspaceType
         })
       });
       const result = await response.json();
       if (result.success && result.workspace) {
         const workspaceId = result.workspace.id;
+        let linkProblem = '';
         if (selectedDatasets.length > 0) {
+          const failures: string[] = [];
           for (const datasetId of selectedDatasets) {
             try {
-              await fetch('/api/datasets', {
+              const linkResponse = await fetch('/api/datasets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'link',
-                  workspace_id: workspaceId,
-                  dataset_id: datasetId,
-                  added_by: 'current_user@example.com'
-                })
+                body: JSON.stringify({ action: 'link', workspace_id: workspaceId, dataset_id: datasetId })
               });
+              if (!linkResponse.ok) {
+                const detail = await linkResponse.json().catch(() => ({}));
+                failures.push(detail.error || `HTTP ${linkResponse.status}`);
+              }
             } catch (err) {
-              console.error(`Error linking dataset ${datasetId}:`, err);
+              failures.push(err instanceof Error ? err.message : String(err));
             }
+          }
+          if (failures.length > 0) {
+            linkProblem = `The workspace was created, but ${failures.length} dataset(s) could not be added: ${failures[0]}`;
           }
         }
         showCreateWorkspace = false;
@@ -221,6 +226,7 @@
         newWorkspaceType = 'general';
         selectedDatasets = [];
         await loadData();
+        workspaceNotice = linkProblem;
       }
     } catch (e) {
       console.error('Error creating workspace:', e);
@@ -338,6 +344,13 @@
             + New Workspace
           </button>
         </div>
+
+        {#if workspaceNotice}
+          <div role="alert" class="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <span>{workspaceNotice}</span>
+            <button type="button" class="shrink-0 font-medium underline" onclick={() => (workspaceNotice = '')}>Dismiss</button>
+          </div>
+        {/if}
 
         <!-- Create Workspace Form (inline) -->
         {#if showCreateWorkspace}

@@ -80,7 +80,7 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST /api/investigations
  * Create a new investigation
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     await ensureTable();
 
@@ -102,7 +102,7 @@ export const POST: RequestHandler = async ({ request }) => {
         data.description || null,
         JSON.stringify(data.query_config),
         data.workspace_id || null,
-        data.created_by || null
+        locals.user?.email ?? null
       ]
     );
 

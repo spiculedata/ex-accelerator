@@ -41,7 +41,7 @@ export function workspaceTables(posts: PostDraft[], windowStart: Date, now: Date
     {
       name: 'datasets',
       columns: ['id', 'name', 'description', 'dataset_type', 'source_platform', 'source_database', 'schema_name', 'table_name', 'record_count', 'date_range_start', 'date_range_end', 'ingestion_method', 'status', 'visibility', 'created_by'],
-      rows: SOURCES.map((s, i) => [i + 1, s.name, `Synthetic ${s.platform} posts about a fictional city`, 'social_media', s.platform, 'etl_postgres', 'public', 'posts', perSource[i], windowStart, now, 'upload', 'available', 'private', EMAIL])
+      rows: SOURCES.map((s, i) => [i + 1, s.name, `Synthetic ${s.platform} posts about a fictional city`, 'social_media', s.platform, 'etl_postgres', 'public', 'posts', perSource[i], windowStart, now, 'upload', 'available', 'public', EMAIL])
     },
     {
       name: 'dataset_tags',
