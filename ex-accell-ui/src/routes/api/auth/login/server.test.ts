@@ -7,8 +7,11 @@ const mocks = vi.hoisted(() => ({
   verifyPassword: vi.fn(),
   hashPassword: vi.fn().mockResolvedValue('scrypt$dummy'),
   blocked: false,
+  ipBlocked: false,
   recordFailure: vi.fn(),
-  reset: vi.fn()
+  reset: vi.fn(),
+  ipRecordFailure: vi.fn(),
+  ipReset: vi.fn()
 }));
 
 vi.mock('$lib/server/auth/userRepo', () => ({
@@ -16,6 +19,7 @@ vi.mock('$lib/server/auth/userRepo', () => ({
   recordLogin: mocks.recordLogin
 }));
 vi.mock('$lib/server/auth/password', () => ({
+  MAX_PASSWORD_LENGTH: 1024,
   verifyPassword: mocks.verifyPassword,
   hashPassword: mocks.hashPassword
 }));
@@ -27,6 +31,11 @@ vi.mock('$lib/server/auth/runtime', () => ({
     isBlocked: () => mocks.blocked,
     recordFailure: mocks.recordFailure,
     reset: mocks.reset
+  },
+  loginIpThrottle: {
+    isBlocked: () => mocks.ipBlocked,
+    recordFailure: mocks.ipRecordFailure,
+    reset: mocks.ipReset
   }
 }));
 
@@ -52,6 +61,9 @@ async function statusOf(result: Promise<Response>): Promise<number> {
 
 beforeEach(() => {
   mocks.blocked = false;
+  mocks.ipBlocked = false;
+  mocks.ipRecordFailure.mockClear();
+  mocks.ipReset.mockClear();
   mocks.findUserByEmail.mockReset();
   mocks.verifyPassword.mockReset();
   mocks.recordFailure.mockClear();
@@ -107,6 +119,35 @@ describe('POST /api/auth/login', () => {
 
     expect(status).toBe(429);
     expect(mocks.findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 without checking credentials when the client address is throttled, whatever the email', async () => {
+    mocks.ipBlocked = true;
+
+    const status = await statusOf(call({ email: 'fresh@example.com', password: 'a-long-password-1' }).result);
+
+    expect(status).toBe(429);
+    expect(mocks.findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it('counts a failure against both the account and the client address', async () => {
+    mocks.findUserByEmail.mockResolvedValue(null);
+    mocks.verifyPassword.mockResolvedValue(false);
+
+    await statusOf(call({ email: 'x@y.co', password: 'nope-nope-nope' }).result);
+
+    expect(mocks.recordFailure).toHaveBeenCalledTimes(1);
+    expect(mocks.ipRecordFailure).toHaveBeenCalledWith('1.2.3.4');
+  });
+
+  it('clears only the account counter on success, so one login cannot reset the address limit', async () => {
+    mocks.findUserByEmail.mockResolvedValue(member);
+    mocks.verifyPassword.mockResolvedValue(true);
+
+    await call({ email: 'a@b.co', password: 'a-long-password-1' }).result;
+
+    expect(mocks.reset).toHaveBeenCalled();
+    expect(mocks.ipReset).not.toHaveBeenCalled();
   });
 
   it.each([{}, { email: 'a@b.co' }, { email: 5, password: 'x' }, { email: 'a@b.co', password: '' }, { email: 'a'.repeat(400), password: 'x' }, 'not json'])(

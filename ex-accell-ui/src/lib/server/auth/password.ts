@@ -12,7 +12,8 @@ const SCRYPT = { N: 16384, r: 8, p: 1 } as const;
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
 const MIN_PASSWORD_LENGTH = 12;
-const MAX_PASSWORD_LENGTH = 1024;
+/** Longest password accepted anywhere (bounds the cost of hashing attacker-supplied input). */
+export const MAX_PASSWORD_LENGTH = 1024;
 
 /** Returns an error message, or null if the password is acceptable. */
 export function validatePasswordStrength(password: string): string | null {

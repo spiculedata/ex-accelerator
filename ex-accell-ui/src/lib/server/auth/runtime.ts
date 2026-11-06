@@ -9,11 +9,18 @@ const log = createLogger('auth');
 
 const THROTTLE_MAX_ATTEMPTS = 5;
 const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+// Coarser limit per client address, across all accounts, to slow password spraying
+const IP_THROTTLE_MAX_ATTEMPTS = 20;
 
 export const SESSION_COOKIE = 'ex_session';
 
 export const loginThrottle = createLoginThrottle({
   maxAttempts: THROTTLE_MAX_ATTEMPTS,
+  windowMs: THROTTLE_WINDOW_MS
+});
+
+export const loginIpThrottle = createLoginThrottle({
+  maxAttempts: IP_THROTTLE_MAX_ATTEMPTS,
   windowMs: THROTTLE_WINDOW_MS
 });
 
