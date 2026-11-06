@@ -252,12 +252,15 @@
     });
   }
 
-  onMount(async () => {
-    await loadData();
-    await initCharts();
+  // Load once on mount, then again only when the selected workspace changes. (Gating on `loading`
+  // instead re-triggers the load every time it finishes, which loops forever.)
+  let loadedWorkspace: string | null | undefined;
+  let mounted = false;
+  onMount(() => {
+    mounted = true;
   });
-
-  $: if (!loading && workspaceId !== undefined && browser) {
+  $: if (mounted && browser && workspaceId !== loadedWorkspace) {
+    loadedWorkspace = workspaceId;
     loadData().then(() => initCharts());
   }
 </script>

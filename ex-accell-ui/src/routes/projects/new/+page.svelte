@@ -99,7 +99,7 @@
     <div class="flex items-center">
       <button 
         on:click={() => window.history.back()}
-        class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors">
+        class="mr-4 p-2 text-white hover:bg-white/20 rounded-xl transition-colors">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>

@@ -64,7 +64,7 @@
       </div>
       <button 
         on:click={() => goto('/projects/new')}
-        class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-white border-opacity-30">
+        class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-white/30">
         + New Project
       </button>
     </div>
