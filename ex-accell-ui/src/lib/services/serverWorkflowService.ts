@@ -1,9 +1,8 @@
 // Server-side Workflow Service
 // Handles workflow operations on the server with PostgreSQL persistence
 
-import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
-import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
+import { pythonDaprWorkflowGenerator, type GeneratedWorkflow } from './pythonDaprWorkflowGenerator';
 import { postgresPool } from './postgres';
 
 /**
@@ -147,8 +146,8 @@ class ServerWorkflowService {
     }
   ): Promise<PublishedWorkflow> {
     try {
-      // Generate Dapr workflow code
-      const generatedCode = daprWorkflowGenerator.generateWorkflowCode(workflowDefinition);
+      // Generate the Python Dapr workflow (the same generator execution uses)
+      const generatedCode = await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
 
       const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = new Date().toISOString();
@@ -429,12 +428,12 @@ class ServerWorkflowService {
       let paramIndex = 1;
 
       if (filters.workflowId) {
-        conditions.push(`workflow_id = $${paramIndex++}`);
+        conditions.push(`e.workflow_id = $${paramIndex++}`);
         params.push(filters.workflowId);
       }
 
       if (filters.status) {
-        conditions.push(`status = $${paramIndex++}`);
+        conditions.push(`e.status = $${paramIndex++}`);
         params.push(filters.status);
       }
 
@@ -444,7 +443,7 @@ class ServerWorkflowService {
         params.push(filters.limit);
       }
 
-      const sql = `SELECT * FROM workflow_executions ${whereClause} ORDER BY started_at DESC ${limitClause}`;
+      const sql = `SELECT e.*, w.name AS workflow_name FROM workflow_executions e LEFT JOIN published_workflows w ON w.id = e.workflow_id ${whereClause} ORDER BY e.started_at DESC ${limitClause}`;
 
       const rows = await postgresPool.query(sql, params);
       return rows.map((row: any) => this.mapRowToExecution(row));
@@ -460,7 +459,7 @@ class ServerWorkflowService {
   async getWorkflowExecution(executionId: string): Promise<WorkflowExecution | null> {
     try {
       const rows = await postgresPool.query(
-        'SELECT * FROM workflow_executions WHERE id = $1',
+        'SELECT e.*, w.name AS workflow_name FROM workflow_executions e LEFT JOIN published_workflows w ON w.id = e.workflow_id WHERE e.id = $1',
         [executionId]
       );
 

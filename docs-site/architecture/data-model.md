@@ -42,8 +42,9 @@ migrations. Until a table exists, the related dashboards show an empty state.
 | Engagement | `content_types`, `post_engagement`, `hashtag_engagement` |
 | Android | `android_devices`, `android_app_usage`, `android_system_metrics` |
 
-Separate schema files cover projects and workspaces, datasets, the workflow builder, dashboards and
-GDELT events.
+The workflow builder stores its definitions and run history in `published_workflows` and
+`workflow_executions` (deleting a workflow also deletes its runs). Separate schema files cover
+projects and workspaces, datasets, dashboards and GDELT events.
 
 ## Cross-module views
 

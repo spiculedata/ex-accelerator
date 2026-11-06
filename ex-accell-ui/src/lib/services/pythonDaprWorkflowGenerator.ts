@@ -6,7 +6,6 @@ import { join } from 'path';
 import { assertSafeIdentifier } from '$lib/utils/pathSafety';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { GeneratedWorkflow } from './daprWorkflowGenerator';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,6 +23,16 @@ interface WorkflowDefinition {
   description: string;
   steps: WorkflowStep[];
   connections: any[];
+}
+
+/** What a generator returns. The *Code fields are empty: workflows run as a single Python script. */
+export interface GeneratedWorkflow {
+  workflowName: string;
+  workflowCode: string;
+  activityCode: string;
+  appCode: string;
+  workflowPattern: string;
+  executionOrder: string[];
 }
 
 export interface PythonDaprWorkflow extends GeneratedWorkflow {
