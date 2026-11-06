@@ -8,6 +8,8 @@ export interface LoginThrottle {
   isBlocked(key: string, nowMs?: number): boolean;
   recordFailure(key: string, nowMs?: number): void;
   reset(key: string): void;
+  /** Removes the most recent attempt for a key (an attempt that turned out not to count). */
+  forgive(key: string): void;
   size(): number;
 }
 
@@ -34,6 +36,12 @@ export function createLoginThrottle({ maxAttempts, windowMs, maxKeys = DEFAULT_M
     },
     reset: (key) => {
       failures.delete(key);
+    },
+    forgive: (key) => {
+      const attempts = failures.get(key);
+      if (!attempts) return;
+      if (attempts.length <= 1) failures.delete(key);
+      else failures.set(key, attempts.slice(0, -1));
     },
     size: () => failures.size
   };

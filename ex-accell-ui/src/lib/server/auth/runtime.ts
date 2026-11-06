@@ -9,11 +9,18 @@ const log = createLogger('auth');
 
 const THROTTLE_MAX_ATTEMPTS = 5;
 const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+// Coarser limit per client address, across all accounts, to slow password spraying
+const IP_THROTTLE_MAX_ATTEMPTS = 20;
 
 export const SESSION_COOKIE = 'ex_session';
 
 export const loginThrottle = createLoginThrottle({
   maxAttempts: THROTTLE_MAX_ATTEMPTS,
+  windowMs: THROTTLE_WINDOW_MS
+});
+
+export const loginIpThrottle = createLoginThrottle({
+  maxAttempts: IP_THROTTLE_MAX_ATTEMPTS,
   windowMs: THROTTLE_WINDOW_MS
 });
 
@@ -25,6 +32,11 @@ export function getAuthConfig(): AuthConfig {
     cachedConfig = resolveAuthConfig(process.env, !dev);
     if (!process.env.SESSION_SECRET) {
       log.warn('SESSION_SECRET not set; using an ephemeral secret, sessions reset on restart');
+    }
+    if (!dev && !process.env.ADDRESS_HEADER) {
+      log.warn(
+        'ADDRESS_HEADER is not set. Behind a reverse proxy every request then looks like one client, so the per-address login limit applies to the whole site. See the deployment guide.'
+      );
     }
   }
   return cachedConfig;

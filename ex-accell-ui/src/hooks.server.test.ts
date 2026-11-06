@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
+const config = vi.hoisted(() => ({ secureCookies: false }));
+
 vi.mock('$lib/server/auth/runtime', () => ({
   SESSION_COOKIE: 'ex_session',
-  getAuthConfig: () => ({ sessionSecret: 's'.repeat(32), sessionTtlSeconds: 3600, secureCookies: false })
+  getAuthConfig: () => ({ sessionSecret: 's'.repeat(32), sessionTtlSeconds: 3600, secureCookies: config.secureCookies })
 }));
 
 import { handle } from './hooks.server';
@@ -73,5 +75,40 @@ describe('handle', () => {
 
     expect(response.status).toBe(403);
     expect(resolve).not.toHaveBeenCalled();
+  });
+});
+
+describe('security headers', () => {
+  const headerSet = ['x-content-type-options', 'referrer-policy', 'x-frame-options', 'permissions-policy'];
+
+  it('adds the baseline headers to responses from routes', async () => {
+    const { response } = await run('/projects', { user: admin });
+
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+    expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN');
+    expect(response.headers.get('permissions-policy')).toContain('camera=()');
+  });
+
+  it('adds them to denial and redirect responses too', async () => {
+    const denied = (await run('/api/projects')).response;
+    const redirected = (await run('/projects')).response;
+
+    for (const response of [denied, redirected]) {
+      for (const name of headerSet) expect(response.headers.get(name), name).toBeTruthy();
+    }
+  });
+
+  it('sends HSTS only when secure cookies are enabled', async () => {
+    config.secureCookies = false;
+    expect((await run('/projects', { user: admin })).response.headers.get('strict-transport-security')).toBeNull();
+
+    config.secureCookies = true;
+    try {
+      const header = (await run('/projects', { user: admin })).response.headers.get('strict-transport-security');
+      expect(header).toContain('max-age=');
+    } finally {
+      config.secureCookies = false;
+    }
   });
 });

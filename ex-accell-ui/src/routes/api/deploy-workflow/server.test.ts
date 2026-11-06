@@ -43,6 +43,14 @@ describe('POST /api/deploy-workflow', () => {
     expect(pythonPath).toMatch(/deployed-workflows\/wf-1\.py$/);
   });
 
+  it('does not reveal the server file path in the response', async () => {
+    const response = await call({ workflowId: 'wf-1', workflowName: 'Demo', code: 'print(1)' });
+    const text = JSON.stringify(await response.json());
+
+    expect(text).not.toContain('deployed-workflows');
+    expect(text).not.toContain(process.cwd());
+  });
+
   it.each(['../../etc/cron.d/evil', '..', 'a/b', '/abs/path', 'x;id'])(
     'rejects unsafe workflowId %j without writing files',
     async (workflowId) => {

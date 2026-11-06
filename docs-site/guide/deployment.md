@@ -51,6 +51,17 @@ port 3000 is reachable **only** through the proxy (change the `ui` port mapping 
 `127.0.0.1:3000:3000`). Otherwise a client can send its own `X-Forwarded-For` header and pick the
 address the throttle sees.
 
+Without `ADDRESS_HEADER` behind a proxy, every request appears to come from the proxy, so the
+per-address login limit (20 failed sign-ins per 15 minutes) applies to the **whole site**: that many
+failures from anyone locks everyone out for a while. The app logs a warning at startup when it is
+running in production without `ADDRESS_HEADER`.
+
+The app adds `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`
+headers to its responses, and `Strict-Transport-Security` (180 days, including subdomains) when
+`COOKIE_SECURE=true`. Static files under `/_app/` are served before the app's hooks run, so have your
+proxy add `X-Content-Type-Options: nosniff` for them too. Only enable HTTPS-only cookies on a host
+whose subdomains are all served over HTTPS, because browsers will remember the HSTS policy.
+
 Do not publish the Postgres, Redis, Ollama or Jupyter ports to the internet. The compose file maps
 them to the host for convenience; bind them to `127.0.0.1` or remove the mappings on a server.
 

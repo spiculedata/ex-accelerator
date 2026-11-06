@@ -7,15 +7,20 @@ const mocks = vi.hoisted(() => ({
   verifyPassword: vi.fn(),
   hashPassword: vi.fn().mockResolvedValue('scrypt$dummy'),
   blocked: false,
+  ipBlocked: false,
   recordFailure: vi.fn(),
-  reset: vi.fn()
+  reset: vi.fn(),
+  forgive: vi.fn(),
+  ipRecordFailure: vi.fn(),
+  ipForgive: vi.fn()
 }));
 
 vi.mock('$lib/server/auth/userRepo', () => ({
   findUserByEmail: mocks.findUserByEmail,
   recordLogin: mocks.recordLogin
 }));
-vi.mock('$lib/server/auth/password', () => ({
+vi.mock('$lib/server/auth/password', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/auth/password')>()),
   verifyPassword: mocks.verifyPassword,
   hashPassword: mocks.hashPassword
 }));
@@ -26,7 +31,13 @@ vi.mock('$lib/server/auth/runtime', () => ({
   loginThrottle: {
     isBlocked: () => mocks.blocked,
     recordFailure: mocks.recordFailure,
-    reset: mocks.reset
+    reset: mocks.reset,
+    forgive: mocks.forgive
+  },
+  loginIpThrottle: {
+    isBlocked: () => mocks.ipBlocked,
+    recordFailure: mocks.ipRecordFailure,
+    forgive: mocks.ipForgive
   }
 }));
 
@@ -52,6 +63,10 @@ async function statusOf(result: Promise<Response>): Promise<number> {
 
 beforeEach(() => {
   mocks.blocked = false;
+  mocks.ipBlocked = false;
+  mocks.ipRecordFailure.mockClear();
+  mocks.ipForgive.mockClear();
+  mocks.forgive.mockClear();
   mocks.findUserByEmail.mockReset();
   mocks.verifyPassword.mockReset();
   mocks.recordFailure.mockClear();
@@ -107,6 +122,60 @@ describe('POST /api/auth/login', () => {
 
     expect(status).toBe(429);
     expect(mocks.findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 without checking credentials when the client address is throttled, whatever the email', async () => {
+    mocks.ipBlocked = true;
+
+    const status = await statusOf(call({ email: 'fresh@example.com', password: 'a-long-password-1' }).result);
+
+    expect(status).toBe(429);
+    expect(mocks.findUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it('counts a failure against both the account and the client address', async () => {
+    mocks.findUserByEmail.mockResolvedValue(null);
+    mocks.verifyPassword.mockResolvedValue(false);
+
+    await statusOf(call({ email: 'x@y.co', password: 'nope-nope-nope' }).result);
+
+    expect(mocks.recordFailure).toHaveBeenCalledTimes(1);
+    expect(mocks.ipRecordFailure).toHaveBeenCalledWith('1.2.3.4');
+    expect(mocks.forgive).not.toHaveBeenCalled();
+  });
+
+  it('on success clears the account counter but only gives back this one attempt on the address', async () => {
+    mocks.findUserByEmail.mockResolvedValue(member);
+    mocks.verifyPassword.mockResolvedValue(true);
+
+    await call({ email: 'a@b.co', password: 'a-long-password-1' }).result;
+
+    expect(mocks.reset).toHaveBeenCalled();
+    expect(mocks.ipForgive).toHaveBeenCalledWith('1.2.3.4');
+  });
+
+  it('counts the attempt before verifying, so parallel guesses cannot all slip past the limit', async () => {
+    mocks.findUserByEmail.mockResolvedValue(member);
+    const order: string[] = [];
+    mocks.recordFailure.mockImplementation(() => order.push('recorded'));
+    mocks.verifyPassword.mockImplementation(async () => {
+      order.push('verified');
+      return false;
+    });
+
+    await statusOf(call({ email: 'a@b.co', password: 'nope-nope-nope' }).result);
+
+    expect(order).toEqual(['recorded', 'verified']);
+  });
+
+  it('does not count an attempt against anyone when the server fails (e.g. database down)', async () => {
+    mocks.findUserByEmail.mockRejectedValue(new Error('db down'));
+
+    const status = await statusOf(call({ email: 'a@b.co', password: 'a-long-password-1' }).result);
+
+    expect(status).toBe(503);
+    expect(mocks.forgive).toHaveBeenCalled();
+    expect(mocks.ipForgive).toHaveBeenCalled();
   });
 
   it.each([{}, { email: 'a@b.co' }, { email: 5, password: 'x' }, { email: 'a@b.co', password: '' }, { email: 'a'.repeat(400), password: 'x' }, 'not json'])(

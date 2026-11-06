@@ -9,7 +9,24 @@ const denial = (error: string, status: number) =>
     headers: { 'content-type': 'application/json' }
   });
 
-export const handle: Handle = async ({ event, resolve }) => {
+const BASELINE_SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+};
+const HSTS_VALUE = 'max-age=15552000; includeSubDomains';
+
+/** Adds security headers to any response (routes, denials and redirects alike). */
+function withSecurityHeaders(response: Response, isSecure: boolean): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(BASELINE_SECURITY_HEADERS)) headers.set(name, value);
+  // Only send HSTS when the site is served over HTTPS (the same signal as the Secure cookie flag)
+  if (isSecure) headers.set('Strict-Transport-Security', HSTS_VALUE);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+const authorize: Handle = async ({ event, resolve }) => {
   const { sessionSecret } = getAuthConfig();
   event.locals.user = verifySessionToken(event.cookies.get(SESSION_COOKIE), sessionSecret);
 
@@ -31,3 +48,6 @@ export const handle: Handle = async ({ event, resolve }) => {
       return resolve(event);
   }
 };
+
+export const handle: Handle = async (input) =>
+  withSecurityHeaders(await authorize(input), getAuthConfig().secureCookies);
