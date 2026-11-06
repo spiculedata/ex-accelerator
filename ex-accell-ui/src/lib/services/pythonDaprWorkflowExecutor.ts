@@ -4,9 +4,10 @@
 import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowService';
 import { pythonDaprWorkflowGenerator, type PythonDaprWorkflow } from './pythonDaprWorkflowGenerator';
 import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
+import { assertSafeIdentifier } from '$lib/utils/pathSafety';
 import { access, writeFile } from 'fs/promises';
 import { constants } from 'fs';
 
@@ -20,7 +21,7 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 export interface PythonWorkflowDeployment {
   workflowId: string;
   pythonScriptPath: string;
@@ -176,7 +177,7 @@ export class PythonDaprWorkflowExecutor {
       });
 
       // Generate unique app ID and ports to avoid conflicts
-      const appId = `python-workflow-${deployment.workflowId}`;
+      const appId = `python-workflow-${assertSafeIdentifier(deployment.workflowId, 'workflowId')}`;
       const daprHttpPort = 3500 + Math.floor(Math.random() * 1000); // Random port to avoid conflicts
       const daprGrpcPort = 50001 + Math.floor(Math.random() * 1000);
 
@@ -190,16 +191,19 @@ export class PythonDaprWorkflowExecutor {
       const pythonExecutable = join(deployment.venvPath, 'bin', 'python');
       const inputJson = JSON.stringify(input);
       
-      const daprCommand = `dapr run ` +
-        `--app-id "${appId}" ` +
-        `--dapr-http-port ${daprHttpPort} ` +
-        `--dapr-grpc-port ${daprGrpcPort} ` +
-        `-- "${pythonExecutable}" "${deployment.pythonScriptPath}" '${inputJson}'`;
+      // Arguments are passed as an array (no shell), so input cannot inject commands
+      const daprArgs = [
+        'run',
+        '--app-id', appId,
+        '--dapr-http-port', String(daprHttpPort),
+        '--dapr-grpc-port', String(daprGrpcPort),
+        '--', pythonExecutable, deployment.pythonScriptPath, inputJson
+      ];
 
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'info',
-        message: `Executing command: ${daprCommand}`
+        message: `Executing command: dapr ${daprArgs.slice(0, -1).join(' ')} <input>`
       });
 
       // Set environment variables for the Python script
@@ -211,7 +215,7 @@ export class PythonDaprWorkflowExecutor {
       };
 
       // Execute the Dapr command
-      const { stdout, stderr } = await execAsync(daprCommand, {
+      const { stdout, stderr } = await execFileAsync('dapr', daprArgs, {
         cwd: join(process.cwd(), 'python-workflows', deployment.workflowId),
         env: env,
         timeout: 600000, // 10 minute timeout

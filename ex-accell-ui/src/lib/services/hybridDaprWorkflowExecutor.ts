@@ -2,13 +2,11 @@
 // Python registers workflows/activities, Node.js manages execution via Dapr JS SDK
 
 import { DaprClient, CommunicationProtocolEnum, WorkflowRuntimeStatus } from '@dapr/dapr';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { join } from 'path';
+import { assertSafeIdentifier } from '$lib/utils/pathSafety';
 import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowService';
 import { pythonDaprWorkflowGenerator, type PythonDaprWorkflow } from './pythonDaprWorkflowGenerator';
-
-const execAsync = promisify(exec);
 
 /**
  * Helper function to safely extract error messages
@@ -236,7 +234,7 @@ export class HybridDaprWorkflowExecutor {
 
       // Generate Python workflow with registration-only main function
       const generatedWorkflow = await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflow.definition);
-      const workflowId = `${workflow.id}_${execution.id}`;
+      const workflowId = assertSafeIdentifier(`${workflow.id}_${execution.id}`, 'workflowId');
       
       // Deploy Python workflow files
       const pythonScriptPath = await pythonDaprWorkflowGenerator.deployPythonDaprWorkflow(
@@ -288,7 +286,7 @@ export class HybridDaprWorkflowExecutor {
       });
 
       // Start the Python process (non-blocking) - connects to working Dapr sidecar
-      const childProcess = exec(`"${pythonExecutable}" "${pythonScriptPath}"`, {
+      const childProcess = spawn(pythonExecutable, [pythonScriptPath], {
         cwd: join(process.cwd(), 'python-workflows', workflowId),
         env: pythonEnv
       });
