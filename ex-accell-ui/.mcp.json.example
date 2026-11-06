@@ -2,7 +2,7 @@
   "mcpServers": {
     "cognee": {
       "type": "http",
-      "url": "http://100.71.133.65:8001/mcp"
+      "url": "http://YOUR-COGNEE-HOST:8001/mcp"
     }
   }
 }

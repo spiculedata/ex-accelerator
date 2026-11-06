@@ -21,3 +21,8 @@ logs/
 
 # Temp / scratch
 temp/
+
+# Local AI-assistant tooling (per-developer; see .mcp.json.example)
+.claude/
+.pi/
+.mcp.json
