@@ -20,7 +20,8 @@ export default defineConfig({
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Configuration', link: '/guide/configuration' },
           { text: 'Authentication and roles', link: '/guide/authentication' },
-          { text: 'Deployment', link: '/guide/deployment' }
+          { text: 'Deployment', link: '/guide/deployment' },
+          { text: 'Try it with demo data', link: '/guide/demo-data' }
         ]
       },
       {

@@ -69,7 +69,8 @@ The command above starts only the core stack. The remaining services in `docker-
 documentation.
 
 The first sign-in creates the database schema. A fresh database has no data, so dashboards show
-empty states until you load some. Sample data and guided tutorials are tracked in the issue tracker.
+empty states until you load some; `npm run seed:demo` loads a synthetic demo dataset (see
+[Try it with demo data](docs-site/guide/demo-data.md)).
 
 ### Troubleshooting
 
