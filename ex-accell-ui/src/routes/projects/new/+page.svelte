@@ -62,7 +62,6 @@
           name: projectName,
           description: projectDescription,
           project_type: projectType,
-          created_by: 'current_user@example.com', // TODO: Get from auth
           data_sources: dataSources,
           team_members: teamMembers
         })

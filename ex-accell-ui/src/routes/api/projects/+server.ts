@@ -31,7 +31,7 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST /api/projects
  * Create a new project
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const data = await request.json();
 
@@ -39,7 +39,8 @@ export const POST: RequestHandler = async ({ request }) => {
       name: data.name,
       description: data.description || '',
       project_type: data.project_type || 'social-media',
-      created_by: data.created_by || 'default_user',
+      // Creator comes from the session, never from the request body
+      created_by: locals.user?.email ?? 'unknown',
       data_sources: data.data_sources || [],
       team_members: data.team_members || []
     });
