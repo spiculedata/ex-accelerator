@@ -1,3 +1,5 @@
+# NOTE: Derived from NYU-DICE-Lab/WavePulse (Apache-2.0, Copyright 2024 New York University).
+# Modified by ex-accelerator contributors (see git history for changes). See NOTICE and README.md.
 """
 Transcribe audio files from the buffer folder and save as JSON.
 Uses configurable transcription backends (local Whisper, Scaleway API, or Scaleway GPU).
