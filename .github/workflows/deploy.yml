@@ -1,8 +1,11 @@
 name: Build & Deploy
 
+# Manual only for now: the app requires SESSION_SECRET and an admin bootstrap on the server, and
+# GitHub's required-reviewers gate needs a public repo or a paid plan. Restore
+#   push:
+#     branches: [main]
+# once the server is configured and the `production` environment has required reviewers.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
