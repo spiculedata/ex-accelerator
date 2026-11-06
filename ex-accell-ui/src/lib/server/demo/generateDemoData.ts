@@ -34,10 +34,18 @@ function topicWeight(topic: DemoTopic, day: number, days: number): number {
   return 1;
 }
 
+/** Most posts carry one hashtag; some carry two, so co-occurrence has something to show. */
+function hashtagSuffix(rng: Rng, topic: DemoTopic): string {
+  if (!rng.chance(0.6)) return '';
+  const first = rng.pick(topic.hashtags);
+  const others = topic.hashtags.filter((tag) => tag !== first);
+  return rng.chance(0.4) && others.length > 0 ? ` ${first} ${rng.pick(others)}` : ` ${first}`;
+}
+
 function writeContent(rng: Rng, topic: DemoTopic, sentiment: Sentiment, languageCode: string): string {
   const band = bandOf(sentiment);
   if (languageCode !== 'en') return `${rng.pick(FOREIGN_SENTENCES[languageCode][band])} ${rng.pick(topic.hashtags)}`;
-  const tags = rng.chance(0.6) ? ` ${rng.pick(topic.hashtags)}` : '';
+  const tags = hashtagSuffix(rng, topic);
   return `${rng.pick(topic.sentences[band])}${tags}`;
 }
 
@@ -68,6 +76,7 @@ function postTables(posts: PostDraft[], rng: Rng, collectedAt: Date): DemoTable[
   const languageRows: Cell[][] = [];
   const engagementRows: Cell[][] = [];
   const topicRows: Cell[][] = [];
+  const mixingRows: Cell[][] = [];
   const hashtagRows: Cell[][] = [];
 
   for (const post of posts) {
@@ -79,6 +88,9 @@ function postTables(posts: PostDraft[], rng: Rng, collectedAt: Date): DemoTable[
     emotionRows.push([post.id, post.id, emotion, round(30 + rng.next() * 65, 2), round(0.6 + rng.next() * 0.38, 3), post.createdAt]);
 
     languageRows.push([post.id, post.id, LANGUAGES[post.languageIndex].id, round(0.85 + rng.next() * 0.14, 3), 'demo-detector']);
+    if (post.languageIndex === 0 && rng.chance(0.06)) {
+      mixingRows.push([mixingRows.length + 1, post.id, LANGUAGES[0].id, LANGUAGES[rng.int(1, 3)].id, 'code-switching', round(0.7 + rng.next() * 0.2, 3), round(0.1 + rng.next() * 0.25, 3), rng.int(2, 3)]);
+    }
     topicRows.push([post.id, post.id, TOPICS.indexOf(post.topic) + 1, round(0.55 + rng.next() * 0.4, 4), true]);
 
     const typeId = rng.weighted(CONTENT_TYPES, post.source.contentWeights).id;
@@ -95,6 +107,7 @@ function postTables(posts: PostDraft[], rng: Rng, collectedAt: Date): DemoTable[
     { name: 'sentiment_classifications', columns: ['id', 'post_id', 'sentiment_category', 'confidence_score', 'analysis_model', 'classification_timestamp'], rows: sentimentRows },
     { name: 'emotion_analysis', columns: ['id', 'post_id', 'emotion', 'intensity_score', 'confidence', 'created_at'], rows: emotionRows },
     { name: 'language_detection', columns: ['id', 'post_id', 'language_id', 'confidence_score', 'detection_model'], rows: languageRows },
+    { name: 'language_mixing', columns: ['id', 'post_id', 'primary_language_id', 'secondary_language_id', 'mixing_type', 'primary_confidence', 'secondary_confidence', 'segment_count'], rows: mixingRows },
     { name: 'document_topics', columns: ['id', 'post_id', 'topic_id', 'probability', 'is_primary'], rows: topicRows },
     { name: 'post_engagement', columns: ['id', 'post_id', 'content_type_id', 'likes_count', 'comments_count', 'shares_count', 'saves_count', 'views_count', 'reach', 'impressions', 'engagement_rate', 'click_through_rate', 'video_completion_rate', 'recorded_at'], rows: engagementRows },
     { name: 'hashtag_engagement', columns: ['id', 'hashtag', 'post_id', 'engagement_boost', 'usage_count', 'avg_engagement_rate', 'impact_score'], rows: hashtagRows }
@@ -117,7 +130,7 @@ function engagementRow(rng: Rng, post: PostDraft, contentTypeId: number): Cell[]
 /** Insert order that satisfies foreign keys. */
 export const TABLE_ORDER = [
   'data_sources', 'crawlers', 'languages', 'content_types', 'topics', 'topic_keywords', 'topic_relationships', 'posts',
-  'sentiment_classifications', 'emotion_analysis', 'language_detection', 'document_topics', 'post_engagement',
+  'sentiment_classifications', 'emotion_analysis', 'language_detection', 'language_mixing', 'document_topics', 'post_engagement',
   'hashtag_engagement', 'sentiment_temporal_trends', 'sentiment_keywords', 'topic_trends', 'activity_logs',
   'projects', 'project_members', 'workspaces', 'workspace_data_sources', 'datasets', 'dataset_tags'
 ];

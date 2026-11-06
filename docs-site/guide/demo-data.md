@@ -69,12 +69,33 @@ table ranks them by post count and weight.
 
 ![Topic modeling dashboard](/screenshots/topic-modeling.png)
 
-## What the demo does not cover yet
+### Engagement analysis
+
+Under **Social Analytics → Engagement Analysis**, totals, average engagement rate and reach are
+computed from each post's likes, comments, shares and saves, with breakdowns by platform, content
+type and time of day.
+
+![Engagement analysis dashboard](/screenshots/engagement-analysis.png)
+
+### Language detection
+
+Under **Social Analytics → Language Detection**, see the languages found, how confident the detector
+was, and the share of posts that mix languages.
+
+![Language detection dashboard](/screenshots/language-detection.png)
+
+### Hashtag analysis
+
+Under **Social Analytics → Hashtag Analysis**, see the most used hashtags and which ones appear
+together.
+
+![Hashtag analysis dashboard](/screenshots/hashtag-analysis.png)
+
+## What the demo does not cover
 
 The demo fills the core analytics tables. Pages backed by optional pipelines (GDELT events, radio
-transcripts, image processing, the workflow builder) stay empty until you run those pipelines, and
-a few dashboards, such as Engagement and Language Detection, still read from older table layouts and
-do not fully reflect the demo data. These gaps are tracked in the issue tracker.
+transcripts, image processing, the workflow builder) stay empty until you run those pipelines. The
+language page has no geographic breakdown, because posts carry no location data.
 
 ## Regenerating the screenshots
 

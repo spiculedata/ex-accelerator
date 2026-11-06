@@ -18,7 +18,10 @@ const SHOTS: Shot[] = [
   { name: 'home', path: '/', fullPage: false },
   { name: 'projects', path: '/projects', fullPage: false },
   { name: 'sentiment-analysis', path: '/text-analytics/sentiment-analysis', fullPage: false, height: 1350 },
-  { name: 'topic-modeling', path: '/text-analytics/topic-modeling', fullPage: true }
+  { name: 'topic-modeling', path: '/text-analytics/topic-modeling', fullPage: true },
+  { name: 'engagement-analysis', path: '/text-analytics/engagement-analysis', fullPage: false, height: 1350 },
+  { name: 'language-detection', path: '/text-analytics/language-detection', fullPage: false, height: 1350 },
+  { name: 'hashtag-analysis', path: '/text-analytics/hashtag-analysis', fullPage: false, height: 1100 }
 ];
 
 const SETTLE_MS = 2000;
