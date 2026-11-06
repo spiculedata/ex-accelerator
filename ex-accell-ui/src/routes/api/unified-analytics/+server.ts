@@ -1485,22 +1485,6 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
-    if (type === 'datasets') {
-      // Return mock datasets for now since we don't have real data tables yet
-      return json({
-        success: true,
-        datasets: [
-          {
-            id: 'sample_social',
-            name: 'Sample Social Media Data',
-            description: 'Sample dataset for testing workflows',
-            table: 'posts',
-            type: 'sample'
-          }
-        ]
-      });
-    }
-    
     if (type === 'workflow-datasets') {
       try {
         const counts = {} as WorkflowDatasetCounts;
@@ -2004,7 +1988,6 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       message: `Query type '${type}' not implemented yet`,
       endpoints: {
         test: '/api/unified-analytics?type=test',
-        datasets: '/api/unified-analytics?type=datasets',
         'cross-platform-sentiment': '/api/unified-analytics?type=cross-platform-sentiment',
         'sentiment-trends': '/api/unified-analytics?type=sentiment-trends',
         'radio-overview': '/api/unified-analytics?type=radio-overview',

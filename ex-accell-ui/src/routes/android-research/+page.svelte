@@ -199,6 +199,14 @@
     return transitions[from]?.[to] || Math.random() * 0.3;
   }
 
+  /** Names the content type that actually has the highest engagement score, if there is any data. */
+  function topEngagementFinding(): string {
+    const scored = researchData.contentEngagement.filter((entry) => typeof entry.engagementScore === 'number');
+    if (scored.length === 0) return 'No content engagement data available';
+    const top = scored.reduce((best, entry) => (entry.engagementScore > best.engagementScore ? entry : best));
+    return `${top.content} shows highest engagement (${top.engagementScore}/100)`;
+  }
+
   function getAppMeanDuration(app: string): number {
     const durations: Record<string, number> = {
       'YouTube': 280, 'Instagram': 180, 'WhatsApp': 90, 'Chrome': 200,
@@ -721,9 +729,9 @@
       },
       {
         title: "Content Engagement Depth",
-        finding: `Video content shows highest engagement (${researchData.contentEngagement[1]?.engagementScore || 92}/100)`,
-        significance: "Visual media captures sustained attention most effectively",
-        implication: "Video-based interfaces may improve user retention"
+        finding: topEngagementFinding(),
+        significance: "Shows which kinds of content capture sustained attention",
+        implication: "Prioritise the highest-engagement content types in interface design"
       }
     ];
 

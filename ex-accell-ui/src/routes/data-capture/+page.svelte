@@ -437,8 +437,9 @@
       progress: wavePulseStatus === 'starting' ? wavePulseProgress : undefined,
       startTime: wavePulseResults?.startTime || null,
       schedule: formatWavePulseSchedule(stream.timeSlots),
-      itemsCollected: wavePulseStatus === 'running' ? Math.floor(Math.random() * 500) : 0, // Mock data
-      totalEstimated: wavePulseStatus === 'running' ? Math.floor(Math.random() * 1000) + 500 : 0,
+      // The WavePulse service does not report collection counts yet, so none are shown
+      itemsCollected: 0,
+      totalEstimated: 0,
       streamUrl: stream.url,
       logs: wavePulseStatus === 'running' ? [
         `[${new Date().toISOString()}] INFO: Started WavePulse for ${stream.radioName}`,
@@ -447,47 +448,7 @@
         wavePulseConfig.enableClassification ? `[${new Date().toISOString()}] INFO: Content classification enabled` : null,
         wavePulseConfig.enableDiarization ? `[${new Date().toISOString()}] INFO: Speaker diarization active` : null
       ].filter(Boolean) : []
-    })),
-    // Add Princeton SMART extract job (always show at least a sample)
-    {
-      id: 'princeton-smart-extract',
-      name: princetonSmartConfig.datasetId 
-        ? `Princeton SMART: ${princetonSmartConfig.datasetId}`
-        : 'Princeton SMART: twitter-election-2024 (Sample)',
-      type: 'princeton-smart',
-      status: princetonSmartConfig.datasetId 
-        ? (princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'running' : princetonSmartStatus === 'completed' ? 'completed' : princetonSmartStatus === 'error' ? 'failed' : 'scheduled')
-        : 'scheduled',
-      progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
-      startTime: princetonSmartResults?.startTime || null,
-      nextRun: princetonSmartConfig.datasetId ? null : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now for demo
-      schedule: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end 
-            ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}` 
-            : 'Date range not configured')
-        : '2024-01-01 to 2024-12-31',
-      itemsCollected: princetonSmartResults?.recordCount || (princetonSmartConfig.datasetId ? 0 : 12547), // Sample data for demo
-      totalEstimated: princetonSmartConfig.maxRecords || 50000,
-      query: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.query || 'No query specified')
-        : '#election2024 OR #vote2024',
-      apiEndpoint: princetonSmartConfig.apiEndpoint,
-      logs: princetonSmartConfig.datasetId && princetonSmartStatus !== 'idle' ? [
-        `[${new Date().toISOString()}] INFO: Princeton SMART extract initiated`,
-        `[${new Date().toISOString()}] INFO: Dataset: ${princetonSmartConfig.datasetId}`,
-        `[${new Date().toISOString()}] INFO: Query: ${princetonSmartConfig.query || 'No query specified'}`,
-        princetonSmartConfig.filters.language !== 'all' ? `[${new Date().toISOString()}] INFO: Language filter: ${princetonSmartConfig.filters.language}` : null,
-        princetonSmartConfig.filters.location ? `[${new Date().toISOString()}] INFO: Location filter: ${princetonSmartConfig.filters.location}` : null,
-        princetonSmartResults ? `[${new Date().toISOString()}] INFO: Extracted ${princetonSmartResults.recordCount} records` : null
-      ].filter(Boolean) : [
-        `[2025-01-29T14:30:00.000Z] INFO: Sample Princeton SMART configuration`,
-        `[2025-01-29T14:30:00.000Z] INFO: Dataset: twitter-election-2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Query: #election2024 OR #vote2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Language filter: en`,
-        `[2025-01-29T14:30:00.000Z] INFO: Location filter: United States`,
-        `[2025-01-29T14:30:00.000Z] INFO: Configure dataset to activate extraction`
-      ]
-    }
+    }))
   ];
 
   // Sorting state
@@ -603,9 +564,6 @@
     includeAnalytics: false
   };
   
-  let princetonSmartStatus = 'idle'; // idle, connecting, fetching, completed, error
-  let princetonSmartProgress = 0;
-  let princetonSmartResults: any = null;
 
   // WavePulse configuration state
   let wavePulseConfig = {
@@ -699,47 +657,6 @@
       includeMetadata: true,
       includeAnalytics: false
     };
-    princetonSmartStatus = 'idle';
-    princetonSmartProgress = 0;
-    princetonSmartResults = null;
-  }
-
-  async function handlePrincetonSmartImport() {
-    if (!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId) {
-      return;
-    }
-
-    princetonSmartStatus = 'connecting';
-    princetonSmartProgress = 0;
-
-    try {
-      // Simulate API connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      princetonSmartStatus = 'fetching';
-      
-      // Simulate data fetching with progress
-      for (let i = 0; i <= 100; i += 10) {
-        princetonSmartProgress = i;
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      
-      // Mock successful import
-      princetonSmartResults = {
-        recordCount: Math.floor(Math.random() * princetonSmartConfig.maxRecords) + 100,
-        datasetId: princetonSmartConfig.datasetId,
-        query: princetonSmartConfig.query,
-        dateRange: princetonSmartConfig.dateRange,
-        format: princetonSmartConfig.outputFormat
-      };
-      
-      princetonSmartStatus = 'completed';
-      
-    } catch (error) {
-      console.error('Princeton SMART import error:', error);
-      errorMessage = 'Failed to import Princeton SMART data. Please check your configuration and try again.';
-      princetonSmartStatus = 'error';
-    }
   }
 
   // WavePulse functions
@@ -2763,48 +2680,9 @@
             </div>
           </div>
 
-          <!-- Status and Progress -->
-          {#if princetonSmartStatus === 'connecting'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center">
-                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-                <span class="text-sm font-medium text-blue-800">Connecting to Princeton SMART API...</span>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'fetching'}
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700">Fetching data from SMART...</span>
-                <span class="text-sm text-gray-500">{princetonSmartProgress}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {princetonSmartProgress}%"></div>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'completed'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-blue-800">Data imported successfully!</span>
-                </div>
-                {#if princetonSmartResults}
-                  <span class="text-sm text-blue-600">{princetonSmartResults.recordCount} records imported</span>
-                {/if}
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'error'}
-            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-sm font-medium text-red-800">Error connecting to Princeton SMART API</span>
-              </div>
-            </div>
-          {/if}
+          <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            Importing from Princeton SMART is not available yet. This form previews the planned configuration.
+          </div>
 
           <!-- Actions -->
           <div class="flex justify-between items-center">
@@ -2819,11 +2697,12 @@
                 class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 Reset Form
               </button>
-              <button 
-                on:click={handlePrincetonSmartImport}
-                disabled={!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId || princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'}
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
-                {princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'Importing...' : 'Import Data'}
+              <button
+                type="button"
+                disabled
+                title="Importing from Princeton SMART is not available yet"
+                class="px-6 py-2 bg-gray-400 text-white rounded-md text-sm font-medium cursor-not-allowed">
+                Import Data
               </button>
             </div>
           </div>
@@ -3086,13 +2965,6 @@
                             </div>
                           {:else if job.type === 'princeton-smart'}
                             <div class="flex items-center justify-end space-x-2">
-                              {#if job.status === 'scheduled' || job.status === 'idle' || job.status === 'error'}
-                                <button
-                                  on:click={handlePrincetonSmartImport}
-                                  class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md">
-                                  Run Extract
-                                </button>
-                              {/if}
                               <button
                                 on:click={() => activeTab = 'princeton-smart'}
                                 class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
