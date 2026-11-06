@@ -21,7 +21,8 @@ export function convertLinks(markdown, docPath = 'index.md') {
 
     const [path, anchor] = target.split('#');
     const absolute = path.startsWith('/') ? path : posix.join(posix.dirname(docPath), path);
-    const page = wikiPageName(`${absolute.replace(/^\/|\/$/g, '').replace(/\.md$/, '')}.md`);
+    // VitePress accepts .md and .html links; both mean the same page
+    const page = wikiPageName(`${absolute.replace(/^\/|\/$/g, '').replace(/\.(md|html)$/, '')}.md`);
     return `${prefix}${page}${anchor ? `#${anchor}` : ''})`;
   });
 }
@@ -56,7 +57,10 @@ export function convertPage(markdown, docPath = 'index.md') {
   return convertContainers(convertLinks(stripFrontMatter(markdown), docPath)).trimEnd() + '\n';
 }
 
-/** _Sidebar.md from the sidebar section of the VitePress config. */
+/**
+ * _Sidebar.md from the sidebar section of the VitePress config. This reads the file as text, so it
+ * expects single-quoted strings and `{ text, link }` items grouped under `{ text, items }` headings.
+ */
 export function buildSidebar(configSource) {
   const section = configSource.slice(configSource.indexOf('sidebar:'));
   const lines = ['**[Home](Home)**', ''];
@@ -86,9 +90,12 @@ export function buildHome(indexSource) {
   return lines.join('\n').trimEnd() + '\n';
 }
 
+// Folders at the top level of docs-site that hold tooling or assets, not pages
+const NON_PAGE_FOLDERS = new Set(['node_modules', '.vitepress', 'public', 'scripts', '.wiki']);
+
 function markdownFiles(directory, root = directory) {
   return readdirSync(directory).flatMap((name) => {
-    if (['node_modules', '.vitepress', 'public', 'scripts', '.wiki'].includes(name)) return [];
+    if (directory === root && NON_PAGE_FOLDERS.has(name)) return [];
     const path = join(directory, name);
     if (statSync(path).isDirectory()) return markdownFiles(path, root);
     return name.endsWith('.md') ? [relative(root, path)] : [];
@@ -101,8 +108,13 @@ export function buildWiki(docsDir, outputDir) {
   mkdirSync(outputDir, { recursive: true });
 
   const pages = [];
+  const owners = new Map();
   for (const file of markdownFiles(docsDir)) {
     const name = wikiPageName(file);
+    // Two docs must not flatten to the same wiki page (names are case-insensitive on GitHub)
+    const key = name.toLowerCase();
+    if (owners.has(key)) throw new Error(`Wiki page name collision: ${file} and ${owners.get(key)} both become "${name}"`);
+    owners.set(key, file);
     const source = readFileSync(join(docsDir, file), 'utf8');
     writeFileSync(join(outputDir, `${name}.md`), convertPage(source, file));
     pages.push(name);

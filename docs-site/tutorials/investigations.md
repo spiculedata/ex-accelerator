@@ -22,8 +22,9 @@ Open **Investigations** in the navigation and choose **New Investigation**.
 5. Choose **Create**.
 
 ::: info Use the Investigations page
-The workspace page also shows a *Create Investigation* button, but it does not do anything yet. Always
-create investigations from **Investigations** in the navigation.
+The workspace page also shows a *Create Investigation* button, but it does not do anything yet
+([#102](https://github.com/spiculedata/ex-accelerator/issues/102)). Always create investigations from
+**Investigations** in the navigation.
 :::
 
 ## 2. Read the workbench

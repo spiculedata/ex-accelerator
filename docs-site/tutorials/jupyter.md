@@ -47,7 +47,11 @@ Templates live in `ex-accell-ui/notebooks/`, including:
 The compose file has a `jupyter` service that mounts `DATA_DIR/notebooks`. Its build context
 (`./jupyter`) is not complete in the repository yet, so use the local Poetry route above for now.
 
-::: warning
-Notebooks run arbitrary code with access to your database. Run Jupyter only on a trusted machine and
-never expose it to the internet. The Research page's launch controls are administrator-only.
+::: danger Run Jupyter only on a trusted, single-user machine
+Notebooks run arbitrary code with access to your database, and the bootstrap script currently writes a
+Jupyter configuration with **no authentication and cross-origin access enabled** to your global
+`~/.jupyter` folder. While that is the case, any web page you visit could reach a running Jupyter
+Lab. Never expose it to a network or the internet, and stop it when you are not using it. Making this
+safe is tracked in [#101](https://github.com/spiculedata/ex-accelerator/issues/101). The Research
+page's launch controls are administrator-only.
 :::

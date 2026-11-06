@@ -293,56 +293,6 @@ c.ServerApp.disable_check_xsrf = True
     
     print("✓ Jupyter configuration created")
 
-def create_startup_script():
-    """Create a startup script for development"""
-    if not os.path.exists("start-dev.sh"):
-        startup_script = '''#!/bin/bash
-# Startup script for Ex-Accelerator UI with Jupyter integration
-
-echo "🚀 Starting Ex-Accelerator UI with Jupyter Lab..."
-
-# Install dependencies first
-echo "📦 Installing Python dependencies..."
-poetry install
-
-# Bootstrap the notebook environment
-echo "📚 Bootstrapping notebook environment..."
-poetry run python bootstrap_notebooks.py
-
-# Start Jupyter Lab in the background
-echo "🔬 Starting Jupyter Lab server..."
-poetry run jupyter lab --port=8888 --no-browser --allow-root &
-JUPYTER_PID=$!
-
-# Wait a moment for Jupyter to start
-echo "⏳ Waiting for Jupyter Lab to start..."
-sleep 5
-
-# Check if Jupyter Lab is running
-if curl -s http://localhost:8888 > /dev/null; then
-    echo "✅ Jupyter Lab is running at http://localhost:8888"
-else
-    echo "⚠️  Jupyter Lab may not be running yet, check the logs"
-fi
-
-# Start the SvelteKit development server
-echo "🌐 Starting SvelteKit development server..."
-npm run dev
-
-# When the script exits, kill Jupyter Lab
-trap "echo 'Stopping Jupyter Lab...'; kill $JUPYTER_PID 2>/dev/null" EXIT
-'''
-        
-        with open("start-dev.sh", "w") as f:
-            f.write(startup_script)
-        
-        # Make script executable
-        os.chmod("start-dev.sh", 0o755)
-        
-        print("✓ start-dev.sh script created")
-    else:
-        print("✓ start-dev.sh script already exists")
-
 def main():
     """Main bootstrap function"""
     print("🏗️  Bootstrapping Jupyter notebook environment for Ex-Accelerator UI")
@@ -361,13 +311,9 @@ def main():
         setup_jupyter_config()
         print()
         
-        # Create startup script
-        create_startup_script()
-        print()
-        
         print("✅ Bootstrap completed successfully!")
         print("\nTo start the development environment with Jupyter integration:")
-        print("  ./start-dev.sh")
+        print("  npm run dev:jupyter")
         print("\nOr start services manually:")
         print("  poetry run jupyter lab --port=8888 --no-browser --allow-root &")
         print("  npm run dev")

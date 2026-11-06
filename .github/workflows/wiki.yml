@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check the converter against the real docs
+        run: node --test docs-site/scripts/wiki.test.mjs
+
       - name: Build wiki pages from docs-site
         run: node docs-site/scripts/wiki.mjs "$RUNNER_TEMP/wiki-out"
 

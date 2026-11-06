@@ -106,6 +106,12 @@ language page has no geographic breakdown, because posts carry no location data.
 
 ## Regenerating the screenshots
 
+::: warning Use a disposable stack
+The tutorial spec deletes projects, investigations and workflows named *Tutorial project*, *Tram delays*
+and *Sentiment of posts* before it starts, on whatever stack the account can reach. Run it only against
+the demo stack.
+:::
+
 The images above come from the same data. With the stack running and demo data loaded:
 
 ```bash

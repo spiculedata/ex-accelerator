@@ -1,6 +1,10 @@
-import { test } from 'node:test';
+import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHome, buildSidebar, convertContainers, convertLinks, convertPage, wikiPageName } from './wiki.mjs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { buildHome, buildSidebar, buildWiki, convertContainers, convertLinks, convertPage, wikiPageName } from './wiki.mjs';
 
 test('wikiPageName flattens paths into wiki page names', () => {
   assert.equal(wikiPageName('index.md'), 'Home');
@@ -101,15 +105,17 @@ features:
 });
 
 // --- the real docs, converted ---
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { buildWiki } from './wiki.mjs';
-
 const docsDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-const outputDir = mkdtempSync(join(tmpdir(), 'wiki-'));
-const pages = buildWiki(docsDir, outputDir);
+let outputDir;
+let pages;
+
+before(() => {
+  outputDir = mkdtempSync(join(tmpdir(), 'wiki-'));
+  pages = buildWiki(docsDir, outputDir);
+});
+
+after(() => rmSync(outputDir, { recursive: true, force: true }));
+
 const allMarkdown = () => readdirSync(outputDir).filter((f) => f.endsWith('.md'));
 
 test('the real docs produce a page for every source page plus Home, sidebar and footer', () => {
@@ -136,7 +142,7 @@ test('no VitePress-only syntax is left in the wiki', () => {
   for (const file of allMarkdown()) {
     const text = readFileSync(join(outputDir, file), 'utf8');
     assert.ok(!/^:::/m.test(text), `${file} still has a ::: container`);
-    assert.ok(!/^---\nlayout:/m.test(text), `${file} still has front matter`);
+    assert.ok(!text.startsWith('---\n'), `${file} still has front matter`);
   }
 });
 
@@ -145,5 +151,39 @@ test('the sidebar links to pages that exist', () => {
   for (const [, target] of sidebar.matchAll(/\]\(([^)\s]+)\)/g)) {
     if (target.startsWith('http')) continue;
     assert.ok(existsSync(join(outputDir, `${target}.md`)), `sidebar link ${target}`);
+  }
+});
+
+test('convertLinks treats .html links like .md links', () => {
+  assert.equal(convertLinks('[x](/guide/deployment.html#backups)', 'index.md'), '[x](Guide-Deployment#backups)');
+});
+
+test('buildWiki refuses two docs that flatten to the same page name', () => {
+  const docs = mkdtempSync(join(tmpdir(), 'wiki-docs-'));
+  try {
+    mkdirSync(join(docs, '.vitepress'));
+    mkdirSync(join(docs, 'foo'));
+    mkdirSync(join(docs, 'foo-bar'));
+    writeFileSync(join(docs, 'index.md'), '---\nhero:\n  name: x\n---\n');
+    writeFileSync(join(docs, '.vitepress', 'config.ts'), "sidebar: []");
+    writeFileSync(join(docs, 'foo', 'bar-baz.md'), '# a');
+    writeFileSync(join(docs, 'foo-bar', 'baz.md'), '# b');
+    assert.throws(() => buildWiki(docs, join(docs, 'out')), /collision/i);
+  } finally {
+    rmSync(docs, { recursive: true, force: true });
+  }
+});
+
+test('buildWiki keeps pages in folders that merely share a name with tooling folders', () => {
+  const docs = mkdtempSync(join(tmpdir(), 'wiki-docs-'));
+  try {
+    mkdirSync(join(docs, '.vitepress'));
+    mkdirSync(join(docs, 'guide', 'public'), { recursive: true });
+    writeFileSync(join(docs, 'index.md'), '---\nhero:\n  name: x\n---\n');
+    writeFileSync(join(docs, '.vitepress', 'config.ts'), 'sidebar: []');
+    writeFileSync(join(docs, 'guide', 'public', 'visibility.md'), '# v');
+    assert.ok(buildWiki(docs, join(docs, 'out')).includes('Guide-Public-Visibility'));
+  } finally {
+    rmSync(docs, { recursive: true, force: true });
   }
 });

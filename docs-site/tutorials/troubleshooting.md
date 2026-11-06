@@ -40,7 +40,7 @@ Stop it (`docker stop dapr_scheduler`) or leave `dapr-placement` out of the comp
 reason. Administrators can add any dataset; other users need access to it, and granting access is an
 administrator action. The demo datasets are public.
 
-**A workspace card says "0 records" although I linked datasets.** Those counters track data sources
+**A workspace card says "0 records" although I linked datasets** ([#102](https://github.com/spiculedata/ex-accelerator/issues/102)). Those counters track data sources
 added through Data Capture. Linked datasets control what the dashboards show; the Workspace selector
 in the navigation shows their post count.
 

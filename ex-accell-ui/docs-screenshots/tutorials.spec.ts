@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * Walks through the tutorials against a stack that holds the demo dataset, capturing a screenshot
- * at each step. It creates real objects with a unique name and deletes them afterwards.
+ * at each step. It creates real objects with stable names (removing leftovers from an earlier run
+ * first) and deletes them afterwards.
+ *
+ * WARNING: it deletes any project, investigation or workflow with those names on the stack it logs
+ * into, so run it only against a disposable demo stack.
  */
 const OUTPUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs-site', 'public', 'screenshots', 'tutorials');
 const SETTLE_MS = 1500;
