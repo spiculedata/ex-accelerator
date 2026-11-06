@@ -1,0 +1,39 @@
+import { defineConfig } from 'vitepress';
+
+export default defineConfig({
+  title: 'ex-accelerator',
+  description: 'Open-source social media analytics platform for collecting, analysing and investigating online data.',
+  base: '/ex-accelerator/',
+  cleanUrls: true,
+  lastUpdated: true,
+  themeConfig: {
+    nav: [
+      { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Architecture', link: '/architecture/overview' },
+      { text: 'Contributing', link: 'https://github.com/spiculedata/ex-accelerator/blob/main/CONTRIBUTING.md' }
+    ],
+    sidebar: [
+      {
+        text: 'Guide',
+        items: [
+          { text: 'Getting started', link: '/guide/getting-started' },
+          { text: 'Configuration', link: '/guide/configuration' },
+          { text: 'Authentication and roles', link: '/guide/authentication' }
+        ]
+      },
+      {
+        text: 'Architecture',
+        items: [{ text: 'Overview', link: '/architecture/overview' }]
+      }
+    ],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/ex-accelerator' }],
+    editLink: {
+      pattern: 'https://github.com/spiculedata/ex-accelerator/edit/main/docs-site/:path',
+      text: 'Edit this page on GitHub'
+    },
+    search: { provider: 'local' },
+    footer: {
+      message: 'Released under the Apache License 2.0.'
+    }
+  }
+});
