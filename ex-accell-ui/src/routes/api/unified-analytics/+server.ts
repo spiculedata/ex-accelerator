@@ -1487,17 +1487,19 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
     if (type === 'workflow-datasets') {
       try {
-        const counts = {} as WorkflowDatasetCounts;
-        for (const [key, sql] of Object.entries(WORKFLOW_DATASET_COUNT_QUERIES)) {
-          try {
-            const [row] = await executeQuery(sql);
-            counts[key as keyof WorkflowDatasetCounts] = Number(row?.count) || 0;
-          } catch (error) {
-            // A module whose table does not exist yet simply has no data
-            if (!isMissingRelationError(error)) throw error;
-            counts[key as keyof WorkflowDatasetCounts] = 0;
-          }
-        }
+        // The counts are independent, so run them together; a module whose table does not exist yet has no data
+        const entries = await Promise.all(
+          Object.entries(WORKFLOW_DATASET_COUNT_QUERIES).map(async ([key, sql]) => {
+            try {
+              const [row] = await executeQuery(sql);
+              return [key, Number(row?.count) || 0] as const;
+            } catch (error) {
+              if (!isMissingRelationError(error)) throw error;
+              return [key, 0] as const;
+            }
+          })
+        );
+        const counts = Object.fromEntries(entries) as unknown as WorkflowDatasetCounts;
         return json({ success: true, data: buildWorkflowDatasets(counts) });
       } catch (error) {
         return queryErrorResponse('Workflow datasets', error, []);

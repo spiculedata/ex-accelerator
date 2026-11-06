@@ -18,6 +18,7 @@ vi.mock('$lib/utils/logger', () => ({
 }));
 
 import { GET } from './+server';
+import { WORKFLOW_DATASET_COUNT_QUERIES } from '$lib/server/workflowDatasets';
 
 const call = (type: string) =>
   GET({ url: new URL(`http://localhost/api/unified-analytics?type=${type}`) } as Parameters<typeof GET>[0]);
@@ -349,6 +350,26 @@ describe('GET /api/unified-analytics workflow-datasets', () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).data).toEqual([]);
+  });
+
+  it('keeps the other datasets when only one module has no table yet', async () => {
+    duckdbQuery.mockImplementation(async (sql: string) => {
+      if (/android_devices/.test(sql)) throw Object.assign(new Error('relation "android_devices" does not exist'), { code: '42P01' });
+      return [{ count: /FROM posts\b/.test(sql) ? '10' : '0' }];
+    });
+
+    const body = await (await get()).json();
+
+    expect(body.data.map((d: { id: string }) => d.id)).toEqual(['unified_analysis', 'social_posts']);
+  });
+
+  it('runs only the fixed count queries, with no input-derived SQL', async () => {
+    duckdbQuery.mockResolvedValue([{ count: '0' }]);
+
+    await get();
+
+    const sent = duckdbQuery.mock.calls.map(([sql]) => String(sql)).sort();
+    expect(sent).toEqual([...Object.values(WORKFLOW_DATASET_COUNT_QUERIES)].sort());
   });
 
   it('returns a 500 for a real failure', async () => {

@@ -109,7 +109,7 @@
     try {
       loadingDatasets = true;
       const response = await fetch('/api/unified-analytics?type=workflow-datasets');
-      const body = await response.json();
+      const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.success) throw new Error(body.error || `Request failed (${response.status})`);
 
       if (mounted) {
