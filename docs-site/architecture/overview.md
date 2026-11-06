@@ -34,6 +34,9 @@ ex-accelerator is a monorepo of cooperating services around one PostgreSQL datab
   A missing table returns empty data flagged `meta.unavailable` so unused modules stay quiet;
   real failures return `500`.
 - **Workflows.** The workflow builder generates Python Dapr workflows that admins can deploy and run.
+  Publishing stores the definition and a generated script in `published_workflows`; each run is a row
+  in `workflow_executions`. There is a single generator (`pythonDaprWorkflowGenerator`) and the hybrid
+  executor runs what it produces.
 
 ## Data model in brief
 
