@@ -26,3 +26,10 @@ temp/
 .claude/
 .pi/
 .mcp.json
+
+# Runtime data and model weights (multi-GB, contains recorded broadcasts and transcripts)
+wavepulse/assets/data/
+wavepulse/assets/models/
+
+# Generated documentation build output
+crawler/docs/_site/

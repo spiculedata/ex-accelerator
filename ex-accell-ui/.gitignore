@@ -30,3 +30,12 @@ vite.config.ts.timestamp-*
 
 # Playwright generated auth state
 tests/.auth/
+
+# Generated at runtime by the workflow engine / local data (never commit)
+/workflow-venvs/
+/python-workflows/
+/deployed-workflows/
+/telegram-data/
+*.db
+*.duckdb
+.ipynb_checkpoints/
