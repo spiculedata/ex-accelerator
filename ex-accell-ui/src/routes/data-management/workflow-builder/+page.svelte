@@ -204,8 +204,7 @@
         name: workflow.name || `Temp Workflow ${Date.now()}`,
         description: workflow.description || 'Temporary workflow for execution',
         version: '1.0.0',
-        tags: [],
-        createdBy: 'current-user'
+        tags: []
       };
 
       const publishResponse = await fetch('/api/workflows', {

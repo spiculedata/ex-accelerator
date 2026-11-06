@@ -37,23 +37,24 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST /api/workflows
  * Publish a new workflow
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const body = await request.json();
     const { workflowDefinition, metadata } = body;
 
     if (!workflowDefinition || !metadata) {
-      return error(400, 'Missing workflowDefinition or metadata');
+      return json({ success: false, error: 'Missing workflowDefinition or metadata' }, { status: 400 });
     }
 
-    if (!metadata.name || !metadata.createdBy) {
-      return error(400, 'Missing required metadata: name, createdBy');
+    if (!metadata.name) {
+      return json({ success: false, error: 'Missing required metadata: name' }, { status: 400 });
     }
 
-    const publishedWorkflow = await serverWorkflowService.publishWorkflow(
-      workflowDefinition,
-      metadata
-    );
+    // The creator is the signed-in user, never a name typed into the form
+    const publishedWorkflow = await serverWorkflowService.publishWorkflow(workflowDefinition, {
+      ...metadata,
+      createdBy: locals.user?.email ?? 'unknown'
+    });
 
     return json({
       success: true,
