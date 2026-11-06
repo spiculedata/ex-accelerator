@@ -424,7 +424,7 @@
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.neutral.count.toLocaleString()} posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-emerald-600 mb-1">{Math.round((sentimentStats.avgConfidence || 0.89) * 100)}%</div>
+        <div class="text-2xl font-bold text-emerald-600 mb-1">{sentimentStats.avgConfidence != null && sentimentStats.avgConfidence > 0 ? `${Math.round(sentimentStats.avgConfidence * 100)}%` : '\u2014'}</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
         <div class="text-xs text-gray-500 mt-1">AI Classification</div>
       </div>

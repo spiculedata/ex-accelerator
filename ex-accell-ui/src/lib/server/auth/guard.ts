@@ -24,7 +24,7 @@ const ADMIN_ONLY_PATTERNS = [
   /^\/api\/generate-python-workflow(\/|$)/,
   /^\/api\/jupyter(\/|$)/,
   /^\/api\/workflows\/[^/]+\/execute(\/|$)/,
-  // Raw SQL and destructive seeding run with the app's full database rights
+  // Raw SQL runs with the app's full database rights. `seed` no longer exists; it stays listed as defence in depth.
   /^\/api\/unified-analytics\/(query|seed)(\/|$)/
 ];
 
