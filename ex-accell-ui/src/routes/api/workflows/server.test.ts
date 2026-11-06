@@ -41,4 +41,13 @@ describe('POST /api/workflows', () => {
     expect(response.status).toBe(400);
     expect(publishWorkflow).not.toHaveBeenCalled();
   });
+
+  it('returns a generic 500 without leaking internal error text', async () => {
+    publishWorkflow.mockRejectedValue(new Error('connection to 10.0.0.5:5432 refused'));
+
+    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } }).catch((e) => e);
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(response.body ?? response)).not.toContain('10.0.0.5');
+  });
 });

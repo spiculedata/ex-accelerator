@@ -19,4 +19,12 @@ describe('resolveInvestigationRange', () => {
   it('fills only the missing start with 90 days before the end', () => {
     expect(resolveInvestigationRange('', '2026-06-01', NOW)).toEqual({ start: '2026-03-03', end: '2026-06-01' });
   });
+
+  it('treats an invalid date as missing instead of throwing', () => {
+    expect(resolveInvestigationRange('not-a-date', 'also-bad', NOW)).toEqual({ start: '2026-03-17', end: '2026-06-15' });
+  });
+
+  it('never returns a start after the end', () => {
+    expect(resolveInvestigationRange('2026-07-01', '2026-06-01', NOW)).toEqual({ start: '2026-03-03', end: '2026-06-01' });
+  });
 });

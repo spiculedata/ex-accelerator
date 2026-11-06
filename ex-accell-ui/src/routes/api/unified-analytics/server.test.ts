@@ -411,6 +411,17 @@ describe('GET /api/unified-analytics investigation-timeline', () => {
     expect(sql).toContain('gdelt_events'); // output column still present
   });
 
+  it('swaps out only the missing source (radio present, GDELT absent)', async () => {
+    stub(false, true);
+
+    await get();
+
+    const sql = timelineSql();
+    expect(sql).not.toContain('FROM gdelt_events');
+    expect(sql).toContain('FROM radio_transcripts');
+    expect(sql).toContain('FROM posts_with_sentiment');
+  });
+
   it('includes each source whose table exists', async () => {
     stub(true, true);
 

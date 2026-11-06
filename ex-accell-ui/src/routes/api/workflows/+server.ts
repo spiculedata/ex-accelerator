@@ -61,7 +61,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       workflow: publishedWorkflow
     });
   } catch (err) {
+    // Detail stays in the server log; the client gets a generic message
     console.error('Error publishing workflow:', err);
-    return error(500, `Failed to publish workflow: ${err instanceof Error ? err.message : String(err)}`);
+    return json({ success: false, error: 'Failed to publish workflow' }, { status: 500 });
   }
 };
