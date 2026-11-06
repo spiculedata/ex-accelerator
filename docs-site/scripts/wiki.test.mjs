@@ -77,6 +77,15 @@ test('buildSidebar groups links by their section in the VitePress config', () =>
   assert.ok(out.indexOf('**Guide**') < out.indexOf('**Tutorials**'));
 });
 
+test('buildSidebar fails loudly when the config has no sidebar', () => {
+  assert.throws(() => buildSidebar("export default { title: 'x' }"), /sidebar/i);
+});
+
+test('buildHome takes the hero text from the hero block, not an action', () => {
+  const index = '---\nhero:\n  name: x\n  tagline: t\n  actions:\n    - theme: brand\n      text: Get started\n      link: /guide/a\n---\n';
+  assert.ok(!buildHome(index).includes('**Get started**'));
+});
+
 test('buildHome turns the home page hero and features into plain markdown', () => {
   const index = `---
 layout: home

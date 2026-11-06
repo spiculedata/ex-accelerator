@@ -62,7 +62,9 @@ export function convertPage(markdown, docPath = 'index.md') {
  * expects single-quoted strings and `{ text, link }` items grouped under `{ text, items }` headings.
  */
 export function buildSidebar(configSource) {
-  const section = configSource.slice(configSource.indexOf('sidebar:'));
+  const start = configSource.indexOf('sidebar:');
+  if (start < 0) throw new Error('No sidebar found in the VitePress config; update scripts/wiki.mjs to match it');
+  const section = configSource.slice(start);
   const lines = ['**[Home](Home)**', ''];
   for (const match of section.matchAll(/text:\s*'([^']+)'(?:\s*,\s*link:\s*'([^']+)')?/g)) {
     const [, text, link] = match;
@@ -75,7 +77,9 @@ export function buildSidebar(configSource) {
 /** Home.md from the VitePress home page's front matter (hero, actions and features). */
 export function buildHome(indexSource) {
   const front = indexSource.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
-  const field = (name) => front.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'm'))?.[1].trim() ?? '';
+  // Hero fields only: the lookup stops before `actions:` so an action's `text:` is never mistaken for the hero text
+  const hero = front.split(/^\s*actions:/m)[0].split(/^features:/m)[0];
+  const field = (name) => hero.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'm'))?.[1].trim() ?? '';
   const lines = [`# ${field('name')}`, '', `**${field('text')}**`, '', field('tagline'), ''];
 
   const actions = [...front.matchAll(/-\s*theme:\s*\w+\s*\n\s*text:\s*(.+)\n\s*link:\s*(\S+)/g)];

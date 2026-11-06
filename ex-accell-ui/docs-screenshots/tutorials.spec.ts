@@ -34,10 +34,17 @@ test('tutorial walkthrough', async ({ page }) => {
   const login = await page.request.post('/api/auth/login', { data: { email, password } });
   expect(login.ok(), 'log in as the demo admin').toBe(true);
 
+  // A failed delete would leave duplicates that change later screenshots, so make it loud
+  const expectDeleted = async (response: { ok(): boolean; status(): number }, what: string) => {
+    expect(response.ok(), `deleting ${what} (HTTP ${response.status()})`).toBe(true);
+  };
+
   // Remove anything a previous (possibly interrupted) run left behind so names stay stable
   const removeByName = async (listUrl: string, key: string, deleteUrl: (id: string | number) => string, name: string) => {
     const body = await (await page.request.get(listUrl)).json();
-    for (const item of body[key] ?? []) if (item.name === name) await page.request.delete(deleteUrl(item.id));
+    for (const item of body[key] ?? []) {
+      if (item.name === name) await expectDeleted(await page.request.delete(deleteUrl(item.id)), `${key} "${name}"`);
+    }
   };
   await removeByName('/api/projects', 'projects', (id) => `/api/projects?id=${id}`, PROJECT_NAME);
   await removeByName('/api/investigations', 'investigations', (id) => `/api/investigations?id=${id}`, INVESTIGATION_NAME);
@@ -127,8 +134,9 @@ test('tutorial walkthrough', async ({ page }) => {
     await shot(page, 'workflow-published');
   } finally {
     // Remove everything this run created
-    if (created.workflow) await page.request.delete(`/api/workflows/${created.workflow}`);
-    if (created.investigation) await page.request.delete(`/api/investigations?id=${created.investigation}`);
-    if (created.project) await page.request.delete(`/api/projects?id=${created.project}`);
+    if (created.workflow) await expectDeleted(await page.request.delete(`/api/workflows/${created.workflow}`), 'the workflow');
+    if (created.investigation) await expectDeleted(await page.request.delete(`/api/investigations?id=${created.investigation}`), 'the investigation');
+    // Deleting the project also deletes its workspaces (ON DELETE CASCADE, migration 0002)
+    if (created.project) await expectDeleted(await page.request.delete(`/api/projects?id=${created.project}`), 'the project');
   }
 });
