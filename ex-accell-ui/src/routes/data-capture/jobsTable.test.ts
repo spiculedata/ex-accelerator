@@ -10,6 +10,7 @@ describe('data-capture jobs table', () => {
   const source = readFileSync(join(__dirname, '+page.svelte'), 'utf8');
 
   const rowStart = source.indexOf('{#each sortedJobs as job}');
+  if (rowStart < 0) throw new Error('The jobs table loop was renamed or moved; update this test to find it');
   const headerStart = source.lastIndexOf('<thead', rowStart);
   const header = source.slice(headerStart, source.indexOf('</thead>', headerStart));
   const firstRow = source.slice(rowStart, source.indexOf('</tr>', rowStart));
@@ -34,7 +35,7 @@ describe('data-capture jobs table', () => {
     expect(firstRow).toContain('confirmDeleteJob(job)');
   });
 
-  it('no longer refers to the removed Princeton SMART import handler', () => {
-    expect(source).not.toContain('handlePrincetonSmartImport');
+  it('does not keep branches for the removed Princeton SMART job type', () => {
+    expect(source).not.toContain("job.type === 'princeton-smart'");
   });
 });
