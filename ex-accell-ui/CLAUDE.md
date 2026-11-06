@@ -81,9 +81,8 @@ set `DATABASE_URL`, `SESSION_SECRET` (32+ chars) and, for the first login, `ADMI
 
 ## Styling
 
-Use Tailwind utility classes. Avoid new `<style>` blocks and inline `style=` attributes unless a
-library requires them (two legacy `<style>` blocks remain in `routes/gdelt` and
-`routes/android-research`).
+Use Tailwind utility classes. Avoid `<style>` blocks and inline `style=` attributes unless a
+library requires them.
 
 ## Dapr and the crawler
 

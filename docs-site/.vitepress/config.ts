@@ -10,6 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Architecture', link: '/architecture/overview' },
+      { text: 'Reference', link: '/reference/api' },
       { text: 'Contributing', link: 'https://github.com/spiculedata/ex-accelerator/blob/main/CONTRIBUTING.md' }
     ],
     sidebar: [
@@ -18,12 +19,21 @@ export default defineConfig({
         items: [
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Configuration', link: '/guide/configuration' },
-          { text: 'Authentication and roles', link: '/guide/authentication' }
+          { text: 'Authentication and roles', link: '/guide/authentication' },
+          { text: 'Deployment', link: '/guide/deployment' }
         ]
       },
       {
         text: 'Architecture',
-        items: [{ text: 'Overview', link: '/architecture/overview' }]
+        items: [
+          { text: 'Overview', link: '/architecture/overview' },
+          { text: 'Data model', link: '/architecture/data-model' },
+          { text: 'Crawler', link: '/architecture/crawler' }
+        ]
+      },
+      {
+        text: 'Reference',
+        items: [{ text: 'API', link: '/reference/api' }]
       }
     ],
     socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/ex-accelerator' }],
