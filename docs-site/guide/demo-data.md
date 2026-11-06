@@ -26,7 +26,9 @@ ALLOW_DEMO_RESET=1 npm run seed:demo -- --reset
 ```
 
 ::: danger
-`--reset` truncates the analytics tables. Never run it against a database you care about.
+`--reset` truncates the analytics tables and, through foreign keys, everything that hangs off
+them: posts and their analysis, projects, workspaces, members and datasets. Never run it against a
+database you care about.
 :::
 
 The data is deterministic apart from its dates, which are relative to the day you load it, so the

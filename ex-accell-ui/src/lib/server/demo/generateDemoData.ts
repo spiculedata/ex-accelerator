@@ -23,7 +23,6 @@ export interface DemoOptions {
 
 const DAY_MS = 86_400_000;
 const HOUR_WEIGHTS = [1, 1, 1, 1, 1, 2, 3, 5, 6, 6, 6, 6, 7, 7, 6, 6, 6, 7, 8, 8, 7, 5, 3, 2];
-const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
 const round = (value: number, places: number) => Number(value.toFixed(places));
 
 /** Topic popularity on a given day; spikes make the timeline interesting. */
@@ -115,8 +114,21 @@ function engagementRow(rng: Rng, post: PostDraft, contentTypeId: number): Cell[]
     round((total / reach) * 100, 2), contentTypeId === 4 ? round(rng.next() * 6, 2) : 0, isVideo ? round(30 + rng.next() * 55, 2) : 0, post.createdAt];
 }
 
+/** Insert order that satisfies foreign keys. */
+export const TABLE_ORDER = [
+  'data_sources', 'crawlers', 'languages', 'content_types', 'topics', 'topic_keywords', 'topic_relationships', 'posts',
+  'sentiment_classifications', 'emotion_analysis', 'language_detection', 'document_topics', 'post_engagement',
+  'hashtag_engagement', 'sentiment_temporal_trends', 'sentiment_keywords', 'topic_trends', 'activity_logs',
+  'projects', 'project_members', 'workspaces', 'workspace_data_sources', 'datasets', 'dataset_tags'
+];
+
 export function generateDemoData(input: DemoOptions = {}): DemoData {
-  const options = { seed: 42, now: new Date(), days: 90, postCount: 1500, ...input };
+  const options: Required<DemoOptions> = {
+    seed: input.seed ?? 42,
+    now: input.now ?? new Date(),
+    days: input.days ?? 90,
+    postCount: input.postCount ?? 1500
+  };
   const rng = createRng(options.seed);
   const posts = draftPosts(rng, options);
   const windowStart = new Date(options.now.getTime() - options.days * DAY_MS);
@@ -130,11 +142,3 @@ export function generateDemoData(input: DemoOptions = {}): DemoData {
     ].sort((a, b) => TABLE_ORDER.indexOf(a.name) - TABLE_ORDER.indexOf(b.name))
   };
 }
-
-/** Insert order that satisfies foreign keys. */
-export const TABLE_ORDER = [
-  'data_sources', 'crawlers', 'languages', 'content_types', 'topics', 'topic_keywords', 'topic_relationships', 'posts',
-  'sentiment_classifications', 'emotion_analysis', 'language_detection', 'document_topics', 'post_engagement',
-  'hashtag_engagement', 'sentiment_temporal_trends', 'sentiment_keywords', 'topic_trends', 'activity_logs',
-  'projects', 'project_members', 'workspaces', 'workspace_data_sources', 'datasets', 'dataset_tags'
-];

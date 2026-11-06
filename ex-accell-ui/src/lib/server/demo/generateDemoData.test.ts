@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { generateDemoData, type DemoTable } from './generateDemoData';
 
 const NOW = new Date('2026-06-15T12:00:00Z');
@@ -95,3 +97,51 @@ describe('generateDemoData', () => {
     expect(column(table('data_sources'), 'name').every((name) => String(name).startsWith('Demo'))).toBe(true);
   });
 });
+
+describe('generateDemoData against the schema', () => {
+  /** Table name -> column names, parsed from the CREATE TABLE blocks in db/migrations. */
+  function migrationColumns(): Map<string, Set<string>> {
+    const dir = join(process.cwd(), 'db', 'migrations');
+    const sql = readdirSync(dir).map((file) => readFileSync(join(dir, file), 'utf8')).join('\n').replace(/--.*$/gm, '');
+    const tables = new Map<string, Set<string>>();
+    for (const match of sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)\s*\(([\s\S]*?)\n\);/g)) {
+      const columns = new Set<string>();
+      for (const line of match[2].split('\n')) {
+        const name = line.trim().match(/^([a-z_][a-z0-9_]*)\s+[A-Za-z]/)?.[1];
+        if (name && !/^(unique|primary|foreign|constraint|check)$/i.test(name)) columns.add(name);
+      }
+      tables.set(match[1], columns);
+    }
+    return tables;
+  }
+
+  it('only inserts into tables and columns that the migrations define', () => {
+    const schema = migrationColumns();
+
+    for (const t of data.tables) {
+      const known = schema.get(t.name);
+      expect(known, `table ${t.name} is not defined in db/migrations`).toBeDefined();
+      for (const columnName of t.columns) expect(known!.has(columnName), `${t.name}.${columnName}`).toBe(true);
+    }
+  });
+
+  it('references only topics that exist in every topic table', () => {
+    const topicIds = new Set(column(table('topics'), 'id'));
+
+    expect(column(table('topic_keywords'), 'topic_id').every((id) => topicIds.has(id))).toBe(true);
+    expect(column(table('topic_trends'), 'topic_id').every((id) => topicIds.has(id))).toBe(true);
+    for (const name of ['topic1_id', 'topic2_id']) {
+      expect(column(table('topic_relationships'), name).every((id) => topicIds.has(id)), name).toBe(true);
+    }
+  });
+
+  it('falls back to defaults when options are explicitly undefined', () => {
+    const result = generateDemoData({ seed: undefined, now: undefined, days: undefined, postCount: 20 });
+
+    expect(table_(result, 'posts').rows).toHaveLength(20);
+  });
+});
+
+function table_(result: { tables: DemoTable[] }, name: string): DemoTable {
+  return result.tables.find((t) => t.name === name)!;
+}

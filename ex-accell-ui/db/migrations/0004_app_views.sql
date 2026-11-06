@@ -19,24 +19,25 @@ SELECT
     COALESCE(pe.shares_count, 0) AS engagement_shares,
     COALESCE(pe.comments_count, 0) AS engagement_comments,
     COALESCE(pe.views_count, 0) AS engagement_views,
-    (SELECT string_agg(ea.emotion, ',') FROM emotion_analysis ea WHERE ea.post_id = p.id) AS emotions
+    (SELECT string_agg(ea.emotion, ',' ORDER BY ea.emotion) FROM emotion_analysis ea WHERE ea.post_id = p.id) AS emotions
 FROM posts p
 JOIN data_sources ds ON ds.id = p.data_source_id
 JOIN sentiment_classifications sc ON sc.post_id = p.id
 LEFT JOIN post_engagement pe ON pe.post_id = p.id
 $view$; END IF; END $migration$;
 
--- Average sentiment mix by hour of day, computed from the posts.
+-- Average sentiment mix by hour of day (UTC), computed from the posts. Uses only columns that every
+-- definition of posts_with_sentiment exposes (`timestamp` in epoch milliseconds).
 DO $migration$ BEGIN IF to_regclass('public.hourly_sentiment_patterns') IS NULL THEN EXECUTE $view$
 CREATE VIEW hourly_sentiment_patterns AS
 SELECT
-    EXTRACT(HOUR FROM created_at)::integer AS hour_of_day,
+    EXTRACT(HOUR FROM to_timestamp("timestamp" / 1000.0) AT TIME ZONE 'UTC')::integer AS hour_of_day,
     ROUND(100.0 * COUNT(*) FILTER (WHERE sentiment_category IN ('Very Positive', 'Positive')) / COUNT(*), 2) AS avg_positive_percentage,
     ROUND(100.0 * COUNT(*) FILTER (WHERE sentiment_category IN ('Very Negative', 'Negative')) / COUNT(*), 2) AS avg_negative_percentage,
     ROUND(100.0 * COUNT(*) FILTER (WHERE sentiment_category = 'Neutral') / COUNT(*), 2) AS avg_neutral_percentage,
     COUNT(*)::integer AS total_posts_analyzed
 FROM posts_with_sentiment
-GROUP BY EXTRACT(HOUR FROM created_at)
+GROUP BY EXTRACT(HOUR FROM to_timestamp("timestamp" / 1000.0) AT TIME ZONE 'UTC')
 $view$; END IF; END $migration$;
 
 -- Saved investigations (also created on demand by the investigations API).

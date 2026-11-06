@@ -674,19 +674,21 @@ export const GET: RequestHandler = async ({ url }) => {
         let whereClause = '';
         if (langCode !== 'all') {
           params.push(langCode);
-          whereClause = `WHERE ld.language_code = $1`;
+          whereClause = `WHERE l.code = $1`;
         }
         const data = await executeQuery(`
           SELECT
-            ld.document_id,
-            ld.document_source,
-            ld.language_code,
-            ld.confidence,
-            l.name as language_name
+            ld.post_id AS document_id,
+            ds.platform AS document_source,
+            l.code AS language_code,
+            ld.confidence_score AS confidence,
+            l.name AS language_name
           FROM language_detection ld
-          JOIN languages l ON ld.language_code = l.code
+          JOIN languages l ON ld.language_id = l.id
+          LEFT JOIN posts p ON p.id = ld.post_id
+          LEFT JOIN data_sources ds ON ds.id = p.data_source_id
           ${whereClause}
-          ORDER BY ld.confidence DESC
+          ORDER BY ld.confidence_score DESC
           LIMIT 100
         `, params);
         return json({ success: true, data });

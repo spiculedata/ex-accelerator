@@ -8,8 +8,7 @@ import 'dotenv/config';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
-import { generateDemoData } from '../src/lib/server/demo/generateDemoData';
-import { TABLE_ORDER } from '../src/lib/server/demo/generateDemoData';
+import { TABLE_ORDER, generateDemoData } from '../src/lib/server/demo/generateDemoData';
 import { toInsertStatements } from '../src/lib/server/demo/insertStatements';
 import { runMigrations } from '../src/lib/server/migrations/runner';
 
@@ -23,21 +22,33 @@ function loadMigrations() {
     .map((file) => ({ name: file.replace(/\.sql$/, ''), sql: readFileSync(join(dir, file), 'utf8') }));
 }
 
+async function occupiedTables(client: pg.Client): Promise<string[]> {
+  const found: string[] = [];
+  for (const table of ['posts', 'projects', 'workspaces', 'datasets']) {
+    const { rows } = await client.query(`SELECT EXISTS (SELECT 1 FROM ${table}) AS present`);
+    if (rows[0].present) found.push(table);
+  }
+  return found;
+}
+
 async function main() {
   const reset = process.argv.includes('--reset');
   if (reset && process.env.ALLOW_DEMO_RESET !== '1') {
     throw new Error('--reset deletes data. Re-run with ALLOW_DEMO_RESET=1 if you are sure.');
   }
 
-  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('Set DATABASE_URL so the loader cannot fall back to an unintended database.');
+
+  const client = new pg.Client({ connectionString });
   await client.connect();
   try {
     const { applied } = await runMigrations(client, loadMigrations());
     if (applied.length > 0) console.log(`Applied migrations: ${applied.join(', ')}`);
 
-    const existing = Number((await client.query('SELECT count(*) AS n FROM posts')).rows[0].n);
-    if (existing > 0 && !reset) {
-      throw new Error(`posts already contains ${existing} rows. Demo data only loads into an empty database.`);
+    const occupied = await occupiedTables(client);
+    if (occupied.length > 0 && !reset) {
+      throw new Error(`Demo data only loads into an empty database, but ${occupied.join(', ')} already contain rows.`);
     }
 
     const data = generateDemoData();

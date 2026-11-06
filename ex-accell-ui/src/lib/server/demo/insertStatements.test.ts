@@ -19,6 +19,13 @@ describe('toInsertStatements', () => {
     expect(statements[1].values).toEqual([3, 'c']);
   });
 
+  it('sends dates as UTC ISO strings so the stored time does not depend on the machine timezone', () => {
+    const when = new Date('2026-06-15T12:30:00Z');
+    const [statement] = toInsertStatements({ name: 'events', columns: ['id', 'at'], rows: [[1, when]] }, 100);
+
+    expect(statement.values).toEqual([1, '2026-06-15T12:30:00.000Z']);
+  });
+
   it('returns nothing for an empty table', () => {
     expect(toInsertStatements({ ...table, rows: [] }, 100)).toEqual([]);
   });

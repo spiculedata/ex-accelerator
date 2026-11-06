@@ -5,6 +5,9 @@ export interface InsertStatement {
   values: Cell[];
 }
 
+/** Dates go as UTC ISO strings; node-postgres would otherwise use the machine's local time. */
+const toDatabaseValue = (cell: Cell): Cell => (cell instanceof Date ? cell.toISOString() : cell);
+
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 
 function assertIdentifier(value: string): void {
@@ -25,7 +28,7 @@ export function toInsertStatements(table: DemoTable, maxParams = 60_000): Insert
       .join(', ');
     statements.push({
       text: `INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES ${placeholders}`,
-      values: batch.flat()
+      values: batch.flat().map(toDatabaseValue)
     });
   }
   return statements;
