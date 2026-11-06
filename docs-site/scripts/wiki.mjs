@@ -1,7 +1,7 @@
 // Builds GitHub wiki pages from the VitePress docs, so the wiki mirrors docs-site/ and is never edited by hand.
 //   node scripts/wiki.mjs [outputDir]      (default: .wiki)
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, posix, relative } from 'node:path';
+import { dirname, join, posix, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ALERT_TYPES = { tip: 'TIP', info: 'NOTE', warning: 'WARNING', danger: 'CAUTION' };
@@ -9,25 +9,45 @@ const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** 'guide/getting-started.md' -> 'Guide-Getting-started'; index pages take their folder's name. */
 export function wikiPageName(docPath) {
-  const parts = docPath.replace(/\.md$/, '').split('/').filter((part) => part !== 'index');
+  const parts = docPath.replace(/\\/g, '/').replace(/\.md$/, '').split('/');
+  if (parts[parts.length - 1] === 'index') parts.pop();
   return parts.length === 0 ? 'Home' : parts.map(capitalise).join('-');
 }
 
 /** Rewrites page links (absolute or relative) to wiki page names and screenshots to the wiki images folder. */
 export function convertLinks(markdown, docPath = 'index.md') {
-  return markdown.replace(/(!?\[[^\]]*\]\()([^)\s]+)\)/g, (match, prefix, target) => {
-    if (/^(https?:|mailto:|#)/.test(target)) return match;
-    if (target.startsWith('/screenshots/')) return `${prefix}images/${target.slice('/screenshots/'.length)})`;
+  const rewrite = (text) =>
+    text.replace(/(!?\[[^\]]*\]\()([^)\s]+)\)/g, (match, prefix, target) => {
+      if (/^(https?:|mailto:|#)/.test(target)) return match;
+      if (target.startsWith('/screenshots/')) return `${prefix}images/${target.slice('/screenshots/'.length)})`;
 
-    const [path, anchor] = target.split('#');
-    const absolute = path.startsWith('/') ? path : posix.join(posix.dirname(docPath), path);
-    // VitePress accepts .md and .html links; both mean the same page
-    const page = wikiPageName(`${absolute.replace(/^\/|\/$/g, '').replace(/\.(md|html)$/, '')}.md`);
-    return `${prefix}${page}${anchor ? `#${anchor}` : ''})`;
-  });
+      const [path, anchor] = target.split('#');
+      const absolute = path.startsWith('/') ? path : posix.join(posix.dirname(docPath), path);
+      // VitePress accepts .md and .html links; both mean the same page
+      const page = wikiPageName(`${absolute.replace(/^\/|\/$/g, '').replace(/\.(md|html)$/, '')}.md`);
+      return `${prefix}${page}${anchor ? `#${anchor}` : ''})`;
+    });
+
+  // Leave fenced blocks and inline code exactly as written
+  let inFence = false;
+  return markdown
+    .split('\n')
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      return line.split(/(`[^`]*`)/).map((part, index) => (index % 2 === 1 ? part : rewrite(part))).join('');
+    })
+    .join('\n');
 }
 
-/** ::: tip Title ... ::: blocks become GitHub alerts (> [!TIP]). Fenced code is left alone. */
+/**
+ * ::: tip|info|warning|danger blocks become GitHub alerts (> [!TIP]). Fenced code is left alone.
+ * Other containers (details, code-group) and nested containers are not supported; the wiki tests fail
+ * if one is left behind, so add support here when a page needs it.
+ */
 export function convertContainers(markdown) {
   const lines = markdown.split('\n');
   const out = [];
@@ -51,10 +71,11 @@ export function convertContainers(markdown) {
   return out.join('\n');
 }
 
+const normalizeNewlines = (markdown) => markdown.replace(/\r\n/g, '\n');
 const stripFrontMatter = (markdown) => markdown.replace(/^---\n[\s\S]*?\n---\n?/, '');
 
 export function convertPage(markdown, docPath = 'index.md') {
-  return convertContainers(convertLinks(stripFrontMatter(markdown), docPath)).trimEnd() + '\n';
+  return convertContainers(convertLinks(stripFrontMatter(normalizeNewlines(markdown)), docPath)).trimEnd() + '\n';
 }
 
 /**
@@ -64,7 +85,18 @@ export function convertPage(markdown, docPath = 'index.md') {
 export function buildSidebar(configSource) {
   const start = configSource.indexOf('sidebar:');
   if (start < 0) throw new Error('No sidebar found in the VitePress config; update scripts/wiki.mjs to match it');
-  const section = configSource.slice(start);
+  // Only the sidebar array: later config (editLink, footer) also has `text:` entries
+  const open = configSource.indexOf('[', start);
+  let depth = 0;
+  let end = configSource.length;
+  for (let i = open; i < configSource.length; i++) {
+    if (configSource[i] === '[') depth++;
+    if (configSource[i] === ']' && --depth === 0) {
+      end = i + 1;
+      break;
+    }
+  }
+  const section = configSource.slice(start, end);
   const lines = ['**[Home](Home)**', ''];
   for (const match of section.matchAll(/text:\s*'([^']+)'(?:\s*,\s*link:\s*'([^']+)')?/g)) {
     const [, text, link] = match;
@@ -76,7 +108,7 @@ export function buildSidebar(configSource) {
 
 /** Home.md from the VitePress home page's front matter (hero, actions and features). */
 export function buildHome(indexSource) {
-  const front = indexSource.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
+  const front = normalizeNewlines(indexSource).match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
   // Hero fields only: the lookup stops before `actions:` so an action's `text:` is never mistaken for the hero text
   const hero = front.split(/^\s*actions:/m)[0].split(/^features:/m)[0];
   const field = (name) => hero.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'm'))?.[1].trim() ?? '';
@@ -102,7 +134,7 @@ function markdownFiles(directory, root = directory) {
     if (directory === root && NON_PAGE_FOLDERS.has(name)) return [];
     const path = join(directory, name);
     if (statSync(path).isDirectory()) return markdownFiles(path, root);
-    return name.endsWith('.md') ? [relative(root, path)] : [];
+    return name.endsWith('.md') ? [relative(root, path).split(sep).join('/')] : [];
   });
 }
 

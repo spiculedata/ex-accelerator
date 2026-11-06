@@ -77,6 +77,34 @@ test('buildSidebar groups links by their section in the VitePress config', () =>
   assert.ok(out.indexOf('**Guide**') < out.indexOf('**Tutorials**'));
 });
 
+test('buildSidebar stops at the end of the sidebar and ignores later config text', () => {
+  const config = `sidebar: [ { text: 'Guide', items: [ { text: 'Start', link: '/guide/start' } ] } ],
+    editLink: { pattern: 'x', text: 'Edit this page on GitHub' },
+    footer: { message: 'Released' }`;
+  const out = buildSidebar(config);
+  assert.ok(!out.includes('Edit this page'));
+  assert.ok(out.includes('[Start](Guide-Start)'));
+});
+
+test('wikiPageName only drops a trailing index, and accepts Windows separators', () => {
+  assert.equal(wikiPageName('index/foo.md'), 'Index-Foo');
+  assert.equal(wikiPageName('guide\\getting-started.md'), 'Guide-Getting-started');
+});
+
+test('convertPage handles CRLF line endings', () => {
+  const out = convertPage('---\r\ntitle: x\r\n---\r\n# Hi\r\n\r\n::: tip\r\nok\r\n:::\r\n', 'a.md');
+  assert.ok(!out.includes('title: x'));
+  assert.ok(out.includes('> [!TIP]'));
+});
+
+test('convertLinks leaves fenced code and inline code untouched', () => {
+  const input = 'Use `[a](/guide/x)` or:\n```md\n[b](/guide/y)\n```\n[real](/guide/z)';
+  const out = convertLinks(input, 'index.md');
+  assert.ok(out.includes('`[a](/guide/x)`'));
+  assert.ok(out.includes('[b](/guide/y)'));
+  assert.ok(out.includes('[real](Guide-Z)'));
+});
+
 test('buildSidebar fails loudly when the config has no sidebar', () => {
   assert.throws(() => buildSidebar("export default { title: 'x' }"), /sidebar/i);
 });

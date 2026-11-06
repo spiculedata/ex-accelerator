@@ -190,8 +190,7 @@ def create_sample_notebooks():
     else:
         with open(sentiment_path, "w") as f:
             json.dump(sentiment_notebook, f, indent=2)
-    
-    print("✓ sentiment_analysis.ipynb created")
+        print("✓ sentiment_analysis.ipynb created")
     
     # Create other notebook templates (simplified versions)
     templates = [
