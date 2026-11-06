@@ -32,8 +32,8 @@ export const GET: RequestHandler = async ({ params }) => {
     // Extract unique source platforms
     const platforms = [...new Set(datasets.map(d => d.source_platform).filter(Boolean))];
 
-    // Calculate total record count
-    const recordCount = datasets.reduce((sum, d) => sum + (d.record_count || 0), 0);
+    // Calculate total record count (BIGINT columns arrive as strings, so convert before adding)
+    const recordCount = datasets.reduce((sum, d) => sum + (Number(d.record_count) || 0), 0);
 
     // Find most recent sync time
     const syncTimes = datasets

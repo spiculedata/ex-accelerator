@@ -26,6 +26,7 @@
   let newDateStart = '';
   let newDateEnd = '';
   let newSources = { gdelt: true, radio: true, social: true };
+  let createError = '';
   let creating = false;
 
   onMount(async () => {
@@ -84,6 +85,7 @@
   async function createInvestigation() {
     if (!newName.trim()) return;
     creating = true;
+    createError = '';
     try {
       const sources: string[] = [];
       if (newSources.gdelt) sources.push('gdelt');
@@ -102,12 +104,15 @@
           sources
         })
       });
-      const result = await response.json();
-      if (result.success && result.investigation) {
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.success && result.investigation) {
         goto(`/investigations/${result.investigation.id}`);
+      } else {
+        createError = result.error || `Could not create the investigation (HTTP ${response.status})`;
       }
     } catch (error) {
       console.error('Error creating investigation:', error);
+      createError = 'Could not create the investigation. Please try again.';
     } finally {
       creating = false;
     }
@@ -393,6 +398,10 @@
             </div>
           </div>
         </div>
+
+        {#if createError}
+          <p role="alert" class="mt-4 text-sm text-red-600">{createError}</p>
+        {/if}
 
         <!-- Actions -->
         <div class="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">

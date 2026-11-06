@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolveInvestigationRange } from '$lib/utils/investigationRange';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { highlightKeywords } from '$lib/utils/highlight';
@@ -377,8 +378,13 @@
         investigation = result.investigation;
         const config = investigation?.query_config || {};
         keywords = investigation?.keywords || config.keywords || [];
-        dateStart = investigation?.date_start || config.dateStart || '';
-        dateEnd = investigation?.date_end || config.dateEnd || '';
+        // The queries need both dates, so a blank range falls back to the last 90 days
+        const range = resolveInvestigationRange(
+          investigation?.date_start || config.dateStart || '',
+          investigation?.date_end || config.dateEnd || ''
+        );
+        dateStart = range.start;
+        dateEnd = range.end;
 
         if (dateStart && dateEnd) {
           setTimeRange(dateStart, dateEnd);
@@ -389,6 +395,12 @@
           loadDetailPanels(keywords, dateStart, dateEnd),
           loadKeywordData(keywords, dateStart, dateEnd)
         ]);
+
+        // Open on the first source that has results rather than an empty tab
+        if (gdeltEvents.length === 0) {
+          if (radioSegments.length > 0) activeTab = 'radio';
+          else if (socialPosts.length > 0) activeTab = 'social';
+        }
       }
     } catch (error) {
       console.error('Error loading investigation:', error);

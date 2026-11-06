@@ -389,3 +389,46 @@ describe('GET /api/unified-analytics removed placeholder queries', () => {
     expect(body.endpoints?.datasets).toBeUndefined();
   });
 });
+
+describe('GET /api/unified-analytics investigation-timeline', () => {
+  const get = () =>
+    GET({ url: new URL('http://localhost/api/unified-analytics?type=investigation-timeline&keywords=tram&date_start=2026-06-01&date_end=2026-06-30') } as Parameters<typeof GET>[0]);
+
+  const stub = (gdelt: boolean, radio: boolean) =>
+    duckdbQuery.mockImplementation(async (sql: string) => (/to_regclass/i.test(sql) ? [{ gdelt, radio }] : []));
+  const timelineSql = () => String(duckdbQuery.mock.calls.map(([sql]) => String(sql)).find((sql) => /date_series/.test(sql)));
+
+  it('uses only the social posts when GDELT and radio tables do not exist', async () => {
+    stub(false, false);
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    const sql = timelineSql();
+    expect(sql).toContain('FROM posts_with_sentiment');
+    expect(sql).not.toContain('FROM gdelt_events');
+    expect(sql).not.toContain('FROM radio_transcripts');
+    expect(sql).toContain('gdelt_events'); // output column still present
+  });
+
+  it('swaps out only the missing source (radio present, GDELT absent)', async () => {
+    stub(false, true);
+
+    await get();
+
+    const sql = timelineSql();
+    expect(sql).not.toContain('FROM gdelt_events');
+    expect(sql).toContain('FROM radio_transcripts');
+    expect(sql).toContain('FROM posts_with_sentiment');
+  });
+
+  it('includes each source whose table exists', async () => {
+    stub(true, true);
+
+    await get();
+
+    const sql = timelineSql();
+    expect(sql).toContain('FROM gdelt_events');
+    expect(sql).toContain('FROM radio_transcripts');
+  });
+});

@@ -80,18 +80,23 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST /api/investigations
  * Create a new investigation
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     await ensureTable();
 
     const data = await request.json();
 
-    if (!data.name || !data.query_config) {
-      return json(
-        { success: false, error: 'name and query_config are required' },
-        { status: 400 }
-      );
+    if (!data.name) {
+      return json({ success: false, error: 'name is required' }, { status: 400 });
     }
+
+    // The New Investigation form sends flat fields; everything downstream reads this shape
+    const queryConfig = data.query_config ?? {
+      keywords: Array.isArray(data.keywords) ? data.keywords : [],
+      dateStart: data.date_start || '',
+      dateEnd: data.date_end || '',
+      sources: Array.isArray(data.sources) ? data.sources : []
+    };
 
     const rows = await postgresPool.query(
       `INSERT INTO investigations (name, description, query_config, workspace_id, created_by)
@@ -100,9 +105,9 @@ export const POST: RequestHandler = async ({ request }) => {
       [
         data.name,
         data.description || null,
-        JSON.stringify(data.query_config),
+        JSON.stringify(queryConfig),
         data.workspace_id || null,
-        data.created_by || null
+        locals.user?.email ?? null
       ]
     );
 

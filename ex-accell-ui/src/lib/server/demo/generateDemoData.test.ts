@@ -92,6 +92,10 @@ describe('generateDemoData', () => {
     expect(emails.every((email) => email.endsWith('@example.com') || email.endsWith('@example.org'))).toBe(true);
   });
 
+  it('makes the demo datasets public so any signed-in user can add them to a workspace', () => {
+    expect(column(table('datasets'), 'visibility').every((visibility) => visibility === 'public')).toBe(true);
+  });
+
   it('labels every data source as demo data', () => {
     expect(column(table('data_sources'), 'name').every((name) => String(name).startsWith('Demo'))).toBe(true);
   });

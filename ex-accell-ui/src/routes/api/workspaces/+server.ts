@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ url }) => {
  * POST /api/workspaces
  * Create a new workspace within a project
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const data = await request.json();
 
@@ -50,7 +50,8 @@ export const POST: RequestHandler = async ({ request }) => {
       name: data.name,
       description: data.description || '',
       workspace_type: data.workspace_type || 'general',
-      created_by: data.created_by || 'default_user',
+      // The creator is the signed-in user, never a name from the request
+      created_by: locals.user?.email ?? 'unknown',
       data_sources: data.data_sources || []
     });
 

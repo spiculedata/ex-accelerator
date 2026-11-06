@@ -1676,11 +1676,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
 
       try {
-        const data = await executeQuery(`
-          WITH date_series AS (
-            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS d
-          ),
-          gdelt AS (
+        // A source whose table does not exist yet contributes empty columns instead of failing the whole timeline
+        const [present] = await executeQuery("SELECT to_regclass('gdelt_events') IS NOT NULL AS gdelt, to_regclass('radio_transcripts') IS NOT NULL AS radio");
+        const gdeltCte = present?.gdelt === true ? `gdelt AS (
             SELECT TO_DATE(sqldate::text, 'YYYYMMDD') AS d,
               COUNT(*) AS event_count, AVG(goldsteinscale) AS avg_goldstein, AVG(avgtone) AS avg_tone
             FROM gdelt_events
@@ -1689,8 +1687,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
               AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
                    OR actiongeo_fullname ILIKE ANY($3::text[]))
             GROUP BY 1
-          ),
-          radio AS (
+          ),` : `gdelt AS (SELECT NULL::date AS d, 0::bigint AS event_count, NULL::float8 AS avg_goldstein, NULL::float8 AS avg_tone WHERE false),`;
+        const radioCte = present?.radio === true ? `radio AS (
             SELECT DATE(segment_start) AS d, COUNT(*) AS segment_count,
               COUNT(*) FILTER (WHERE sentiment = 'positive') AS positive,
               COUNT(*) FILTER (WHERE sentiment = 'negative') AS negative,
@@ -1699,8 +1697,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
             WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
               AND transcript ILIKE ANY($3::text[])
             GROUP BY 1
-          ),
-          social AS (
+          ),` : `radio AS (SELECT NULL::date AS d, 0::bigint AS segment_count, 0::bigint AS positive, 0::bigint AS negative, 0::bigint AS neutral WHERE false),`;
+        const socialCte = `social AS (
             SELECT DATE(to_timestamp(timestamp/1000)) AS d, COUNT(*) AS post_count,
               COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) AS positive,
               COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) AS negative,
@@ -1710,7 +1708,15 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
               AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
               AND text ILIKE ANY($3::text[])
             GROUP BY 1
-          )
+          )`;
+
+        const data = await executeQuery(`
+          WITH date_series AS (
+            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS d
+          ),
+          ${gdeltCte}
+          ${radioCte}
+          ${socialCte}
           SELECT ds.d as date,
             COALESCE(g.event_count, 0) as gdelt_events, g.avg_goldstein, g.avg_tone,
             COALESCE(r.segment_count, 0) as radio_segments, COALESCE(r.positive, 0) as radio_positive,
