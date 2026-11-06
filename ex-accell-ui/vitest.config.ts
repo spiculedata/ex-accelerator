@@ -3,6 +3,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  // Render Svelte components with the browser build so component tests can mount them
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   test: {
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.ts'],

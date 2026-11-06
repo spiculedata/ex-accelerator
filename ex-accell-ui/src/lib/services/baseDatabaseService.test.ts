@@ -297,6 +297,36 @@ describe('BaseDatabaseService', () => {
         expect(get(apiErrors)).toEqual([]);
       });
 
+      it('does not clear one request\'s error when the same endpoint succeeds with different parameters', async () => {
+        vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'trends', params: { range: '7d' } });
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => ({ success: true, data: [] }) })));
+        await service.publicQueryAPI({ endpoint: 'trends', params: { range: '30d' } });
+
+        expect(get(apiErrors)).toHaveLength(1);
+        expect(get(apiErrors)[0].source).toContain('range=7d');
+      });
+
+      it('words a timeout in plain language', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(Object.assign(new Error('signal is aborted without reason'), { name: 'AbortError' })));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'slow' });
+
+        expect(get(apiErrors)[0].message).toBe('The request timed out');
+      });
+
+      it('tells the user to sign in again when the session has expired', async () => {
+        vi.stubGlobal('fetch', createFetchError(401, 'Unauthorized'));
+
+        await service.connect();
+        await service.publicQueryAPI({ endpoint: 'private' });
+
+        expect(get(apiErrors)[0].message).toMatch(/sign in again/i);
+      });
+
       it('reports a failed raw SQL query too', async () => {
         vi.stubGlobal('fetch', createNetworkError());
 
