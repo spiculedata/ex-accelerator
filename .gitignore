@@ -33,3 +33,6 @@ wavepulse/assets/models/
 
 # Generated documentation build output
 crawler/docs/_site/
+
+# Third-party Superset checkout (2 GB clone of apache/superset); use the official image instead
+/superset/
