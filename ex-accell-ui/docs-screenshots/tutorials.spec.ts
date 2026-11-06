@@ -1,0 +1,130 @@
+import { test, expect, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Walks through the tutorials against a stack that holds the demo dataset, capturing a screenshot
+ * at each step. It creates real objects with a unique name and deletes them afterwards.
+ */
+const OUTPUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs-site', 'public', 'screenshots', 'tutorials');
+const SETTLE_MS = 1500;
+const PROJECT_NAME = 'Tutorial project';
+const INVESTIGATION_NAME = 'Tram delays';
+const WORKFLOW_NAME = 'Sentiment of posts';
+
+test.use({ viewport: { width: 1440, height: 1000 } });
+
+const shot = async (page: Page, name: string, fullPage = false) => {
+  await page.waitForTimeout(SETTLE_MS);
+  await page.screenshot({ path: join(OUTPUT_DIR, `${name}.png`), fullPage, animations: 'disabled' });
+};
+
+test('tutorial walkthrough', async ({ page }) => {
+  test.setTimeout(180_000);
+  mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  const email = process.env.SCREENSHOT_EMAIL;
+  const password = process.env.SCREENSHOT_PASSWORD;
+  if (!email || !password) throw new Error('Set SCREENSHOT_EMAIL and SCREENSHOT_PASSWORD (the demo admin account)');
+  const login = await page.request.post('/api/auth/login', { data: { email, password } });
+  expect(login.ok(), 'log in as the demo admin').toBe(true);
+
+  // Remove anything a previous (possibly interrupted) run left behind so names stay stable
+  const removeByName = async (listUrl: string, key: string, deleteUrl: (id: string | number) => string, name: string) => {
+    const body = await (await page.request.get(listUrl)).json();
+    for (const item of body[key] ?? []) if (item.name === name) await page.request.delete(deleteUrl(item.id));
+  };
+  await removeByName('/api/projects', 'projects', (id) => `/api/projects?id=${id}`, PROJECT_NAME);
+  await removeByName('/api/investigations', 'investigations', (id) => `/api/investigations?id=${id}`, INVESTIGATION_NAME);
+  await removeByName('/api/workflows', 'workflows', (id) => `/api/workflows/${id}`, WORKFLOW_NAME);
+
+  const created: { project?: string; investigation?: string; workflow?: string } = {};
+  try {
+    // --- Tutorial: your first project ---
+    await page.goto('/projects/new', { waitUntil: 'networkidle' });
+    await shot(page, 'new-project', true);
+    await page.fill('#project-name', PROJECT_NAME);
+    await page.fill('#project-description', 'Following the first-project tutorial');
+    await page.getByText('Telegram', { exact: true }).click();
+    await page.getByText('YouTube', { exact: true }).click();
+    await page.getByRole('button', { name: 'Create Project' }).click();
+    await page.waitForURL(/\/projects\/\d+/);
+    created.project = page.url().match(/\/projects\/(\d+)/)![1];
+    await page.waitForLoadState('networkidle');
+    await shot(page, 'project-empty');
+
+    await page.getByRole('button', { name: /New Workspace/ }).click();
+    await page.getByPlaceholder(/Twitter Analysis/).fill('Telegram and YouTube');
+    await page.locator('select').first().selectOption({ label: 'Analysis' });
+    await page.getByPlaceholder('Describe the purpose...').fill('Telegram and YouTube posts only');
+    await page.getByText('Demo Telegram local channels').click();
+    await page.getByText('Demo YouTube city channels').click();
+    await shot(page, 'workspace-form');
+    await page.getByRole('button', { name: 'Create Workspace' }).click();
+    await expect(page.getByText('Telegram and YouTube').first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await shot(page, 'workspace-created');
+
+    // --- Tutorial: dashboards scoped to the workspace ---
+    await page.getByText('Telegram and YouTube').first().click();
+    await page.waitForURL(/\/workspaces\/\d+/);
+    const workspaceId = page.url().match(/\/workspaces\/(\d+)/)![1];
+    await page.goto(`/text-analytics/sentiment-analysis?workspace=${workspaceId}`, { waitUntil: 'networkidle' });
+    await page.setViewportSize({ width: 1440, height: 1350 });
+    await shot(page, 'sentiment-scoped');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    // --- Tutorial: investigations ---
+    await page.goto('/investigations', { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /New Investigation/ }).first().click();
+    await page.getByPlaceholder(/Ukraine Conflict/).fill(INVESTIGATION_NAME);
+    await page.getByPlaceholder(/Describe the research question/).fill('Do tram delays dominate the transit conversation?');
+    const keywords = page.getByPlaceholder(/Type keyword/);
+    for (const keyword of ['tram', 'delays']) {
+      await keywords.fill(keyword);
+      await keywords.press('Enter');
+    }
+    await page.getByLabel('GDELT Events').uncheck();
+    await page.getByLabel('Radio Transcripts').uncheck();
+    await shot(page, 'investigation-form');
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await page.waitForURL(/\/investigations\/\d+/);
+    created.investigation = page.url().match(/\/investigations\/(\d+)/)![1];
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(INVESTIGATION_NAME, { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /social\s*[1-9]/i })).toBeVisible(); // matching posts were found
+    await shot(page, 'investigation-workbench');
+
+    // --- Tutorial: build and publish a workflow ---
+    await page.goto('/data-management/workflow-builder', { waitUntil: 'networkidle' });
+    await page.getByText('Dataset Input', { exact: true }).first().dragTo(page.locator('main'), { targetPosition: { x: 700, y: 300 } });
+    await page.getByText('Sentiment Analysis', { exact: true }).first().dragTo(page.locator('main'), { targetPosition: { x: 1100, y: 300 } });
+    const ports = page.locator('[class*="rounded-full"][class*="bg-blue"]');
+    await expect(page.getByText('2 steps')).toBeVisible();
+    await ports.nth(0).click();
+    await ports.nth(1).click();
+    await expect(page.getByText('1 connections')).toBeVisible();
+    await shot(page, 'workflow-connected');
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByRole('button', { name: 'Publish' }).click();
+    await page.getByLabel(/Workflow Name/).fill(WORKFLOW_NAME);
+    await page.getByPlaceholder('Describe what this workflow does').fill('Loads posts and classifies their sentiment');
+    await shot(page, 'workflow-publish');
+    const published = page.waitForResponse((r) => r.url().endsWith('/api/workflows') && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Publish Workflow' }).last().click();
+    const body = await (await published).json();
+    created.workflow = body.workflow?.id;
+    // Publishing confirms with a browser dialog (Playwright dismisses it); the workflow is then listed on Data Management
+    await page.goto('/data-management', { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /Processing Workflows/ }).click();
+    await expect(page.getByText(WORKFLOW_NAME).first()).toBeVisible();
+    await shot(page, 'workflow-published');
+  } finally {
+    // Remove everything this run created
+    if (created.workflow) await page.request.delete(`/api/workflows/${created.workflow}`);
+    if (created.investigation) await page.request.delete(`/api/investigations?id=${created.investigation}`);
+    if (created.project) await page.request.delete(`/api/projects?id=${created.project}`);
+  }
+});

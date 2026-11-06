@@ -9,6 +9,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Tutorials', link: '/tutorials/' },
       { text: 'Architecture', link: '/architecture/overview' },
       { text: 'Reference', link: '/reference/api' },
       { text: 'Contributing', link: 'https://github.com/spiculedata/ex-accelerator/blob/main/CONTRIBUTING.md' }
@@ -22,6 +23,20 @@ export default defineConfig({
           { text: 'Authentication and roles', link: '/guide/authentication' },
           { text: 'Deployment', link: '/guide/deployment' },
           { text: 'Try it with demo data', link: '/guide/demo-data' }
+        ]
+      },
+      {
+        text: 'Tutorials',
+        items: [
+          { text: 'Overview', link: '/tutorials/' },
+          { text: 'Your first project', link: '/tutorials/first-project' },
+          { text: 'Explore the dashboards', link: '/tutorials/explore-dashboards' },
+          { text: 'Investigate a question', link: '/tutorials/investigations' },
+          { text: 'Build and publish a workflow', link: '/tutorials/workflows' },
+          { text: 'Schedule a crawl', link: '/tutorials/schedule-a-crawl' },
+          { text: 'Research in Jupyter', link: '/tutorials/jupyter' },
+          { text: 'Troubleshooting and FAQ', link: '/tutorials/troubleshooting' },
+          { text: 'Glossary', link: '/tutorials/glossary' }
         ]
       },
       {
