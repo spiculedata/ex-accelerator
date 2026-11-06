@@ -184,8 +184,12 @@ def create_sample_notebooks():
     
     # Write sentiment analysis notebook
     import json
-    with open(notebooks_dir / "sentiment_analysis.ipynb", "w") as f:
-        json.dump(sentiment_notebook, f, indent=2)
+    sentiment_path = notebooks_dir / "sentiment_analysis.ipynb"
+    if sentiment_path.exists():
+        print("• sentiment_analysis.ipynb already exists, leaving it as is")
+    else:
+        with open(sentiment_path, "w") as f:
+            json.dump(sentiment_notebook, f, indent=2)
     
     print("✓ sentiment_analysis.ipynb created")
     
@@ -243,6 +247,9 @@ def create_sample_notebooks():
             "nbformat_minor": 4
         }
         
+        if (notebooks_dir / filename).exists():
+            print(f"• {filename} already exists, leaving it as is")
+            continue
         with open(notebooks_dir / filename, "w") as f:
             json.dump(basic_notebook, f, indent=2)
         
@@ -288,9 +295,14 @@ c.ServerApp.allow_credentials = True
 c.ServerApp.disable_check_xsrf = True
 '''
     
-    with open(jupyter_dir / "jupyter_lab_config.py", "w") as f:
+    config_path = jupyter_dir / "jupyter_lab_config.py"
+    if config_path.exists():
+        print(f"• {config_path} already exists, leaving it as is")
+        return
+
+    with open(config_path, "w") as f:
         f.write(config_content)
-    
+
     print("✓ Jupyter configuration created")
 
 def main():

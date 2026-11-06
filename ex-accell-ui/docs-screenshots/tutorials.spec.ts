@@ -41,7 +41,9 @@ test('tutorial walkthrough', async ({ page }) => {
 
   // Remove anything a previous (possibly interrupted) run left behind so names stay stable
   const removeByName = async (listUrl: string, key: string, deleteUrl: (id: string | number) => string, name: string) => {
-    const body = await (await page.request.get(listUrl)).json();
+    const list = await page.request.get(listUrl);
+    expect(list.ok(), `listing ${key} (HTTP ${list.status()})`).toBe(true);
+    const body = await list.json();
     for (const item of body[key] ?? []) {
       if (item.name === name) await expectDeleted(await page.request.delete(deleteUrl(item.id)), `${key} "${name}"`);
     }
@@ -127,6 +129,7 @@ test('tutorial walkthrough', async ({ page }) => {
     await page.getByRole('button', { name: 'Publish Workflow' }).last().click();
     const body = await (await published).json();
     created.workflow = body.workflow?.id;
+    expect(created.workflow, 'publishing returned a workflow id').toBeTruthy();
     // Publishing confirms with a browser dialog (Playwright dismisses it); the workflow is then listed on Data Management
     await page.goto('/data-management', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /Processing Workflows/ }).click();

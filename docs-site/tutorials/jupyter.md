@@ -12,11 +12,11 @@ been exercised against the demo stack.
 From `ex-accell-ui/`:
 
 ```bash
-npm run jupyter:bootstrap   # once: installs the Python packages and downloads NLTK data
+npm run jupyter:bootstrap   # once: installs the Python packages, downloads NLTK data, adds any missing templates
 npm run dev:jupyter         # starts the web app and Jupyter Lab together
 ```
 
-Or start only Jupyter Lab with `npm run jupyter:start` and open `http://localhost:8888`.
+The bootstrap never overwrites a notebook or a Jupyter configuration that already exists. Or start only Jupyter Lab with `npm run jupyter:start` and open `http://localhost:8888`.
 
 ## 2. Open a template
 

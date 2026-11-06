@@ -7,9 +7,8 @@ echo "🚀 Starting Ex-Accelerator UI with Jupyter Lab..."
 echo "📦 Installing Python dependencies..."
 poetry install
 
-# Bootstrap the notebook environment
-echo "📚 Bootstrapping notebook environment..."
-poetry run python scripts/bootstrap_notebooks.py
+# One-time notebook setup (NLTK data, templates) is `npm run jupyter:bootstrap`; it is not repeated here
+# because it must never overwrite notebooks you have edited.
 
 # Start Jupyter Lab in the background
 echo "🔬 Starting Jupyter Lab server..."
