@@ -88,8 +88,9 @@ library requires them (two legacy `<style>` blocks remain in `routes/gdelt` and
 ## Dapr and the crawler
 
 - `dapr.yaml` runs the UI (app id `ex-accell-ui`, sidecar HTTP 3500) alongside the crawler
-  (app id `telegram-scraper`, gRPC 6481) for local multi-app development. Adjust the crawler's
-  `appDirPath` for your machine.
+  (app id `telegram-scraper`, gRPC 6481, expected in `../crawler`) for local multi-app development.
+- The local Dapr secret store reads `secrets.json`, which is gitignored. Copy it from
+  `secrets.example.json` (`npm run dapr:setup` does this for you).
 - Crawl jobs are scheduled through the Dapr Jobs API from `/api/jobs`. The job payload's `value`
   is `platform:jsonConfig`, for example `telegram:{"urls":["@channel"],"crawlId":"x","maxPosts":1000}`.
   Job state lives in the Redis state store (`/api/job-state`).
