@@ -3,8 +3,8 @@
   import { page } from '$app/stores';
   import Navigation from '$lib/components/Navigation.svelte';
 
-  // Hide nav on full-screen investigation workbench
-  $: isFullScreen = $page.url.pathname.match(/^\/investigations\/\d+/);
+  // Hide nav on full-screen investigation workbench and the login page
+  $: isFullScreen = $page.url.pathname.match(/^\/investigations\/\d+/) || $page.url.pathname === '/login';
 </script>
 
 {#if !isFullScreen}

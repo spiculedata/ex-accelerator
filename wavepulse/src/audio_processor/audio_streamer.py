@@ -1,3 +1,5 @@
+# NOTE: Derived from NYU-DICE-Lab/WavePulse (Apache-2.0, Copyright 2024 New York University).
+# Modified by ex-accelerator contributors (see git history for changes). See NOTICE and README.md.
 """
 Stream audio from multiple radio stations concurrently, saving the recordings in 30-minute segments (configurable) for easier downstream processing.
 - Each recorded audio file is saved in a dedicated recordings folder for backup purposes. A temporary copy is placed in the audio_buffer folder for transcription.

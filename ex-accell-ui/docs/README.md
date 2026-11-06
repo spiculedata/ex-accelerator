@@ -16,13 +16,8 @@ This directory contains organized documentation for the ex-accelerator UI projec
   - Developer setup instructions
   - Jupyter Lab integration guide
   
-- **`testing/`** - Testing documentation and strategies
-  - Cypress test suite documentation
-  - Testing best practices
-
 ## Quick Navigation
 
 - [Database Setup](./database/DATABASE_SETUP.md) - Get started with the unified DuckDB database
 - [Developer Guide](./setup/DEVELOPER_GUIDE.md) - Complete development setup
 - [Unified Database Summary](./database/UNIFIED_DATABASE_SUMMARY.md) - Overview of the analytics database structure
-- [Testing Guide](./testing/CYPRESS_TEST_SUITE_SUMMARY.md) - Cypress testing documentation

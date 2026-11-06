@@ -15,8 +15,9 @@ import type { PublishedWorkflow, WorkflowExecution } from './serverWorkflowServi
 import { unifiedDb } from './duckdb';
 import { writeFile, mkdir, access } from 'fs/promises';
 import { join } from 'path';
+import { assertSafeIdentifier, resolveWithin } from '$lib/utils/pathSafety';
 import { constants } from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { DaprClient, CommunicationProtocolEnum } from '@dapr/dapr';
 
@@ -586,16 +587,17 @@ class DaprWorkflowExecutor {
    * Execute deployed code directly (fallback when Dapr not available)
    */
   private async executeDeployedCodeDirectly(execution: WorkflowExecution, workflowId: string): Promise<void> {
-    const execAsync = promisify(exec);
+    const execFileAsync = promisify(execFile);
 
     try {
+      assertSafeIdentifier(workflowId, 'workflowId');
       execution.logs.push({
         timestamp: new Date().toISOString(),
         level: 'info',
         message: 'Attempting direct execution of deployed Python code'
       });
 
-      const workflowFile = join(process.cwd(), 'deployed-workflows', `${workflowId}.py`);
+      const workflowFile = resolveWithin(join(process.cwd(), 'deployed-workflows'), `${workflowId}.py`);
       
       // Check if the workflow file exists
       try {
@@ -616,7 +618,7 @@ class DaprWorkflowExecutor {
       });
       
       // Execute the deployed Python workflow
-      const { stdout, stderr } = await execAsync(`python3 "${workflowFile}"`, {
+      const { stdout, stderr } = await execFileAsync('python3', [workflowFile], {
         timeout: 5 * 60 * 1000, // 5 minute timeout
         cwd: join(process.cwd(), 'deployed-workflows')
       });

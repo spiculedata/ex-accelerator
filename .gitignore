@@ -21,3 +21,18 @@ logs/
 
 # Temp / scratch
 temp/
+
+# Local AI-assistant tooling (per-developer; see .mcp.json.example)
+.claude/
+.pi/
+.mcp.json
+
+# Runtime data and model weights (multi-GB, contains recorded broadcasts and transcripts)
+wavepulse/assets/data/
+wavepulse/assets/models/
+
+# Generated documentation build output
+crawler/docs/_site/
+
+# Third-party Superset checkout (2 GB clone of apache/superset); use the official image instead
+/superset/

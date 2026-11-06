@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cognee": {
+      "type": "http",
+      "url": "http://YOUR-COGNEE-HOST:8001/mcp"
+    }
+  }
+}

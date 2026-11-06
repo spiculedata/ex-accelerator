@@ -4,6 +4,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
 /**
@@ -11,45 +12,40 @@ import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/se
  * This leverages DuckDB's analytical engine on PostgreSQL tables
  */
 async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-  try {
-    // Execute query using DuckDB execution engine for analytical queries
-    const rows = await postgresPool.duckdbQuery(sql, params);
+  // Errors propagate: callers map failures through queryErrorResponse (missing table => empty, else 500)
+  const rows = await postgresPool.duckdbQuery(sql, params);
 
-    // Convert BigInts and numeric strings to regular numbers for JSON serialization
-    // PostgreSQL's pg driver returns COUNT/AVG/SUM/numeric columns as strings
-    const numericColumns = new Set([
-      'count', 'post_count', 'total_posts', 'total_size', 'topic_count',
-      'avg_confidence', 'avg_coherence', 'positive_ratio', 'correlation',
-      'positive', 'negative', 'neutral', 'total_posts_analyzed',
-      'positive_count', 'negative_count', 'neutral_count',
-      'hour_of_day', 'document_count', 'average_engagement', 'growth_rate',
-      'similarity_score', 'weight', 'size', 'coherence_score', 'rank_position',
-      'confidence', 'confidence_score', 'intensity_score',
-      'avg_negative_percentage', 'avg_neutral_percentage',
-      'record_count', 'health',
-      'total_transcripts', 'total_seconds', 'station_count', 'avg_duration',
-      'political_count', 'ad_count', 'transcript_count', 'positive_count',
-      'negative_count', 'neutral_count', 'avg_relevance', 'word_count',
-      'duration_seconds', 'avg_confidence'
-    ]);
+  // Convert BigInts and numeric strings to regular numbers for JSON serialization
+  // PostgreSQL's pg driver returns COUNT/AVG/SUM/numeric columns as strings
+  const numericColumns = new Set([
+    'count', 'post_count', 'total_posts', 'total_size', 'topic_count',
+    'avg_confidence', 'avg_coherence', 'positive_ratio', 'correlation',
+    'positive', 'negative', 'neutral', 'total_posts_analyzed',
+    'positive_count', 'negative_count', 'neutral_count',
+    'hour_of_day', 'document_count', 'average_engagement', 'growth_rate',
+    'similarity_score', 'weight', 'size', 'coherence_score', 'rank_position',
+    'confidence', 'confidence_score', 'intensity_score',
+    'avg_negative_percentage', 'avg_neutral_percentage',
+    'record_count', 'health',
+    'total_transcripts', 'total_seconds', 'station_count', 'avg_duration',
+    'political_count', 'ad_count', 'transcript_count', 'positive_count',
+    'negative_count', 'neutral_count', 'avg_relevance', 'word_count',
+    'duration_seconds', 'avg_confidence'
+  ]);
 
-    return rows.map(row => {
-      const serializedRow: any = {};
-      for (const [key, value] of Object.entries(row)) {
-        if (typeof value === 'bigint') {
-          serializedRow[key] = Number(value);
-        } else if (typeof value === 'string' && numericColumns.has(key) && value !== '' && !isNaN(Number(value))) {
-          serializedRow[key] = Number(value);
-        } else {
-          serializedRow[key] = value;
-        }
+  return rows.map(row => {
+    const serializedRow: any = {};
+    for (const [key, value] of Object.entries(row)) {
+      if (typeof value === 'bigint') {
+        serializedRow[key] = Number(value);
+      } else if (typeof value === 'string' && numericColumns.has(key) && value !== '' && !isNaN(Number(value))) {
+        serializedRow[key] = Number(value);
+      } else {
+        serializedRow[key] = value;
       }
-      return serializedRow;
-    });
-  } catch (error) {
-    console.error(`PostgreSQL/DuckDB query error:`, error);
-    return [];
-  }
+    }
+    return serializedRow;
+  });
 }
 
 /**
@@ -192,8 +188,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('Cross-platform sentiment query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Cross-platform sentiment', error, []);
       }
     }
     
@@ -244,8 +239,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('Sentiment trends query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Sentiment trends', error, []);
       }
     }
     
@@ -299,8 +293,7 @@ export const GET: RequestHandler = async ({ url }) => {
         
         return json({ success: true, data });
       } catch (error) {
-        console.error('Sample posts query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Sample posts', error, []);
       }
     }
     
@@ -337,8 +330,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('Platform performance query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Platform performance', error, []);
       }
     }
     
@@ -363,8 +355,7 @@ export const GET: RequestHandler = async ({ url }) => {
         
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Top keywords query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Top keywords', error, []);
       }
     }
     
@@ -387,8 +378,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Emotion correlations query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Emotion correlations', error, []);
       }
     }
 
@@ -409,8 +399,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Emotion stats query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Emotion stats', error, []);
       }
     }
 
@@ -441,8 +430,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Sentiment keywords query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Sentiment keywords', error, []);
       }
     }
     
@@ -465,8 +453,7 @@ export const GET: RequestHandler = async ({ url }) => {
         
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Hourly patterns query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Hourly patterns', error, []);
       }
     }
     
@@ -514,8 +501,7 @@ export const GET: RequestHandler = async ({ url }) => {
         
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Export data query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Export data', error, []);
       }
     }
     
@@ -541,8 +527,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Topics overview query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Topics overview', error, []);
       }
     }
 
@@ -569,8 +554,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Topic keywords query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Topic keywords', error, []);
       }
     }
 
@@ -596,8 +580,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Topic trends query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Topic trends', error, []);
       }
     }
 
@@ -620,8 +603,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Topic relationships query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Topic relationships', error, []);
       }
     }
 
@@ -644,8 +626,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: data || [] });
       } catch (error) {
-        console.error('Topic categories query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Topic categories', error, []);
       }
     }
     
@@ -665,8 +646,7 @@ export const GET: RequestHandler = async ({ url }) => {
         `);
         return json({ success: true, data });
       } catch (error) {
-        console.error('Language stats query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Language stats', error, []);
       }
     }
 
@@ -683,8 +663,7 @@ export const GET: RequestHandler = async ({ url }) => {
         `);
         return json({ success: true, data });
       } catch (error) {
-        console.error('Language trends query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Language trends', error, []);
       }
     }
 
@@ -712,8 +691,7 @@ export const GET: RequestHandler = async ({ url }) => {
         `, params);
         return json({ success: true, data });
       } catch (error) {
-        console.error('Language detection detail query failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Language detection detail', error, []);
       }
     }
 
@@ -755,8 +733,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT summary failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT summary', error, []);
       }
     }
 
@@ -797,8 +774,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT by country failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT by country', error, []);
       }
     }
 
@@ -858,8 +834,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT by event type failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT by event type', error, []);
       }
     }
 
@@ -894,8 +869,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT timeline failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT timeline', error, []);
       }
     }
 
@@ -934,8 +908,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT top actors failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT top actors', error, []);
       }
     }
 
@@ -1042,8 +1015,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: { summary: summary[0], actors, eventTypes, toneTrend, keyEvents } });
       } catch (error) {
-        console.error('GDELT country detail failed:', error);
-        return json({ success: true, data: {} });
+        return queryErrorResponse('GDELT country detail', error, {});
       }
     }
 
@@ -1082,8 +1054,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data });
       } catch (error) {
-        console.error('GDELT conflicts failed:', error);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('GDELT conflicts', error, []);
       }
     }
 
@@ -1128,8 +1099,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
         return json({ success: true, data: { summary: summary[0], events } });
       } catch (error) {
-        console.error('GDELT search failed:', error);
-        return json({ success: true, data: {} });
+        return queryErrorResponse('GDELT search', error, {});
       }
     }
 
@@ -1407,8 +1377,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio overview query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio overview', err, []);
       }
     }
 
@@ -1424,8 +1393,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio sentiment query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio sentiment', err, []);
       }
     }
 
@@ -1442,8 +1410,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio by-station query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio by-station', err, []);
       }
     }
 
@@ -1461,8 +1428,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio trends query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio trends', err, []);
       }
     }
 
@@ -1474,8 +1440,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio topics query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio topics', err, []);
       }
     }
 
@@ -1491,8 +1456,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio political query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio political', err, []);
       }
     }
 
@@ -1537,8 +1501,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `, params);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio transcripts query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio transcripts', err, []);
       }
     }
 
@@ -1551,8 +1514,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         `);
         return json({ success: true, data });
       } catch (err) {
-        console.error('Radio wordcloud query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Radio wordcloud', err, []);
       }
     }
 
@@ -1618,8 +1580,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data });
       } catch (err) {
-        console.error('Investigation timeline query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation timeline', err, []);
       }
     }
 
@@ -1655,8 +1616,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data });
       } catch (err) {
-        console.error('Investigation GDELT events query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation GDELT events', err, []);
       }
     }
 
@@ -1686,8 +1646,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data });
       } catch (err) {
-        console.error('Investigation radio segments query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation radio segments', err, []);
       }
     }
 
@@ -1718,8 +1677,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data });
       } catch (err) {
-        console.error('Investigation social posts query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation social posts', err, []);
       }
     }
 
@@ -1781,8 +1739,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data: data || [] });
       } catch (err) {
-        console.error('Investigation keyword overlap query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation keyword overlap', err, []);
       }
     }
 
@@ -1819,8 +1776,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data: data || [] });
       } catch (err) {
-        console.error('Investigation locations query failed:', err);
-        return json({ success: true, data: [] });
+        return queryErrorResponse('Investigation locations', err, []);
       }
     }
 
@@ -1879,8 +1835,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
         return json({ success: true, data: { actors: data || [], pairs: pairs || [] } });
       } catch (err) {
-        console.error('Investigation actors query failed:', err);
-        return json({ success: true, data: { actors: [], pairs: [] } });
+        return queryErrorResponse('Investigation actors', err, { actors: [], pairs: [] });
       }
     }
 
@@ -1910,11 +1865,6 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     });
   } catch (err) {
-    console.error('Unified analytics API error:', err);
-    return json({
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-      message: 'Failed to process unified analytics request'
-    });
+    return queryErrorResponse('Unified analytics request', err, []);
   }
 };

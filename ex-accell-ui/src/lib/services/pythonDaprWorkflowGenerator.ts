@@ -3,11 +3,12 @@
 
 import { writeFile, mkdir, access, readFile } from 'fs/promises';
 import { join } from 'path';
-import { exec } from 'child_process';
+import { assertSafeIdentifier } from '$lib/utils/pathSafety';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { GeneratedWorkflow } from './daprWorkflowGenerator';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface WorkflowStep {
   id: string;
@@ -73,6 +74,8 @@ export class PythonDaprWorkflowGenerator {
     workflowId: string, 
     generatedWorkflow: PythonDaprWorkflow
   ): Promise<string> {
+    assertSafeIdentifier(workflowId, 'workflowId');
+
     try {
       // Create directories
       await this.ensureDirectories(workflowId);
@@ -821,15 +824,15 @@ def ${activityName}(ctx: WorkflowActivityContext, input_data: dict):
       console.log(`Setting up virtual environment with Dapr SDK: ${venvPath}`);
       
       // Create virtual environment
-      await execAsync(`python3 -m venv "${venvPath}"`);
+      await execFileAsync('python3', ['-m', 'venv', venvPath]);
       
       // Upgrade pip
       const pipPath = join(venvPath, 'bin', 'pip');
-      await execAsync(`"${pipPath}" install --upgrade pip`);
+      await execFileAsync(pipPath, ['install', '--upgrade', 'pip']);
       
       // Install requirements (includes Dapr SDK)
       const requirementsPath = join(this.workflowsDir, workflowId, 'requirements.txt');
-      await execAsync(`"${pipPath}" install -r "${requirementsPath}"`);
+      await execFileAsync(pipPath, ['install', '-r', requirementsPath]);
       
       console.log('Virtual environment with Dapr SDK setup completed');
       

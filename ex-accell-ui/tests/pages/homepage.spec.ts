@@ -16,8 +16,8 @@ test.describe('Homepage', () => {
     await expect(page.locator('nav')).toBeVisible();
   });
 
-  test('shows welcome heading', async ({ page }) => {
+  test('shows the app heading', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Social Explorer' }).first()).toBeVisible();
   });
 });
