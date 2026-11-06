@@ -33,6 +33,11 @@ export function getAuthConfig(): AuthConfig {
     if (!process.env.SESSION_SECRET) {
       log.warn('SESSION_SECRET not set; using an ephemeral secret, sessions reset on restart');
     }
+    if (!dev && !process.env.ADDRESS_HEADER) {
+      log.warn(
+        'ADDRESS_HEADER is not set. Behind a reverse proxy every request then looks like one client, so the per-address login limit applies to the whole site. See the deployment guide.'
+      );
+    }
   }
   return cachedConfig;
 }
