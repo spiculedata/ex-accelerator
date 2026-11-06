@@ -331,10 +331,12 @@ describe('GET /api/unified-analytics trigrams', () => {
 });
 
 describe('GET /api/unified-analytics removed placeholder queries', () => {
-  it('no longer serves invented datasets (use /api/datasets)', async () => {
+  it('does not serve invented datasets: type=datasets falls through to the default handler', async () => {
     const response = await GET({ url: new URL('http://localhost/api/unified-analytics?type=datasets') } as Parameters<typeof GET>[0]);
-    const text = JSON.stringify(await response.json());
+    const body = await response.json();
 
-    expect(text).not.toContain('Sample Social Media Data');
+    expect(JSON.stringify(body)).not.toContain('Sample Social Media Data');
+    expect(body.datasets).toBeUndefined();
+    expect(body.endpoints?.datasets).toBeUndefined();
   });
 });

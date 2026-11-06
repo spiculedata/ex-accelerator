@@ -448,47 +448,7 @@
         wavePulseConfig.enableClassification ? `[${new Date().toISOString()}] INFO: Content classification enabled` : null,
         wavePulseConfig.enableDiarization ? `[${new Date().toISOString()}] INFO: Speaker diarization active` : null
       ].filter(Boolean) : []
-    })),
-    // Princeton SMART extract job, shown only once a dataset has been configured
-    ...(princetonSmartConfig.datasetId
-      ? [
-          {
-            id: 'princeton-smart-extract',
-            name: `Princeton SMART: ${princetonSmartConfig.datasetId}`,
-            type: 'princeton-smart',
-            status:
-              princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'
-                ? 'running'
-                : princetonSmartStatus === 'completed'
-                  ? 'completed'
-                  : princetonSmartStatus === 'error'
-                    ? 'failed'
-                    : 'scheduled',
-            progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
-            startTime: princetonSmartResults?.startTime || null,
-            nextRun: null,
-            schedule:
-              princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end
-                ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}`
-                : 'Date range not configured',
-            itemsCollected: princetonSmartResults?.recordCount || 0,
-            totalEstimated: princetonSmartConfig.maxRecords || 0,
-            query: princetonSmartConfig.query || 'No query specified',
-            apiEndpoint: princetonSmartConfig.apiEndpoint,
-            logs:
-              princetonSmartStatus !== 'idle'
-                ? [
-                    `[${new Date().toISOString()}] INFO: Princeton SMART extract initiated`,
-                    `[${new Date().toISOString()}] INFO: Dataset: ${princetonSmartConfig.datasetId}`,
-                    `[${new Date().toISOString()}] INFO: Query: ${princetonSmartConfig.query || 'No query specified'}`,
-                    princetonSmartConfig.filters.language !== 'all' ? `[${new Date().toISOString()}] INFO: Language filter: ${princetonSmartConfig.filters.language}` : null,
-                    princetonSmartConfig.filters.location ? `[${new Date().toISOString()}] INFO: Location filter: ${princetonSmartConfig.filters.location}` : null,
-                    princetonSmartResults ? `[${new Date().toISOString()}] INFO: Extracted ${princetonSmartResults.recordCount} records` : null
-                  ].filter(Boolean)
-                : []
-          }
-        ]
-      : [])
+    }))
   ];
 
   // Sorting state
@@ -604,9 +564,6 @@
     includeAnalytics: false
   };
   
-  let princetonSmartStatus = 'idle'; // idle, connecting, fetching, completed, error
-  let princetonSmartProgress = 0;
-  let princetonSmartResults: any = null;
 
   // WavePulse configuration state
   let wavePulseConfig = {
@@ -700,19 +657,6 @@
       includeMetadata: true,
       includeAnalytics: false
     };
-    princetonSmartStatus = 'idle';
-    princetonSmartProgress = 0;
-    princetonSmartResults = null;
-  }
-
-  function handlePrincetonSmartImport() {
-    if (!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId) {
-      return;
-    }
-
-    // Importing from Princeton SMART is not implemented. Say so rather than simulating a successful import.
-    errorMessage = 'Importing Princeton SMART data is not available yet.';
-    princetonSmartStatus = 'error';
   }
 
   // WavePulse functions
@@ -2736,48 +2680,9 @@
             </div>
           </div>
 
-          <!-- Status and Progress -->
-          {#if princetonSmartStatus === 'connecting'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center">
-                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-                <span class="text-sm font-medium text-blue-800">Connecting to Princeton SMART API...</span>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'fetching'}
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700">Fetching data from SMART...</span>
-                <span class="text-sm text-gray-500">{princetonSmartProgress}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {princetonSmartProgress}%"></div>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'completed'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-blue-800">Data imported successfully!</span>
-                </div>
-                {#if princetonSmartResults}
-                  <span class="text-sm text-blue-600">{princetonSmartResults.recordCount} records imported</span>
-                {/if}
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'error'}
-            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-sm font-medium text-red-800">Error connecting to Princeton SMART API</span>
-              </div>
-            </div>
-          {/if}
+          <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            Importing from Princeton SMART is not available yet. This form previews the planned configuration.
+          </div>
 
           <!-- Actions -->
           <div class="flex justify-between items-center">
@@ -2792,11 +2697,12 @@
                 class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 Reset Form
               </button>
-              <button 
-                on:click={handlePrincetonSmartImport}
-                disabled={!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId || princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'}
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
-                {princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'Importing...' : 'Import Data'}
+              <button
+                type="button"
+                disabled
+                title="Importing from Princeton SMART is not available yet"
+                class="px-6 py-2 bg-gray-400 text-white rounded-md text-sm font-medium cursor-not-allowed">
+                Import Data
               </button>
             </div>
           </div>
@@ -2966,113 +2872,7 @@
                               <svg class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828a2 2 0 01-1.414-.586l5-5A2 2 0 009 12.172V5L8 4z"></path>
                               </svg>
-                            {:else if job.type === 'princeton-smart'}
-                              <svg class="w-5 h-5 text-purple-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                              </svg>
                             {:else}
-                              <svg class="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0 9c-5 0-9-4-9-9m9 9c5 0 9-4 9-9m0-9v9"></path>
-                              </svg>
-                            {/if}
-                            <div class="min-w-0">
-                              <div class="text-sm font-medium text-gray-900 truncate">{job.name}</div>
-                              <div class="text-xs text-gray-500">
-                                {#if job.type === 'wavepulse'}
-                                  Radio Stream
-                                {:else if job.type === 'princeton-smart'}
-                                  SMART Extract
-                                {:else}
-                                  Crawler Job
-                                {/if}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <!-- Status -->
-                        <td class="px-6 py-4 whitespace-nowrap">
-                          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(job.status)}">
-                            {job.status}
-                          </span>
-                          {#if job.status === 'running' && job.progress !== undefined}
-                            <div class="mt-1 w-24">
-                              <div class="w-full bg-gray-200 rounded-full h-1">
-                                <div class="bg-blue-600 h-1 rounded-full" style="width: {job.progress}%"></div>
-                              </div>
-                              <div class="text-xs text-gray-500 mt-0.5">{job.progress}%</div>
-                            </div>
-                          {/if}
-                        </td>
-
-                        <!-- Schedule -->
-                        <td class="px-6 py-4">
-                          <div class="text-sm text-gray-900">{job.schedule || '-'}</div>
-                        </td>
-
-                        <!-- Items Collected -->
-                        <td class="px-6 py-4 whitespace-nowrap">
-                          <div class="text-sm text-gray-900">{(job.itemsCollected || 0).toLocaleString()}</div>
-                          {#if job.totalEstimated}
-                            <div class="text-xs text-gray-500">of {job.totalEstimated.toLocaleString()}</div>
-                          {/if}
-                        </td>
-
-                        <!-- Time -->
-                        <td class="px-6 py-4 whitespace-nowrap">
-                          <div class="text-sm text-gray-900">
-                            {#if job.status === 'scheduled' && job.nextRun}
-                              {formatDateTime(job.nextRun)}
-                            {:else if job.startTime}
-                              {formatDateTime(job.startTime)}
-                            {:else}
-                              -
-                            {/if}
-                          </div>
-                          <div class="text-xs text-gray-500">
-                            {job.status === 'running' ? 'Started' : job.status === 'scheduled' ? 'Next Run' : 'Last Run'}
-                          </div>
-                        </td>
-
-                        <!-- Actions -->
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {#if job.type === 'wavepulse'}
-                            <div class="flex items-center justify-end space-x-2">
-                              {#if job.status === 'scheduled' || job.status === 'idle'}
-                                <button
-                                  on:click={handleWavePulseStart}
-                                  class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-md">
-                                  Start
-                                </button>
-                              {:else if job.status === 'running'}
-                                <button
-                                  on:click={handleWavePulseStop}
-                                  class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded-md">
-                                  Stop
-                                </button>
-                              {/if}
-                              <button
-                                on:click={() => activeTab = 'wavepulse'}
-                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
-                                Configure
-                              </button>
-                            </div>
-                          {:else if job.type === 'princeton-smart'}
-                            <div class="flex items-center justify-end space-x-2">
-                              {#if job.status === 'scheduled' || job.status === 'idle' || job.status === 'error'}
-                                <button
-                                  on:click={handlePrincetonSmartImport}
-                                  class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md">
-                                  Run Extract
-                                </button>
-                              {/if}
-                              <button
-                                on:click={() => activeTab = 'princeton-smart'}
-                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
-                                Configure
-                              </button>
-                            </div>
-                          {:else}
                             <div class="flex items-center justify-end space-x-2">
                               {#if job.status === 'scheduled' || job.status === 'pending'}
                                 <button
