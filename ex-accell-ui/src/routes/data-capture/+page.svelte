@@ -426,7 +426,7 @@
     return `Daily (${timeSlots.length} time slots)`;
   }
 
-  // Combine crawler jobs, WavePulse schedules, and Princeton SMART extracts
+  // Combine crawler jobs and WavePulse schedules
   $: allJobs = [
     ...crawlJobs,
     ...wavePulseConfig.radioStreams.map((stream, index) => ({
@@ -2714,7 +2714,7 @@
     {#if activeTab === 'schedule'}
       <div class="space-y-6">
         <!-- Statistics -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-2xl font-bold text-emerald-600 mb-1">{allJobs.filter(job => job.status === 'running').length}</div>
             <div class="text-sm text-gray-600">Running</div>
@@ -2734,10 +2734,6 @@
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-2xl font-bold text-amber-600 mb-1">{allJobs.filter(job => job.type === 'wavepulse').length}</div>
             <div class="text-sm text-gray-600">Radio Streams</div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-            <div class="text-2xl font-bold text-purple-600 mb-1">{allJobs.filter(job => job.type === 'princeton-smart').length}</div>
-            <div class="text-sm text-gray-600">SMART Extracts</div>
           </div>
         </div>
 
@@ -2872,10 +2868,6 @@
                               <svg class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828a2 2 0 01-1.414-.586l5-5A2 2 0 009 12.172V5L8 4z"></path>
                               </svg>
-                            {:else if job.type === 'princeton-smart'}
-                              <svg class="w-5 h-5 text-purple-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                              </svg>
                             {:else}
                               <svg class="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0 9c-5 0-9-4-9-9m9 9c5 0 9-4 9-9m0-9v9"></path>
@@ -2886,8 +2878,6 @@
                               <div class="text-xs text-gray-500">
                                 {#if job.type === 'wavepulse'}
                                   Radio Stream
-                                {:else if job.type === 'princeton-smart'}
-                                  SMART Extract
                                 {:else}
                                   Crawler Job
                                 {/if}
@@ -2959,14 +2949,6 @@
                               {/if}
                               <button
                                 on:click={() => activeTab = 'wavepulse'}
-                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
-                                Configure
-                              </button>
-                            </div>
-                          {:else if job.type === 'princeton-smart'}
-                            <div class="flex items-center justify-end space-x-2">
-                              <button
-                                on:click={() => activeTab = 'princeton-smart'}
                                 class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
                                 Configure
                               </button>
