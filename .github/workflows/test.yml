@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build & Type Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,7 @@ jobs:
   unit-tests:
     name: Unit Tests (Vitest)
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +74,7 @@ jobs:
   playwright-e2e:
     name: E2E Tests (Playwright)
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: pgduckdb/pgduckdb:17-main
