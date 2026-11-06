@@ -17,7 +17,7 @@
 
 {#if user}
   <div class="hidden md:flex items-center space-x-3">
-    <div class="text-right leading-tight">
+    <div class="hidden min-[1700px]:block text-right leading-tight" title="{user.name} ({user.role})">
       <p class="text-sm font-medium text-gray-900">{user.name}</p>
       <p class="text-xs text-gray-500 capitalize">{user.role}</p>
     </div>
@@ -25,7 +25,8 @@
       type="button"
       on:click={signOut}
       disabled={isSigningOut}
-      class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors disabled:opacity-60"
+      title="Signed in as {user.name} ({user.role})"
+      class="shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors disabled:opacity-60"
     >
       Sign out
     </button>

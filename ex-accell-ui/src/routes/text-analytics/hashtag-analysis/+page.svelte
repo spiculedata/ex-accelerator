@@ -93,8 +93,17 @@
     });
   }
 
-  onMount(() => { loadData(); });
-  $: if (workspaceId !== undefined && !loading) loadData();
+  // Load once on mount, then again only when the selected workspace changes. (Gating on `loading`
+  // instead re-triggers the load every time it finishes, which loops forever.)
+  let loadedWorkspace: string | null | undefined;
+  let mounted = false;
+  onMount(() => {
+    mounted = true;
+  });
+  $: if (mounted && workspaceId !== loadedWorkspace) {
+    loadedWorkspace = workspaceId;
+    loadData();
+  }
 </script>
 
 <svelte:head>

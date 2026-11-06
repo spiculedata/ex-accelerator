@@ -1165,7 +1165,7 @@
 						
 						<!-- Loading Overlay for Filter Panel -->
 						{#if isUpdatingFilter}
-							<div class="absolute inset-0 bg-white bg-opacity-90 rounded-xl flex items-center justify-center z-40">
+							<div class="absolute inset-0 bg-white/90 rounded-xl flex items-center justify-center z-40">
 								<div class="text-center">
 									<div class="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600 mx-auto mb-3"></div>
 									<div class="text-sm font-medium text-gray-700">Updating filters...</div>
@@ -1748,7 +1748,7 @@
 							
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}
-								<div class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+								<div class="absolute inset-0 bg-white/75 flex items-center justify-center z-50">
 									<div class="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
 										<div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
 										<div class="text-lg font-semibold text-gray-900 mb-2">Refreshing Data</div>
