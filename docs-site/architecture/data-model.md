@@ -1,14 +1,21 @@
 # Data model
 
 All analytics live in one PostgreSQL database. Posts from every platform land in a shared `posts`
-table, and each analytics module adds its own tables keyed to it. Schema definitions are in
-`ex-accell-ui/sql/schemas/`.
+table, and each analytics module adds its own tables keyed to it. The core definitions are in
+`ex-accell-ui/db/migrations/`.
 
-::: warning Work in progress
-A fresh install does not yet create these tables automatically; see
-[issue #83](https://github.com/spiculedata/ex-accelerator/issues/83). Until then, apply the schema
-files you need with `psql`. Until a table exists, the related dashboards show an empty state.
-:::
+## Schema management
+
+The web app creates and updates the core schema itself. On the first sign-in it applies the SQL files
+in `ex-accell-ui/db/migrations/` in order and records each in a `schema_migrations` table, so every
+file runs once. A database that already contains the core tables (an install from before migrations
+existed) is recorded as up to date without running anything, so existing data is never touched.
+
+To change the schema, add the next numbered file (for example `0004_add_thing.sql`). Keep migrations
+to DDL; sample data belongs in `ex-accell-ui/db/seed/`.
+
+Tables for optional pipelines (GDELT, radio, image processing) are created by their ETL jobs, not by
+migrations. Until a table exists, the related dashboards show an empty state.
 
 ## Core tables
 

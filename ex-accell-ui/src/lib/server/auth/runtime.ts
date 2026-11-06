@@ -1,6 +1,7 @@
 import { dev } from '$app/environment';
 import { createLogger } from '$lib/utils/logger';
 import { resolveAuthConfig, type AuthConfig } from './config';
+import { migrateDatabase } from '$lib/server/migrations';
 import { createLoginThrottle } from './throttle';
 import { bootstrapAdmin, ensureAuthSchema } from './userRepo';
 
@@ -31,10 +32,11 @@ export function getAuthConfig(): AuthConfig {
 
 let preparation: Promise<void> | null = null;
 
-/** Ensures the users table exists and the first admin is bootstrapped. Retried after failure. */
+/** Migrates the schema, ensures the users table exists and bootstraps the first admin. Retried after failure. */
 export function prepareAuth(): Promise<void> {
   if (!preparation) {
     preparation = (async () => {
+      await migrateDatabase();
       await ensureAuthSchema();
       const result = await bootstrapAdmin(process.env);
       if (result === 'created') log.info('Created initial admin user from ADMIN_EMAIL');

@@ -1,5 +1,9 @@
 # SQL Directory
 
+> **The core schema now lives in `../db/migrations/`** and is applied automatically on first
+> sign-in (see the data model docs). The files here are reference material from earlier
+> DuckDB-based work; several are DuckDB-dialect and do not apply to PostgreSQL unchanged.
+
 This directory contains all SQL-related files for the ex-accelerator UI project.
 
 ## Structure
