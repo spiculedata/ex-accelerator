@@ -638,9 +638,9 @@ export const GET: RequestHandler = async ({ url }) => {
             l.code as language_code,
             l.name as language,
             COUNT(ld.id) as post_count,
-            AVG(ld.confidence) as confidence
+            AVG(ld.confidence_score) as confidence
           FROM language_detection ld
-          JOIN languages l ON ld.language_code = l.code
+          JOIN languages l ON ld.language_id = l.id
           GROUP BY l.code, l.name
           ORDER BY post_count DESC
         `);
