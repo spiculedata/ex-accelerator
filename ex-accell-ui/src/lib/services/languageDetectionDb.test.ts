@@ -70,42 +70,35 @@ describe('getLanguageStats', () => {
 describe('getLanguageAnalysis', () => {
   it('returns empty array when no data', async () => {
     mockFetch({ 'language-stats': [] });
-    const analysis = await languageDetectionDb.getLanguageAnalysis();
-    expect(analysis).toEqual([]);
+
+    expect(await languageDetectionDb.getLanguageAnalysis()).toEqual([]);
   });
 
-  it('transforms data with confidence breakdown and native names', async () => {
-    const data = [
-      { language: 'English', language_code: 'en', post_count: 100, confidence: 0.95 },
-      { language: 'Welsh', language_code: 'cy', post_count: 50, confidence: 0.8 }
-    ];
-    mockFetch({ 'language-stats': data });
+  it('uses the real confidence buckets from the database', async () => {
+    mockFetch({
+      'language-stats': [{
+        language_code: 'es', language: 'Spanish', post_count: '200', confidence: '0.9123',
+        very_high_count: '120', high_count: '50', medium_count: '20', low_count: '10', confidence_stddev: '0.0431'
+      }]
+    });
 
-    const analysis = await languageDetectionDb.getLanguageAnalysis();
+    const [analysis] = await languageDetectionDb.getLanguageAnalysis();
 
-    expect(analysis).toHaveLength(2);
-    expect(analysis[0].code).toBe('en');
-    expect(analysis[0].name).toBe('English');
-    expect(analysis[0].native_name).toBe('English');
-    expect(analysis[0].totalDetections).toBe(100);
-    expect(analysis[0].avgConfidence).toBe(0.95);
-    expect(analysis[0].confidenceStddev).toBe(0.05);
-
-    expect(analysis[1].native_name).toBe('Cymraeg');
+    expect(analysis).toEqual({
+      code: 'es', name: 'Spanish', native_name: 'Español', totalDetections: 200,
+      veryHighConfidence: 120, highConfidence: 50, mediumConfidence: 20, lowConfidence: 10,
+      avgConfidence: 0.91, confidenceStddev: 0.04
+    });
   });
 
-  it('uses language name as native_name for unknown codes', async () => {
-    const data = [
-      { language: 'Klingon', language_code: 'tlh', post_count: 5, confidence: 0.6 }
-    ];
-    mockFetch({ 'language-stats': data });
+  it('uses the language name as native_name for unknown codes', async () => {
+    mockFetch({ 'language-stats': [{ language_code: 'xx', language: 'Klingon', post_count: '1', confidence: '0.9', very_high_count: '0', high_count: '1', medium_count: '0', low_count: '0', confidence_stddev: '0' }] });
 
-    const analysis = await languageDetectionDb.getLanguageAnalysis();
-    expect(analysis[0].native_name).toBe('Klingon');
+    const [analysis] = await languageDetectionDb.getLanguageAnalysis();
+
+    expect(analysis.native_name).toBe('Klingon');
   });
 });
-
-// ─── getLanguageTrends ─────────────────────────────────────────────────────
 
 describe('getLanguageTrends', () => {
   it('returns empty array when no data', async () => {
@@ -134,145 +127,115 @@ describe('getLanguageTrends', () => {
 
 describe('getSamplePosts', () => {
   it('returns empty array when no data', async () => {
-    mockFetch({ 'sample-posts': [] });
-    const posts = await languageDetectionDb.getSamplePosts();
-    expect(posts).toEqual([]);
+    mockFetch({ 'language-posts': [] });
+
+    expect(await languageDetectionDb.getSamplePosts()).toEqual([]);
   });
 
-  it('transforms posts with language mapping based on platform', async () => {
-    const data = [
-      { id: '1', text: 'Hello world', platform: 'twitter', confidence: 0.92, timestamp: '2024-01-01T00:00:00Z' },
-      { id: '2', text: 'Hola mundo', platform: 'facebook', confidence: 0.88, timestamp: '2024-01-02T00:00:00Z' }
-    ];
-    mockFetch({ 'sample-posts': data });
+  it('maps the language detected for each post, not one guessed from its platform', async () => {
+    mockFetch({
+      'language-posts': [{
+        id: 12, text: 'Bonjour', language_code: 'fr', language_name: 'French', confidence: '0.97',
+        timestamp: '2026-10-07 08:30:00', platform: 'bluesky', secondary_language: 'en', secondary_confidence: '0.2'
+      }]
+    });
 
-    const posts = await languageDetectionDb.getSamplePosts();
+    const [post] = await languageDetectionDb.getSamplePosts();
 
-    expect(posts).toHaveLength(2);
-    expect(posts[0].language).toBe('en');
-    expect(posts[0].language_name).toBe('English');
-    expect(posts[0].confidence).toBe(0.92);
-
-    expect(posts[1].language).toBe('es');
-    expect(posts[1].language_name).toBe('Spanish');
+    expect(post).toEqual({
+      id: 12, text: 'Bonjour', language: 'fr', language_name: 'French', confidence: 0.97,
+      timestamp: '2026-10-07T08:30:00.000Z', platform: 'bluesky', secondary_language: 'en', secondary_confidence: 0.2
+    });
   });
 
-  it('passes platform and limit filters', async () => {
-    mockFetch({ 'sample-posts': [] });
-    await languageDetectionDb.getSamplePosts({ platform: 'twitter', limit: 25 });
+  it('leaves the secondary language empty when none was detected', async () => {
+    mockFetch({ 'language-posts': [{ id: 1, text: 'Hi', language_code: 'en', language_name: 'English', confidence: '0.99', timestamp: '2026-10-07 08:30:00', platform: 'telegram', secondary_language: null, secondary_confidence: null }] });
 
-    const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('platform')).toBe('twitter');
-    expect(parsed.searchParams.get('limit')).toBe('25');
+    const [post] = await languageDetectionDb.getSamplePosts();
+
+    expect(post.secondary_language).toBeNull();
+    expect(post.secondary_confidence).toBeNull();
+  });
+
+  it('passes the platform, language, confidence and limit filters to the API', async () => {
+    mockFetch({ 'language-posts': [] });
+
+    await languageDetectionDb.getSamplePosts({ platform: 'youtube', language: 'es', confidenceThreshold: 0.8, limit: 25 } as any);
+
+    const url = String((fetch as any).mock.calls[0][0]);
+    expect(url).toContain('platform=youtube');
+    expect(url).toContain('language=es');
+    expect(url).toContain('minConfidence=0.8');
+    expect(url).toContain('limit=25');
   });
 });
-
-// ─── getLanguageMixing ─────────────────────────────────────────────────────
 
 describe('getLanguageMixing', () => {
   it('returns empty array when no data', async () => {
-    mockFetch({ 'emotion-correlations': [] });
-    const mixing = await languageDetectionDb.getLanguageMixing();
-    expect(mixing).toEqual([]);
+    mockFetch({ 'language-mixing': [] });
+
+    expect(await languageDetectionDb.getLanguageMixing()).toEqual([]);
   });
 
-  it('generates mixing pairs from correlation data', async () => {
-    const data = [
-      { score: 50 },
-      { score: 40 },
-      { score: 30 }
-    ];
-    mockFetch({ 'emotion-correlations': data });
+  it('maps real language pairs with their share of all mixed posts', async () => {
+    mockFetch({
+      'language-mixing': [
+        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30' },
+        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10' }
+      ]
+    });
 
     const mixing = await languageDetectionDb.getLanguageMixing();
 
-    expect(mixing).toHaveLength(3);
-    expect(mixing[0].primary_language).toBe('English');
-    expect(mixing[0].secondary_language).toBe('Spanish');
-    expect(mixing[0].occurrence_count).toBeGreaterThanOrEqual(10);
-    expect(mixing[0].percentage).toBeGreaterThan(0);
+    expect(mixing).toEqual([
+      { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: 30, percentage: 75 },
+      { primary_language: 'English', secondary_language: 'French', occurrence_count: 10, percentage: 25 }
+    ]);
   });
 });
-
-// ─── getGeographicDistribution ─────────────────────────────────────────────
 
 describe('getGeographicDistribution', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'platform-performance': [] });
-    const geo = await languageDetectionDb.getGeographicDistribution();
-    expect(geo).toEqual([]);
-  });
+  it('returns nothing because posts carry no location data', async () => {
+    mockFetch({ 'platform-performance': [{ platform: 'twitter', total_posts: 100 }] });
 
-  it('generates geographic distribution from platform data', async () => {
-    const data = [
-      { platform: 'twitter', total_posts: 1000 }
-    ];
-    mockFetch({ 'platform-performance': data });
-
-    const geo = await languageDetectionDb.getGeographicDistribution();
-
-    expect(geo).toHaveLength(5);
-    expect(geo[0].language_name).toBe('English');
-    expect(geo[0].country_code).toBe('US');
-    expect(geo[0].region).toBe('North America');
-    expect(geo[0].country_rank).toBe(1);
-    expect(geo[0].post_count).toBeGreaterThan(0);
+    expect(await languageDetectionDb.getGeographicDistribution()).toEqual([]);
   });
 });
-
-// ─── getLanguageDetectionStats ─────────────────────────────────────────────
 
 describe('getLanguageDetectionStats', () => {
   it('returns defaults when no data', async () => {
-    mockFetch({ 'cross-platform-sentiment': [] });
+    mockFetch({ 'language-stats': [] });
+
     const stats = await languageDetectionDb.getLanguageDetectionStats();
 
     expect(stats.totalPosts).toBe(0);
     expect(stats.totalLanguages).toBe(0);
-    expect(stats.avgConfidence).toBe(0);
-    expect(stats.topLanguage.name).toBe('English');
-    expect(stats.confidenceDistribution.veryHigh).toBe(0);
+    expect(stats.confidenceDistribution).toEqual({ veryHigh: 0, high: 0, medium: 0, low: 0 });
   });
 
-  it('calculates stats from cross-platform data', async () => {
-    const data = [
-      { post_count: 200, avg_confidence: 0.9 },
-      { post_count: 100, avg_confidence: 0.8 }
-    ];
-    mockFetch({ 'cross-platform-sentiment': data });
+  it('aggregates real totals, the top language and the confidence distribution', async () => {
+    mockFetch({
+      'language-stats': [
+        { language_code: 'en', language: 'English', post_count: '300', confidence: '0.9', very_high_count: '200', high_count: '60', medium_count: '30', low_count: '10', confidence_stddev: '0.05' },
+        { language_code: 'es', language: 'Spanish', post_count: '100', confidence: '0.8', very_high_count: '40', high_count: '30', medium_count: '20', low_count: '10', confidence_stddev: '0.06' }
+      ]
+    });
 
     const stats = await languageDetectionDb.getLanguageDetectionStats();
 
-    expect(stats.totalPosts).toBe(300);
-    expect(stats.totalLanguages).toBe(5);
-    expect(stats.avgConfidence).toBe(0.85);
-    expect(stats.confidenceDistribution.veryHigh).toBe(Math.floor(300 * 0.4));
-    expect(stats.confidenceDistribution.high).toBe(Math.floor(300 * 0.3));
-    expect(stats.lastUpdated).toBeTruthy();
+    expect(stats.totalPosts).toBe(400);
+    expect(stats.totalLanguages).toBe(2);
+    expect(stats.avgConfidence).toBe(0.88);
+    expect(stats.topLanguage).toEqual({ name: 'English' });
+    expect(stats.confidenceDistribution).toEqual({ veryHigh: 240, high: 90, medium: 50, low: 20 });
   });
 });
 
-// ─── exportLanguageData ────────────────────────────────────────────────────
-
 describe('exportLanguageData', () => {
   it('combines results from all queries', async () => {
-    const langStats = [
-      { language: 'English', language_code: 'en', post_count: 100, confidence: 0.9 }
-    ];
-    const samplePosts = [
-      { id: '1', text: 'Hello', platform: 'twitter', confidence: 0.9, timestamp: '2024-01-01T00:00:00Z' }
-    ];
-    const crossPlatform = [{ post_count: 100, avg_confidence: 0.9 }];
-    const platformPerf = [{ platform: 'twitter', total_posts: 100 }];
-
     mockFetch({
-      'language-stats': langStats,
-      'sample-posts': samplePosts,
-      'cross-platform-sentiment': crossPlatform,
-      'platform-performance': platformPerf,
-      'language-trends': [],
-      'emotion-correlations': []
+      'language-stats': [{ language_code: 'en', language: 'English', post_count: '100', confidence: '0.9', very_high_count: '60', high_count: '30', medium_count: '5', low_count: '5', confidence_stddev: '0.04' }],
+      'language-posts': [{ id: 1, text: 'Hello', language_code: 'en', language_name: 'English', confidence: '0.9', timestamp: '2026-10-07 08:30:00', platform: 'telegram', secondary_language: null, secondary_confidence: null }]
     });
 
     const result = await languageDetectionDb.exportLanguageData();

@@ -4,6 +4,8 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
+import { languageQueries } from '$lib/server/languageQueries';
 import { queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
@@ -52,6 +54,27 @@ async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
  * GET /api/unified-analytics
  * Test connection and basic queries for unified analytics
  */
+interface HashtagPostSource {
+  from: string;
+  idColumn: string;
+  contentColumn: string;
+  platformColumn: string;
+}
+
+/** Where hashtags are read from: the ETL silver.posts table when present, else the core posts table. */
+async function hashtagPostSource(): Promise<HashtagPostSource> {
+  const [row] = await executeQuery("SELECT to_regclass('silver.posts') IS NOT NULL AS present");
+  if (row?.present === true) {
+    return { from: 'FROM silver.posts', idColumn: 'post_id', contentColumn: 'content', platformColumn: 'media_type' };
+  }
+  return {
+    from: 'FROM posts p JOIN data_sources ds ON ds.id = p.data_source_id',
+    idColumn: 'p.id',
+    contentColumn: 'p.content',
+    platformColumn: 'ds.platform'
+  };
+}
+
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const type = url.searchParams.get('type');
@@ -538,18 +561,20 @@ export const GET: RequestHandler = async ({ url }) => {
         let whereClause = '';
         if (topicId) {
           params.push(topicId);
-          whereClause = `WHERE topic_id = $1`;
+          whereClause = `WHERE t.topic_id = $1`;
         }
 
+        // Keyed by the readable topics.topic_id so it matches topics-overview
         const data = await executeQuery(`
           SELECT
-            topic_id,
-            keyword,
-            weight,
-            rank_position
-          FROM topic_keywords
+            t.topic_id AS topic_id,
+            tk.keyword,
+            tk.weight,
+            tk.rank_position
+          FROM topic_keywords tk
+          JOIN topics t ON t.id = tk.topic_id
           ${whereClause}
-          ORDER BY topic_id, rank_position
+          ORDER BY t.topic_id, tk.rank_position
         `, params);
 
         return json({ success: true, data: data || [] });
@@ -633,20 +658,38 @@ export const GET: RequestHandler = async ({ url }) => {
     // ─── Language Detection Endpoints ─────────────────────────────────────
     if (type === 'language-stats') {
       try {
-        const data = await executeQuery(`
-          SELECT
-            l.code as language_code,
-            l.name as language,
-            COUNT(ld.id) as post_count,
-            AVG(ld.confidence_score) as confidence
-          FROM language_detection ld
-          JOIN languages l ON ld.language_id = l.id
-          GROUP BY l.code, l.name
-          ORDER BY post_count DESC
-        `);
+        const data = await executeQuery(languageQueries.stats());
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language stats', error, []);
+      }
+    }
+
+    if (type === 'language-posts') {
+      try {
+        const params: any[] = [];
+        const conditions: string[] = [];
+        const platform = url.searchParams.get('platform');
+        const language = url.searchParams.get('language');
+        const minConfidence = parseFloat(url.searchParams.get('minConfidence') || '');
+        if (platform && platform !== 'all') { params.push(platform); conditions.push(`ds.platform = $${params.length}`); }
+        if (language && language !== 'all') { params.push(language); conditions.push(`l.code = $${params.length}`); }
+        if (Number.isFinite(minConfidence)) { params.push(minConfidence); conditions.push(`ld.confidence_score >= $${params.length}`); }
+        params.push(Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 200));
+
+        const data = await executeQuery(languageQueries.posts(conditions, `$${params.length}`), params);
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Language posts', error, []);
+      }
+    }
+
+    if (type === 'language-mixing') {
+      try {
+        const data = await executeQuery(languageQueries.mixing());
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Language mixing', error, []);
       }
     }
 
@@ -1240,37 +1283,67 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
+    if (type?.startsWith('engagement-')) {
+      try {
+        const wsId = url.searchParams.get('workspace_id');
+        let platforms: string[] = [];
+        if (wsId) {
+          const scope = await resolveWorkspaceScope(url);
+          if (scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
+        }
+        const filter = platforms.length > 0;
+        const params: any[] = filter ? [platforms] : [];
+        const limitParam = `$${params.length + 1}`;
+        const days = ENGAGEMENT_TRENDS_DAYS[url.searchParams.get('timeRange') || '7d'] ?? 7;
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10') || 10, 1), 100);
+
+        const queries: Record<string, { sql: string; extra?: any[] }> = {
+          'engagement-stats': { sql: engagementQueries.stats(filter) },
+          'engagement-platforms': { sql: engagementQueries.platforms(filter) },
+          'engagement-content-types': { sql: engagementQueries.contentTypes(filter) },
+          'engagement-trends': { sql: engagementQueries.trends(filter, days) },
+          'engagement-top-posts': { sql: engagementQueries.topPosts(filter, limitParam), extra: [limit] },
+          'engagement-timing': { sql: engagementQueries.timing(filter) }
+        };
+        const query = queries[type];
+        if (!query) return json({ success: false, error: `Unknown engagement query: ${type}` }, { status: 400 });
+
+        const data = await executeQuery(query.sql, [...params, ...(query.extra ?? [])]);
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Engagement analysis', error, []);
+      }
+    }
+
     if (type === 'hashtag-analysis') {
       try {
         const limit = parseInt(url.searchParams.get('limit') || '50');
         const wsId = url.searchParams.get('workspace_id');
 
+        // ETL installs keep posts in silver.posts; otherwise use the core posts table
+        const source = await hashtagPostSource();
+
         // Only apply platform filter if workspace is specified
         let platformFilter = '';
-        const params: any[] = [];
-        let paramIndex = 1;
-
+        const filterParams: any[] = [];
         if (wsId) {
           const scope = await resolveWorkspaceScope(url);
           if (scope.hasSocialMedia && scope.socialPlatforms.length > 0) {
-            platformFilter = `AND media_type = ANY($${paramIndex})`;
-            params.push(scope.socialPlatforms);
-            paramIndex++;
+            platformFilter = `AND ${source.platformColumn} = ANY($1)`;
+            filterParams.push(scope.socialPlatforms);
           }
         }
+        const limitParam = `$${filterParams.length + 1}`;
 
-        params.push(limit);
-
-        // Extract hashtags from posts using regex
         const data = await executeQuery(`
           WITH hashtag_extract AS (
             SELECT
-              unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag,
-              post_id,
-              media_type
-            FROM silver.posts
-            WHERE content IS NOT NULL
-              AND content LIKE '%#%'
+              unnest(regexp_matches(${source.contentColumn}, '#([A-Za-z0-9_]+)', 'g')) as hashtag,
+              ${source.idColumn} as post_id,
+              ${source.platformColumn} as media_type
+            ${source.from}
+            WHERE ${source.contentColumn} IS NOT NULL
+              AND ${source.contentColumn} LIKE '%#%'
               ${platformFilter}
           )
           SELECT
@@ -1282,17 +1355,17 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
           GROUP BY lower(hashtag)
           HAVING COUNT(*) >= 2
           ORDER BY count DESC
-          LIMIT $${paramIndex}
-        `, params);
+          LIMIT ${limitParam}
+        `, [...filterParams, limit]);
 
         // Also get hashtag co-occurrence (top pairs)
         const cooccurrence = await executeQuery(`
           WITH hashtag_extract AS (
             SELECT
-              post_id,
-              unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag
-            FROM silver.posts
-            WHERE content IS NOT NULL AND content LIKE '%#%'
+              ${source.idColumn} as post_id,
+              unnest(regexp_matches(${source.contentColumn}, '#([A-Za-z0-9_]+)', 'g')) as hashtag
+            ${source.from}
+            WHERE ${source.contentColumn} IS NOT NULL AND ${source.contentColumn} LIKE '%#%'
             ${platformFilter}
           ),
           pairs AS (
@@ -1306,7 +1379,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
           HAVING COUNT(*) >= 2
           ORDER BY co_count DESC
           LIMIT 20
-        `, platformFilter ? params.slice(0, -1) : []);
+        `, filterParams);
 
         return json({
           success: true,
@@ -1317,9 +1390,10 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
             totalPosts: data.reduce((sum: number, h: any) => sum + parseInt(h.post_count || 0), 0)
           }
         });
-      } catch (error: any) {
-        console.error('Hashtag analysis failed:', error);
-        return json({ success: true, data: { hashtags: [], cooccurrence: [], totalHashtags: 0, totalPosts: 0 } });
+      } catch (error) {
+        return queryErrorResponse('Hashtag analysis', error, {
+          hashtags: [], cooccurrence: [], totalHashtags: 0, totalPosts: 0
+        });
       }
     }
 
