@@ -37,6 +37,16 @@ describe('publishWorkflow', () => {
     expect(stored.workflowPattern).toBe('pure-python-dapr-sdk');
     expect(stored.pythonScript).toContain('dapr.ext.workflow');
   });
+
+  it('does not store or return machine-specific paths from the generator', async () => {
+    const published = await serverWorkflowService.publishWorkflow(definition, { name: 'Demo', description: 'd', createdBy: 'a@example.com' });
+
+    const stored = String(query.mock.calls[0][1][6]);
+    expect(stored).not.toContain('virtualEnvPath');
+    expect(stored).not.toContain('activationScript');
+    expect(stored).not.toContain(process.cwd());
+    expect(JSON.stringify(published.generatedCode)).not.toContain('virtualEnvPath');
+  });
 });
 
 describe('listing queries', () => {
@@ -71,11 +81,14 @@ describe('workflow tables', () => {
   const source = readFileSync(join(__dirname, 'serverWorkflowService.ts'), 'utf8');
   const schema = migrationColumns();
 
-  /** Columns named in INSERT column lists, UPDATE ... SET assignments and `row.` reads for a table. */
+  /**
+   * Columns named in INSERT column lists and in UPDATE ... SET assignments for a table. Matches any
+   * `column = ...` in the SET block, so literals and functions (`completed_at = NOW()`) count too.
+   */
   function usedColumns(table: string): string[] {
     const inserts = [...source.matchAll(new RegExp(`INSERT INTO ${table}\\s*\\(([^)]*)\\)`, 'g'))].flatMap((m) => m[1].split(',').map((c) => c.trim()));
     const updateBlocks = [...source.matchAll(new RegExp(`UPDATE ${table}\\s+SET\\s+([\\s\\S]*?)\\s+WHERE`, 'g'))].map((m) => m[1]);
-    const sets = updateBlocks.flatMap((block) => [...block.matchAll(/([a-z_]+)\s*=\s*\$/g)].map((m) => m[1]));
+    const sets = updateBlocks.flatMap((block) => [...block.matchAll(/(?:^|,)\s*([a-z_]+)\s*=/g)].map((m) => m[1]));
     return [...new Set([...inserts, ...sets])].filter((c) => c.length > 0 && !c.startsWith('$'));
   }
 

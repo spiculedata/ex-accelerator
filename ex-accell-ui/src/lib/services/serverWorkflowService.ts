@@ -146,8 +146,10 @@ class ServerWorkflowService {
     }
   ): Promise<PublishedWorkflow> {
     try {
-      // Generate the Python Dapr workflow (the same generator execution uses)
-      const generatedCode = await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
+      // Keep a snapshot of the generated Python for display. Runs regenerate from the definition (they
+      // do not execute this copy), and the generator's server-side paths are not worth storing or exposing.
+      const { virtualEnvPath: _venv, activationScript: _activation, ...generatedCode } =
+        await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
 
       const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = new Date().toISOString();

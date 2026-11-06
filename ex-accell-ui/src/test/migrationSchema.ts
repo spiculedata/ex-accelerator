@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Table name -> column names, parsed from the CREATE TABLE blocks in db/migrations. For schema-drift tests. */
 export function migrationColumns(): Map<string, Set<string>> {
-  const dir = join(process.cwd(), 'db', 'migrations');
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'db', 'migrations');
   const sql = readdirSync(dir)
     .sort()
     .map((file) => readFileSync(join(dir, file), 'utf8'))
