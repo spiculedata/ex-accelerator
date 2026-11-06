@@ -86,12 +86,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     const data = await request.json();
 
-    if (!data.name || !data.query_config) {
-      return json(
-        { success: false, error: 'name and query_config are required' },
-        { status: 400 }
-      );
+    if (!data.name) {
+      return json({ success: false, error: 'name is required' }, { status: 400 });
     }
+
+    // The New Investigation form sends flat fields; everything downstream reads this shape
+    const queryConfig = data.query_config ?? {
+      keywords: Array.isArray(data.keywords) ? data.keywords : [],
+      dateStart: data.date_start || '',
+      dateEnd: data.date_end || '',
+      sources: Array.isArray(data.sources) ? data.sources : []
+    };
 
     const rows = await postgresPool.query(
       `INSERT INTO investigations (name, description, query_config, workspace_id, created_by)
@@ -100,7 +105,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       [
         data.name,
         data.description || null,
-        JSON.stringify(data.query_config),
+        JSON.stringify(queryConfig),
         data.workspace_id || null,
         locals.user?.email ?? null
       ]
