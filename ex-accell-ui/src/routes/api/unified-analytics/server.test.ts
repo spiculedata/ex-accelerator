@@ -6,8 +6,10 @@ const { duckdbQuery, healthCheck } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { duckdbQuery, healthCheck } }));
+const { resolveWorkspaceScope } = vi.hoisted(() => ({ resolveWorkspaceScope: vi.fn().mockResolvedValue(null) }));
+
 vi.mock('$lib/services/workspaceContextResolver', () => ({
-  resolveWorkspaceScope: vi.fn().mockResolvedValue(null),
+  resolveWorkspaceScope,
   buildPlatformFilter: vi.fn().mockReturnValue(null),
   hasDataType: vi.fn().mockReturnValue(true)
 }));
@@ -141,5 +143,86 @@ describe('GET /api/unified-analytics topic-keywords', () => {
     const sql = String(duckdbQuery.mock.calls[0][0]);
     expect(sql).toMatch(/JOIN topics t ON t\.id = tk\.topic_id/);
     expect(sql).toMatch(/t\.topic_id AS topic_id/);
+  });
+});
+
+describe('GET /api/unified-analytics engagement edge cases', () => {
+  const get = (query: string) =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?${query}`) } as Parameters<typeof GET>[0]);
+
+  it('rejects an unknown engagement query with a 400', async () => {
+    const response = await get('type=engagement-nope');
+
+    expect(response.status).toBe(400);
+  });
+
+  it('filters by the workspace platforms, passing them as $1 and the limit as $2', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram'] });
+    duckdbQuery.mockResolvedValue([]);
+
+    try {
+      await get('type=engagement-top-posts&workspace_id=7&limit=5');
+    } finally {
+      resolveWorkspaceScope.mockResolvedValue(null);
+    }
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('ds.platform = ANY($1)');
+    expect(String(sql)).toContain('LIMIT $2');
+    expect(params).toEqual([['telegram'], 5]);
+  });
+
+  it('clamps the limit to 1-100', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('type=engagement-top-posts&limit=100000');
+
+    expect(duckdbQuery.mock.calls[0][1]).toEqual([100]);
+  });
+
+  it('counts a post once in content-type positive share even with several classifications', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('type=engagement-content-types');
+
+    const sql = String(duckdbQuery.mock.calls[0][0]);
+    expect(sql).not.toMatch(/LEFT JOIN sentiment_classifications/);
+    expect(sql).toMatch(/EXISTS/);
+  });
+});
+
+describe('GET /api/unified-analytics language-posts', () => {
+  const get = (query: string) =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?${query}`) } as Parameters<typeof GET>[0]);
+
+  it('numbers parameters in order for every filter and clamps the limit', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('type=language-posts&platform=youtube&language=es&minConfidence=0.8&limit=9999');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('ds.platform = $1');
+    expect(String(sql)).toContain('l.code = $2');
+    expect(String(sql)).toContain('ld.confidence_score >= $3');
+    expect(String(sql)).toContain('LIMIT $4');
+    expect(params).toEqual(['youtube', 'es', 0.8, 200]);
+  });
+
+  it('returns each post once even when it has several mixing rows', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await get('type=language-posts');
+
+    expect(String(duckdbQuery.mock.calls[0][0])).not.toMatch(/LEFT JOIN language_mixing/);
+  });
+});
+
+describe('GET /api/unified-analytics hashtag-analysis limit', () => {
+  it('falls back to a default when limit is not a number', async () => {
+    duckdbQuery.mockImplementation(async (sql: string) => (/to_regclass/i.test(sql) ? [{ present: false }] : []));
+
+    const response = await GET({ url: new URL('http://localhost/api/unified-analytics?type=hashtag-analysis&limit=abc') } as Parameters<typeof GET>[0]);
+
+    expect(response.status).toBe(200);
   });
 });

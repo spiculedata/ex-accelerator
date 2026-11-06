@@ -1317,7 +1317,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
     if (type === 'hashtag-analysis') {
       try {
-        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 500);
         const wsId = url.searchParams.get('workspace_id');
 
         // ETL installs keep posts in silver.posts; otherwise use the core posts table

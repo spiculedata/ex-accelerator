@@ -29,14 +29,14 @@ export const languageQueries = {
       ld.confidence_score AS confidence,
       CAST(p.created_at AS TEXT) AS timestamp,
       ds.platform,
-      l2.code AS secondary_language,
-      lm.secondary_confidence
+      (SELECT l2.code FROM language_mixing lm JOIN languages l2 ON l2.id = lm.secondary_language_id
+        WHERE lm.post_id = p.id ORDER BY lm.id LIMIT 1) AS secondary_language,
+      (SELECT lm.secondary_confidence FROM language_mixing lm
+        WHERE lm.post_id = p.id ORDER BY lm.id LIMIT 1) AS secondary_confidence
     FROM language_detection ld
     JOIN languages l ON l.id = ld.language_id
     JOIN posts p ON p.id = ld.post_id
     JOIN data_sources ds ON ds.id = p.data_source_id
-    LEFT JOIN language_mixing lm ON lm.post_id = p.id
-    LEFT JOIN languages l2 ON l2.id = lm.secondary_language_id
     ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''}
     ORDER BY p.created_at DESC
     LIMIT ${limitParam}`,

@@ -67,8 +67,10 @@ const round = (value: number, places: number): number => Number(value.toFixed(pl
 
 /** The database returns naive UTC timestamps like '2026-10-07 08:30:00'. */
 const toIsoString = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '';
   const text = String(value);
-  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : `${text.replace(' ', 'T')}Z`).toISOString();
+  const date = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : `${text.replace(' ', 'T')}Z`);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 };
 
 /**

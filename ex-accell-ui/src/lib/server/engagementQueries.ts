@@ -13,12 +13,6 @@ const POSITIVE_CATEGORIES = "('Very Positive', 'Positive')";
 
 export const ENGAGEMENT_TRENDS_DAYS: Readonly<Record<string, number>> = { '7d': 7, '14d': 14, '30d': 30, '90d': 90 };
 
-export interface EngagementQuery {
-  sql: string;
-  /** True when the query uses the platform filter parameter ($1). */
-  usesPlatformFilter: boolean;
-}
-
 /** Wraps WHERE conditions, adding the optional platform filter. */
 const where = (platformFilter: boolean, extra: string[] = []): string => {
   const conditions = [...(platformFilter ? ['ds.platform = ANY($1)'] : []), ...extra];
@@ -64,10 +58,12 @@ export const engagementQueries = {
       COALESCE(AVG(pe.likes_count), 0) AS avg_likes,
       COALESCE(AVG(pe.comments_count), 0) AS avg_comments,
       COALESCE(AVG(pe.shares_count), 0) AS avg_shares,
-      COALESCE(AVG(CASE WHEN sc.sentiment_category IN ${POSITIVE_CATEGORIES} THEN 1.0 ELSE 0.0 END), 0) AS positive_share
+      COALESCE(AVG(CASE WHEN EXISTS (
+        SELECT 1 FROM sentiment_classifications sc
+        WHERE sc.post_id = p.id AND sc.sentiment_category IN ${POSITIVE_CATEGORIES}
+      ) THEN 1.0 ELSE 0.0 END), 0) AS positive_share
     ${BASE_FROM}
     LEFT JOIN content_types ct ON ct.id = pe.content_type_id
-    LEFT JOIN sentiment_classifications sc ON sc.post_id = p.id
     ${where(platformFilter)}
     GROUP BY COALESCE(ct.name, 'Unknown')
     ORDER BY engagement_rate DESC`,

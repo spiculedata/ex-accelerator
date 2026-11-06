@@ -157,6 +157,22 @@ describe('getSamplePosts', () => {
     expect(post.secondary_confidence).toBeNull();
   });
 
+  it('returns an empty timestamp instead of failing when a post has no date', async () => {
+    mockFetch({ 'language-posts': [{ id: 1, text: 'Hi', language_code: 'en', language_name: 'English', confidence: '0.9', timestamp: null, platform: 'telegram', secondary_language: null, secondary_confidence: null }] });
+
+    const [post] = await languageDetectionDb.getSamplePosts();
+
+    expect(post.timestamp).toBe('');
+  });
+
+  it('keeps a timezone offset when the database provides one', async () => {
+    mockFetch({ 'language-posts': [{ id: 1, text: 'Hi', language_code: 'en', language_name: 'English', confidence: '0.9', timestamp: '2026-10-07T10:30:00+02:00', platform: 'telegram', secondary_language: null, secondary_confidence: null }] });
+
+    const [post] = await languageDetectionDb.getSamplePosts();
+
+    expect(post.timestamp).toBe('2026-10-07T08:30:00.000Z');
+  });
+
   it('passes the platform, language, confidence and limit filters to the API', async () => {
     mockFetch({ 'language-posts': [] });
 
