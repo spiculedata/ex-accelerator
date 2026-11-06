@@ -1,85 +1,111 @@
-# Ex-Accelerator
+# ex-accelerator
 
-A social media analytics platform for collecting, analyzing, and visualizing data from multiple social media platforms.
+[![Tests](https://github.com/spiculedata/ex-accelerator/actions/workflows/test.yml/badge.svg)](https://github.com/spiculedata/ex-accelerator/actions/workflows/test.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-## Overview
+A social media research platform: collect posts from several platforms, load them into one
+analytics database, and explore them through dashboards, investigations and notebooks.
 
-Ex-Accelerator is a full-stack analytics platform that helps researchers and analysts:
+> **Status: early, pre-1.0.** The platform is under active development. Interfaces and the
+> database schema may change, and some modules (for example the workflow builder) are
+> experimental. Run it on a trusted network until you have reviewed the
+> [security notes](SECURITY.md).
 
-- **Collect data** from social media platforms (Telegram, YouTube)
-- **Analyze content** with sentiment analysis, topic modeling, and language detection
-- **Visualize insights** through interactive dashboards
-- **Organize research** with projects and workspaces
+## What it does
 
-## Repository Structure
+- **Collect.** A Go crawler gathers Telegram, YouTube and Bluesky content on a schedule; ETL
+  pipelines load datasets such as GDELT; a radio service records and transcribes broadcasts.
+- **Analyse.** Sentiment and emotion, topic modelling, language detection, engagement, GDELT
+  events and Android usage analytics, with cross-module views over the same posts.
+- **Explore.** Interactive dashboards (ECharts, Leaflet), keyword-highlighted investigations of
+  transcripts, and embedded Jupyter notebooks.
+- **Organise.** Projects and workspaces keep datasets separate. Accounts have admin, user and
+  viewer roles.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser --> UI["Web app<br/>SvelteKit"]
+    UI --> PG[("PostgreSQL<br/>+ pg_duckdb")]
+    UI -- Dapr --> Redis[("Redis<br/>state / pub-sub")]
+    Crawler["Crawler (Go)"] --> Redis
+    Crawler --> PG
+    ETL["ETL (Python)"] --> PG
+    Radio["WavePulse radio service"] --> PG
+    Jupyter --> PG
 ```
-ex-accelerator/
-├── ex-accell-ui/    # Main web application (SvelteKit + Dapr)
-└── etl/             # ETL pipeline for data processing
+
+| Directory | Role |
+|-----------|------|
+| [`ex-accell-ui/`](ex-accell-ui) | SvelteKit 2 / Svelte 5 web app and API (TypeScript, Tailwind CSS 4) |
+| [`etl/`](etl) | Python data pipelines |
+| [`crawler/`](crawler) | Go crawler for Telegram, YouTube and Bluesky |
+| [`wavepulse/`](wavepulse) | Radio recording and transcription, derived from [NYU WavePulse](https://github.com/NYU-DICE-Lab/WavePulse) |
+| [`jupyter/`](jupyter) | Jupyter Lab environment |
+| [`deploy/`](deploy), [`docker-compose.yml`](docker-compose.yml) | Dapr components and the compose stack |
+| [`docs-site/`](docs-site) | Documentation site source (VitePress) |
+
+## Quickstart
+
+You need [Docker](https://docs.docker.com/get-docker/) with Compose v2.
+
+```bash
+git clone https://github.com/spiculedata/ex-accelerator.git
+cd ex-accelerator
+
+cp .env.example .env
+# Edit .env: set SESSION_SECRET (openssl rand -hex 32), ADMIN_PASSWORD (12+ characters)
+# and change POSTGRES_PASSWORD.
+
+docker compose up -d --build postgres redis dapr-placement ui ui-dapr
 ```
 
-## Getting Started
+Open <http://localhost:3000> and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from your `.env`.
+The first admin account is created automatically when the user table is empty.
 
-### Main Application (ex-accell-ui)
+The command above starts only the core stack. The remaining services in `docker-compose.yml`
+(Ollama, Jupyter, WavePulse, the crawler, ETL) are optional and need extra setup; see the
+documentation.
 
-The primary application is in the `ex-accell-ui/` directory:
+A fresh database is empty, so dashboards show empty states until you load data. Sample data and
+guided tutorials are tracked in the issue tracker.
+
+### Troubleshooting
+
+- **`port is already allocated` for 50006.** A local `dapr init` already runs a container on that
+  port. Stop it (`docker stop dapr_scheduler`) or leave `dapr-placement` out of the command; the web
+  app works without it, but Dapr features will not.
+- **`SESSION_SECRET` error on start.** The secret is required. Generate one with
+  `openssl rand -hex 32` and put it in `.env`.
+- **Login does not stick over plain HTTP.** Keep `COOKIE_SECURE=false` for `http://localhost`, and
+  set it to `true` only when serving over HTTPS.
+- **Data lives in `./data`.** Set `DATA_DIR` in `.env` to move it. Remove the directory to reset.
+
+## Development
 
 ```bash
 cd ex-accell-ui
-npm install
-npm run dapr:setup
-npm run dev:dapr
+npm ci
+npm run dev        # needs a PostgreSQL with pg_duckdb; see CONTRIBUTING.md
+npm run test:unit  # unit tests (Vitest)
+npm run check      # type check
 ```
 
-See [ex-accell-ui/README.md](./ex-accell-ui/README.md) for detailed setup instructions.
-
-### Prerequisites
-
-- Node.js 18+
-- Go 1.21+ (for Telegram scraper)
-- Docker (for Redis)
-- Dapr CLI
-
-## Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| Frontend | SvelteKit 2.x, Svelte 5, TypeScript, Tailwind CSS |
-| Analytics Database | DuckDB |
-| Service Mesh | Dapr |
-| State Store | Redis |
-| Crawlers | Go (Telegram/YouTube scraper) |
-| Visualization | ECharts, Leaflet |
-
-## Features
-
-### Analytics Modules
-
-- **Sentiment Analysis** - NLP-powered sentiment and emotion detection
-- **Topic Modeling** - Theme and trend discovery
-- **Language Detection** - Multi-language analysis
-- **Engagement Analysis** - Performance metrics
-- **GDELT Events** - Global event analysis
-- **Android Analytics** - Mobile interaction analysis
-
-### Data Collection
-
-- Automated web crawlers for Telegram and YouTube
-- Job scheduling via web interface
-- Real-time progress monitoring
-
-### Research Organization
-
-- Projects for grouping research initiatives
-- Workspaces for dataset isolation
-- Cross-platform comparative analysis
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the database container for local development, the full
+set of checks and commit conventions.
 
 ## Documentation
 
-- [ex-accell-ui/README.md](./ex-accell-ui/README.md) - Main application documentation
-- [ex-accell-ui/CLAUDE.md](./ex-accell-ui/CLAUDE.md) - Development guidelines
+- Documentation site: <https://spiculedata.github.io/ex-accelerator/> (published once the project is public)
+- Source for the site lives in [`docs-site/`](docs-site); run `npm run docs:dev` inside it to preview.
+
+## Security
+
+Please report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
 
 ## License
 
-This project is part of the Ex-Accelerator platform.
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). The `wavepulse/` directory is
+derived from NYU's WavePulse and carries its own notices, including a note about a pending patent
+application; read [`wavepulse/NOTICE`](wavepulse/NOTICE) before commercial use.

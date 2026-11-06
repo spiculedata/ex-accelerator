@@ -36,3 +36,6 @@ crawler/docs/_site/
 
 # Third-party Superset checkout (2 GB clone of apache/superset); use the official image instead
 /superset/
+
+# Personal Claude Code instructions
+CLAUDE.local.md
