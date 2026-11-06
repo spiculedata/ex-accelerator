@@ -437,8 +437,9 @@
       progress: wavePulseStatus === 'starting' ? wavePulseProgress : undefined,
       startTime: wavePulseResults?.startTime || null,
       schedule: formatWavePulseSchedule(stream.timeSlots),
-      itemsCollected: wavePulseStatus === 'running' ? Math.floor(Math.random() * 500) : 0, // Mock data
-      totalEstimated: wavePulseStatus === 'running' ? Math.floor(Math.random() * 1000) + 500 : 0,
+      // The WavePulse service does not report collection counts yet, so none are shown
+      itemsCollected: 0,
+      totalEstimated: 0,
       streamUrl: stream.url,
       logs: wavePulseStatus === 'running' ? [
         `[${new Date().toISOString()}] INFO: Started WavePulse for ${stream.radioName}`,
@@ -448,46 +449,46 @@
         wavePulseConfig.enableDiarization ? `[${new Date().toISOString()}] INFO: Speaker diarization active` : null
       ].filter(Boolean) : []
     })),
-    // Add Princeton SMART extract job (always show at least a sample)
-    {
-      id: 'princeton-smart-extract',
-      name: princetonSmartConfig.datasetId 
-        ? `Princeton SMART: ${princetonSmartConfig.datasetId}`
-        : 'Princeton SMART: twitter-election-2024 (Sample)',
-      type: 'princeton-smart',
-      status: princetonSmartConfig.datasetId 
-        ? (princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'running' : princetonSmartStatus === 'completed' ? 'completed' : princetonSmartStatus === 'error' ? 'failed' : 'scheduled')
-        : 'scheduled',
-      progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
-      startTime: princetonSmartResults?.startTime || null,
-      nextRun: princetonSmartConfig.datasetId ? null : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now for demo
-      schedule: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end 
-            ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}` 
-            : 'Date range not configured')
-        : '2024-01-01 to 2024-12-31',
-      itemsCollected: princetonSmartResults?.recordCount || (princetonSmartConfig.datasetId ? 0 : 12547), // Sample data for demo
-      totalEstimated: princetonSmartConfig.maxRecords || 50000,
-      query: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.query || 'No query specified')
-        : '#election2024 OR #vote2024',
-      apiEndpoint: princetonSmartConfig.apiEndpoint,
-      logs: princetonSmartConfig.datasetId && princetonSmartStatus !== 'idle' ? [
-        `[${new Date().toISOString()}] INFO: Princeton SMART extract initiated`,
-        `[${new Date().toISOString()}] INFO: Dataset: ${princetonSmartConfig.datasetId}`,
-        `[${new Date().toISOString()}] INFO: Query: ${princetonSmartConfig.query || 'No query specified'}`,
-        princetonSmartConfig.filters.language !== 'all' ? `[${new Date().toISOString()}] INFO: Language filter: ${princetonSmartConfig.filters.language}` : null,
-        princetonSmartConfig.filters.location ? `[${new Date().toISOString()}] INFO: Location filter: ${princetonSmartConfig.filters.location}` : null,
-        princetonSmartResults ? `[${new Date().toISOString()}] INFO: Extracted ${princetonSmartResults.recordCount} records` : null
-      ].filter(Boolean) : [
-        `[2025-01-29T14:30:00.000Z] INFO: Sample Princeton SMART configuration`,
-        `[2025-01-29T14:30:00.000Z] INFO: Dataset: twitter-election-2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Query: #election2024 OR #vote2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Language filter: en`,
-        `[2025-01-29T14:30:00.000Z] INFO: Location filter: United States`,
-        `[2025-01-29T14:30:00.000Z] INFO: Configure dataset to activate extraction`
-      ]
-    }
+    // Princeton SMART extract job, shown only once a dataset has been configured
+    ...(princetonSmartConfig.datasetId
+      ? [
+          {
+            id: 'princeton-smart-extract',
+            name: `Princeton SMART: ${princetonSmartConfig.datasetId}`,
+            type: 'princeton-smart',
+            status:
+              princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'
+                ? 'running'
+                : princetonSmartStatus === 'completed'
+                  ? 'completed'
+                  : princetonSmartStatus === 'error'
+                    ? 'failed'
+                    : 'scheduled',
+            progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
+            startTime: princetonSmartResults?.startTime || null,
+            nextRun: null,
+            schedule:
+              princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end
+                ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}`
+                : 'Date range not configured',
+            itemsCollected: princetonSmartResults?.recordCount || 0,
+            totalEstimated: princetonSmartConfig.maxRecords || 0,
+            query: princetonSmartConfig.query || 'No query specified',
+            apiEndpoint: princetonSmartConfig.apiEndpoint,
+            logs:
+              princetonSmartStatus !== 'idle'
+                ? [
+                    `[${new Date().toISOString()}] INFO: Princeton SMART extract initiated`,
+                    `[${new Date().toISOString()}] INFO: Dataset: ${princetonSmartConfig.datasetId}`,
+                    `[${new Date().toISOString()}] INFO: Query: ${princetonSmartConfig.query || 'No query specified'}`,
+                    princetonSmartConfig.filters.language !== 'all' ? `[${new Date().toISOString()}] INFO: Language filter: ${princetonSmartConfig.filters.language}` : null,
+                    princetonSmartConfig.filters.location ? `[${new Date().toISOString()}] INFO: Location filter: ${princetonSmartConfig.filters.location}` : null,
+                    princetonSmartResults ? `[${new Date().toISOString()}] INFO: Extracted ${princetonSmartResults.recordCount} records` : null
+                  ].filter(Boolean)
+                : []
+          }
+        ]
+      : [])
   ];
 
   // Sorting state
@@ -704,42 +705,14 @@
     princetonSmartResults = null;
   }
 
-  async function handlePrincetonSmartImport() {
+  function handlePrincetonSmartImport() {
     if (!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId) {
       return;
     }
 
-    princetonSmartStatus = 'connecting';
-    princetonSmartProgress = 0;
-
-    try {
-      // Simulate API connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      princetonSmartStatus = 'fetching';
-      
-      // Simulate data fetching with progress
-      for (let i = 0; i <= 100; i += 10) {
-        princetonSmartProgress = i;
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      
-      // Mock successful import
-      princetonSmartResults = {
-        recordCount: Math.floor(Math.random() * princetonSmartConfig.maxRecords) + 100,
-        datasetId: princetonSmartConfig.datasetId,
-        query: princetonSmartConfig.query,
-        dateRange: princetonSmartConfig.dateRange,
-        format: princetonSmartConfig.outputFormat
-      };
-      
-      princetonSmartStatus = 'completed';
-      
-    } catch (error) {
-      console.error('Princeton SMART import error:', error);
-      errorMessage = 'Failed to import Princeton SMART data. Please check your configuration and try again.';
-      princetonSmartStatus = 'error';
-    }
+    // Importing from Princeton SMART is not implemented. Say so rather than simulating a successful import.
+    errorMessage = 'Importing Princeton SMART data is not available yet.';
+    princetonSmartStatus = 'error';
   }
 
   // WavePulse functions

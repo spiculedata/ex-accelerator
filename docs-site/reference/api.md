@@ -35,7 +35,7 @@ The main groups; others (GDELT, image processing, data sharing, overview and mon
 | `/api/projects`, `/api/workspaces`, `/api/datasets` | Organise research | user (write), viewer (read) |
 | `/api/jobs`, `/api/job-state`, `/api/crawler` | Schedule and monitor crawls | user |
 | `/api/investigations`, `/api/wavepulse` | Transcript investigations and radio data | user |
-| `/api/unified-analytics/query`, `/api/unified-analytics/seed` | Raw SQL and destructive seeding | admin |
+| `/api/unified-analytics/query` | Raw SQL | admin |
 | `/api/deploy-workflow`, `/api/generate-python-workflow`, `/api/workflows/:id/execute`, `/api/jupyter/*` | Generate, deploy and run code | admin |
 
 Viewers are read-only: requests other than `GET`, `HEAD` and `OPTIONS` return `403` (except the public auth routes, so a viewer can still sign out).

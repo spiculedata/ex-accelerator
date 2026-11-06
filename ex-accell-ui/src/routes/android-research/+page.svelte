@@ -721,7 +721,9 @@
       },
       {
         title: "Content Engagement Depth",
-        finding: `Video content shows highest engagement (${researchData.contentEngagement[1]?.engagementScore || 92}/100)`,
+        finding: researchData.contentEngagement[1]?.engagementScore !== undefined
+          ? `Video content shows highest engagement (${researchData.contentEngagement[1].engagementScore}/100)`
+          : 'Video content shows highest engagement',
         significance: "Visual media captures sustained attention most effectively",
         implication: "Video-based interfaces may improve user retention"
       }
