@@ -1,4 +1,5 @@
 <script lang="ts">
+  import UserMenu from '$lib/components/UserMenu.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
@@ -609,6 +610,8 @@
             Select Project
           </button>
         {/if}
+
+        <UserMenu />
 
         <!-- Mobile menu button -->
         <div class="lg:hidden">
