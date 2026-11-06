@@ -2714,7 +2714,7 @@
     {#if activeTab === 'schedule'}
       <div class="space-y-6">
         <!-- Statistics -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-2xl font-bold text-emerald-600 mb-1">{allJobs.filter(job => job.status === 'running').length}</div>
             <div class="text-sm text-gray-600">Running</div>
