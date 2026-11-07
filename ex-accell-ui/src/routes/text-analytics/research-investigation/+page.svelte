@@ -106,7 +106,7 @@
   }
 
   function openInJupyterLab() {
-    window.open(jupyterLink(connection, `/lab/tree/notebooks/${notebookFile}`), '_blank');
+    window.open(jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`), '_blank');
   }
 
   async function checkJupyterStatus() {
@@ -405,7 +405,7 @@
         <div class="border border-gray-200 rounded-xl overflow-hidden" style="height: 600px;">
           {#if isJupyterRunning}
             <iframe 
-              src="{jupyterLink(connection, `/lab/tree/notebooks/${notebookFile}`)}" 
+              src="{jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`)}" 
               class="w-full h-full"
               title="Jupyter Notebook">
             </iframe>

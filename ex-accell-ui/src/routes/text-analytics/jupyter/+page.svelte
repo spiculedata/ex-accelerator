@@ -16,8 +16,15 @@
   let showFullScreen = false;
   
   // Only an explicit click starts the server; polling just checks the connection we already have
+  let errorMessage = '';
+
   async function startJupyter() {
+    errorMessage = '';
     connection = connection ?? (await connectJupyter());
+    if (!connection) {
+      errorMessage = 'Could not start Jupyter Lab. Check that Poetry and the Python environment are set up (npm run jupyter:bootstrap) and that you are signed in as an administrator.';
+      return;
+    }
     await checkJupyterStatus();
   }
 
@@ -26,13 +33,12 @@
       isJupyterRunning = false;
       return;
     }
-    fetch(jupyterLink(connection, '/api/status'))
-      .then(response => {
-        isJupyterRunning = response.ok;
-      })
-      .catch(() => {
-        isJupyterRunning = false;
-      });
+    try {
+      const response = await fetch(jupyterLink(connection, '/api/status'));
+      isJupyterRunning = response.ok;
+    } catch {
+      isJupyterRunning = false;
+    }
   }
 
   function openInNewTab() {
@@ -182,6 +188,10 @@
               </div>
             </div>
             
+            {#if errorMessage}
+              <p class="mt-4 text-sm text-red-700 max-w-md mx-auto" role="alert">{errorMessage}</p>
+            {/if}
+
             <button 
               on:click={startJupyter}
               class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors">
@@ -200,7 +210,7 @@
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div class="space-y-3">
             <button 
-              on:click={() => window.open(`${jupyterLink(connection, '/lab/tree/notebooks')}`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,7 +224,7 @@
             </button>
             
             <button 
-              on:click={() => window.open(`${jupyterLink(connection, '/lab/tree/notebooks/sentiment_analysis.ipynb')}`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree/sentiment_analysis.ipynb'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +238,7 @@
             </button>
             
             <button 
-              on:click={() => window.open(`${jupyterLink(connection, '/lab/tree/notebooks/custom_research.ipynb')}`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree/custom_research.ipynb'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

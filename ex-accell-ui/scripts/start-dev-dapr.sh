@@ -1,6 +1,8 @@
 #!/bin/bash
 # Startup script for Ex-Accelerator UI with Jupyter integration and Dapr sidecar
 
+cd "$(dirname "$0")/.."
+
 echo "🚀 Starting Ex-Accelerator UI with Jupyter Lab and Dapr..."
 
 # Install dependencies first
