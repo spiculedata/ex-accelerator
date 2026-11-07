@@ -11,7 +11,7 @@ export function fileLaunchStore(path: string): LaunchStore {
 		read() {
 			try {
 				const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<SavedLaunch>;
-				return typeof parsed.pid === 'number' && parsed.url && parsed.baseUrl ? (parsed as SavedLaunch) : null;
+				return typeof parsed.pid === 'number' && typeof parsed.url === 'string' && typeof parsed.baseUrl === 'string' ? (parsed as SavedLaunch) : null;
 			} catch {
 				return null;
 			}

@@ -20,11 +20,8 @@
 
   async function startJupyter() {
     errorMessage = '';
-    connection = await connectJupyter();
-    if (!connection) {
-      errorMessage = 'Could not start Jupyter Lab. Check that Poetry and the Python environment are set up (npm run jupyter:bootstrap) and that you are signed in as an administrator.';
-      return;
-    }
+    connection = await connectJupyter((message) => (errorMessage = message));
+    if (!connection) return;
     await checkJupyterStatus();
   }
 
@@ -36,6 +33,7 @@
     try {
       const response = await fetch(jupyterLink(connection, '/api/status'));
       isJupyterRunning = response.ok;
+      if (response.status === 401 || response.status === 403) connection = null; // restarted with a new token
     } catch {
       isJupyterRunning = false;
       connection = null; // Jupyter may have restarted with a new token; Start reconnects

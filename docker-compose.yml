@@ -130,7 +130,7 @@ services:
       - "127.0.0.1:8888:8888"  # loopback only; put a TLS proxy in front to expose it
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-}  # set in .env; if empty Jupyter makes its own token and the app cannot link to it
-      # Read by the Jupyter image's config (jupyter/Dockerfile); the app's origin, so use the URL you open it on
+      # TODO(#101): only enforced once jupyter/Dockerfile (which reads this) is committed. Set it to the URL you open the app on, e.g. behind a TLS proxy
       JUPYTER_ALLOW_ORIGIN: ${JUPYTER_ALLOW_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
       PGHOST: postgres

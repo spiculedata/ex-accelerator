@@ -29,3 +29,10 @@ describe('jupyterLink', () => {
 		expect(jupyterLink({ baseUrl: 'http://h:8888', token: 't' }, '/lab?reset')).toBe('http://h:8888/lab?reset=&token=t');
 	});
 });
+
+describe('token round trip', () => {
+	it('decodes a token that needed URL encoding', () => {
+		const parsed = parseJupyterStart({ success: true, data: { url: 'http://j:8888/?token=a%2Fb%20c', baseUrl: 'http://j:8888' } });
+		expect(parsed?.token).toBe('a/b c');
+	});
+});

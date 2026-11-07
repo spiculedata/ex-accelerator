@@ -25,11 +25,15 @@ export function jupyterLink(connection: JupyterConnection | null, path: string):
 }
 
 /** Starts (or reuses) JupyterLab through the admin-only endpoint and returns how to reach it. */
-export async function connectJupyter(): Promise<JupyterConnection | null> {
+export async function connectJupyter(onError?: (message: string) => void): Promise<JupyterConnection | null> {
 	try {
 		const response = await fetch('/api/jupyter/start', { method: 'POST' });
-		return response.ok ? parseJupyterStart(await response.json()) : null;
+		const body = await response.json().catch(() => null);
+		if (response.ok) return parseJupyterStart(body);
+		onError?.(response.status === 403 || response.status === 401 ? 'Only administrators can start Jupyter Lab.' : (body?.error ?? 'Could not start Jupyter Lab.'));
+		return null;
 	} catch {
+		onError?.('Could not reach the server.');
 		return null;
 	}
 }

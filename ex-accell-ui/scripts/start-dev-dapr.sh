@@ -30,7 +30,7 @@ echo "⏳ Waiting for Jupyter Lab to start..."
 sleep 5
 
 # Check if Jupyter Lab is running
-if curl -s "http://localhost:8888/api?token=$JUPYTER_TOKEN" > /dev/null; then
+if curl -sf "http://localhost:8888/api?token=$JUPYTER_TOKEN" > /dev/null; then
     echo "✅ Jupyter Lab is running at http://localhost:8888/?token=$JUPYTER_TOKEN"
 else
     echo "⚠️  Jupyter Lab may not be running yet, check the logs"

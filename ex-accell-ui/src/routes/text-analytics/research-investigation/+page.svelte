@@ -90,10 +90,9 @@
   async function startJupyter() {
     // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
     const tab = window.open('', '_blank');
-    connection = await connectJupyter();
+    connection = await connectJupyter((message) => (errorMessage = message));
     if (!connection) {
       tab?.close();
-      errorMessage = 'Could not start JupyterLab. Run npm run jupyter:bootstrap, check that Poetry is installed, and sign in as an administrator.';
       return;
     }
     if (tab) tab.opener = null;
@@ -122,6 +121,7 @@
     try {
       const response = await fetch(jupyterLink(connection, '/api'), { method: 'GET' });
       isJupyterRunning = response.ok;
+      if (response.status === 401 || response.status === 403) connection = null;
     } catch (error) {
       isJupyterRunning = false;
       connection = null;
