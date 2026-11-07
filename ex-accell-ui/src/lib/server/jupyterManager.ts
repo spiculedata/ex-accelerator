@@ -60,6 +60,8 @@ export function createJupyterManager(options: ManagerOptions) {
 		if (saved && isAlive(saved.pid) && (await isReady(saved.baseUrl, saved.url))) {
 			return { url: saved.url, baseUrl: saved.baseUrl, message: 'JupyterLab is already running' };
 		}
+		// A recorded process that is alive but not answering still holds the port (or is a recycled pid's stranger)
+		if (saved && isAlive(saved.pid)) kill(saved.pid);
 		store.clear();
 
 		if (!hasConfig()) throw new Error('Jupyter is not set up yet: run `npm run jupyter:bootstrap` first');

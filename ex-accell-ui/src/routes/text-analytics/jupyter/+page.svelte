@@ -36,7 +36,6 @@
       if (response.status === 401 || response.status === 403) connection = null; // restarted with a new token
     } catch {
       isJupyterRunning = false;
-      connection = null; // Jupyter may have restarted with a new token; Start reconnects
     }
   }
 

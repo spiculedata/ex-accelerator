@@ -86,8 +86,9 @@ describe('createJupyterManager', () => {
 
 	it('does not reuse a saved launch whose pid is alive but not answering', async () => {
 		const saved = { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' };
-		const { ensure, spawn } = setup({ saved, ready: false });
+		const { ensure, spawn, kill } = setup({ saved, ready: false });
 		await expect(ensure(ORIGIN)).rejects.toThrow();
+		expect(kill).toHaveBeenCalledWith(7);
 		expect(spawn).toHaveBeenCalledTimes(1);
 	});
 
