@@ -54,7 +54,7 @@ export function convertContainers(markdown) {
   let inFence = false;
   let alert = null;
   for (const line of lines) {
-    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
     const open = !inFence && !alert && line.match(/^:::\s*(tip|info|warning|danger)\b\s*(.*)$/);
     if (open) {
       alert = ALERT_TYPES[open[1]];
@@ -98,10 +98,16 @@ export function buildSidebar(configSource) {
   }
   const section = configSource.slice(start, end);
   const lines = ['**[Home](Home)**', ''];
+  let emittedLinks = 0;
   for (const match of section.matchAll(/text:\s*'([^']+)'(?:\s*,\s*link:\s*'([^']+)')?/g)) {
     const [, text, link] = match;
+    if (link) emittedLinks++;
     if (link) lines.push(`- [${text}](${link.startsWith('http') ? link : wikiPageName(`${link.replace(/^\/|\/$/g, '')}.md`)})`);
     else lines.push('', `**${text}**`, '');
+  }
+  const declaredLinks = (section.match(/\blink:/g) ?? []).length;
+  if (declaredLinks !== emittedLinks) {
+    throw new Error(`Sidebar has ${declaredLinks} links but ${emittedLinks} were converted; scripts/wiki.mjs only understands \`text: '...', link: '...'\` items`);
   }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }

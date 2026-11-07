@@ -25,6 +25,8 @@ const shot = async (page: Page, name: string, fullPage = false) => {
 };
 
 test('tutorial walkthrough', async ({ page }) => {
+  // Deletes objects by name on the stack it logs into, so it only runs when explicitly allowed
+  test.skip(process.env.ALLOW_DOCS_CLEANUP !== '1', 'Set ALLOW_DOCS_CLEANUP=1 to run against a disposable demo stack');
   test.setTimeout(180_000);
   mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -35,8 +37,9 @@ test('tutorial walkthrough', async ({ page }) => {
   expect(login.ok(), 'log in as the demo admin').toBe(true);
 
   // A failed delete would leave duplicates that change later screenshots, so make it loud
+  // Soft assertions: in the final cleanup every delete is attempted even if an earlier one fails
   const expectDeleted = async (response: { ok(): boolean; status(): number }, what: string) => {
-    expect(response.ok(), `deleting ${what} (HTTP ${response.status()})`).toBe(true);
+    expect.soft(response.ok(), `deleting ${what} (HTTP ${response.status()})`).toBe(true);
   };
 
   // Remove anything a previous (possibly interrupted) run left behind so names stay stable

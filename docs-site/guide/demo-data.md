@@ -108,8 +108,8 @@ language page has no geographic breakdown, because posts carry no location data.
 
 ::: warning Use a disposable stack
 The tutorial spec deletes projects, investigations and workflows named *Tutorial project*, *Tram delays*
-and *Sentiment of posts* before it starts, on whatever stack the account can reach. Run it only against
-the demo stack.
+and *Sentiment of posts* before it starts, on whatever stack the account can reach. It is skipped unless
+you set `ALLOW_DOCS_CLEANUP=1`; do that only against the demo stack.
 :::
 
 The images above come from the same data. With the stack running and demo data loaded:
@@ -118,7 +118,7 @@ The images above come from the same data. With the stack running and demo data l
 cd ex-accell-ui
 SCREENSHOT_BASE_URL=http://localhost:3000 \
 SCREENSHOT_EMAIL=<admin email> SCREENSHOT_PASSWORD=<admin password> \
-npm run docs:screenshots
+ALLOW_DOCS_CLEANUP=1 npm run docs:screenshots
 ```
 
 They are written to `docs-site/public/screenshots/` using a fixed 1440px viewport. The same command also

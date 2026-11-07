@@ -224,3 +224,8 @@ test('buildWiki keeps pages in folders that merely share a name with tooling fol
     rmSync(docs, { recursive: true, force: true });
   }
 });
+
+test('buildSidebar fails when a sidebar item uses a shape it cannot convert', () => {
+  const config = `sidebar: [{ text: 'Guide', items: [{ link: '/guide/a', text: 'A' }] }]`;
+  assert.throws(() => buildSidebar(config), /links but/);
+});
