@@ -3,6 +3,7 @@
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
 
   // Load current project and check if exists
   onMount(async () => {
@@ -15,7 +16,7 @@
   });
 
   let errorMessage = '';
-  let jupyterUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8888` : 'http://localhost:8888';
+  let connection: JupyterConnection | null = null;
   let isJupyterRunning = false;
   let notebookFile = '';
   let notebookTemplate = 'sentiment_analysis';
@@ -86,9 +87,16 @@
 
   let selectedTemplate = notebookTemplates[0];
 
-  function startJupyter() {
-    // Open JupyterLab in a new tab
-    window.open(jupyterUrl, '_blank');
+  async function startJupyter() {
+    // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
+    const tab = window.open('', '_blank');
+    connection = await connectJupyter((message) => (errorMessage = message));
+    if (!connection) {
+      tab?.close();
+      return;
+    }
+    if (tab) tab.opener = null;
+    if (tab) tab.location.href = jupyterLink(connection, '/lab');
   }
 
   let showEmbeddedNotebook = false;
@@ -101,14 +109,19 @@
   }
 
   function openInJupyterLab() {
-    const url = `${jupyterUrl}/lab/tree/notebooks/${notebookFile}`;
-    window.open(url, '_blank');
+    if (!connection) return;
+    window.open(jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`), '_blank');
   }
 
   async function checkJupyterStatus() {
+    if (!connection) {
+      isJupyterRunning = false;
+      return;
+    }
     try {
-      const response = await fetch(`${jupyterUrl}/api`, { method: 'GET' });
+      const response = await fetch(jupyterLink(connection, '/api'), { method: 'GET' });
       isJupyterRunning = response.ok;
+      if (response.status === 401 || response.status === 403) connection = null;
     } catch (error) {
       isJupyterRunning = false;
     }
@@ -328,7 +341,7 @@
               {:else}
                 <div class="bg-green-50 rounded-xl p-4 text-sm">
                   <p class="font-medium text-green-900 mb-2">✓ JupyterLab is running</p>
-                  <p class="text-green-700">Server available at <a href="{jupyterUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">{jupyterUrl}</a></p>
+                  <p class="text-green-700">Server available at <a href="{jupyterLink(connection, '/lab')}" target="_blank" class="text-blue-600 hover:underline font-medium">{connection?.baseUrl}</a></p>
                 </div>
               {/if}
             </div>
@@ -397,7 +410,7 @@
         <div class="border border-gray-200 rounded-xl overflow-hidden" style="height: 600px;">
           {#if isJupyterRunning}
             <iframe 
-              src="{jupyterUrl}/lab/tree/notebooks/{notebookFile}" 
+              src="{jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`)}" 
               class="w-full h-full"
               title="Jupyter Notebook">
             </iframe>

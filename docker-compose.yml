@@ -58,6 +58,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}  # set true when serving over HTTPS
       ADDRESS_HEADER: ${ADDRESS_HEADER:-}  # e.g. X-Forwarded-For, only behind a trusted proxy
       XFF_DEPTH: ${XFF_DEPTH:-}
+      # JupyterLab runs as its own service; the app hands the browser this URL and token (admins only)
+      JUPYTER_URL: ${JUPYTER_URL:-http://localhost:8888}
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-}  # set in .env; if empty Jupyter makes its own token and the app cannot link to it
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       DAPR_HTTP_PORT: "3500"
@@ -124,8 +127,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"  # loopback only; put a TLS proxy in front to expose it
     environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-}  # set in .env; if empty Jupyter makes its own token and the app cannot link to it
+      # TODO(#101): only enforced once jupyter/Dockerfile (which reads this) is committed. Set it to the URL you open the app on, e.g. behind a TLS proxy
+      JUPYTER_ALLOW_ORIGIN: ${JUPYTER_ALLOW_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-analytics}
       PGHOST: postgres
       PGPORT: "5432"

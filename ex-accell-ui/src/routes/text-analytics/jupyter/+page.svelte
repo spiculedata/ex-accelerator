@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
+  import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
   
   // Redirect to projects if no current project
   onMount(() => {
@@ -10,22 +11,37 @@
     }
   });
 
-  let jupyterUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8888` : 'http://localhost:8888';
+  let connection: JupyterConnection | null = null;
   let isJupyterRunning = false;
   let showFullScreen = false;
   
-  function checkJupyterStatus() {
-    fetch(`${jupyterUrl}/api/status`)
-      .then(response => {
-        isJupyterRunning = response.ok;
-      })
-      .catch(() => {
-        isJupyterRunning = false;
-      });
+  // Only an explicit click starts the server; polling just checks the connection we already have
+  let errorMessage = '';
+
+  async function startJupyter() {
+    errorMessage = '';
+    connection = await connectJupyter((message) => (errorMessage = message));
+    if (!connection) return;
+    await checkJupyterStatus();
+  }
+
+  async function checkJupyterStatus() {
+    if (!connection) {
+      isJupyterRunning = false;
+      return;
+    }
+    try {
+      const response = await fetch(jupyterLink(connection, '/api/status'));
+      isJupyterRunning = response.ok;
+      if (response.status === 401 || response.status === 403) connection = null; // restarted with a new token
+    } catch {
+      isJupyterRunning = false;
+    }
   }
 
   function openInNewTab() {
-    window.open(`${jupyterUrl}/lab`, '_blank');
+    if (!connection) return;
+    window.open(jupyterLink(connection, '/lab'), '_blank');
   }
 
   function toggleFullScreen() {
@@ -34,7 +50,6 @@
 
   // Check Jupyter status on mount and periodically
   onMount(() => {
-    checkJupyterStatus();
     const interval = setInterval(checkJupyterStatus, 5000);
     return () => clearInterval(interval);
   });
@@ -142,7 +157,7 @@
     <div class="bg-white rounded-xl shadow-sm overflow-hidden {showFullScreen ? 'h-full' : ''}">
       {#if isJupyterRunning}
         <iframe 
-          src="{jupyterUrl}/lab" 
+          src="{jupyterLink(connection, '/lab')}" 
           class="w-full {showFullScreen ? 'h-full' : 'h-[800px]'}"
           title="Jupyter Lab Interface">
         </iframe>
@@ -171,10 +186,14 @@
               </div>
             </div>
             
+            {#if errorMessage}
+              <p class="mt-4 text-sm text-red-700 max-w-md mx-auto" role="alert">{errorMessage}</p>
+            {/if}
+
             <button 
-              on:click={checkJupyterStatus}
+              on:click={startJupyter}
               class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors">
-              Check Status Again
+              Start Jupyter Lab
             </button>
           </div>
         </div>
@@ -189,7 +208,7 @@
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div class="space-y-3">
             <button 
-              on:click={() => window.open(`${jupyterUrl}/lab/tree/notebooks`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,7 +222,7 @@
             </button>
             
             <button 
-              on:click={() => window.open(`${jupyterUrl}/lab/tree/notebooks/sentiment_analysis.ipynb`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree/sentiment_analysis.ipynb'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +236,7 @@
             </button>
             
             <button 
-              on:click={() => window.open(`${jupyterUrl}/lab/tree/notebooks/custom_research.ipynb`, '_blank')}
+              on:click={() => window.open(jupyterLink(connection, '/lab/tree/custom_research.ipynb'), '_blank')}
               class="w-full text-left p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
               <div class="flex items-center">
                 <svg class="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

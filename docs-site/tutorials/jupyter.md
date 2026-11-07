@@ -16,7 +16,7 @@ npm run jupyter:bootstrap   # once: installs the Python packages, downloads NLTK
 npm run dev:jupyter         # starts the web app and Jupyter Lab together
 ```
 
-The bootstrap never overwrites a notebook or a Jupyter configuration that already exists. Or start only Jupyter Lab with `npm run jupyter:start` and open `http://localhost:8888`.
+The bootstrap never overwrites a notebook. It writes Jupyter's settings to the project-local `ex-accell-ui/.jupyter/` folder and leaves your own `~/.jupyter` alone. Or start only Jupyter Lab with `npm run jupyter:start`, which prints a `http://localhost:8888/?token=...` link; the token is random on every start.
 
 ## 2. Open a template
 
@@ -47,11 +47,18 @@ Templates live in `ex-accell-ui/notebooks/`, including:
 The compose file has a `jupyter` service that mounts `DATA_DIR/notebooks`. Its build context
 (`./jupyter`) is not complete in the repository yet, so use the local Poetry route above for now.
 
-::: danger Run Jupyter only on a trusted, single-user machine
-Notebooks run arbitrary code with access to your database, and the bootstrap script currently writes a
-Jupyter configuration with **no authentication and cross-origin access enabled** to your global
-`~/.jupyter` folder. While that is the case, any web page you visit could reach a running Jupyter
-Lab. Never expose it to a network or the internet, and stop it when you are not using it. Making this
-safe is tracked in [#101](https://github.com/spiculedata/ex-accelerator/issues/101). The Research
-page's launch controls are administrator-only.
+::: tip Upgrading from an earlier version
+Re-run `npm run jupyter:bootstrap` once so the project-local `.jupyter/` config exists; without it the
+embedded page cannot talk to Jupyter. Older versions also wrote an open configuration to
+`~/.jupyter/jupyter_lab_config.py` (no token, any origin, XSRF checks off). The app no longer uses it,
+but any other `jupyter lab` you run still does, so delete it unless you rely on it. The bootstrap
+warns when it finds that file.
+:::
+
+::: warning Notebooks run code with access to your database
+Jupyter Lab listens on `127.0.0.1` only, requires a token (random on every start unless you set `JUPYTER_TOKEN`), keeps cross-site
+request checks on and accepts cross-origin requests only from the app's own address. The Research
+page's launch controls are administrator-only, and they hand the tokenised link to the signed-in
+administrator. Notebooks receive the app's database credentials (`DATABASE_URL`), so use a database role with only the rights you want notebooks to have. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The
+compose file publishes it on `127.0.0.1`; set `JUPYTER_TOKEN` in `.env` so the app can open it. `JUPYTER_ALLOW_ORIGIN` defaults to `http://localhost:3000` for compose and to `http://localhost:5173` for the local dev scripts.
 :::
