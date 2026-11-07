@@ -71,7 +71,7 @@ table ranks them by post count and weight.
 
 ### Engagement analysis
 
-Under **Social Analytics → Engagement Analysis**, totals, average engagement rate and reach are
+Under **Social Analytics → Engagement**, totals, average engagement rate and reach are
 computed from each post's likes, comments, shares and saves, with breakdowns by platform, content
 type and time of day.
 
@@ -86,14 +86,14 @@ was, and the share of posts that mix languages.
 
 ### Hashtag analysis
 
-Under **Social Analytics → Hashtag Analysis**, see the most used hashtags and which ones appear
+Under **Social Analytics → Hashtags**, see the most used hashtags and which ones appear
 together.
 
 ![Hashtag analysis dashboard](/screenshots/hashtag-analysis.png)
 
 ### Trigram analysis
 
-Under **Social Analytics → Trigram Analysis**, see the three-word phrases that recur in posts, how
+Under **Social Analytics → Trigrams**, see the three-word phrases that recur in posts, how
 positive or negative the posts containing them are, and whether each phrase is rising or fading.
 
 ![Trigram analysis dashboard](/screenshots/trigram-analysis.png)
@@ -106,13 +106,21 @@ language page has no geographic breakdown, because posts carry no location data.
 
 ## Regenerating the screenshots
 
+::: warning Use a disposable stack
+The tutorial spec deletes projects, investigations and workflows named *Tutorial project*, *Tram delays*
+and *Sentiment of posts* before it starts, on whatever stack the account can reach. It is skipped unless
+you set `ALLOW_DOCS_CLEANUP=1`; do that only against the demo stack.
+:::
+
 The images above come from the same data. With the stack running and demo data loaded:
 
 ```bash
 cd ex-accell-ui
 SCREENSHOT_BASE_URL=http://localhost:3000 \
 SCREENSHOT_EMAIL=<admin email> SCREENSHOT_PASSWORD=<admin password> \
-npm run docs:screenshots
+ALLOW_DOCS_CLEANUP=1 npm run docs:screenshots
 ```
 
-They are written to `docs-site/public/screenshots/` using a fixed 1440px viewport.
+They are written to `docs-site/public/screenshots/` using a fixed 1440px viewport. The same command also
+replays the [tutorials](/tutorials/) against the demo data (creating and then deleting a project, an
+investigation and a workflow) and saves their screenshots under `screenshots/tutorials/`.

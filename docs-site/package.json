@@ -5,7 +5,9 @@
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "docs:preview": "vitepress preview",
+    "wiki:build": "node scripts/wiki.mjs",
+    "wiki:test": "node --test scripts/wiki.test.mjs"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"
