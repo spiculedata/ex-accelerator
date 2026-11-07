@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { createJupyterManager, type LaunchStore, type SavedLaunch } from './jupyterManager';
 
@@ -36,6 +36,14 @@ function isAlive(pid: number): boolean {
 	}
 }
 
+function killProcessGroup(pid: number): void {
+	try {
+		process.kill(-pid, 'SIGTERM');
+	} catch {
+		// already gone
+	}
+}
+
 async function isReady(baseUrl: string, url: string): Promise<boolean> {
 	try {
 		const token = new URL(url).searchParams.get('token') ?? '';
@@ -54,5 +62,7 @@ export const ensureJupyter = createJupyterManager({
 	cwd: process.cwd(),
 	store: fileLaunchStore(join(process.cwd(), '.jupyter', 'launch.json')),
 	isAlive,
-	isReady
+	isReady,
+	kill: killProcessGroup,
+	hasConfig: () => existsSync(join(process.cwd(), '.jupyter', 'jupyter_lab_config.py'))
 });

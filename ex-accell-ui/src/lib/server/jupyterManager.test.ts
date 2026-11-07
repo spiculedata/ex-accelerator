@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ChildProcess } from 'child_process';
 import { createJupyterManager, jupyterEnvironment, type LaunchStore, type SavedLaunch, type SpawnFn } from './jupyterManager';
 
-function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved?: SavedLaunch | null; alive?: boolean } = {}) {
+function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved?: SavedLaunch | null; alive?: boolean; config?: boolean } = {}) {
 	const handlers: Record<string, (...args: unknown[]) => void> = {};
 	const child = {
 		pid: 4242,
@@ -22,6 +22,7 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 			saved = null;
 		}
 	};
+	const kill = vi.fn();
 	const ensure = createJupyterManager({
 		spawn,
 		env: overrides.env ?? {},
@@ -29,10 +30,12 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 		store,
 		isAlive: () => overrides.alive ?? true,
 		isReady: async () => overrides.ready ?? true,
+		kill,
+		hasConfig: () => overrides.config ?? true,
 		readyTimeoutMs: 30,
 		pollMs: 5
 	});
-	return { ensure, spawn, handlers, store };
+	return { ensure, spawn, handlers, store, kill };
 }
 
 const ORIGIN = 'http://localhost:5173';
@@ -70,17 +73,49 @@ describe('createJupyterManager', () => {
 		expect(access.url).not.toContain('token=old');
 	});
 
-	it('fails and forgets the launch when Jupyter never becomes ready', async () => {
-		const { ensure, store } = setup({ ready: false });
+	it('fails, forgets the launch and kills the process when Jupyter never becomes ready', async () => {
+		const { ensure, store, kill } = setup({ ready: false });
 		await expect(ensure(ORIGIN)).rejects.toThrow(/did not become ready/);
 		expect(store.read()).toBeNull();
+		expect(kill).toHaveBeenCalledWith(4242);
+	});
+
+	it('does not reuse a saved launch whose pid is alive but not answering', async () => {
+		const saved = { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' };
+		const { ensure, spawn } = setup({ saved, ready: false });
+		await expect(ensure(ORIGIN)).rejects.toThrow();
+		expect(spawn).toHaveBeenCalledTimes(1);
+	});
+
+	it('shares one launch between concurrent requests', async () => {
+		const { ensure, spawn } = setup();
+		const [a, b] = await Promise.all([ensure(ORIGIN), ensure(ORIGIN)]);
+		expect(spawn).toHaveBeenCalledTimes(1);
+		expect(a.url).toBe(b.url);
+	});
+
+	it('asks for the bootstrap when the project-local config is missing', async () => {
+		const { ensure, spawn } = setup({ config: false });
+		await expect(ensure(ORIGIN)).rejects.toThrow(/jupyter:bootstrap/);
+		expect(spawn).not.toHaveBeenCalled();
+	});
+
+	it('does not let a stale child clear a newer launch', async () => {
+		const { ensure, handlers, store } = setup();
+		await ensure(ORIGIN);
+		store.write({ pid: 9999, url: 'http://localhost:8888/?token=new', baseUrl: 'http://localhost:8888' });
+		handlers.exit(1);
+		expect(store.read()?.pid).toBe(9999);
 	});
 
 	it('reports a launch error such as a missing Poetry', async () => {
 		const { ensure, handlers } = setup({ ready: false });
+		const started = Date.now();
 		const pending = ensure(ORIGIN);
+		await Promise.resolve();
 		handlers.error(new Error('spawn poetry ENOENT'));
 		await expect(pending).rejects.toThrow(/Poetry/);
+		expect(Date.now() - started).toBeLessThan(25);
 	});
 
 	it('forgets the launch when the process exits', async () => {

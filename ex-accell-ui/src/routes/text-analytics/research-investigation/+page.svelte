@@ -88,12 +88,15 @@
   let selectedTemplate = notebookTemplates[0];
 
   async function startJupyter() {
+    // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
+    const tab = window.open('', '_blank');
     connection = connection ?? (await connectJupyter());
     if (!connection) {
-      errorMessage = 'Could not start JupyterLab. Check that Poetry and the Python environment are set up (npm run jupyter:bootstrap).';
+      tab?.close();
+      errorMessage = 'Could not start JupyterLab. Run npm run jupyter:bootstrap, check that Poetry is installed, and sign in as an administrator.';
       return;
     }
-    window.open(jupyterLink(connection, '/lab'), '_blank');
+    if (tab) tab.location.href = jupyterLink(connection, '/lab');
   }
 
   let showEmbeddedNotebook = false;

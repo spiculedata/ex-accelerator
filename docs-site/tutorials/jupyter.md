@@ -59,6 +59,6 @@ warns when it finds that file.
 Jupyter Lab listens on `127.0.0.1` only, requires a random token on every start, keeps cross-site
 request checks on and accepts cross-origin requests only from the app's own address. The Research
 page's launch controls are administrator-only, and they hand the tokenised link to the signed-in
-administrator. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The
+administrator. Notebooks receive the app's database credentials (`DATABASE_URL`), so use a database role with only the rights you want notebooks to have. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The
 compose file publishes it on `127.0.0.1`; set `JUPYTER_TOKEN` in `.env` so the app can open it. `JUPYTER_ALLOW_ORIGIN` defaults to `http://localhost:3000` for compose and to `http://localhost:5173` for the local dev scripts.
 :::

@@ -29,6 +29,10 @@ interface ManagerOptions {
 	store: LaunchStore;
 	isAlive: (pid: number) => boolean;
 	isReady: (baseUrl: string, url: string) => Promise<boolean>;
+	/** Stops a launched Jupyter (and its process group) that never became usable */
+	kill: (pid: number) => void;
+	/** The project-local config written by `npm run jupyter:bootstrap` */
+	hasConfig: () => boolean;
 	readyTimeoutMs?: number;
 	pollMs?: number;
 }
@@ -48,26 +52,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Keeps track of the one JupyterLab this app started so later requests (even after a restart) reuse it. */
 export function createJupyterManager(options: ManagerOptions) {
-	const { spawn, env, cwd, store, isAlive, isReady, readyTimeoutMs = 20_000, pollMs = 500 } = options;
+	const { spawn, env, cwd, store, isAlive, isReady, kill, hasConfig, readyTimeoutMs = 20_000, pollMs = 500 } = options;
+	let inFlight: Promise<JupyterAccess> | null = null;
 
-	async function waitUntilReady(baseUrl: string, url: string): Promise<boolean> {
-		const deadline = Date.now() + readyTimeoutMs;
-		while (Date.now() < deadline) {
-			if (await isReady(baseUrl, url)) return true;
-			await sleep(pollMs);
-		}
-		return false;
-	}
-
-	return async function ensureJupyter(appOrigin: string): Promise<JupyterAccess> {
-		const external = resolveExternalJupyter(env);
-		if (external) return { ...external, message: 'Using the configured JupyterLab' };
-
+	async function launchJupyter(appOrigin: string): Promise<JupyterAccess> {
 		const saved = store.read();
-		if (saved && isAlive(saved.pid)) {
+		if (saved && isAlive(saved.pid) && (await isReady(saved.baseUrl, saved.url))) {
 			return { url: saved.url, baseUrl: saved.baseUrl, message: 'JupyterLab is already running' };
 		}
 		store.clear();
+
+		if (!hasConfig()) throw new Error('Jupyter is not set up yet: run `npm run jupyter:bootstrap` first');
 
 		const launch = buildJupyterLaunch(env.JUPYTER_ALLOW_ORIGIN || appOrigin);
 		const child = spawn('poetry', ['run', 'jupyter', ...launch.args], {
@@ -79,23 +74,43 @@ export function createJupyterManager(options: ManagerOptions) {
 		child.unref();
 
 		let failure: Error | null = null;
+		// A stale child must never wipe the record of a newer launch
+		const forgetIfMine = () => {
+			if (store.read()?.pid === child.pid) store.clear();
+		};
 		child.on('error', (error: Error) => {
 			console.error('Failed to start JupyterLab:', error);
 			failure = error;
-			store.clear();
+			forgetIfMine();
 		});
 		child.on('exit', (code: number | null) => {
 			console.log(`JupyterLab process exited with code ${code}`);
-			store.clear();
+			forgetIfMine();
 		});
 
 		if (child.pid !== undefined) store.write({ pid: child.pid, url: launch.url, baseUrl: launch.baseUrl });
 
-		const ready = await waitUntilReady(launch.baseUrl, launch.url);
-		if (failure || !ready) {
-			store.clear();
-			throw new Error(failure ? 'JupyterLab could not be launched (is Poetry installed?)' : 'JupyterLab did not become ready in time');
+		const deadline = Date.now() + readyTimeoutMs;
+		let ready = false;
+		while (!failure && !ready && Date.now() < deadline) {
+			ready = await isReady(launch.baseUrl, launch.url);
+			if (!ready) await sleep(pollMs);
 		}
-		return { url: launch.url, baseUrl: launch.baseUrl, message: 'JupyterLab is running' };
+		if (ready) return { url: launch.url, baseUrl: launch.baseUrl, message: 'JupyterLab is running' };
+
+		if (child.pid !== undefined) kill(child.pid);
+		forgetIfMine();
+		throw new Error(failure ? 'JupyterLab could not be launched (is Poetry installed?)' : 'JupyterLab did not become ready in time');
+	}
+
+	return async function ensureJupyter(appOrigin: string): Promise<JupyterAccess> {
+		const external = resolveExternalJupyter(env);
+		if (external) return { ...external, message: 'Using the configured JupyterLab' };
+
+		// Concurrent callers (double click, two tabs) share one launch
+		inFlight ??= launchJupyter(appOrigin).finally(() => {
+			inFlight = null;
+		});
+		return inFlight;
 	};
 }
