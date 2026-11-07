@@ -15,8 +15,13 @@
   let isJupyterRunning = false;
   let showFullScreen = false;
   
-  async function checkJupyterStatus() {
+  // Only an explicit click starts the server; polling just checks the connection we already have
+  async function startJupyter() {
     connection = connection ?? (await connectJupyter());
+    await checkJupyterStatus();
+  }
+
+  async function checkJupyterStatus() {
     if (!connection) {
       isJupyterRunning = false;
       return;
@@ -31,7 +36,8 @@
   }
 
   function openInNewTab() {
-    window.open(`${jupyterLink(connection, '/lab')}`, '_blank');
+    if (!connection) return;
+    window.open(jupyterLink(connection, '/lab'), '_blank');
   }
 
   function toggleFullScreen() {
@@ -40,7 +46,6 @@
 
   // Check Jupyter status on mount and periodically
   onMount(() => {
-    checkJupyterStatus();
     const interval = setInterval(checkJupyterStatus, 5000);
     return () => clearInterval(interval);
   });
@@ -178,9 +183,9 @@
             </div>
             
             <button 
-              on:click={checkJupyterStatus}
+              on:click={startJupyter}
               class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors">
-              Check Status Again
+              Start Jupyter Lab
             </button>
           </div>
         </div>

@@ -7,6 +7,7 @@ export interface JupyterLaunch {
 	args: string[];
 	env: { JUPYTER_TOKEN: string; JUPYTER_ALLOW_ORIGIN: string; JUPYTER_CONFIG_DIR: string };
 	url: string;
+	baseUrl: string;
 }
 
 export interface ExternalJupyter {
@@ -27,12 +28,13 @@ export function buildJupyterLaunch(
 ): JupyterLaunch {
 	const token = generateToken();
 	return {
-		args: ['lab', `--port=${JUPYTER_PORT}`, '--ServerApp.ip=127.0.0.1', '--no-browser'],
+		args: ['lab', `--port=${JUPYTER_PORT}`, '--ServerApp.ip=127.0.0.1', '--ServerApp.port_retries=0', '--no-browser'],
 		env: {
 			JUPYTER_TOKEN: token,
 			JUPYTER_ALLOW_ORIGIN: appOrigin,
 			JUPYTER_CONFIG_DIR: '.jupyter'
 		},
+		baseUrl: `http://localhost:${JUPYTER_PORT}`,
 		url: `http://localhost:${JUPYTER_PORT}/?token=${token}`
 	};
 }

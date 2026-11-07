@@ -18,7 +18,7 @@ export JUPYTER_URL="${JUPYTER_URL:-http://localhost:8888}"
 
 # Start Jupyter Lab in the background
 echo "🔬 Starting Jupyter Lab server..."
-poetry run jupyter lab --port=8888 --ServerApp.ip=127.0.0.1 --no-browser &
+poetry run jupyter lab --port=8888 --ServerApp.ip=127.0.0.1 --ServerApp.port_retries=0 --no-browser &
 JUPYTER_PID=$!
 
 # Wait a moment for Jupyter to start

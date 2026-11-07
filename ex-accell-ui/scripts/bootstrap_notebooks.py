@@ -282,6 +282,15 @@ c.ServerApp.root_dir = "./notebooks"
     config_path = jupyter_dir / "jupyter_lab_config.py"
     config_path.write_text(config_content)
     print(f"✓ Jupyter configuration written to {config_path}")
+    warn_about_legacy_global_config()
+
+
+def warn_about_legacy_global_config():
+    """Older versions wrote an open (no token, any origin, no XSRF) config to ~/.jupyter"""
+    legacy = Path.home() / ".jupyter" / "jupyter_lab_config.py"
+    if legacy.exists() and "disable_check_xsrf = True" in legacy.read_text():
+        print(f"⚠ {legacy} disables authentication and XSRF checks (written by an older bootstrap).")
+        print("  Any other `jupyter lab` you run still uses it. Delete it unless you rely on it.")
 
 
 def main():

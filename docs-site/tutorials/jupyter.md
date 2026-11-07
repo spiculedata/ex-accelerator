@@ -47,10 +47,18 @@ Templates live in `ex-accell-ui/notebooks/`, including:
 The compose file has a `jupyter` service that mounts `DATA_DIR/notebooks`. Its build context
 (`./jupyter`) is not complete in the repository yet, so use the local Poetry route above for now.
 
+::: tip Upgrading from an earlier version
+Re-run `npm run jupyter:bootstrap` once so the project-local `.jupyter/` config exists; without it the
+embedded page cannot talk to Jupyter. Older versions also wrote an open configuration to
+`~/.jupyter/jupyter_lab_config.py` (no token, any origin, XSRF checks off). The app no longer uses it,
+but any other `jupyter lab` you run still does, so delete it unless you rely on it. The bootstrap
+warns when it finds that file.
+:::
+
 ::: warning Notebooks run code with access to your database
 Jupyter Lab listens on `127.0.0.1` only, requires a random token on every start, keeps cross-site
 request checks on and accepts cross-origin requests only from the app's own address. The Research
 page's launch controls are administrator-only, and they hand the tokenised link to the signed-in
 administrator. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The
-compose file publishes it on `127.0.0.1`; set `JUPYTER_TOKEN` in `.env` so the app can open it.
+compose file publishes it on `127.0.0.1`; set `JUPYTER_TOKEN` in `.env` so the app can open it. `JUPYTER_ALLOW_ORIGIN` defaults to `http://localhost:3000` for compose and to `http://localhost:5173` for the local dev scripts.
 :::

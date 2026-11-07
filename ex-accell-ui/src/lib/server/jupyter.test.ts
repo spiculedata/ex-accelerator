@@ -15,6 +15,11 @@ describe('buildJupyterLaunch', () => {
 		expect(launch.url).toBe('http://localhost:8888/?token=tok123');
 	});
 
+	it('fails instead of moving to another port when 8888 is taken', () => {
+		expect(launch.args).toContain('--ServerApp.port_retries=0');
+		expect(launch.baseUrl).toBe('http://localhost:8888');
+	});
+
 	it('restricts origin and framing to the app origin', () => {
 		expect(launch.env.JUPYTER_ALLOW_ORIGIN).toBe('http://localhost:5173');
 	});

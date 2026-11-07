@@ -18,10 +18,14 @@ describe('parseJupyterStart', () => {
 
 describe('jupyterLink', () => {
 	it('appends the token to a path', () => {
-		expect(jupyterLink({ baseUrl: 'http://h:8888', token: 'a b' }, '/lab/tree/x.ipynb')).toBe('http://h:8888/lab/tree/x.ipynb?token=a%20b');
+		expect(jupyterLink({ baseUrl: 'http://h:8888', token: 'a b' }, '/lab/tree/x.ipynb')).toBe('http://h:8888/lab/tree/x.ipynb?token=a+b');
 	});
 
-	it('falls back to the plain base URL without a token', () => {
+	it('returns an empty string without a connection', () => {
 		expect(jupyterLink(null, '/lab')).toBe('');
+	});
+
+	it('keeps an existing query string', () => {
+		expect(jupyterLink({ baseUrl: 'http://h:8888', token: 't' }, '/lab?reset')).toBe('http://h:8888/lab?reset=&token=t');
 	});
 });
