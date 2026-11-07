@@ -51,6 +51,12 @@ describe('createJupyterManager', () => {
 		expect(spawn).not.toHaveBeenCalled();
 	});
 
+	it('explains a missing token when only JUPYTER_URL is configured', async () => {
+		const { ensure, spawn } = setup({ env: { JUPYTER_URL: 'http://j:8888' } });
+		await expect(ensure(ORIGIN)).rejects.toThrow(/JUPYTER_TOKEN/);
+		expect(spawn).not.toHaveBeenCalled();
+	});
+
 	it('spawns with an argument array and the token only in the environment', async () => {
 		const { ensure, spawn } = setup();
 		const access = await ensure(ORIGIN);
@@ -88,7 +94,7 @@ describe('createJupyterManager', () => {
 		const saved = { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' };
 		const { ensure, spawn, kill } = setup({ saved, ready: false });
 		await expect(ensure(ORIGIN)).rejects.toThrow();
-		expect(kill).toHaveBeenCalledWith(7);
+		expect(kill).not.toHaveBeenCalledWith(7); // the recorded pid could belong to an unrelated process now
 		expect(spawn).toHaveBeenCalledTimes(1);
 	});
 

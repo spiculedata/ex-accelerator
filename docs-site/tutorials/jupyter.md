@@ -56,7 +56,7 @@ warns when it finds that file.
 :::
 
 ::: warning Notebooks run code with access to your database
-Jupyter Lab listens on `127.0.0.1` only, requires a random token on every start, keeps cross-site
+Jupyter Lab listens on `127.0.0.1` only, requires a token (random on every start unless you set `JUPYTER_TOKEN`), keeps cross-site
 request checks on and accepts cross-origin requests only from the app's own address. The Research
 page's launch controls are administrator-only, and they hand the tokenised link to the signed-in
 administrator. Notebooks receive the app's database credentials (`DATABASE_URL`), so use a database role with only the rights you want notebooks to have. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The

@@ -60,8 +60,8 @@ export function createJupyterManager(options: ManagerOptions) {
 		if (saved && isAlive(saved.pid) && (await isReady(saved.baseUrl, saved.url))) {
 			return { url: saved.url, baseUrl: saved.baseUrl, message: 'JupyterLab is already running' };
 		}
-		// A recorded process that is alive but not answering still holds the port (or is a recycled pid's stranger)
-		if (saved && isAlive(saved.pid)) kill(saved.pid);
+		// Never signal a recorded pid we cannot verify: it may have been recycled by an unrelated process.
+		// If it really is a stuck Jupyter, the relaunch fails fast with a "port in use" message instead.
 		store.clear();
 
 		if (!hasConfig()) throw new Error('Jupyter is not set up yet: run `npm run jupyter:bootstrap` first');
@@ -112,6 +112,7 @@ export function createJupyterManager(options: ManagerOptions) {
 	return async function ensureJupyter(appOrigin: string): Promise<JupyterAccess> {
 		const external = resolveExternalJupyter(env);
 		if (external) return { ...external, message: 'Using the configured JupyterLab' };
+		if (env.JUPYTER_URL) throw new Error('JUPYTER_URL is set but JUPYTER_TOKEN is empty: set JUPYTER_TOKEN in .env');
 
 		// Concurrent callers (double click, two tabs) share one launch
 		inFlight ??= launchJupyter(appOrigin).finally(() => {
