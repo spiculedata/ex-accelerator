@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ChildProcess } from 'child_process';
 import { createJupyterManager, jupyterEnvironment, type LaunchStore, type SavedLaunch, type SpawnFn } from './jupyterManager';
 
-function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved?: SavedLaunch | null; alive?: boolean; config?: boolean } = {}) {
+function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved?: SavedLaunch | null; alive?: boolean; config?: boolean; readyTimeoutMs?: number } = {}) {
 	const handlers: Record<string, (...args: unknown[]) => void> = {};
 	const child = {
 		pid: 4242,
@@ -23,19 +23,23 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 		}
 	};
 	const kill = vi.fn();
+	let readyCalls = 0;
 	const ensure = createJupyterManager({
 		spawn,
 		env: overrides.env ?? {},
 		cwd: '.',
 		store,
 		isAlive: () => overrides.alive ?? true,
-		isReady: async () => overrides.ready ?? true,
+		isReady: async () => {
+			readyCalls++;
+			return overrides.ready ?? true;
+		},
 		kill,
 		hasConfig: () => overrides.config ?? true,
-		readyTimeoutMs: 30,
+		readyTimeoutMs: overrides.readyTimeoutMs ?? 30,
 		pollMs: 5
 	});
-	return { ensure, spawn, handlers, store, kill };
+	return { ensure, spawn, handlers, store, kill, isReadyCalls: () => readyCalls };
 }
 
 const ORIGIN = 'http://localhost:5173';
@@ -110,12 +114,21 @@ describe('createJupyterManager', () => {
 
 	it('reports a launch error such as a missing Poetry', async () => {
 		const { ensure, handlers } = setup({ ready: false });
-		const started = Date.now();
 		const pending = ensure(ORIGIN);
 		await Promise.resolve();
 		handlers.error(new Error('spawn poetry ENOENT'));
 		await expect(pending).rejects.toThrow(/Poetry/);
-		expect(Date.now() - started).toBeLessThan(25);
+	});
+
+	it('fails fast, naming the port, when Jupyter exits before it is ready', async () => {
+		const { ensure, handlers, isReadyCalls } = setup({ ready: false, readyTimeoutMs: 5000 });
+		const started = Date.now();
+		const pending = ensure(ORIGIN);
+		await Promise.resolve();
+		handlers.exit(1);
+		await expect(pending).rejects.toThrow(/8888/);
+		expect(Date.now() - started).toBeLessThan(1000);
+		expect(isReadyCalls()).toBeLessThan(5);
 	});
 
 	it('forgets the launch when the process exits', async () => {

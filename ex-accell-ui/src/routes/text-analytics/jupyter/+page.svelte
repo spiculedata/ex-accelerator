@@ -20,7 +20,7 @@
 
   async function startJupyter() {
     errorMessage = '';
-    connection = connection ?? (await connectJupyter());
+    connection = await connectJupyter();
     if (!connection) {
       errorMessage = 'Could not start Jupyter Lab. Check that Poetry and the Python environment are set up (npm run jupyter:bootstrap) and that you are signed in as an administrator.';
       return;
@@ -38,6 +38,7 @@
       isJupyterRunning = response.ok;
     } catch {
       isJupyterRunning = false;
+      connection = null; // Jupyter may have restarted with a new token; Start reconnects
     }
   }
 

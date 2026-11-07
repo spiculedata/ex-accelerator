@@ -74,6 +74,7 @@ export function createJupyterManager(options: ManagerOptions) {
 		child.unref();
 
 		let failure: Error | null = null;
+		let exitedEarly = false;
 		// A stale child must never wipe the record of a newer launch
 		const forgetIfMine = () => {
 			if (store.read()?.pid === child.pid) store.clear();
@@ -85,6 +86,7 @@ export function createJupyterManager(options: ManagerOptions) {
 		});
 		child.on('exit', (code: number | null) => {
 			console.log(`JupyterLab process exited with code ${code}`);
+			exitedEarly = true;
 			forgetIfMine();
 		});
 
@@ -92,7 +94,7 @@ export function createJupyterManager(options: ManagerOptions) {
 
 		const deadline = Date.now() + readyTimeoutMs;
 		let ready = false;
-		while (!failure && !ready && Date.now() < deadline) {
+		while (!failure && !exitedEarly && !ready && Date.now() < deadline) {
 			ready = await isReady(launch.baseUrl, launch.url);
 			if (!ready) await sleep(pollMs);
 		}
@@ -100,7 +102,9 @@ export function createJupyterManager(options: ManagerOptions) {
 
 		if (child.pid !== undefined) kill(child.pid);
 		forgetIfMine();
-		throw new Error(failure ? 'JupyterLab could not be launched (is Poetry installed?)' : 'JupyterLab did not become ready in time');
+		if (failure) throw new Error('JupyterLab could not be launched (is Poetry installed?)');
+		if (exitedEarly) throw new Error('JupyterLab exited straight away; port 8888 may already be in use by another Jupyter');
+		throw new Error('JupyterLab did not become ready in time');
 	}
 
 	return async function ensureJupyter(appOrigin: string): Promise<JupyterAccess> {

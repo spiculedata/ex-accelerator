@@ -15,7 +15,9 @@ poetry install
 # Jupyter listens on loopback only, with a random token that the app shares through JUPYTER_URL/JUPYTER_TOKEN
 export JUPYTER_CONFIG_DIR="${JUPYTER_CONFIG_DIR:-.jupyter}"
 export JUPYTER_ALLOW_ORIGIN="${JUPYTER_ALLOW_ORIGIN:-http://localhost:5173}"
-export JUPYTER_TOKEN="${JUPYTER_TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(24))')}"
+JUPYTER_TOKEN="${JUPYTER_TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(24))' 2>/dev/null || openssl rand -hex 24)}"
+[ -n "$JUPYTER_TOKEN" ] || { echo "Could not generate a Jupyter token (need python3 or openssl)" >&2; exit 1; }
+export JUPYTER_TOKEN
 export JUPYTER_URL="${JUPYTER_URL:-http://localhost:8888}"
 
 # Start Jupyter Lab in the background

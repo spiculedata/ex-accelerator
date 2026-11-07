@@ -17,7 +17,7 @@ export function fileLaunchStore(path: string): LaunchStore {
 			}
 		},
 		write(launch) {
-			mkdirSync(dirname(path), { recursive: true });
+			mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
 			writeFileSync(path, JSON.stringify(launch), { mode: 0o600 });
 			chmodSync(path, 0o600);
 		},
