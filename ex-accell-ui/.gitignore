@@ -43,3 +43,6 @@ tests/.auth/
 # Local Dapr secret store (copy from secrets.example.json)
 secrets.json
 scripts/populate_iran_data.sql
+
+# Project-local Jupyter config
+/.jupyter

@@ -22,7 +22,7 @@
 		"test:e2e:ui": "playwright test --ui",
 		"test": "npm run test:unit && npm run test:e2e",
 		"test:full": "npm run check && npm run build && npm run test",
-		"jupyter:start": "poetry run jupyter lab --port=8888 --no-browser --allow-root",
+		"jupyter:start": "./scripts/start-jupyter.sh",
 		"jupyter:bootstrap": "poetry install && poetry run python scripts/bootstrap_notebooks.py",
 		"dapr:init": "dapr init",
 		"dapr:setup": "./scripts/setup-deployment.sh",

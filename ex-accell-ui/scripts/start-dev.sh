@@ -7,12 +7,18 @@ echo "🚀 Starting Ex-Accelerator UI with Jupyter Lab..."
 echo "📦 Installing Python dependencies..."
 poetry install
 
-# One-time notebook setup (NLTK data, templates) is `npm run jupyter:bootstrap`; it is not repeated here
-# because it must never overwrite notebooks you have edited.
+# One-time notebook setup (NLTK data, templates) is `npm run jupyter:bootstrap`; it is a one-time step
+# and is not repeated here.
+
+# Jupyter listens on loopback only, with a random token that the app shares through JUPYTER_URL/JUPYTER_TOKEN
+export JUPYTER_CONFIG_DIR="${JUPYTER_CONFIG_DIR:-.jupyter}"
+export JUPYTER_ALLOW_ORIGIN="${JUPYTER_ALLOW_ORIGIN:-http://localhost:5173}"
+export JUPYTER_TOKEN="${JUPYTER_TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(24))')}"
+export JUPYTER_URL="${JUPYTER_URL:-http://localhost:8888}"
 
 # Start Jupyter Lab in the background
 echo "🔬 Starting Jupyter Lab server..."
-poetry run jupyter lab --port=8888 --no-browser --allow-root &
+poetry run jupyter lab --port=8888 --ServerApp.ip=127.0.0.1 --no-browser &
 JUPYTER_PID=$!
 
 # Wait a moment for Jupyter to start
@@ -20,8 +26,8 @@ echo "⏳ Waiting for Jupyter Lab to start..."
 sleep 5
 
 # Check if Jupyter Lab is running
-if curl -s http://localhost:8888 > /dev/null; then
-    echo "✅ Jupyter Lab is running at http://localhost:8888"
+if curl -s "http://localhost:8888/api?token=$JUPYTER_TOKEN" > /dev/null; then
+    echo "✅ Jupyter Lab is running at http://localhost:8888/?token=$JUPYTER_TOKEN"
 else
     echo "⚠️  Jupyter Lab may not be running yet, check the logs"
 fi
