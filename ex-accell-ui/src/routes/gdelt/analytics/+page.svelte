@@ -3,9 +3,11 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
 
   // Date range filter — default to last 12 months rolling window
   const _now = new Date();
@@ -86,9 +88,7 @@
       eventTypes = eventData.success ? eventData.data || [] : [];
       actors = actorData.success ? actorData.data || [] : [];
 
-      if (!summary && countries.length === 0 && eventTypes.length === 0) {
-        errorMessage = 'No GDELT data found. Ensure the gdelt_events table is populated in the PostgreSQL database.';
-      }
+      unavailable = !summary && countries.length === 0 && eventTypes.length === 0;
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Failed to load GDELT analytics data';
     } finally {
@@ -204,7 +204,7 @@
 
 <PageHeader
   title="GDELT Analytics"
-  subtitle="Explore 23M+ global events from the GDELT Project"
+  subtitle="Explore global news events from the GDELT Project"
   accentColor="amber"
   backHref="/gdelt"
 >
@@ -288,6 +288,11 @@
       {/if}
     </div>
 
+    {#if unavailable}
+      <DataUnavailable
+        title="No GDELT events are loaded"
+        description="These tables summarise GDELT news events. They fill in once GDELT data has been loaded into the database." />
+    {/if}
     {#if errorMessage}
       <ErrorAlert message={errorMessage} />
     {/if}

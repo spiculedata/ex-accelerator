@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
@@ -7,6 +8,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let brandStats: any[] = [];
   let brandChart: any = null;
   let imageUrl = '';
@@ -18,6 +20,7 @@
     try {
       const res = await fetch('/api/image-processing?action=brand-stats&limit=20');
       const data = await res.json();
+      unavailable = !!data.meta?.unavailable;
       if (data.success) brandStats = data.data || [];
     } catch (err: any) { errorMessage = err.message; }
     finally { loading = false; await initCharts(); }
@@ -64,6 +67,13 @@
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
     <div class="flex items-center">

@@ -2,6 +2,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { queryErrorResponse } from '$lib/server/queryErrors';
+import { emptyImageData } from '$lib/server/imageProcessingEmpty';
 
 /**
  * GET /api/image-processing — query image analysis results and stats
@@ -268,8 +270,9 @@ export const GET: RequestHandler = async ({ url }) => {
 
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
-    console.error('Image processing API error:', err);
-    return json({ success: false, error: err.message }, { status: 500 });
+    // A missing table means image analysis has not been set up: answer with an empty result flagged
+    // unavailable. Anything else is a generic 500; the detail is logged, never sent to the browser.
+    return queryErrorResponse('Image processing', err, emptyImageData(action));
   }
 };
 
@@ -477,6 +480,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
     console.error('Image processing POST error:', err);
-    return json({ success: false, error: err.message }, { status: 500 });
+    return json({ success: false, error: 'Image analysis failed. Check that the image service is running and try again.' }, { status: 500 });
   }
 };

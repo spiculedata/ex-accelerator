@@ -7,6 +7,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { getCountryNameWithFallback, getAllCountries } from '$lib/countryMapping';
+	import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 	
 	let mapContainer: HTMLDivElement;
 	let map: any;
@@ -14,6 +15,8 @@
 	let events: any[] = [];
 	let loading = true;
 	let error = '';
+	// GDELT has not been loaded into this database: say so, rather than show an error or an empty map
+	let gdeltUnavailable = false;
 	let markers: any = {};
 	let activeEventTypes = new Set(['all']);
 	let isToggling = false;
@@ -740,7 +743,7 @@
 		}
 		
 		const data = await response.json();
-		console.log('API response:', { eventsCount: data.events?.length, hasError: !!data.error });
+		gdeltUnavailable = !!data.unavailable;
 		
 		if (data.error) {
 			throw new Error(data.error);
@@ -1136,6 +1139,10 @@
 					<p class="text-sm text-gray-500 mt-2">Fetching global event data from database</p>
 				</div>
 			</div>
+		{:else if gdeltUnavailable}
+			<DataUnavailable
+				title="No GDELT events are loaded"
+				description="The world map shows news events from the GDELT Project. It fills in once GDELT data has been loaded into the database." />
 		{:else if error}
 			<div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-400">
 				<div class="flex items-center">
@@ -1147,7 +1154,7 @@
 					<div class="ml-3">
 						<h3 class="text-sm font-medium text-red-800">Error Loading Data</h3>
 						<p class="text-sm text-red-700 mt-1">{error}</p>
-						<p class="text-xs text-red-600 mt-2">Check the browser console for more details.</p>
+						<p class="text-xs text-red-600 mt-2">Check that the database is running, then reload the page.</p>
 						<button 
 							on:click={() => error = ''}
 							class="text-xs text-red-600 hover:text-red-800 mt-2 underline"

@@ -9,3 +9,4 @@ export { default as FormInput } from './FormInput.svelte';
 export { default as SelectDropdown } from './SelectDropdown.svelte';
 export { default as BrandMark } from './BrandMark.svelte';
 export { default as PostDrilldown } from './PostDrilldown.svelte';
+export { default as DataUnavailable } from './DataUnavailable.svelte';
