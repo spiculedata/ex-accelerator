@@ -93,6 +93,11 @@ secret() { # secret <file> <bytes>: create the file only if generation produced 
 # If a container exists, every saved secret must too, or the printed sign-in would not match the data
 had_secrets=1
 for f in admin-password db-password session-secret; do [ -s "$STATE_DIR/$f" ] || had_secrets=0; done
+if exists && [ "$had_secrets" = 0 ]; then
+  guard
+  echo "The demo database exists but its saved credentials are gone. Run: npm run demo -- --reset" >&2
+  exit 1
+fi
 secret admin-password 18
 secret session-secret 48
 secret db-password 18
@@ -102,10 +107,6 @@ DB_PASSWORD="$(cat "$STATE_DIR/db-password")"
 
 if exists; then
   guard
-  if [ "$had_secrets" = 0 ]; then
-    echo "The demo database exists but its saved credentials are gone. Run: npm run demo -- --reset" >&2
-    exit 1
-  fi
   docker start "$CONTAINER" >/dev/null || {
     echo "Could not start the demo database. If port $PORT is now in use, free it or run: npm run demo -- --reset" >&2
     exit 1

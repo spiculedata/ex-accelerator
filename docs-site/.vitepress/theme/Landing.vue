@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useData, withBase } from 'vitepress';
 
 const { frontmatter } = useData();
@@ -12,11 +12,10 @@ const tabs = [
 ];
 const active = ref(tabs[0].id);
 
-const steps = [
-  { n: '1', title: 'Collect', text: 'Bring posts in from Telegram, YouTube and Bluesky, pull GDELT news events, load your own datasets, and capture radio with transcription.' },
-  { n: '2', title: 'Analyse', text: 'Every post is scored for sentiment, emotion, topic and language, with engagement, hashtag and phrase analysis on top.' },
-  { n: '3', title: 'Investigate', text: 'Group work into projects and workspaces, then follow a keyword across social, news and radio on a single timeline.' }
-];
+// The first three front matter features (Collect, Analyse, Investigate) are the steps, so the wiki Home and this page share one source
+const steps = computed(() =>
+  (frontmatter.value.features ?? []).slice(0, 3).map((f: { title: string; details: string }, i: number) => ({ n: String(i + 1), title: f.title, text: f.details }))
+);
 
 const features = [
   {
