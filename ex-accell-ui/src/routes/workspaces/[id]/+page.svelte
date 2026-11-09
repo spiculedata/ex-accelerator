@@ -214,9 +214,9 @@
           <button
             type="button"
             class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            onclick={() => goto(`/data-management?workspace=${workspaceId}`)}
+            onclick={() => goto(`/data-management?workspace=${workspaceId}&link=1`)}
           >
-            + Add Data Source
+            Link dataset
           </button>
         </div>
 

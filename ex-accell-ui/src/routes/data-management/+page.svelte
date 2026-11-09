@@ -7,6 +7,8 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { getStatusColor } from '$lib/utils/colorUtils';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import { Modal } from '$lib/components/ui';
+  import { normalizeDataset, unlinkedDatasets } from '$lib/utils/datasetRows';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
@@ -26,6 +28,10 @@
   };
 
   let showAddSourceModal = false;
+  // Linking a dataset: which one is in flight, a message for the modal, and a confirmation for the page
+  let linkingId: number | null = null;
+  let linkError = '';
+  let linkNotice = '';
   let showPreviewModal = false;
   let showRadioConfigModal = false;
   let showCrawlerModal = false;
@@ -73,6 +79,8 @@
       return;
     }
     await loadData();
+    // The workspace page's "Link dataset" button arrives with ?link=1 and goes straight to the dialog
+    if (workspaceId && $page.url.searchParams.get('link') === '1') openAddSourceModal();
   });
 
   async function loadData() {
@@ -85,14 +93,14 @@
       const dsResponse = await fetch(`/api/datasets${dsParams}`);
       const dsResult = await dsResponse.json();
       if (dsResult.success) {
-        availableDatasets = dsResult.datasets || [];
+        availableDatasets = (dsResult.datasets || []).map(normalizeDataset);
       }
 
       // Load all available datasets (for the "add source" modal)
       const allDsResponse = await fetch('/api/datasets?status=available');
       const allDsResult = await allDsResponse.json();
       if (allDsResult.success) {
-        allDatasets = allDsResult.datasets || [];
+        allDatasets = (allDsResult.datasets || []).map(normalizeDataset);
       }
 
       // Load workflows
@@ -140,6 +148,9 @@
   }
 
   function openAddSourceModal() {
+    // A fresh dialog starts clean: no old error, and the earlier confirmation has done its job
+    linkError = '';
+    linkNotice = '';
     showAddSourceModal = true;
   }
 
@@ -147,7 +158,10 @@
     showCrawlerModal = true;
   }
 
-  async function handleLinkDataset(datasetId: number) {
+  async function handleLinkDataset(dataset: any) {
+    if (linkingId !== null) return;
+    linkingId = dataset.id;
+    linkError = '';
     try {
       const response = await fetch('/api/datasets', {
         method: 'POST',
@@ -155,7 +169,7 @@
         body: JSON.stringify({
           action: 'link',
           workspace_id: parseInt(workspaceId || '0'),
-          dataset_id: datasetId,
+          dataset_id: dataset.id,
           added_by: 'user',
           settings: {}
         })
@@ -163,12 +177,15 @@
       const result = await response.json();
       if (result.success) {
         showAddSourceModal = false;
+        linkNotice = `Linked "${dataset.name}" to this workspace.`;
         await loadData();
       } else {
-        errorMessage = result.error || 'Failed to link dataset';
+        linkError = result.error || 'We could not link that dataset. Try again.';
       }
     } catch (error) {
-      errorMessage = 'Failed to link dataset';
+      linkError = 'We could not link that dataset. Try again.';
+    } finally {
+      linkingId = null;
     }
   }
 
@@ -379,7 +396,7 @@
           <span class="text-lg font-bold text-emerald-600">{formatNumber(dataStats.totalRecordsCapture)}</span>
         </button>
         <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
-        <button on:click={() => activeTab = 'workflows'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'workflows' ? 'bg-blue-50' : ''}">
+        <button on:click={() => { activeTab = 'workflows'; linkNotice = ''; }} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'workflows' ? 'bg-blue-50' : ''}">
           <span class="text-2xl mb-1">⚙️</span>
           <span class="text-xs font-medium text-gray-700">Workflows</span>
           <span class="text-lg font-bold text-purple-600">{workflows.length}</span>
@@ -422,13 +439,18 @@
       </div>
 
       <div class="p-6">
+        <div role="status" aria-live="polite">
+          {#if linkNotice}
+            <p class="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-2 text-sm text-ink-900">{linkNotice}</p>
+          {/if}
+        </div>
         {#if activeTab === 'capture'}
           <!-- Data Sources -->
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Data Sources</h3>
             <div class="flex space-x-2">
               <button on:click={openAddSourceModal} class="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors">
-                Add Source
+                Link dataset
               </button>
               <button on:click={handleImportDataset} class="px-4 py-2 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg border border-teal-200 transition-colors">
                 Start Crawl
@@ -493,7 +515,7 @@
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Available Datasets</h3>
             <button on:click={handleImportDataset} class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-              Import Dataset
+              Start crawl
             </button>
           </div>
 
@@ -636,34 +658,51 @@
   {/if}
   </div>
 
-{#if showAddSourceModal}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showAddSourceModal = false}>
-    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
-      <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">Add Data Source</h3>
-        <p class="text-sm text-gray-500 mt-1">Link an available dataset to this workspace</p>
-      </div>
-      <div class="p-4 space-y-2">
-        {#each allDatasets.filter(d => !availableDatasets.some(ad => ad.id === d.id)) as dataset}
-          <button on:click={() => handleLinkDataset(dataset.id)}
-            class="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-            <div class="font-medium text-gray-900">{dataset.name}</div>
-            <div class="text-sm text-gray-500 mt-1">{dataset.description?.substring(0, 80) || ''}</div>
-            <div class="flex items-center space-x-3 mt-2 text-xs text-gray-400">
-              <span>{dataset.dataset_type}</span>
-              <span>{formatNumber(parseInt(dataset.record_count) || 0)} records</span>
-            </div>
-          </button>
-        {:else}
-          <p class="text-sm text-gray-500 text-center py-4">No additional datasets available to link.</p>
-        {/each}
-      </div>
-      <div class="p-4 border-t border-gray-200">
-        <button on:click={() => showAddSourceModal = false} class="w-full px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg">Close</button>
-      </div>
-    </div>
-  </div>
-{/if}
+<Modal open={showAddSourceModal} title="Link a dataset" description="Choose a dataset to add to this workspace. It then scopes the dashboards and analysis." onclose={() => (showAddSourceModal = false)}>
+  {#if linkError}
+    <p role="alert" class="mb-3 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-ink-900">{linkError}</p>
+  {/if}
+  <ul class="space-y-2">
+    {#each unlinkedDatasets(allDatasets, availableDatasets) as dataset (dataset.id)}
+      <li>
+        <button
+          type="button"
+          on:click={() => handleLinkDataset(dataset)}
+          disabled={linkingId !== null}
+          class="w-full rounded-lg border border-ink-200 p-4 text-left transition-colors hover:border-primary-300 hover:bg-primary-50 disabled:opacity-60"
+        >
+          <div class="font-medium text-ink-900">{dataset.name}{#if linkingId === dataset.id}<span class="ml-2 text-sm font-normal text-ink-600">Linking…</span>{/if}</div>
+          <div class="mt-1 text-sm text-ink-600">{String(dataset.description ?? '').substring(0, 80)}</div>
+          <div class="mt-2 flex items-center space-x-3 text-xs text-ink-500">
+            <span>{dataset.dataset_type}</span>
+            <span>{formatNumber(parseInt(String(dataset.record_count)) || 0)} records</span>
+          </div>
+        </button>
+      </li>
+    {:else}
+      <li class="py-4 text-center text-sm text-ink-600">Every available dataset is already linked to this workspace.</li>
+    {/each}
+  </ul>
+  <svelte:fragment slot="footer">
+    <button type="button" on:click={() => (showAddSourceModal = false)} class="w-full rounded-lg bg-ink-100 px-4 py-2 text-sm text-ink-700 hover:bg-ink-200">Close</button>
+  </svelte:fragment>
+</Modal>
+
+<Modal open={showPreviewModal} title={previewDataset?.name ?? 'Dataset'} description="What this dataset contains" onclose={() => (showPreviewModal = false)}>
+  {#if previewDataset}
+    <dl class="grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+      <dt class="text-ink-500">Description</dt><dd class="col-span-2 text-ink-900">{previewDataset.description || 'No description'}</dd>
+      <dt class="text-ink-500">Type</dt><dd class="col-span-2 text-ink-900">{previewDataset.dataset_type || previewDataset.type || 'unknown'}</dd>
+      {#if previewDataset.source_platform}<dt class="text-ink-500">Platform</dt><dd class="col-span-2 text-ink-900">{previewDataset.source_platform}</dd>{/if}
+      <dt class="text-ink-500">Records</dt><dd class="col-span-2 text-ink-900">{formatNumber(parseInt(String(previewDataset.record_count)) || previewDataset.records || 0)}</dd>
+      {#if previewDataset.date_range_start}<dt class="text-ink-500">Date range</dt><dd class="col-span-2 text-ink-900">{String(previewDataset.date_range_start).slice(0, 10)} to {String(previewDataset.date_range_end ?? '').slice(0, 10)}</dd>{/if}
+      <dt class="text-ink-500">{previewDataset.workspace_id ? 'Link status' : 'Status'}</dt><dd class="col-span-2 text-ink-900">{previewDataset.status}</dd>
+    </dl>
+  {/if}
+  <svelte:fragment slot="footer">
+    <button type="button" on:click={() => (showPreviewModal = false)} class="w-full rounded-lg bg-ink-100 px-4 py-2 text-sm text-ink-700 hover:bg-ink-200">Close</button>
+  </svelte:fragment>
+</Modal>
 
 {#if showRadioConfigModal}
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showRadioConfigModal = false}>
