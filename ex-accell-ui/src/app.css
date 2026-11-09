@@ -10,11 +10,13 @@
  * every class, each default colour family is pointed at a brand ramp:
  *   gray, slate, zinc, neutral, stone        -> ink      (neutrals)
  *   blue, sky, cyan, teal, indigo, violet,
- *   purple, fuchsia                          -> primary  (Tidewater)
+ *   purple, fuchsia, pink                    -> primary  (Tidewater)
  *   green, emerald, lime                     -> success
- *   red, rose, pink                          -> danger
+ *   red, rose                                -> danger   (errors and destructive actions only)
  *   orange, amber, yellow                    -> signal
- * New code should use the brand names (ink, primary, signal, success, danger) directly.
+ * Because several hues now share a ramp, never use these families to tell categories apart:
+ * use the categorical tokens (--se-cat-*) or add a label. New code should use the brand names
+ * (ink, primary, signal, success, danger) directly.
  */
 @theme {
   --font-sans: var(--se-font-sans);
@@ -304,18 +306,18 @@
   --color-rose-800: var(--se-danger-800);
   --color-rose-900: var(--se-danger-900);
   --color-rose-950: var(--se-danger-950);
-  /* pink -> danger */
-  --color-pink-50: var(--se-danger-50);
-  --color-pink-100: var(--se-danger-100);
-  --color-pink-200: var(--se-danger-200);
-  --color-pink-300: var(--se-danger-300);
-  --color-pink-400: var(--se-danger-400);
-  --color-pink-500: var(--se-danger-500);
-  --color-pink-600: var(--se-danger-600);
-  --color-pink-700: var(--se-danger-700);
-  --color-pink-800: var(--se-danger-800);
-  --color-pink-900: var(--se-danger-900);
-  --color-pink-950: var(--se-danger-950);
+  /* pink -> primary */
+  --color-pink-50: var(--se-primary-50);
+  --color-pink-100: var(--se-primary-100);
+  --color-pink-200: var(--se-primary-200);
+  --color-pink-300: var(--se-primary-300);
+  --color-pink-400: var(--se-primary-400);
+  --color-pink-500: var(--se-primary-500);
+  --color-pink-600: var(--se-primary-600);
+  --color-pink-700: var(--se-primary-700);
+  --color-pink-800: var(--se-primary-800);
+  --color-pink-900: var(--se-primary-900);
+  --color-pink-950: var(--se-primary-950);
   /* orange -> signal */
   --color-orange-50: var(--se-signal-50);
   --color-orange-100: var(--se-signal-100);

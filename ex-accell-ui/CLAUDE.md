@@ -89,7 +89,9 @@ Follow the brand guidelines (`docs-site/brand`, tokens in `src/lib/styles/brand-
 colour names in new code: `ink`, `primary`, `signal`, `success`, `danger`. Tailwind's default names (`gray`,
 `blue`, `red`, ...) are mapped onto them for older pages, so they still work but hide intent. Sentiment colours
 come from `getSentimentColor` (`$lib/utils/colorUtils`), never from `red`/`green` classes or hex in a page.
-Signal is a fill colour: do not use `text-signal-*` below 700 on white.
+Signal is a fill colour: do not use `text-signal-*` below 700 on white. Several Tailwind hue families now share one
+ramp (`blue`, `indigo`, `purple`, `pink` and others are all primary), so never use them to tell categories apart;
+use the categorical tokens (`--se-cat-*`) or a label.
 
 Use Tailwind utility classes. Avoid `<style>` blocks and inline `style=` attributes unless a
 library requires them.

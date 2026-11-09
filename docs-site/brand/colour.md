@@ -124,6 +124,7 @@ hex values above.
 ```
 
 Tailwind's default names are mapped for compatibility: `gray`, `slate`, `zinc`, `neutral`, `stone` to
-ink; `blue`, `sky`, `cyan`, `teal`, `indigo`, `violet`, `purple`, `fuchsia` to primary; `green`,
-`emerald`, `lime` to success; `red`, `rose`, `pink` to danger; `orange`, `amber`, `yellow` to signal.
+ink; `blue`, `sky`, `cyan`, `teal`, `indigo`, `violet`, `purple`, `fuchsia`, `pink` to primary; `green`,
+`emerald`, `lime` to success; `red`, `rose` to danger; `orange`, `amber`, `yellow` to signal.
+Several families now share a ramp, so never use them to tell categories apart: use the categorical colours or a label.
 New code should use the brand names.
