@@ -5,7 +5,6 @@
   let projectName = '';
   let projectDescription = '';
   let projectType = 'social-media';
-  let dataSources: any[] = [];
   let teamMembers: any[] = [];
   let newMemberEmail = '';
   let isCreating = false;
@@ -16,26 +15,6 @@
     { value: 'customer-feedback', label: 'Customer Feedback', description: 'Process customer reviews, surveys, and support interactions' },
     { value: 'content-analysis', label: 'Content Analysis', description: 'Analyze documents, articles, and multimedia content' }
   ];
-
-  const availableDataSources = [
-    { id: 'twitter', name: 'Twitter/X', type: 'social' },
-    { id: 'reddit', name: 'Reddit', type: 'social' },
-    { id: 'telegram', name: 'Telegram', type: 'social' },
-    { id: 'youtube', name: 'YouTube', type: 'social' },
-    { id: 'instagram', name: 'Instagram', type: 'social' },
-    { id: 'linkedin', name: 'LinkedIn', type: 'social' },
-    { id: 'csv-upload', name: 'CSV Upload', type: 'upload' },
-    { id: 'json-upload', name: 'JSON Upload', type: 'upload' },
-    { id: 'text-files', name: 'Text Files', type: 'upload' }
-  ];
-
-  function toggleDataSource(sourceId: string) {
-    if (dataSources.includes(sourceId)) {
-      dataSources = dataSources.filter(id => id !== sourceId);
-    } else {
-      dataSources = [...dataSources, sourceId];
-    }
-  }
 
   function addTeamMember() {
     if (newMemberEmail.trim() && !teamMembers.includes(newMemberEmail.trim())) {
@@ -62,7 +41,6 @@
           name: projectName,
           description: projectDescription,
           project_type: projectType,
-          data_sources: dataSources,
           team_members: teamMembers
         })
       });
@@ -84,7 +62,7 @@
   }
 
   function validateForm() {
-    return projectName.trim().length > 0 && dataSources.length > 0;
+    return projectName.trim().length > 0;
   }
 </script>
 
@@ -178,38 +156,12 @@
           </div>
         </div>
 
-        <!-- Data Sources -->
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900 mb-6">Data Sources *</h2>
-          <p class="text-sm text-gray-600 mb-4">Select the data sources you plan to use in this project</p>
-          
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each availableDataSources as source}
-              <label class="relative cursor-pointer">
-                <input 
-                  type="checkbox"
-                  on:change={() => toggleDataSource(source.id)}
-                  class="sr-only">
-                <div class="border-2 rounded-xl p-4 transition-all {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
-                  <div class="flex items-center">
-                    <div class="w-5 h-5 border-2 rounded mr-3 flex items-center justify-center {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
-                      {#if dataSources.includes(source.id)}
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                      {/if}
-                    </div>
-                    <div>
-                      <h3 class="font-medium text-gray-900">{source.name}</h3>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {source.type === 'social' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-800'} mt-1">
-                        {source.type === 'social' ? 'Social Media' : 'File Upload'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </label>
-            {/each}
-          </div>
+        <!-- Where data comes from: datasets are linked per workspace, not chosen here -->
+        <div class="rounded-xl border border-ink-200 bg-ink-50 px-5 py-4">
+          <h2 class="text-base font-semibold text-ink-900">Where the data comes from</h2>
+          <p class="mt-1 text-sm text-ink-600">
+            You link datasets to a workspace after the project is created, so there is nothing to choose here.
+          </p>
         </div>
 
         <!-- Team Members -->

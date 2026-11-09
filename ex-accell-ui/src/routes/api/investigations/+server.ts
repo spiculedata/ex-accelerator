@@ -90,6 +90,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       return json({ success: false, error: 'name is required' }, { status: 400 });
     }
 
+    // The date range is optional, but when given it must be real days with the start not after the end
+    const dayOk = (value: unknown) =>
+      typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+    for (const field of ['date_start', 'date_end'] as const) {
+      if (data[field] && !dayOk(data[field])) {
+        return json({ success: false, error: `${field} must be a date (YYYY-MM-DD)` }, { status: 400 });
+      }
+    }
+    if (data.date_start && data.date_end && data.date_start > data.date_end) {
+      return json({ success: false, error: 'date_start must be on or before date_end: the start date is after the end date' }, { status: 400 });
+    }
+
     // workspace_id is optional, but when present it must name an existing workspace
     let workspaceId: number | null = null;
     if (data.workspace_id !== undefined && data.workspace_id !== null) {

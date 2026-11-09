@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { commitKeywords } from '$lib/utils/keywords';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
@@ -94,8 +95,18 @@
     showNewModal = false;
   }
 
+  // A reversed range is caught here, before the request, so the message sits beside the dates
+  $: rangeError = newDateStart && newDateEnd && newDateStart > newDateEnd ? 'The start date is after the end date.' : '';
+
   async function createInvestigation() {
     if (!newName.trim()) return;
+    if (rangeError) {
+      createError = rangeError;
+      return;
+    }
+    // A keyword typed but not confirmed with Enter or a comma still counts
+    newKeywords = commitKeywords(newKeywords, newKeywordsInput);
+    newKeywordsInput = '';
     creating = true;
     createError = '';
     try {
@@ -387,10 +398,15 @@
                 id="inv-date-end"
                 type="date"
                 bind:value={newDateEnd}
+                aria-invalid={rangeError ? 'true' : undefined}
+                aria-describedby="inv-date-hint"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               />
             </div>
           </div>
+          <p id="inv-date-hint" class="-mt-2 text-xs {rangeError ? 'text-danger-700' : 'text-ink-500'}">
+            {rangeError || 'Leave both blank to use the last 90 days. The end date is included.'}
+          </p>
 
           <!-- Sources -->
           <div>

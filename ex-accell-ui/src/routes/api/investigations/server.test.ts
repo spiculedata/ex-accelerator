@@ -81,6 +81,28 @@ describe('POST /api/investigations', () => {
   });
 });
 
+describe('POST /api/investigations date range', () => {
+  it.each([
+    [{ date_start: '2026-10-01', date_end: '2026-09-01' }, 'before'],
+    [{ date_start: 'tomorrow' }, 'date_start'],
+    [{ date_end: '2026-02-30' }, 'date_end']
+  ])('rejects %j', async (dates, mention) => {
+    const response = await call({ name: 'x', ...dates });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain(mention);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO investigations'))).toBe(false);
+  });
+
+  it('accepts a valid range, an equal start and end, and blank dates', async () => {
+    for (const dates of [{ date_start: '2026-10-01', date_end: '2026-10-31' }, { date_start: '2026-10-01', date_end: '2026-10-01' }, { date_start: '', date_end: '' }]) {
+      const response = await call({ name: 'x', ...dates });
+      expect(response.status).toBe(200);
+    }
+  });
+});
+
 describe('PATCH /api/investigations annotations', () => {
   const patch = (body: unknown) =>
     PATCH({
