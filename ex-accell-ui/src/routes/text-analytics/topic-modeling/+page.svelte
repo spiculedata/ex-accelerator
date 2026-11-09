@@ -1,5 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
@@ -531,8 +533,12 @@
     }
   }
 
+  // The topic whose posts are open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
+
   function selectTopic(topic: Topic) {
     selectedTopic = topic;
+    drilldown = { title: `Topic: ${topic.name}`, filters: { topic: String(topic.id), ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } };
   }
 </script>
 
@@ -738,8 +744,8 @@
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button 
                     on:click={() => selectTopic(topic)}
-                    class="text-indigo-600 hover:text-indigo-900">
-                    Analyze
+                    class="text-primary-700 hover:text-primary-900 font-medium">
+                    View posts
                   </button>
                 </td>
               </tr>
@@ -758,3 +764,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, highlightKeywords } from './highlight';
+import { escapeHtml, highlightKeywords, splitHighlight } from './highlight';
 
 describe('escapeHtml', () => {
   it('escapes the five HTML-significant characters', () => {
@@ -46,5 +46,36 @@ describe('highlightKeywords', () => {
 
   it('ignores empty keywords', () => {
     expect(highlightKeywords('abc', ['', ''])).toBe('abc');
+  });
+});
+
+describe('splitHighlight', () => {
+  it('splits text into plain and matching segments, ignoring case', () => {
+    expect(splitHighlight('Another Tram delay, another tram', ['tram'])).toEqual([
+      { text: 'Another ', match: false },
+      { text: 'Tram', match: true },
+      { text: ' delay, another ', match: false },
+      { text: 'tram', match: true }
+    ]);
+  });
+
+  it('returns the whole text as one plain segment when there is nothing to match', () => {
+    expect(splitHighlight('hello', [])).toEqual([{ text: 'hello', match: false }]);
+    expect(splitHighlight('hello', ['', '  '])).toEqual([{ text: 'hello', match: false }]);
+    expect(splitHighlight('', ['x'])).toEqual([]);
+  });
+
+  it('treats search terms literally, not as a pattern', () => {
+    expect(splitHighlight('cost (a+b) now', ['(a+b)'])).toEqual([
+      { text: 'cost ', match: false },
+      { text: '(a+b)', match: true },
+      { text: ' now', match: false }
+    ]);
+  });
+
+  it('keeps markup as plain text so it can be rendered without {@html}', () => {
+    const segments = splitHighlight('<b>hi</b> hi', ['hi']);
+
+    expect(segments.map((s) => s.text).join('')).toBe('<b>hi</b> hi');
   });
 });
