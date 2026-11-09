@@ -48,6 +48,7 @@ async function main() {
 
     const occupied = await occupiedTables(client);
     if (occupied.length > 0 && !reset) {
+      // scripts/demo.sh recognises this message to tell a resumed demo from a failure; keep the wording in step
       throw new Error(`Demo data only loads into an empty database, but ${occupied.join(', ')} already contain rows.`);
     }
 

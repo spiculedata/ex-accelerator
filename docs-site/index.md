@@ -35,5 +35,5 @@ features:
   - title: Investigate
     details: Group work into projects and workspaces, then follow a keyword across social, news and radio on one timeline.
   - title: Research
-    details: Built-in Jupyter notebooks and a visual workflow builder for repeatable analysis.
+    details: Built-in Jupyter notebooks, plus a visual workflow builder (early preview).
 ---

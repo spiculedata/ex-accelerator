@@ -22,8 +22,8 @@ const features = [
   {
     kicker: 'Sentiment and emotion',
     title: 'Know how people feel, and when it turned',
-    text: 'See the positive, negative and neutral split, the emotions behind it and the trend over time. Filter by source and date, then read the individual posts and the confidence behind each label.',
-    points: ['Spot spikes: a burst of negative posts is visible the day it happens', 'Compare Telegram, YouTube and Bluesky side by side', 'Export the analysis'],
+    text: 'See the positive, negative and neutral split and the emotions behind it. Filter by source, then read the individual posts and the confidence behind each label.',
+    points: ['Positive, negative and neutral share at a glance', 'Compare Telegram, YouTube and Bluesky', 'Read the posts behind the numbers, with a confidence score for each'],
     src: '/screenshots/sentiment-analysis.png',
     alt: 'Sentiment analysis dashboard'
   },
@@ -31,7 +31,7 @@ const features = [
     kicker: 'Topic modelling',
     title: 'Find the themes you did not search for',
     text: 'Topics are surfaced from the data itself, with their volume, weight and keywords, so you can see what a community is actually talking about before you decide what to dig into.',
-    points: ['Topic network and treemap views', 'Keywords and share of conversation per topic', 'One click from a topic to analysing it'],
+    points: ['Topics ranked by number of posts', 'Keywords and weight for each topic', 'Network and treemap views'],
     src: '/screenshots/topic-modeling.png',
     alt: 'Topic modelling page'
   },
@@ -39,15 +39,15 @@ const features = [
     kicker: 'Investigations',
     title: 'Follow a story across social, news and radio',
     text: 'Name the keywords and the dates, and the workbench lines up matching social posts, GDELT news events and radio segments on one timeline, with the posts themselves underneath.',
-    points: ['Social, GDELT and radio in one view', 'Cross-filtered by date, source and sentiment', 'Saved per workspace so a team can pick it up later'],
+    points: ['Social, GDELT and radio lanes on one timeline', 'Expand any post for engagement, sentiment and emotion', 'Export the evidence set as JSON'],
     src: '/screenshots/tutorials/investigation-workbench.png',
     alt: 'Investigation workbench'
   },
   {
-    kicker: 'Workflows and notebooks',
-    title: 'Make the analysis repeatable',
-    text: 'Chain cleaning, feature and analysis steps in a visual builder, publish the result, or drop into the built-in Jupyter notebooks when you want full control over the code.',
-    points: ['Drag-and-drop workflow builder', 'Starter notebooks for GDELT, sentiment and topics', 'Runs against the same database as the dashboards'],
+    kicker: 'Notebooks and workflows',
+    title: 'Go deeper in code when you need to',
+    text: 'Open the built-in Jupyter notebooks against the same database as the dashboards, or sketch an analysis in the visual workflow builder, which is an early preview.',
+    points: ['Starter notebooks for GDELT, sentiment and topics', 'Same database as the dashboards', 'Visual workflow builder (early preview)'],
     src: '/screenshots/tutorials/workflow-connected.png',
     alt: 'Workflow builder'
   }
@@ -186,7 +186,7 @@ async function copyCommands() {
           </p>
           <ul class="checks">
             <li>Needs Node 22 and Docker, nothing else</li>
-            <li>Runs on localhost only, and nothing leaves your machine</li>
+            <li>Runs on localhost only</li>
             <li>Remove it any time with <code>npm run demo -- --reset</code></li>
           </ul>
         </div>

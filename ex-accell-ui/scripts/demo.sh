@@ -86,7 +86,7 @@ chmod 700 "$STATE_DIR"
 secret() { # secret <file> <bytes>: create the file only if generation produced something usable
   local file="$STATE_DIR/$1" value
   [ -s "$file" ] && return 0
-  value="$(random "$2")"
+  value="$(random "$2")" || value="" # unset falls through to the friendly error below
   [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret (need python3 or openssl)." >&2; exit 1; }
   (umask 077; printf '%s\n' "$value" > "$file")
 }
