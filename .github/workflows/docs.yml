@@ -19,6 +19,9 @@ jobs:
   build:
     name: Build docs
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read # configure-pages reads the Pages site settings
     defaults:
       run:
         working-directory: docs-site
