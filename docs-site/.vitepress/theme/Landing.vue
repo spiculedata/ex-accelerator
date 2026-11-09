@@ -99,16 +99,15 @@ async function copyCommands() {
 
         <div class="showcase">
           <div class="frame">
-            <div class="chrome" role="tablist" aria-label="Product views">
+            <div class="chrome" role="group" aria-label="Product views">
               <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
               <button
                 v-for="t in tabs"
                 :key="t.id"
                 type="button"
-                role="tab"
                 class="tab"
                 :class="{ on: active === t.id }"
-                :aria-selected="active === t.id"
+                :aria-pressed="active === t.id"
                 @click="active = t.id"
               >{{ t.label }}</button>
             </div>

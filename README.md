@@ -58,7 +58,7 @@ npm run demo
 ```
 
 The sign-in is printed in the terminal. `npm run demo -- --stop` stops the database and
-`npm run demo -- --reset` removes it.
+`npm run demo -- --reset` deletes it (then run `npm run demo` for a fresh one).
 
 ## Quickstart
 

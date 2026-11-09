@@ -26,7 +26,7 @@ machine. A random sign-in is generated, printed in the terminal and kept in `ex-
 | `npm run demo -- --stop` | Stop the database container and keep its data |
 | `npm run demo -- --reset` | Delete the demo database and generated sign-in |
 
-It never touches your `.env` or any database other than its own container. To load the data into a
+It never writes your `.env` or touches any database other than its own container. To load the data into a
 database you already run, use the manual steps below.
 
 ## Load it into your own database

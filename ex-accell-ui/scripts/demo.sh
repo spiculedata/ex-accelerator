@@ -4,9 +4,11 @@
 #
 #   npm run demo            start (or resume) the demo
 #   npm run demo -- --stop  stop the demo database
-#   npm run demo -- --reset delete the demo database and start again from scratch
+#   npm run demo -- --reset delete the demo database and sign-in, then exit (run npm run demo to start fresh)
+#   npm run demo -- --help  show this help
 #
-# Nothing here touches .env or any database other than the demo container.
+# Nothing here writes your .env or touches any database other than the demo container. The database
+# settings it exports take precedence over any in your .env; other settings there still apply.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -15,7 +17,6 @@ CONTAINER="${DEMO_DB_CONTAINER:-social-explorer-demo-db}"
 PORT="${DEMO_DB_PORT:-55432}"
 IMAGE="pgduckdb/pgduckdb:17-main"
 DB="analytics"
-DB_PASSWORD="demo"
 APP_PORT="${DEMO_APP_PORT:-5173}"
 STATE_DIR=".demo"
 ADMIN_EMAIL="demo@example.com"
@@ -24,6 +25,11 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing $1: $2" >&2; exit 1;
 random() { python3 -c "import secrets; print(secrets.token_urlsafe($1))" 2>/dev/null || openssl rand -base64 "$1" | tr -d '=+/\n'; }
 
 case "${1:-}" in
+  "") ;;
+  --help|-h)
+    sed -n '2,/^set -/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
   --stop)
     docker stop "$CONTAINER" >/dev/null 2>&1 && echo "Stopped $CONTAINER (data kept; run npm run demo to resume)." || echo "$CONTAINER is not running."
     exit 0
@@ -31,12 +37,20 @@ case "${1:-}" in
   --reset)
     docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
     rm -rf "$STATE_DIR"
-    echo "Demo database removed."
+    echo "Demo database and sign-in removed. Run npm run demo to start fresh."
+    echo "To reclaim the disk space of the image as well: docker rmi $IMAGE"
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $1 (try --help)" >&2
+    exit 2
     ;;
 esac
 
 need node "install Node 22 from https://nodejs.org"
 need npm "install Node 22 from https://nodejs.org"
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+[ "$node_major" -ge 22 ] || { echo "Node 22 or newer is required (found $(node -v)). Install it from https://nodejs.org" >&2; exit 1; }
 need docker "install Docker from https://docs.docker.com/get-docker/ and start it"
 docker info >/dev/null 2>&1 || { echo "Docker is installed but not running. Start it and try again." >&2; exit 1; }
 
@@ -45,20 +59,33 @@ if [ ! -d node_modules ]; then
   npm ci
 fi
 
-# Credentials are generated once and kept in .demo/ (ignored by git) so a restart signs in with the same ones
+# Secrets are generated once and kept in .demo/ (ignored by git, mode 0600) so a restart reuses them
 mkdir -p "$STATE_DIR"
 chmod 700 "$STATE_DIR"
-[ -f "$STATE_DIR/admin-password" ] || { random 18 > "$STATE_DIR/admin-password"; chmod 600 "$STATE_DIR/admin-password"; }
-[ -f "$STATE_DIR/session-secret" ] || { random 48 > "$STATE_DIR/session-secret"; chmod 600 "$STATE_DIR/session-secret"; }
+secret() { # secret <file> <bytes>: create the file only if generation produced something usable
+  local file="$STATE_DIR/$1" value
+  [ -s "$file" ] && return 0
+  value="$(random "$2")"
+  [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret (need python3 or openssl)." >&2; exit 1; }
+  (umask 077; printf '%s\n' "$value" > "$file")
+}
+secret admin-password 18
+secret session-secret 48
+secret db-password 18
 ADMIN_PASSWORD="$(cat "$STATE_DIR/admin-password")"
 SESSION_SECRET="$(cat "$STATE_DIR/session-secret")"
+DB_PASSWORD="$(cat "$STATE_DIR/db-password")"
 
 if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
   docker start "$CONTAINER" >/dev/null
 else
   echo "Starting PostgreSQL with pg_duckdb on 127.0.0.1:$PORT (first run pulls the image)..."
-  docker run -d --name "$CONTAINER" -p "127.0.0.1:$PORT:5432" \
-    -e POSTGRES_PASSWORD="$DB_PASSWORD" -e POSTGRES_DB="$DB" "$IMAGE" >/dev/null
+  if ! docker run -d --name "$CONTAINER" -p "127.0.0.1:$PORT:5432" \
+    -e POSTGRES_PASSWORD="$DB_PASSWORD" -e POSTGRES_DB="$DB" "$IMAGE" >/dev/null; then
+    docker rm -f "$CONTAINER" >/dev/null 2>&1 || true # a failed start leaves a Created container that would block the next run
+    echo "Could not start the database. If port $PORT is in use, set DEMO_DB_PORT to another port." >&2
+    exit 1
+  fi
 fi
 
 printf "Waiting for the database"
@@ -72,9 +99,10 @@ echo
 export DATABASE_URL="postgresql://postgres:$DB_PASSWORD@127.0.0.1:$PORT/$DB"
 export POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="$PORT" POSTGRES_DB="$DB" POSTGRES_USER=postgres POSTGRES_PASSWORD="$DB_PASSWORD"
 export SESSION_SECRET ADMIN_EMAIL ADMIN_PASSWORD ADMIN_NAME="Demo admin"
-export COOKIE_SECURE=false # plain http on localhost
+export COOKIE_SECURE=false
 
 # The loader refuses a database that already has data, which is how a resumed demo is recognised
+echo "Loading demo data (the first run applies the schema, this takes a few seconds)..."
 if out=$(npm run --silent seed:demo 2>&1); then
   echo "$out"
 elif echo "$out" | grep -q "already contain rows"; then
@@ -96,4 +124,4 @@ cat <<MSG
 MSG
 
 # 127.0.0.1 only: the demo uses a generated password but is not meant to be reachable from the network
-exec npx vite dev --host 127.0.0.1 --port "$APP_PORT"
+exec npx vite dev --host 127.0.0.1 --port "$APP_PORT" --strictPort
