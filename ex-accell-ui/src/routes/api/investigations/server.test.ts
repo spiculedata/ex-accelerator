@@ -55,4 +55,28 @@ describe('POST /api/investigations', () => {
   it('requires a name', async () => {
     expect((await call({ keywords: ['a'] })).status).toBe(400);
   });
+
+  it('files the investigation under an existing workspace', async () => {
+    query.mockImplementation(async (sql: string) =>
+      String(sql).includes('INSERT INTO investigations') ? [{ id: 7 }] : String(sql).includes('FROM workspaces') ? [{ id: 3 }] : []
+    );
+
+    const response = await call({ name: 'x', workspace_id: 3 });
+
+    expect(response.status).toBe(200);
+    expect(insertCall()[1][3]).toBe(3);
+  });
+
+  it.each([['abc'], [0], [-1], [1.5]])('rejects workspace_id %j', async (workspace_id) => {
+    const response = await call({ name: 'x', workspace_id });
+
+    expect(response.status).toBe(400);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO investigations'))).toBe(false);
+  });
+
+  it('rejects a workspace that does not exist', async () => {
+    const response = await call({ name: 'x', workspace_id: 99 });
+
+    expect(response.status).toBe(404);
+  });
 });

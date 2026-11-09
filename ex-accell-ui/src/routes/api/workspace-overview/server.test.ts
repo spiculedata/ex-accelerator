@@ -39,4 +39,24 @@ describe('GET /api/workspace-overview', () => {
     expect(sourcesSql).toContain('workspace_data_sources');
     expect(sourcesSql).toContain('workspace_datasets');
   });
+
+  it('lists inactive sources but leaves them out of the totals, like the project rollup', async () => {
+    query
+      .mockResolvedValueOnce([workspace])
+      .mockResolvedValueOnce([linked, { ...captured, status: 'error', record_count: 500 }])
+      .mockResolvedValueOnce([]);
+
+    const body = await (await call()).json();
+
+    expect(body.data_sources).toHaveLength(2);
+    expect(body.summary).toMatchObject({ total_data_sources: 1, total_records: 921 });
+  });
+
+  it('passes the source kind through', async () => {
+    query.mockResolvedValueOnce([workspace]).mockResolvedValueOnce([linked]).mockResolvedValueOnce([]);
+
+    const body = await (await call()).json();
+
+    expect(body.data_sources[0].kind).toBe('dataset');
+  });
 });

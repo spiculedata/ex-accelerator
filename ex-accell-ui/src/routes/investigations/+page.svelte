@@ -29,6 +29,7 @@
   let newSources = { gdelt: true, radio: true, social: true };
   let createError = '';
   let creating = false;
+  let createInWorkspace: number | null = null;
 
   // Opened from a workspace page (?workspace=<id>): create the investigation inside that workspace
   // Reactive: the page is reused on same-route navigation, so a stale workspace must not stick
@@ -37,7 +38,10 @@
 
   onMount(async () => {
     await loadInvestigations();
-    if (workspaceId) openModal();
+    if (workspaceId) {
+      openModal();
+      createInWorkspace = workspaceId;
+    }
   });
 
   async function loadInvestigations() {
@@ -82,6 +86,7 @@
     newDateStart = '';
     newDateEnd = '';
     newSources = { gdelt: true, radio: true, social: true };
+    createInWorkspace = null;
     showNewModal = true;
   }
 
@@ -109,7 +114,7 @@
           date_start: newDateStart,
           date_end: newDateEnd,
           sources,
-          ...(workspaceId ? { workspace_id: workspaceId } : {})
+          ...(createInWorkspace ? { workspace_id: createInWorkspace } : {})
         })
       });
       const result = await response.json().catch(() => ({}));

@@ -54,7 +54,9 @@ export const GET: RequestHandler = async ({ url }) => {
     );
 
     // 4. Build summary
-    const totalRecords = dataSources.reduce(
+    // Like the project and home rollups, only active sources count towards the totals
+    const activeSources = dataSources.filter((ds: any) => ds.status === 'active');
+    const totalRecords = activeSources.reduce(
       (sum: number, ds: any) => sum + (Number(ds.record_count) || 0),
       0
     );
@@ -91,7 +93,7 @@ export const GET: RequestHandler = async ({ url }) => {
       })),
       summary: {
         total_records: totalRecords,
-        total_data_sources: dataSources.length,
+        total_data_sources: activeSources.length,
         total_investigations: investigations.length
       }
     });
