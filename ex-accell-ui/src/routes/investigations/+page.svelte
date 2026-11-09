@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { formatDay } from '$lib/utils/dayFormat';
+  import { commitKeywords } from '$lib/utils/keywords';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
@@ -65,7 +67,14 @@
       const response = await fetch(workspaceId ? `/api/investigations?workspace_id=${workspaceId}` : '/api/investigations');
       const result = await response.json();
       if (result.success) {
-        investigations = result.investigations || [];
+        // The list returns the query inside query_config; the cards read keywords, dates and sources directly
+        investigations = (result.investigations || []).map((inv: any) => ({
+          ...inv,
+          keywords: inv.keywords ?? inv.query_config?.keywords ?? [],
+          date_start: inv.date_start ?? inv.query_config?.dateStart ?? '',
+          date_end: inv.date_end ?? inv.query_config?.dateEnd ?? '',
+          sources: inv.sources ?? inv.query_config?.sources ?? []
+        }));
       }
     } catch (error) {
       console.error('Error loading investigations:', error);
@@ -75,10 +84,7 @@
   }
 
   function addKeyword() {
-    const trimmed = newKeywordsInput.trim();
-    if (!trimmed) return;
-    const tags = trimmed.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0 && !newKeywords.includes(k));
-    newKeywords = [...newKeywords, ...tags];
+    newKeywords = commitKeywords(newKeywords, newKeywordsInput);
     newKeywordsInput = '';
   }
 
@@ -109,8 +115,15 @@
     showNewModal = false;
   }
 
+  // A reversed range is caught here, before the request, so the message sits beside the dates
+  $: rangeError = newDateStart && newDateEnd && newDateStart > newDateEnd ? 'The start date is after the end date.' : '';
+
   async function createInvestigation() {
-    if (!newName.trim()) return;
+    // Create is disabled while the range is wrong; the message is beside the dates
+    if (!newName.trim() || rangeError) return;
+    // A keyword typed but not confirmed with Enter or a comma still counts
+    newKeywords = commitKeywords(newKeywords, newKeywordsInput);
+    newKeywordsInput = '';
     creating = true;
     createError = '';
     try {
@@ -284,7 +297,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>{formatDate(investigation.date_start)} - {formatDate(investigation.date_end)}</span>
+                <span>{formatDay(investigation.date_start, { year: true })} - {formatDay(investigation.date_end, { year: true })}</span>
               {/if}
             </div>
             <div class="flex items-center space-x-1.5">
@@ -400,6 +413,8 @@
                 id="inv-date-start"
                 type="date"
                 bind:value={newDateStart}
+                aria-invalid={rangeError ? 'true' : undefined}
+                aria-describedby="inv-date-hint"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               />
             </div>
@@ -409,10 +424,15 @@
                 id="inv-date-end"
                 type="date"
                 bind:value={newDateEnd}
+                aria-invalid={rangeError ? 'true' : undefined}
+                aria-describedby="inv-date-hint"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               />
             </div>
           </div>
+          <p id="inv-date-hint" class="-mt-2 text-xs {rangeError ? 'text-danger-700' : 'text-ink-500'}">
+            {rangeError || 'Leave both blank to use the last 90 days. The end date is included.'}
+          </p>
 
           <!-- Sources -->
           <div>
@@ -448,7 +468,7 @@
           </button>
           <button
             on:click={createInvestigation}
-            disabled={!newName.trim() || creating}
+            disabled={!newName.trim() || creating || !!rangeError}
             class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {#if creating}

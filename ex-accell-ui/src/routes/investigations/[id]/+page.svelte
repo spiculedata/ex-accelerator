@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolveInvestigationRange } from '$lib/utils/investigationRange';
+  import { formatDay } from '$lib/utils/dayFormat';
   import { parseAnnotations, type Annotation } from '$lib/utils/annotations';
   import { createSingleFlight } from '$lib/utils/singleFlight';
   import { beforeNavigate } from '$app/navigation';
@@ -563,14 +564,7 @@
   }
 
   function formatDateCompact(dateStr: string): string {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
+    return formatDay(dateStr);
   }
 
   function formatGdeltDate(sqldate: string | number): string {

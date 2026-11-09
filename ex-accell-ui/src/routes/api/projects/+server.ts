@@ -41,7 +41,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       project_type: data.project_type || 'social-media',
       // Creator comes from the session, never from the request body
       created_by: locals.user?.email ?? 'unknown',
-      data_sources: data.data_sources || [],
       team_members: data.team_members || []
     });
 
