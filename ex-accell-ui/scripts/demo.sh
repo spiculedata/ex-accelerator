@@ -21,20 +21,41 @@ APP_PORT="${DEMO_APP_PORT:-5173}"
 STATE_DIR=".demo"
 ADMIN_EMAIL="demo@example.com"
 
+LABEL="social-explorer.demo=1"
+exists() { docker container inspect "$CONTAINER" >/dev/null 2>&1; }
+# Only ever touch a container this script created, whatever DEMO_DB_CONTAINER says
+guard() {
+  exists || return 0
+  [ "$(docker container inspect -f '{{index .Config.Labels "social-explorer.demo"}}' "$CONTAINER")" = "1" ] || {
+    echo "Container $CONTAINER exists but was not created by this demo, so it is left alone. Set DEMO_DB_CONTAINER to another name." >&2
+    exit 1
+  }
+}
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing $1: $2" >&2; exit 1; }; }
 random() { python3 -c "import secrets; print(secrets.token_urlsafe($1))" 2>/dev/null || openssl rand -base64 "$1" | tr -d '=+/\n'; }
 
 case "${1:-}" in
   "") ;;
   --help|-h)
-    sed -n '2,/^set -/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
+    cat <<'HELP'
+Social Explorer one-command demo
+
+  npm run demo            start (or resume) the demo on http://localhost:5173
+  npm run demo -- --stop  stop the demo database, keeping its data
+  npm run demo -- --reset delete the demo database and sign-in, then exit
+  npm run demo -- --help  show this help
+
+Environment: DEMO_DB_PORT (55432), DEMO_APP_PORT (5173), DEMO_DB_CONTAINER (social-explorer-demo-db).
+HELP
     exit 0
     ;;
   --stop)
+    guard
     docker stop "$CONTAINER" >/dev/null 2>&1 && echo "Stopped $CONTAINER (data kept; run npm run demo to resume)." || echo "$CONTAINER is not running."
     exit 0
     ;;
   --reset)
+    guard
     docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
     rm -rf "$STATE_DIR"
     echo "Demo database and sign-in removed. Run npm run demo to start fresh."
@@ -69,6 +90,7 @@ secret() { # secret <file> <bytes>: create the file only if generation produced 
   [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret (need python3 or openssl)." >&2; exit 1; }
   (umask 077; printf '%s\n' "$value" > "$file")
 }
+had_db_password=0; [ -s "$STATE_DIR/db-password" ] && had_db_password=1
 secret admin-password 18
 secret session-secret 48
 secret db-password 18
@@ -76,13 +98,22 @@ ADMIN_PASSWORD="$(cat "$STATE_DIR/admin-password")"
 SESSION_SECRET="$(cat "$STATE_DIR/session-secret")"
 DB_PASSWORD="$(cat "$STATE_DIR/db-password")"
 
-if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
-  docker start "$CONTAINER" >/dev/null
+if exists; then
+  guard
+  if [ "$had_db_password" = 0 ]; then
+    echo "The demo database exists but its saved credentials are gone. Run: npm run demo -- --reset" >&2
+    exit 1
+  fi
+  docker start "$CONTAINER" >/dev/null || {
+    echo "Could not start the demo database. If port $PORT is now in use, free it or run: npm run demo -- --reset" >&2
+    exit 1
+  }
 else
   echo "Starting PostgreSQL with pg_duckdb on 127.0.0.1:$PORT (first run pulls the image)..."
-  if ! docker run -d --name "$CONTAINER" -p "127.0.0.1:$PORT:5432" \
+  if ! docker run -d --name "$CONTAINER" --label "$LABEL" -p "127.0.0.1:$PORT:5432" \
     -e POSTGRES_PASSWORD="$DB_PASSWORD" -e POSTGRES_DB="$DB" "$IMAGE" >/dev/null; then
-    docker rm -f "$CONTAINER" >/dev/null 2>&1 || true # a failed start leaves a Created container that would block the next run
+    # We just created (or failed to create) this name, so removing it cannot hit a database the user wanted
+    docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
     echo "Could not start the database. If port $PORT is in use, set DEMO_DB_PORT to another port." >&2
     exit 1
   fi
@@ -109,6 +140,7 @@ elif echo "$out" | grep -q "already contain rows"; then
   echo "Demo data is already loaded."
 else
   echo "$out" >&2
+  echo "If this is a database authentication error, the saved credentials no longer match the container: npm run demo -- --reset" >&2
   exit 1
 fi
 
