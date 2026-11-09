@@ -63,24 +63,47 @@ describe('saveDraft', () => {
     expect(JSON.parse(params[6])).toEqual({});
   });
 
-  it('updates an existing draft in place and keeps its id', async () => {
-    query.mockResolvedValueOnce([{ id: 'wf_9', status: 'draft' }]).mockResolvedValue([]);
+  it('updates the creator\'s own draft in place in one statement, keeping its id', async () => {
+    query.mockResolvedValueOnce([{ id: 'wf_9' }]);
 
     const draft = await serverWorkflowService.saveDraft(definition, meta, 'wf_9');
 
     expect(draft.id).toBe('wf_9');
-    const updateCall = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE published_workflows'))!;
-    expect(String(updateCall[0])).toContain("status = 'draft'");
-    expect(updateCall[1]).toContain('wf_9');
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0];
+    expect(String(sql)).toContain('UPDATE published_workflows');
+    expect(String(sql)).toContain("status = 'draft'");
+    expect(String(sql)).toContain('created_by');
+    expect(params).toContain('wf_9');
+    expect(params).toContain('a@example.com');
   });
 
-  it('never overwrites a published workflow: it saves a new draft instead', async () => {
-    query.mockResolvedValueOnce([{ id: 'wf_7', status: 'published' }]).mockResolvedValue([]);
+  it('saves a new draft instead when the id is not the caller\'s draft (someone else\'s, published, or gone)', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValue([]);
 
     const draft = await serverWorkflowService.saveDraft(definition, meta, 'wf_7');
 
     expect(draft.id).not.toBe('wf_7');
-    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE published_workflows'))).toBe(false);
+    expect(query.mock.calls[1][0]).toContain('INSERT INTO published_workflows');
+  });
+
+  it('records the real step count, duration and dataset requirements, and copes with steps that have no config', async () => {
+    const half = { ...definition, steps: [{ id: 's1', type: 'dataset_input', name: 'Input' }] };
+
+    await serverWorkflowService.saveDraft(half, meta);
+
+    const stored = JSON.parse(query.mock.calls[0][1][7]);
+    expect(stored.stepCount).toBe(1);
+    expect(stored).toHaveProperty('estimatedDuration');
+    expect(stored.datasetRequirements).toEqual([]);
+  });
+});
+
+describe('executeWorkflow', () => {
+  it('refuses to run a workflow that has not been published', async () => {
+    query.mockResolvedValueOnce([{ id: 'wf_d', name: 'Draft', status: 'draft', workflow_definition: definition, generated_code: {}, metadata: {} }]);
+
+    await expect(serverWorkflowService.executeWorkflow('wf_d', {})).rejects.toThrow(/published/i);
   });
 });
 

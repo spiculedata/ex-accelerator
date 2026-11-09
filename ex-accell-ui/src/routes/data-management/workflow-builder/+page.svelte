@@ -424,7 +424,7 @@
         </div>
 
         <div class="flex items-center space-x-3">
-          <span role="status" class="text-sm {saveState.kind === 'error' ? 'text-red-700' : 'text-gray-600'}">{saveState.message}</span>
+          <span role="status" class="text-sm {saveState.kind === 'error' ? 'text-danger-700' : 'text-ink-600'}">{saveState.message}</span>
           <button
             onclick={saveWorkflow}
             disabled={saveState.kind === 'saving'}

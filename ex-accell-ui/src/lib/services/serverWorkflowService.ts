@@ -144,17 +144,24 @@ class ServerWorkflowService {
   ): Promise<{ id: string; name: string; status: 'draft'; updatedAt: string }> {
     try {
       const now = new Date().toISOString();
-      const workflowMetadata = { stepCount: workflowDefinition.steps.length, tags: [] as string[] };
+      const workflowMetadata = {
+        stepCount: workflowDefinition.steps.length,
+        estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
+        datasetRequirements: this.extractDatasetRequirements(workflowDefinition),
+        tags: [] as string[]
+      };
 
       if (existingId) {
-        const found = await postgresPool.query('SELECT id, status FROM published_workflows WHERE id = $1', [existingId]);
-        if (found[0]?.status === 'draft') {
-          await postgresPool.query(
-            `UPDATE published_workflows
-             SET name = $1, description = $2, workflow_definition = $3, metadata = $4, updated_at = $5, status = 'draft'
-             WHERE id = $6`,
-            [metadata.name, metadata.description, JSON.stringify(workflowDefinition), JSON.stringify(workflowMetadata), now, existingId]
-          );
+        // One statement: it only matches the caller's own row, and only while it is still a draft, so a
+        // concurrent publish or someone else's draft is never overwritten
+        const updated = await postgresPool.query(
+          `UPDATE published_workflows
+           SET name = $1, description = $2, workflow_definition = $3, metadata = $4, updated_at = $5
+           WHERE id = $6 AND status = 'draft' AND created_by = $7
+           RETURNING id`,
+          [metadata.name, metadata.description, JSON.stringify(workflowDefinition), JSON.stringify(workflowMetadata), now, existingId, metadata.createdBy]
+        );
+        if (updated.length > 0) {
           return { id: existingId, name: metadata.name, status: 'draft', updatedAt: now };
         }
       }
@@ -406,6 +413,9 @@ class ServerWorkflowService {
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
     }
+    if (workflow.status !== 'published') {
+      throw new Error(`Workflow ${workflowId} is a ${workflow.status}. Only published workflows can be run: publish it first.`);
+    }
 
     // Create execution record
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -649,7 +659,7 @@ class ServerWorkflowService {
     const requirements: string[] = [];
 
     workflowDefinition.steps.forEach((step: any) => {
-      if (step.type === 'dataset_input' && step.config.dataset_id) {
+      if (step.type === 'dataset_input' && step.config?.dataset_id) {
         requirements.push(step.config.dataset_id);
       }
     });
