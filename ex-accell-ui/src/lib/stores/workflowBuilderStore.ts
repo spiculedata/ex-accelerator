@@ -149,7 +149,8 @@ function createWorkflowBuilderStore() {
     loadWorkflow(workflow: Workflow) {
       update(state => ({
         ...state,
-        workflow,
+        // A saved status can be out of date, so each step's readiness is worked out again from its settings
+        workflow: { ...workflow, steps: workflow.steps.map(withStatus) },
         selectedStep: null,
         selectedStepId: null,
         showStepConfig: false
