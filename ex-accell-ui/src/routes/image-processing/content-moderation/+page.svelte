@@ -6,6 +6,7 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import ResponsibleUse from '$lib/components/ui/ResponsibleUse.svelte';
 
   let loading = true;
   let errorMessage = '';
@@ -169,6 +170,9 @@
         description="This page fills in once images have been processed. You can try the analysis on a single image below." />
     </div>
   {/if}
+
+  <!-- Shown on every tab -->
+  <div class="max-w-7xl mx-auto"><ResponsibleUse tool="content moderation" /></div>
 
   <!-- Tab Switcher -->
   <div class="flex space-x-1 bg-gray-100 rounded-xl p-1 mb-8 max-w-xs">

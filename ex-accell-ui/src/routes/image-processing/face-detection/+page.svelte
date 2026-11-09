@@ -7,6 +7,7 @@
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import ModelTierSelector from '$lib/components/ui/ModelTierSelector.svelte';
+  import ResponsibleUse from '$lib/components/ui/ResponsibleUse.svelte';
 
   let selectedTier = 'fast';
 
@@ -202,6 +203,8 @@
   </PageHeader>
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ResponsibleUse tool="face detection" />
+
     <!-- Privacy Banner -->
     <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-8">
       <div class="flex items-start">

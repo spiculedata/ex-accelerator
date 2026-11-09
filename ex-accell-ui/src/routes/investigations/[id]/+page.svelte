@@ -33,6 +33,7 @@
   import TopicsPortal from '$lib/components/investigation/portals/TopicsPortal.svelte';
   import GeographyPortal from '$lib/components/investigation/portals/GeographyPortal.svelte';
   import ActorsPortal from '$lib/components/investigation/portals/ActorsPortal.svelte';
+  import { CSV_BOM, socialPostRecord, toCsv } from '$lib/utils/evidenceExport';
 
   export const ssr = false;
 
@@ -685,6 +686,17 @@
     else if (!confirm('Your latest notes have not been saved. Leave this page anyway?')) cancel();
   });
 
+  function downloadFile(contents: string, type: string, extension: string) {
+    const blob = new Blob([contents], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investigation-${(investigation?.name ?? 'export').replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.${extension}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Every post that was loaded (up to 200), not a sample, with the fields needed to cite and find each one again
   async function handleExport() {
     const report = {
       investigation: { name: investigation?.name, keywords, dateStart, dateEnd },
@@ -692,16 +704,18 @@
       summary: { gdelt_events: gdeltEvents.length, radio_segments: radioSegments.length, social_posts: socialPosts.length, timeline_days: timelineData.length },
       gdelt_sample: gdeltEvents.slice(0, 50),
       radio_sample: radioSegments.slice(0, 20),
-      social_sample: socialPosts.slice(0, 50),
+      social_posts: socialPosts.map(socialPostRecord),
+      note: `Posts carry no permalink in this data. Each has a citation (platform, post id, author, ISO 8601 UTC time) to find it again. This export holds the ${socialPosts.length} posts loaded for this investigation (the workbench loads at most 200) and ignores any cross-filter on screen.`,
       exported_at: new Date().toISOString()
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `investigation-${investigation?.name?.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(JSON.stringify(report, null, 2), 'application/json', 'json');
+  }
+
+  function handleExportCsv() {
+    const rows = socialPosts.map(socialPostRecord);
+    // Text starting with = + - @ gets a leading ' so a spreadsheet cannot run it; the JSON export holds the verbatim text
+    const columns = ['id', 'platform', 'author', 'posted_at', 'text', 'sentiment', 'confidence', 'emotions', 'likes', 'shares', 'comments', 'citation'] as const;
+    downloadFile(CSV_BOM + toCsv(rows, columns), 'text/csv;charset=utf-8', 'csv');
   }
 
   $: totalItems = crossFilteredGdelt.length + crossFilteredRadio.length + crossFilteredSocial.length;
@@ -775,7 +789,8 @@
           <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full text-[7px] text-white flex items-center justify-center">{annotations.length}</span>
         {/if}
       </button>
-      <button on:click={handleExport} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors" title="Export">
+      <button on:click={handleExportCsv} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors text-xs font-semibold" title="Export posts as CSV (text starting with = + - @ is prefixed with an apostrophe; JSON is verbatim)" aria-label="Export posts as CSV">CSV</button>
+      <button on:click={handleExport} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors" title="Export everything as JSON" aria-label="Export everything as JSON">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>

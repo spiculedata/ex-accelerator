@@ -6,10 +6,15 @@
   import type { JobState } from '$lib/services/jobStateStore';
   import { getStatusColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { describeJobStateFailure, type JobStateProblem } from '$lib/utils/jobStateProblem';
+  import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
   
   let activeTab = 'schedule';
   let errorMessage = '';
   
+  // Why job history could not be shown, in terms a person can act on
+  let jobProblem: JobStateProblem | null = null;
+
   // Load job states from state store
   async function loadJobStates(forceRefresh = false) {
     loadingJobStates = true;
@@ -49,13 +54,14 @@
         if (runningJobs.length > 0 && !isGlobalPollingActive) {
           startGlobalJobMonitoring();
         }
+        jobProblem = null;
       } else {
         console.error('Failed to load job states:', response.status, response.statusText);
-        errorMessage = 'Failed to load job states. Please try again.';
+        jobProblem = describeJobStateFailure(response.status, await response.json().catch(() => null));
       }
     } catch (error) {
       console.error('Failed to load job states:', error);
-      errorMessage = 'Failed to load job states. Please try again.';
+      jobProblem = describeJobStateFailure(0, null);
     } finally {
       loadingJobStates = false;
     }
@@ -1473,6 +1479,14 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {#if jobProblem}
+      <div role="alert" class="mb-4 rounded-xl border border-ink-200 bg-white px-6 py-5">
+        <p class="font-medium text-ink-900">{jobProblem.title}</p>
+        <p class="mt-1 text-sm text-ink-600">{jobProblem.detail}</p>
+        {#if jobProblem.command}<div class="mt-3 max-w-md"><CopyCommand command={jobProblem.command} /></div>{/if}
+        <button type="button" on:click={() => loadJobStates(true)} class="mt-3 rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700">Try again</button>
+      </div>
+    {/if}
     {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
 
     <!-- Web Crawler Tab -->

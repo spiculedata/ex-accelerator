@@ -1833,7 +1833,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT id, text, timestamp, platform,
+          SELECT id, text, timestamp, platform, author,
             sentiment_category, confidence_score, emotions,
             engagement_likes, engagement_shares, engagement_comments
           FROM posts_with_sentiment
