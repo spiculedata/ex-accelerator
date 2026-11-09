@@ -7,6 +7,7 @@ export default defineConfig({
   cleanUrls: true,
   head: [
     // og:title and og:description come from each page (the landing page sets its own in index.md)
+    // The favicon and og:image URLs include the base path; forks or a custom domain should change them
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/social-explorer/brand/mark.svg' }],
     ['meta', { property: 'og:type', content: 'website' }],
     // Absolute URL: link previews need one. Forks or a custom domain should change it.

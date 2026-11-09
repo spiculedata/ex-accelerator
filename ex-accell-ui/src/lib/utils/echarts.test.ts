@@ -95,6 +95,12 @@ describe('waitForEcharts after a failed load', () => {
 });
 
 describe('brand chart theme', () => {
+  it('registers the theme as soon as ECharts loads, so charts created directly can use it too', async () => {
+    await waitForEcharts();
+
+    expect(fakeEcharts.registerTheme).toHaveBeenCalledWith('social-explorer', expect.any(Object));
+  });
+
   it('registers the Social Explorer theme and initialises charts with it', async () => {
     await waitForEcharts();
 

@@ -68,13 +68,23 @@ describe('getSentimentColor', () => {
     expect(getSentimentColor('unknown')).toBe('#98a2ae');
   });
 
-  it('never pairs red with green, which is what colour-blind readers cannot separate', () => {
+  it('keeps positive on the blue side and negative on the warm side, with no green anywhere', () => {
     const hexes = ['very positive', 'positive', 'neutral', 'negative', 'very negative'].map((s) => getSentimentColor(s));
     const isGreen = (hex: string) => {
       const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
       return g > r + 20 && g > b + 20;
     };
     expect(hexes.some(isGreen)).toBe(false);
+
+    const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (const level of ['very positive', 'positive']) {
+      const [r, , b] = channels(getSentimentColor(level));
+      expect(b).toBeGreaterThan(r);
+    }
+    for (const level of ['negative', 'very negative']) {
+      const [r, , b] = channels(getSentimentColor(level));
+      expect(r).toBeGreaterThan(b);
+    }
   });
 
   it.each([
@@ -149,8 +159,8 @@ describe('getHealthColor', () => {
   });
 
   it('returns yellow for >= 90', () => {
-    expect(getHealthColor(90)).toBe('text-yellow-600');
-    expect(getHealthColor(94)).toBe('text-yellow-600');
+    expect(getHealthColor(90)).toBe('text-signal-800');
+    expect(getHealthColor(94)).toBe('text-signal-800');
   });
 
   it('returns red for < 90', () => {

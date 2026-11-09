@@ -3,7 +3,7 @@
  * guidelines always show the real colours. Fonts are self-hosted (no third-party font requests).
  */
 @import '@fontsource-variable/atkinson-hyperlegible-next';
-@import '@fontsource-variable/newsreader';
+@import '@fontsource-variable/newsreader/opsz.css';
 @import '@fontsource-variable/jetbrains-mono';
 @import '../../../ex-accell-ui/src/lib/styles/brand-tokens.css';
 

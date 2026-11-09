@@ -355,17 +355,17 @@
           <h3 class="text-lg font-bold text-gray-900 mb-4">Pattern Insights</h3>
           <div class="space-y-4">
             {#if mostPositive}
-              <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                <span class="text-sm font-medium text-green-800">Most Positive</span>
-                <p class="text-sm text-green-700">"{mostPositive.trigram}"</p>
-                <p class="text-xs text-green-600 mt-1">{signed(mostPositive.sentiment)} sentiment score</p>
+              <div class="bg-sentiment-positive/10 border border-sentiment-positive/40 rounded-lg p-3">
+                <span class="text-sm font-medium text-ink-900">Most positive</span>
+                <p class="text-sm text-ink-700">"{mostPositive.trigram}"</p>
+                <p class="text-xs text-ink-600 mt-1">{signed(mostPositive.sentiment)} sentiment score</p>
               </div>
             {/if}
             {#if mostCritical}
-              <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                <span class="text-sm font-medium text-red-800">Most Critical</span>
-                <p class="text-sm text-red-700">"{mostCritical.trigram}"</p>
-                <p class="text-xs text-red-600 mt-1">{signed(mostCritical.sentiment)} sentiment score</p>
+              <div class="bg-sentiment-negative/10 border border-sentiment-negative/40 rounded-lg p-3">
+                <span class="text-sm font-medium text-ink-900">Most critical</span>
+                <p class="text-sm text-ink-700">"{mostCritical.trigram}"</p>
+                <p class="text-xs text-ink-600 mt-1">{signed(mostCritical.sentiment)} sentiment score</p>
               </div>
             {/if}
             {#if !mostPositive && !mostCritical}

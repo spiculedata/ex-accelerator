@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/atkinson-hyperlegible-next";
-@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/newsreader/opsz.css";
 @import "@fontsource-variable/jetbrains-mono";
 @import "./lib/styles/brand-tokens.css";
 
@@ -415,7 +415,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    /* Loading indicators keep moving so a wait never looks frozen; everything else stops */
+    *:not(.animate-spin):not(.animate-pulse), *:not(.animate-spin):not(.animate-pulse)::before, *:not(.animate-spin):not(.animate-pulse)::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

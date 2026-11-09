@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { onMount } from 'svelte';
   import { radioAnalyticsDb } from '$lib/services/radioAnalyticsDb';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
@@ -117,12 +118,7 @@
   });
 
   function getSentimentBadgeClasses(sentiment: string): string {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive': return 'bg-emerald-100 text-emerald-800';
-      case 'negative': return 'bg-rose-100 text-rose-800';
-      case 'neutral': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    return getSentimentColor(sentiment, 'tailwind');
   }
 
   function getPoliticalBadgeClasses(isPolitical: boolean): string {

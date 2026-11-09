@@ -8,6 +8,11 @@
   import { computeTimelineHighlightDays } from '$lib/utils/crossFilterHelpers';
   import CrossFilterBadge from '../CrossFilterBadge.svelte';
 
+  // Hoisted so the d3 accessors below do not look the colours up per point
+  const positiveColor = getSentimentColor('positive');
+  const negativeColor = getSentimentColor('negative');
+  const neutralColor = getSentimentColor('neutral');
+
   const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
   export let timelineData: any[] = [];
@@ -143,7 +148,7 @@
         .attr('cx', d => xScale(d.parsedDate))
         .attr('cy', d => yScale(d.score))
         .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
-        .attr('fill', d => d.score > 0.05 ? getSentimentColor('positive') : d.score < -0.05 ? getSentimentColor('negative') : getSentimentColor('neutral'))
+        .attr('fill', d => d.score > 0.05 ? positiveColor : d.score < -0.05 ? negativeColor : neutralColor)
         .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
         .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
         .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)

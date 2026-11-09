@@ -406,7 +406,7 @@
       </div>
     {:else}
 
-    <!-- Overview Stats -->
+    <!-- Overview Stats. The large figures use the darker very-positive and very-negative tones: the lighter ones fall below 3:1 on white. -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-sentiment-very-positive mb-1">{sentimentStats.positive.percentage}%</div>

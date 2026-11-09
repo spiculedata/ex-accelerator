@@ -36,6 +36,8 @@ export async function waitForEcharts(): Promise<EChartsStatic> {
     throw error;
   });
   const echarts = await loading;
+  // Registered here so charts created directly with echarts.init(el, 'social-explorer') get the theme too
+  echarts.registerTheme?.(BRAND_THEME, brandChartTheme);
   (window as any).echarts ??= echarts;
   return echarts;
 }

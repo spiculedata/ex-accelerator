@@ -109,7 +109,7 @@ export function getConfidenceColor(confidence: number): string {
 
 export function getHealthColor(health: number): string {
   if (health >= 95) return 'text-green-600';
-  if (health >= 90) return 'text-yellow-600';
+  if (health >= 90) return 'text-signal-800';
   return 'text-red-600';
 }
 

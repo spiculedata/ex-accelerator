@@ -39,8 +39,8 @@
 
 	const colors = {
 		gdeltBar: '#64748b',
-		goldsteinNeg: '#ef4444',
-		goldsteinPos: '#22c55e',
+		goldsteinNeg: '#d55e00',
+		goldsteinPos: '#0072b2',
 		positive: getSentimentColor('positive'),
 		negative: getSentimentColor('negative'),
 		neutral: getSentimentColor('neutral')

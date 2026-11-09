@@ -607,9 +607,9 @@
 
   function sentimentDotColor(sentiment?: string): string {
     const s = (sentiment || 'neutral').toLowerCase();
-    if (s === 'positive') return 'bg-emerald-500';
-    if (s === 'negative') return 'bg-rose-500';
-    return 'bg-slate-500';
+    if (s === 'positive') return 'bg-sentiment-positive';
+    if (s === 'negative') return 'bg-sentiment-negative';
+    return 'bg-sentiment-neutral';
   }
 
 
@@ -1066,7 +1066,7 @@
                         {@const sentNorm = (post.sentiment_category || '').toLowerCase().includes('positive') ? 'positive' : (post.sentiment_category || '').toLowerCase().includes('negative') ? 'negative' : 'neutral'}
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <span
-                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-emerald-500/15 text-emerald-400' : sentNorm === 'negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}"
+                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-sentiment-positive/20 text-sentiment-positive' : sentNorm === 'negative' ? 'bg-sentiment-negative/20 text-sentiment-negative' : 'bg-slate-700/50 text-slate-400'}"
                           on:click|stopPropagation={() => setCrossFilter({ dimension: 'sentiment', value: sentNorm, label: post.sentiment_category || sentNorm })}
                           role="button"
                           tabindex="0"
