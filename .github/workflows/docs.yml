@@ -19,9 +19,6 @@ jobs:
   build:
     name: Build docs
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: read # configure-pages reads the Pages site settings
     defaults:
       run:
         working-directory: docs-site
@@ -39,9 +36,6 @@ jobs:
       - run: npm ci
       - run: npm run docs:build
       - run: npm run wiki:test
-
-      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
-        if: github.ref == 'refs/heads/main' && vars.DOCS_DEPLOY == 'true'
 
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         if: github.ref == 'refs/heads/main' && vars.DOCS_DEPLOY == 'true'

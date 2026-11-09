@@ -20,7 +20,7 @@ class GDELTDownloader:
         self.session = requests.Session()
         
     def get_2025_files(self) -> List[Tuple[str, str, str]]:
-        """Fetch GDELT masterlist and filter for 2025 files"""
+        """Fetch GDELT masterlist and filter for 2025+ files"""
         logger.info("Fetching GDELT masterlist...")
         
         try:
@@ -41,10 +41,10 @@ class GDELTDownloader:
                     size, hash_val, url = parts[0], parts[1], parts[2]
                     filename = url.split('/')[-1]
                     
-                    if filename.startswith('2025'):
+                    if filename.startswith('2025') or filename.startswith('2026'):
                         files_2025.append((size, hash_val, url))
             
-            logger.info(f"Found {len(files_2025)} files from 2025")
+            logger.info(f"Found {len(files_2025)} files from 2025-2026")
             return files_2025
             
         except Exception as e:
