@@ -89,7 +89,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment trends over time
    */
-  async getSentimentTrends(timeRange: string = '7d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
+  async getSentimentTrends(timeRange: string = '30d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange, ...extraParams }
@@ -109,7 +109,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         total: (item.positive || 0) + (item.negative || 0) + (item.neutral || 0)
       }),
       []
-    ).reverse(); // Reverse to get chronological order
+    ).sort((a, b) => String(a.date).localeCompare(String(b.date))); // oldest to newest, whatever order the API used
   }
 
   /**

@@ -236,10 +236,25 @@ export const GET: RequestHandler = async ({ url }) => {
         const timeRange = url.searchParams.get('timeRange') || '30d';
         const days = timeRange === '90d' ? 90 : timeRange === '30d' ? 30 : timeRange === '14d' ? 14 : 7;
 
+        // The window is the date bar when it is set, otherwise the last N days
+        const dateBounds: Array<[string, number]> = [];
+        for (const [name, bound, op] of [['date_start', 'start', '>='], ['date_end', 'end', '<=']] as const) {
+          const value = url.searchParams.get(name);
+          if (!value) continue;
+          const epochMs = dateBoundToEpochMs(value, bound);
+          if (epochMs === null) {
+            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp with a time zone` }, { status: 400 });
+          }
+          dateBounds.push([op, epochMs]);
+        }
+
         // Build platform filter
         const conditions: string[] = [];
-        const params: any[] = [days];
-        let paramIndex = 2;
+        const params: any[] = dateBounds.length > 0 ? dateBounds.map(([, ms]) => ms) : [days];
+        let paramIndex = params.length + 1;
+        const windowClause = dateBounds.length > 0
+          ? dateBounds.map(([op], i) => `timestamp ${op} $${i + 1}`).join(' AND ')
+          : "DATE(to_timestamp(timestamp/1000)) >= CURRENT_DATE - $1::integer";
 
         const explicitPlatforms = url.searchParams.get('platforms');
         if (explicitPlatforms !== null) {
@@ -270,7 +285,7 @@ export const GET: RequestHandler = async ({ url }) => {
             COUNT(*) as total_posts
           FROM posts_with_sentiment
           WHERE timestamp IS NOT NULL
-            AND DATE(to_timestamp(timestamp/1000)) >= CURRENT_DATE - $1::integer
+            AND ${windowClause}
             ${whereClause}
           GROUP BY DATE(to_timestamp(timestamp/1000))
           ORDER BY date

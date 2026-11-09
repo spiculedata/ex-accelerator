@@ -8,6 +8,7 @@
   import { summarizeTrigrams, trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
   import { getTrendColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { platformOptions } from '$lib/utils/platformOptions';
 
   // The phrase the visitor chose; its posts open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
@@ -20,6 +21,8 @@
   // Trigrams analysis data
   let loading = true;
   let trigramsData: TrigramData[] = [];
+  // Only platforms that appear in the data are offered
+  $: platformChoices = platformOptions(trigramsData.flatMap((t) => t.platforms ?? []));
   let trigramStats: TrigramStats = {
     totalTrigrams: 0,
     uniqueTrigrams: 0,
@@ -183,10 +186,9 @@
             <label class="text-sm font-medium text-gray-700">Platform:</label>
             <select bind:value={selectedPlatform} class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
               <option value="all">All Platforms</option>
-              <option value="twitter">Twitter</option>
-              <option value="facebook">Facebook</option>
-              <option value="instagram">Instagram</option>
-              <option value="linkedin">LinkedIn</option>
+              {#each platformChoices as choice}
+                <option value={choice.value}>{choice.label}</option>
+              {/each}
             </select>
           </div>
           

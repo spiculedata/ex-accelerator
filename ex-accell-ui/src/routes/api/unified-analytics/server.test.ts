@@ -477,3 +477,32 @@ describe('GET /api/unified-analytics date filters for cross-platform sentiment',
     expect(body.success).toBe(true);
   });
 });
+
+describe('GET /api/unified-analytics sentiment-trends range', () => {
+  it('uses the date bar (epoch ms bounds) when it is set, instead of the fixed number of days', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=7d&date_start=2026-10-01&date_end=2026-10-31');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('timestamp >=');
+    expect(String(sql)).not.toContain('CURRENT_DATE');
+    expect(params).toEqual([Date.UTC(2026, 9, 1), Date.UTC(2026, 9, 31, 23, 59, 59, 999)]);
+  });
+
+  it('falls back to the number of days when there are no dates', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=30d');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('CURRENT_DATE');
+    expect(params[0]).toBe(30);
+  });
+
+  it('rejects an invalid date with a 400', async () => {
+    const response = await call('sentiment-trends', '&date_start=soon');
+
+    expect(response.status).toBe(400);
+  });
+});
