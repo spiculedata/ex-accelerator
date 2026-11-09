@@ -4,6 +4,8 @@
   import { onMount } from 'svelte';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
   import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
+  import { extractCommand } from '$lib/utils/commandHint';
+  import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
 
   // Load current project and check if exists
   onMount(async () => {
@@ -273,7 +275,15 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+    {#if errorMessage}
+      <ErrorAlert message={errorMessage} />
+      {#if extractCommand(errorMessage)}
+        <div class="mt-2 max-w-xl"><CopyCommand command={extractCommand(errorMessage) ?? ''} /></div>
+      {/if}
+      <p class="mt-2 text-sm text-ink-600">
+        Setup steps are in the <a class="text-primary-700 underline" href="https://spiculedata.github.io/social-explorer/tutorials/jupyter" target="_blank" rel="noopener">Jupyter guide</a>.
+      </p>
+    {/if}
 
     <!-- Quick Start Section -->
     <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
@@ -361,9 +371,13 @@
                 
                 <button 
                   on:click={createNotebook}
-                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
+                  disabled={!isJupyterRunning}
+                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors">
                   Open in Embedded Viewer
                 </button>
+                {#if !isJupyterRunning}
+                  <p class="text-xs text-ink-600">Start JupyterLab in Step 1 first. You can still download the template.</p>
+                {/if}
                 
                 {#if isJupyterRunning}
                   <button 

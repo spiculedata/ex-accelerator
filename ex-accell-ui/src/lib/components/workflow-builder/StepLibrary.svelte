@@ -6,7 +6,9 @@
    * Provides search functionality and visual feedback during drag operations.
    */
 
-  import { workflowBuilder } from '$lib/stores/workflowBuilderStore';
+  import { get } from 'svelte/store';
+  import { workflowBuilder, workflowSteps } from '$lib/stores/workflowBuilderStore';
+  import { nextStepPosition } from '$lib/utils/workflowSteps';
   import { stepLibrary, getStepColorClasses, searchSteps, type StepTemplate } from './stepLibraryData';
 
   // Search state
@@ -37,16 +39,24 @@
     return `${classes.bg} ${classes.border} ${classes.text}`;
   }
 
-  // Keyboard accessibility for drag
+  // Clicking, or pressing Enter or Space on, a component adds it to the canvas, so the library works
+  // without a mouse drag. The announcement tells screen reader users what happened.
+  let announcement = '';
+  function addToCanvas(step: StepTemplate) {
+    const { x, y } = nextStepPosition(get(workflowSteps).length);
+    workflowBuilder.addStep(step, x, y);
+    announcement = `Added ${step.name} to the workflow`;
+  }
+
   function handleKeyDown(event: KeyboardEvent, step: StepTemplate) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      // Keyboard users can't drag - provide alternative interaction
-      // Could open a modal or add to center of canvas
-      console.log('Keyboard add step:', step.name);
+      addToCanvas(step);
     }
   }
 </script>
+
+<span class="sr-only" role="status" aria-live="polite">{announcement}</span>
 
 <!-- Component Library Sidebar -->
 <div class="w-80 bg-white border-r border-gray-200 overflow-y-auto">
@@ -100,10 +110,11 @@
                 draggable="true"
                 ondragstart={(e) => handleDragStart(e, step)}
                 ondragend={handleDragEnd}
+                onclick={() => addToCanvas(step)}
                 onkeydown={(e) => handleKeyDown(e, step)}
                 role="button"
                 tabindex="0"
-                aria-label="Drag to add {step.name} component">
+                aria-label="Add {step.name} to the workflow, or drag it onto the canvas">
 
                 <div class="flex items-center space-x-3">
                   <span class="text-lg" aria-hidden="true">{step.icon}</span>
