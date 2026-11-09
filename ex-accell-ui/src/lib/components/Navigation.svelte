@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { signOut } from '$lib/utils/signOut';
+  import { initials } from '$lib/utils/initials';
   import BrandMark from '$lib/components/ui/BrandMark.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
   import { goto } from '$app/navigation';
@@ -353,6 +355,7 @@
     ...item,
     current: item.href === currentPath
   }));
+  $: user = $page.data.user as { name: string; email: string; role: string } | null | undefined;
 </script>
 
 <nav aria-label="Main navigation" class="bg-white border-b border-ink-200">
@@ -361,7 +364,7 @@
       <!-- Left: Logo + Nav Links -->
       <div class="flex items-center">
         <!-- Logo -->
-        <a href="/" class="flex items-center mr-8 text-primary-700" aria-label="Social Explorer home">
+        <a href="/" class="flex items-center mr-6 text-primary-700" aria-label="Social Explorer home">
           <BrandMark size={32} />
           <span class="ml-2.5 font-sans text-xl font-semibold tracking-tight text-ink-900 whitespace-nowrap hidden sm:block">
             Social Explorer
@@ -369,7 +372,7 @@
         </a>
 
         <!-- Desktop Nav Links -->
-        <div class="hidden lg:flex lg:items-center lg:space-x-1 border-l border-gray-200 pl-6">
+        <div class="hidden xl:flex xl:items-center xl:space-x-1 border-l border-ink-200 pl-4">
           {#each updatedNavItems as item, ni}
             {#if item.hasDropdown}
               <div class="relative nav-dropdown">
@@ -377,7 +380,7 @@
                   on:click={() => toggleDropdown(item.name)}
                   aria-expanded={openDropdowns[item.name] || false}
                   aria-haspopup="true"
-                  class="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors {item.current
+                  class="flex items-center px-2.5 py-2 rounded-lg text-sm font-medium transition-colors {item.current
                     ? 'bg-blue-50 text-blue-700'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                 >
@@ -419,7 +422,7 @@
               <a
                 href={item.href}
                 on:click={(e) => navigateToApp(item, e)}
-                class="px-3 py-2 rounded-lg text-sm font-medium transition-colors {item.current
+                class="px-2.5 py-2 rounded-lg text-sm font-medium transition-colors {item.current
                   ? 'bg-blue-50 text-blue-700'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                 aria-current={item.current ? 'page' : undefined}
@@ -613,7 +616,7 @@
         <UserMenu />
 
         <!-- Mobile menu button -->
-        <div class="lg:hidden">
+        <div class="xl:hidden">
           <button
             type="button"
             class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 p-2 rounded-md"
@@ -639,7 +642,7 @@
 
   <!-- Mobile menu -->
   {#if mobileMenuOpen}
-    <div class="lg:hidden border-t border-gray-200 bg-white mobile-menu">
+    <div class="xl:hidden border-t border-ink-200 bg-white mobile-menu">
       <div class="px-2 pt-2 pb-3 space-y-1">
         {#each updatedNavItems as item, ni}
           {#if item.hasDropdown}
@@ -735,17 +738,23 @@
           </div>
         {/if}
         
-        <div class="px-3 py-2 border-t border-gray-200">
-          <div class="flex items-center space-x-3 mt-3">
-            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <span class="text-white font-medium text-sm">JD</span>
+        {#if user}
+          <div class="px-3 py-3 border-t border-ink-200">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 bg-primary-600 rounded-full flex items-center justify-center shrink-0" aria-hidden="true">
+                <span class="text-white font-medium text-sm">{initials(user.name, user.email)}</span>
+              </div>
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-ink-900 truncate">{user.name}</div>
+                <div class="text-xs text-ink-500 truncate">{user.email} · <span class="capitalize">{user.role}</span></div>
+              </div>
             </div>
-            <div>
-              <div class="text-sm font-medium text-gray-900">John Doe</div>
-              <div class="text-xs text-gray-500">john@example.com</div>
+            <div class="mt-3 flex gap-2">
+              <a href="/projects" class="flex-1 text-center px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Switch project</a>
+              <button type="button" on:click={signOut} class="flex-1 px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Sign out</button>
             </div>
           </div>
-        </div>
+        {/if}
       </div>
     </div>
   {/if}
