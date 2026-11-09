@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { getSentimentColor } from '$lib/utils/colorUtils';
+  import { correlationMatrix } from '$lib/utils/correlation';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
@@ -206,45 +207,28 @@
     });
   }
 
+  // Daily post counts by sentiment over the last 30 days; the matrix says which of them move together
+  $: dailyCounts = {
+    Positive: trendData.map((d: any) => Number(d.positive) || 0),
+    Neutral: trendData.map((d: any) => Number(d.neutral) || 0),
+    Negative: trendData.map((d: any) => Number(d.negative) || 0)
+  };
+  $: matrix = correlationMatrix(dailyCounts);
+  $: hasMatrix = matrix.values.some((row, i) => row.some((value, j) => i !== j && value !== null));
+
   function updateCorrelationMatrix() {
-    if (!correlationChart) return;
-
-    // Build correlation from real metrics
-    const metrics = ['Sentiment', 'Topics', 'Languages', 'Posts', 'Engagement'];
-
-    // Calculate real correlations from data overlaps
-    const totalPosts = sentimentData.reduce((s: number, d: any) => s + (parseInt(d.post_count) || 0), 0);
-    const topicCoverage = topicsData.reduce((s: number, t: any) => s + (parseInt(t.size) || 0), 0) / Math.max(totalPosts, 1);
-    const langDiversity = languageData.length / 10; // Normalized
-    const sentimentSpread = sentimentData.length / 5; // How many categories have data
-
-    const data: [number, number, number][] = [];
-    const matrix = [
-      [1.0, topicCoverage * 0.6, 0.3, sentimentSpread * 0.8, 0.5],
-      [topicCoverage * 0.6, 1.0, 0.4, 0.7, topicCoverage],
-      [0.3, 0.4, 1.0, langDiversity, 0.2],
-      [sentimentSpread * 0.8, 0.7, langDiversity, 1.0, 0.6],
-      [0.5, topicCoverage, 0.2, 0.6, 1.0],
-    ];
-
-    for (let i = 0; i < metrics.length; i++) {
-      for (let j = 0; j < metrics.length; j++) {
-        data.push([i, j, Math.round(Math.min(matrix[i][j], 1) * 100) / 100]);
-      }
-    }
+    if (!correlationChart || !hasMatrix) return;
+    const { labels, values } = matrix;
+    const data = values.flatMap((row, y) => row.map((value, x) => [x, y, value === null ? '-' : Math.round(value * 100) / 100]));
 
     correlationChart.setOption({
-      title: { text: 'Metric Correlations', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
-      tooltip: { formatter: (p: any) => `${metrics[p.data[0]]} vs ${metrics[p.data[1]]}: ${p.data[2]}` },
-      grid: { left: 80, right: 40, top: 40, bottom: 40 },
-      xAxis: { type: 'category', data: metrics, axisLabel: { fontSize: 10, rotate: 30 }, splitArea: { show: true } },
-      yAxis: { type: 'category', data: metrics, axisLabel: { fontSize: 10 }, splitArea: { show: true } },
-      visualMap: { min: 0, max: 1, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f0f9ff', '#3b82f6', '#1e40af'] } },
-      series: [{
-        type: 'heatmap', data,
-        label: { show: true, fontSize: 10 },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } }
-      }]
+      tooltip: { formatter: (p: any) => `${labels[p.data[1]]} and ${labels[p.data[0]]}: ${p.data[2] === '-' ? 'not enough variation to compare' : p.data[2]}` },
+      grid: { left: 80, right: 90, top: 10, bottom: 50 },
+      xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
+      yAxis: { type: 'category', data: labels, inverse: true, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
+      // Diverging scale from -1 to 1, in hues that are not the sentiment colours; the legend sits beside the grid
+      visualMap: { min: -1, max: 1, calculable: false, orient: 'vertical', right: 10, top: 'middle', itemHeight: 140, text: ['+1', '-1'], inRange: { color: ['#cc79a7', '#ffffff', '#009e73'] } },
+      series: [{ type: 'heatmap', data, label: { show: true, fontSize: 12 }, emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.3)' } } }]
     });
   }
 
@@ -267,7 +251,7 @@
 
 <PageHeader
   title="Analytics Correlation"
-  subtitle="Cross-dimensional analysis across sentiment, topics, languages, and platforms"
+  subtitle="Sentiment, topics, languages and platforms side by side, with how daily sentiment moves together"
   accentColor="cyan"
 />
 
@@ -303,7 +287,7 @@
         <div class="text-xs text-gray-500">Platforms</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 text-center">
-        <div class="text-xl font-bold text-cyan-600">{sentimentData.filter(d => d.sentiment_category !== 'Unknown').length}</div>
+        <div class="text-xl font-bold text-cyan-600">{new Set(sentimentData.map(d => d.sentiment_category).filter(c => c && c !== 'Unknown')).size}</div>
         <div class="text-xs text-gray-500">Sentiment Categories</div>
       </div>
     </div>
@@ -335,9 +319,18 @@
         <div id="corr-hourly" class="w-full h-80"></div>
       </div>
 
-      <!-- Correlation Matrix -->
+      <!-- Correlation matrix -->
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <div id="corr-matrix" class="w-full h-80"></div>
+        <h2 class="text-sm font-bold text-ink-900">Do sentiments rise and fall together?</h2>
+        <p class="mt-1 text-xs text-ink-600">
+          Correlation of daily post counts by sentiment over the last 30 days. +1 means two sentiments rise and fall on the same days,
+          -1 means one rises as the other falls, and 0 means no pattern. When overall volume drives the numbers all three move together; values near 0 mean no clear pattern.
+        </p>
+        {#if hasMatrix}
+          <div id="corr-matrix" class="w-full h-64"></div>
+        {:else}
+          <p class="py-16 text-center text-sm text-ink-500">Not enough days with data to compare sentiments yet. At least three days are needed.</p>
+        {/if}
       </div>
     </div>
   {/if}

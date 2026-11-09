@@ -8,7 +8,7 @@
   import { topicModelingDb } from '$lib/services/topicModelingDb';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { browser } from '$app/environment';
   import { getCategoryColor } from '$lib/utils/colorUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
@@ -75,8 +75,9 @@
       console.log('Topic modeling data loaded successfully from database');
       loading = false;
       
-      // Initialize charts after data is loaded
+      // The chart containers only exist once the loading state has been replaced, so wait for the page to render
       try {
+        await tick();
         await waitForEcharts();
         initializeCharts();
       } catch (e) {
@@ -96,7 +97,8 @@
   let searchQuery = '';
   let minTopicSize = 1;
   let sliderValue = 0; // 0-100 linear slider mapped to log scale
-  let showNetworkDiagram = true;
+  // The treemap reads at a glance; the network is for exploring how topics relate
+  let showNetworkDiagram = false;
   let networkChart: any = null;
   let treemapChart: any = null;
 
@@ -139,16 +141,6 @@
   // Get categories from database data
   $: categories = ['all', ...topicCategories.map(cat => cat.category)];
 
-  // Initialize charts after component mounts
-  onMount(async () => {
-    try {
-      await waitForEcharts();
-      initializeCharts();
-    } catch (e) {
-      console.error('Charts unavailable:', e);
-    }
-  });
-
   function initializeCharts() {
     initNetworkChart();
     initTreemapChart();
@@ -167,20 +159,15 @@
   async function initTreemapChart() {
     if (!browser) return;
     const treemapContainer = document.getElementById('treemap-chart');
-    if (!treemapContainer) {
-      console.error('Treemap container not found');
-      return;
-    }
+    if (!treemapContainer) return;
 
     // Make sure container is visible before initializing
     if (treemapContainer.classList.contains('hidden')) {
       treemapContainer.classList.remove('hidden');
     }
 
-    console.log('Initializing treemap chart...');
     treemapChart = initChart(treemapContainer);
     if (!treemapChart) return;
-    console.log('Treemap chart initialized:', treemapChart);
     await updateTreemapChart();
     
     // Restore visibility state
@@ -189,15 +176,34 @@
     }
   }
 
+  // Okabe-Ito order, colour-blind safe; categories beyond the eighth reuse colours and are told apart by the legend and tooltip
+  const NETWORK_COLOURS = ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'];
+  const LABEL_LIMIT = 14;
+  // A category has the same colour in the network, the treemap and the legend
+  // The order is the sorted names, so it cannot differ between the two charts
+  $: categoryOrder = [...new Set(topicsData.map(topic => topic.category).filter(Boolean))].sort();
+  const colourOfCategory = (name: string) => NETWORK_COLOURS[Math.max(0, categoryOrder.indexOf(name)) % NETWORK_COLOURS.length];
+  const colourByCategory = (nodes: any[]) =>
+    nodes.map(group => ({ ...group, children: group.children?.map((topic: any) => ({ ...topic, itemStyle: { ...topic.itemStyle, color: colourOfCategory(group.name) } })) }));
+  const truncate = (name: string) => (name.length > 22 ? `${name.slice(0, 21)}…` : name);
+
   function updateNetworkChart() {
     if (!browser || !networkChart) return;
 
+    const categoryNames = categoryOrder;
+    const largest = Math.max(1, ...filteredTopics.map(topic => topic.size));
+    // Only the biggest topics are labelled; the rest are named on hover, so labels do not pile up
+    const labelled = new Set([...filteredTopics].sort((a, b) => b.size - a.size).slice(0, LABEL_LIMIT).map(topic => topic.id));
+
     const nodes = filteredTopics.map(topic => ({
       id: topic.id,
-      name: topic.name,
+      name: truncate(topic.name),
+      fullName: topic.name,
       value: topic.size,
-      category: topic.category,
-      symbolSize: Math.max(8, Math.min(60, Math.sqrt(topic.size) / 5))
+      category: Math.max(0, categoryNames.indexOf(topic.category)),
+      categoryName: topic.category,
+      symbolSize: 14 + 42 * Math.sqrt(topic.size / largest),
+      label: { show: labelled.has(topic.id) }
     }));
 
     const links = topicRelationships.filter(rel =>
@@ -206,68 +212,42 @@
     ).map(rel => ({
       source: rel.topic1_id,
       target: rel.topic2_id,
-      value: rel.similarity_score
+      value: rel.similarity_score,
+      lineStyle: { width: 1 + 5 * Math.min(1, rel.similarity_score) }
     }));
 
     const option = {
-      title: {
-        text: 'Topic Relationship Network',
-        left: 'center',
-        textStyle: {
-          fontSize: 18,
-          fontWeight: 'bold'
-        }
-      },
       tooltip: {
         trigger: 'item',
         formatter: function(params: any) {
           if (params.dataType === 'node') {
-            return `<strong>${params.data.name}</strong><br/>Posts: ${params.data.value.toLocaleString()}<br/>Category: ${params.data.category}`;
+            return `<strong>${params.data.fullName}</strong><br/>Posts: ${params.data.value.toLocaleString()}<br/>Category: ${params.data.categoryName}`;
           } else if (params.dataType === 'edge') {
             return `Connection Strength: ${(params.data.value * 100).toFixed(1)}%`;
           }
         }
       },
       legend: {
+        type: 'scroll',
         orient: 'horizontal',
-        bottom: 20,
-        data: categories.filter(c => c !== 'all')
+        bottom: 0,
+        data: categoryNames
       },
+      color: NETWORK_COLOURS,
       series: [{
         type: 'graph',
         layout: 'force',
         data: nodes,
         links: links,
-        categories: categories.filter(c => c !== 'all').map(cat => ({ name: cat })),
+        categories: categoryNames.map(cat => ({ name: cat })),
         roam: true,
-        focusNodeAdjacency: true,
-        itemStyle: {
-          borderColor: '#fff',
-          borderWidth: 1,
-          shadowBlur: 3,
-          shadowColor: 'rgba(0, 0, 0, 0.3)'
-        },
-        label: {
-          show: true,
-          position: 'right',
-          formatter: '{b}',
-          fontSize: 10
-        },
-        lineStyle: {
-          color: 'source',
-          curveness: 0.3,
-          opacity: 0.6
-        },
-        emphasis: {
-          focus: 'adjacency',
-          lineStyle: {
-            width: 10
-          }
-        },
-        force: {
-          repulsion: 500,
-          edgeLength: [50, 200]
-        }
+        top: 10,
+        bottom: 40,
+        itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
+        label: { show: false, position: 'right', formatter: '{b}', fontSize: 11, color: '#0f1926' },
+        lineStyle: { color: '#98a2ae', curveness: 0.1, opacity: 0.7 },
+        emphasis: { focus: 'adjacency', label: { show: true } },
+        force: { repulsion: 260, gravity: 0.08, edgeLength: [60, 160], layoutAnimation: false }
       }]
     };
 
@@ -305,9 +285,7 @@
         minSize: minTopicSize
       };
       
-      const treemapData = await topicModelingDb.getTreemapData(filters as any, workspaceId || undefined);
-
-      console.log('Treemap data:', treemapData);
+      const treemapData = colourByCategory(await topicModelingDb.getTreemapData(filters as any, workspaceId || undefined));
 
       const option = {
         title: {
@@ -469,9 +447,7 @@
         }]
       };
 
-      console.log('Setting treemap option:', option);
       treemapChart.setOption(option, true);
-      console.log('Treemap chart updated successfully');
       
     } catch (error) {
       console.error('Error updating treemap chart:', error);
@@ -679,7 +655,7 @@
         </div>
       </div>
       
-      <div class="h-96">
+      <div class="h-[32rem]">
         <div id="network-chart" class="w-full h-full" class:hidden={!showNetworkDiagram}></div>
         <div id="treemap-chart" class="w-full h-full" class:hidden={showNetworkDiagram}></div>
       </div>

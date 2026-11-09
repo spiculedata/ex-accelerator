@@ -5,6 +5,7 @@ import {
   currentProject,
   setCurrentProject,
   loadCurrentProject,
+  projectNotice,
   clearCurrentProject,
   type Project
 } from './projectStore';
@@ -39,6 +40,7 @@ beforeEach(() => {
   localStorageMock.clear();
   currentProject.set(null);
   availableProjects.set([]);
+  projectNotice.set(null);
 });
 
 describe('projectStore', () => {
@@ -176,6 +178,39 @@ describe('projectStore', () => {
       clearCurrentProject();
       expect(get(currentProject)).toBeNull();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('currentProject');
+    });
+  });
+
+  describe('a saved project that is no longer available', () => {
+    const reply = (body: unknown) => ({ ok: true, json: () => Promise.resolve(body) });
+
+    it('forgets the stale id, falls back to the first project and says so', async () => {
+      localStorageMock.setItem('currentProject', '99');
+      vi.stubGlobal('fetch', vi.fn()
+        .mockResolvedValueOnce(reply({ success: false, error: 'Project not found' })) // saved id
+        .mockResolvedValueOnce(reply({ success: true, projects: [{ id: 1 }] })) // list
+        .mockResolvedValueOnce(reply({ success: true, project: { id: 1, name: 'Marlow' } }))); // first project
+
+      expect(await loadCurrentProject()).toBe(true);
+      expect(get(currentProject)!.id).toBe('1');
+      expect(localStorageMock.getItem('currentProject')).toBe('1');
+      expect(get(projectNotice)).toContain('Marlow');
+    });
+
+    it('keeps the saved id when the server cannot be reached, so a blip does not change the project', async () => {
+      localStorageMock.setItem('currentProject', '10');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+      expect(await loadCurrentProject()).toBe(false);
+      expect(localStorageMock.getItem('currentProject')).toBe('10');
+      expect(get(projectNotice)).toBeNull();
+    });
+
+    it('stays quiet when the saved project loads', async () => {
+      localStorageMock.setItem('currentProject', '10');
+      mockFetch({ success: true, project: { id: 10, name: 'Saved' } });
+      await loadCurrentProject();
+      expect(get(projectNotice)).toBeNull();
     });
   });
 });

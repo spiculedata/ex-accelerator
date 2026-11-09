@@ -5,6 +5,7 @@
   import { dismissApiErrors } from '$lib/stores/apiErrors';
   import Navigation from '$lib/components/Navigation.svelte';
   import ApiErrorBanner from '$lib/components/ApiErrorBanner.svelte';
+  import { projectNotice } from '$lib/stores/projectStore';
 
   // Failures belong to the page that requested the data; don't carry them to the next one
   beforeNavigate(() => dismissApiErrors());
@@ -20,5 +21,11 @@
 
 <main id="main-content">
   {#if !isFullScreen}<ApiErrorBanner />{/if}
+  {#if !isFullScreen && $projectNotice}
+    <div role="status" class="mx-auto mt-4 flex max-w-7xl items-start justify-between gap-3 rounded-lg border border-signal-300 bg-signal-50 px-4 py-3 text-sm text-ink-900">
+      <p>{$projectNotice}</p>
+      <button type="button" class="shrink-0 font-medium text-primary-700 hover:underline" on:click={() => projectNotice.set(null)}>Dismiss</button>
+    </div>
+  {/if}
   <slot />
 </main>

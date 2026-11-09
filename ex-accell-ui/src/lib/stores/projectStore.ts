@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 
 export interface Project {
   id: string;
@@ -19,6 +19,12 @@ export const availableProjects = writable<Project[]>([]);
 
 // Current active project store
 export const currentProject = writable<Project | null>(null);
+
+// A one-line explanation shown when the project had to change by itself (for example a saved project was deleted)
+export const projectNotice = writable<string | null>(null);
+
+// Whether the last project lookup reached the server and found nothing, or could not reach it at all
+let lastLookup: 'found' | 'missing' | 'unreachable' = 'found';
 
 // Function to set the current project
 export async function setCurrentProject(projectId: string): Promise<boolean> {
@@ -47,11 +53,14 @@ export async function setCurrentProject(projectId: string): Promise<boolean> {
         currentProject.set(project);
         // Persist to localStorage
         localStorage.setItem('currentProject', projectId);
+        lastLookup = 'found';
         return true;
       }
+      lastLookup = 'missing';
       return false;
     } catch (error) {
       console.error('Error loading project:', error);
+      lastLookup = 'unreachable';
       return false;
     }
   }
@@ -59,26 +68,37 @@ export async function setCurrentProject(projectId: string): Promise<boolean> {
 }
 
 // Function to load project from localStorage on app init
-// If no saved project, auto-selects the first available project
+// If no saved project, or the saved one no longer exists, selects the first available project
 export async function loadCurrentProject(): Promise<boolean> {
-  if (typeof window !== 'undefined') {
-    const savedProjectId = localStorage.getItem('currentProject');
-    if (savedProjectId) {
-      return await setCurrentProject(savedProjectId);
-    }
+  if (typeof window === 'undefined') return false;
 
-    // No saved project — auto-select the first available one
-    try {
-      const response = await fetch('/api/projects');
-      const result = await response.json();
-      if (result.success && result.projects && result.projects.length > 0) {
-        return await setCurrentProject(result.projects[0].id.toString());
-      }
-    } catch (error) {
-      console.error('Error auto-selecting project:', error);
-    }
+  const savedProjectId = localStorage.getItem('currentProject');
+  if (savedProjectId) {
+    if (await setCurrentProject(savedProjectId)) return true;
+    // Only a project the server says is gone is stale; a failed request must not change anything
+    if (lastLookup !== 'missing') return false;
+    localStorage.removeItem('currentProject');
   }
-  return false;
+
+  const selected = await selectFirstProject();
+  if (selected && savedProjectId) {
+    projectNotice.set(`Your previously selected project is no longer available, so ${selected} is open instead.`);
+  }
+  return selected !== null;
+}
+
+/** Opens the first project the user can see and returns its name, or null when there is none. */
+async function selectFirstProject(): Promise<string | null> {
+  try {
+    const response = await fetch('/api/projects');
+    const result = await response.json();
+    if (result.success && result.projects && result.projects.length > 0) {
+      if (await setCurrentProject(result.projects[0].id.toString())) return get(currentProject)?.name ?? '';
+    }
+  } catch (error) {
+    console.error('Error auto-selecting project:', error);
+  }
+  return null;
 }
 
 // Function to clear current project
