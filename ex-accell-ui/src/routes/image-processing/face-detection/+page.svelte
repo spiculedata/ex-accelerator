@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -12,6 +13,7 @@
   // State
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let faceStats: { distribution: { range: string; count: number }[]; summary: { totalFaces: number; imagesWithFaces: number; avgFacesPerImage: number; totalImages: number } } = {
     distribution: [],
     summary: { totalFaces: 0, imagesWithFaces: 0, avgFacesPerImage: 0, totalImages: 0 }
@@ -39,6 +41,8 @@
       if (!resultsRes.ok) throw new Error(`Failed to load face results: ${resultsRes.statusText}`);
 
       const statsData = await statsRes.json();
+
+      unavailable = !!statsData.meta?.unavailable;
       const resultsData = await resultsRes.json();
 
       // Map API response to expected format
@@ -218,6 +222,13 @@
         <ErrorAlert message={errorMessage} />
       </div>
     {/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
     <!-- Analyze Panel -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
