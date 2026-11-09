@@ -1,15 +1,12 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import { signOut } from '$lib/utils/signOut';
 
   let isSigningOut = false;
 
-  async function signOut() {
+  async function handleSignOut() {
     isSigningOut = true;
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } finally {
-      window.location.href = '/login';
-    }
+    await signOut();
   }
 
   $: user = $page.data.user as { name: string; email: string; role: string } | null | undefined;
@@ -23,7 +20,7 @@
     </div>
     <button
       type="button"
-      on:click={signOut}
+      on:click={handleSignOut}
       disabled={isSigningOut}
       title="Signed in as {user.name} ({user.role})"
       class="shrink-0 whitespace-nowrap px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors disabled:opacity-60"
