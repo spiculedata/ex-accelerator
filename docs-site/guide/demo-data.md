@@ -5,7 +5,31 @@ A fresh install is empty. The repository includes a generator that fills the dat
 housing, water quality and more. Nothing in it comes from real people or real events, so it is safe
 to explore, screenshot and share.
 
-## Load it
+## The fastest way
+
+You need Node 22 and Docker, and nothing else:
+
+```bash
+git clone https://github.com/spiculedata/social-explorer.git
+cd social-explorer/ex-accell-ui
+npm run demo
+```
+
+This starts a throwaway PostgreSQL with `pg_duckdb` in a Docker container (on `127.0.0.1:55432`),
+loads the demo dataset and runs the app on `http://localhost:5173`, reachable only from your
+machine. A random sign-in is generated, printed in the terminal and kept in `ex-accell-ui/.demo/`
+(ignored by git), so running it again resumes with the same login and data.
+
+| Command | Does |
+|---------|------|
+| `npm run demo` | Start, or resume, the demo |
+| `npm run demo -- --stop` | Stop the database container and keep its data |
+| `npm run demo -- --reset` | Delete the demo database and generated sign-in |
+
+It never touches your `.env` or any database other than its own container. To load the data into a
+database you already run, use the manual steps below.
+
+## Load it into your own database
 
 You need the stack running (see [Getting started](/guide/getting-started)) and a checkout of the
 repository, because the loader runs from source:

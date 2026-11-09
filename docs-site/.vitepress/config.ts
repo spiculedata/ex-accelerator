@@ -5,6 +5,13 @@ export default defineConfig({
   description: 'Open-source social media analytics platform for collecting, analysing and investigating online data.',
   base: '/social-explorer/',
   cleanUrls: true,
+  head: [
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: 'Social Explorer: follow a story across social, news and radio' }],
+    ['meta', { property: 'og:description', content: 'Open-source platform that brings posts, news events and broadcasts into one database and scores them for sentiment, topics and language. Try it with one command.' }],
+    ['meta', { property: 'og:image', content: 'https://spiculedata.github.io/social-explorer/screenshots/sentiment-analysis.png' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
+  ],
   lastUpdated: true,
   themeConfig: {
     nav: [
