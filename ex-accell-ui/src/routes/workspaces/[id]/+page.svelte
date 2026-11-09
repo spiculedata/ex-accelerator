@@ -210,7 +210,11 @@
             <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Data Sources</h2>
             <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{dataSources.length}</span>
           </div>
-          <button type="button" class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+          <button
+            type="button"
+            class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            onclick={() => goto(`/data-management?workspace=${workspaceId}`)}
+          >
             + Add Data Source
           </button>
         </div>
@@ -269,7 +273,11 @@
             </div>
             <p class="text-slate-600 font-medium mb-1">No investigations yet</p>
             <p class="text-sm text-slate-400 mb-4">Create an investigation to start analyzing this workspace's data</p>
-            <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <button
+              type="button"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              onclick={() => goto(`/investigations?workspace=${workspaceId}`)}
+            >
               Create Investigation
             </button>
           </div>
