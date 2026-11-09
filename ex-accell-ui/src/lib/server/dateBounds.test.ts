@@ -24,6 +24,9 @@ describe('dateBoundToEpochMs', () => {
     expect(dateBoundToEpochMs('2026-11-09T14:02:11+01:00', 'start')).toBe(Date.parse('2026-11-09T13:02:11Z'));
     expect(dateBoundToEpochMs('2026-11-09T14:02', 'start')).toBeNull();
     expect(dateBoundToEpochMs('2026-02-30T00:00:00Z', 'start')).toBeNull();
+    expect(dateBoundToEpochMs('2026-11-09T25:00:00Z', 'start')).toBeNull();
+    expect(dateBoundToEpochMs('2026-11-09T1:2Z', 'start')).toBeNull();
+    expect(dateBoundToEpochMs('2026-11-09T14:02Z', 'start')).toBe(Date.parse('2026-11-09T14:02:00Z'));
   });
 
   it.each([['not-a-date'], [''], ['2026-13-45'], ['2026-11-9x']])('returns null for %j', (value) => {

@@ -203,7 +203,7 @@ export const GET: RequestHandler = async ({ url }) => {
           if (!value) continue;
           const epochMs = dateBoundToEpochMs(value, bound);
           if (epochMs === null) {
-            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp` }, { status: 400 });
+            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp with a time zone` }, { status: 400 });
           }
           conditions.push(`timestamp ${op} $${paramIndex}`);
           params.push(epochMs);

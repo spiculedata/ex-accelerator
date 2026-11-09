@@ -92,6 +92,11 @@
       loadFailed = true;
       sentimentStats = emptySentimentStats();
       totalPosts = 0;
+      detailedSentiments = [];
+      emotionStats = [];
+      sentimentTrends = [];
+      samplePosts = [];
+      filteredPosts = [];
       loading = false;
     }
   }
@@ -482,7 +487,7 @@
     </div>
 
     <!-- Charts Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8" class:hidden={loadFailed}>
       <!-- Sentiment Distribution Chart -->
       <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="sentiment-chart" class="w-full h-80"></div>

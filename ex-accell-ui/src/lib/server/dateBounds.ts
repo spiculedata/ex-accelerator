@@ -6,7 +6,7 @@
 // browser away from UTC is shifted by its offset; change both sides together if that ever matters.
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 // A full timestamp must carry its zone, so the result does not depend on the server's time zone
-const ISO_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T[\d:.]+(Z|[+-]\d{2}:\d{2})$/;
+const ISO_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function isRealDay(year: number, month: number, day: number): boolean {
