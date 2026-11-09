@@ -10,6 +10,10 @@ describe('extractCommand', () => {
     expect(extractCommand('Run `npm run a` then `npm run b`')).toBe('npm run a');
   });
 
+  it.each([['run `npm run a; rm -rf /` first'], ['run `npm run a && curl x` first'], ['run `npm run a | sh` first'], ['run `npm run $(x)` first']])('does not offer a command with shell chaining in it (%s)', (message) => {
+    expect(extractCommand(message)).toBeNull();
+  });
+
   it.each([['Port 8888 is busy'], [''], ['a `` empty'], ['`not` a command']])('returns null when there is no command in %j', (message) => {
     expect(extractCommand(message)).toBeNull();
   });

@@ -92,6 +92,7 @@
   async function startJupyter() {
     // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
     const tab = window.open('', '_blank');
+    errorMessage = '';
     connection = await connectJupyter((message) => (errorMessage = message));
     if (!connection) {
       tab?.close();
@@ -277,12 +278,13 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {#if errorMessage}
       <ErrorAlert message={errorMessage} />
-      {#if extractCommand(errorMessage)}
-        <div class="mt-2 max-w-xl"><CopyCommand command={extractCommand(errorMessage) ?? ''} /></div>
+      {@const command = extractCommand(errorMessage)}
+      {#if command}
+        <div class="mt-2 max-w-xl"><CopyCommand {command} /></div>
+        <p class="mt-2 text-sm text-ink-600">
+          Setup steps are in the <a class="text-primary-700 underline" href="https://spiculedata.github.io/social-explorer/tutorials/jupyter" target="_blank" rel="noopener">Jupyter guide</a>.
+        </p>
       {/if}
-      <p class="mt-2 text-sm text-ink-600">
-        Setup steps are in the <a class="text-primary-700 underline" href="https://spiculedata.github.io/social-explorer/tutorials/jupyter" target="_blank" rel="noopener">Jupyter guide</a>.
-      </p>
     {/if}
 
     <!-- Quick Start Section -->

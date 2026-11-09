@@ -8,7 +8,7 @@
 
   import { get } from 'svelte/store';
   import { workflowBuilder, workflowSteps } from '$lib/stores/workflowBuilderStore';
-  import { nextStepPosition } from '$lib/utils/workflowSteps';
+  import { nextFreePosition } from '$lib/utils/workflowSteps';
   import { stepLibrary, getStepColorClasses, searchSteps, type StepTemplate } from './stepLibraryData';
 
   // Search state
@@ -43,7 +43,7 @@
   // without a mouse drag. The announcement tells screen reader users what happened.
   let announcement = '';
   function addToCanvas(step: StepTemplate) {
-    const { x, y } = nextStepPosition(get(workflowSteps).length);
+    const { x, y } = nextFreePosition(get(workflowSteps).map((step) => step.position));
     workflowBuilder.addStep(step, x, y);
     announcement = `Added ${step.name} to the workflow`;
   }
