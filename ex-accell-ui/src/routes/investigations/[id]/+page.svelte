@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolveInvestigationRange } from '$lib/utils/investigationRange';
+  import { parseAnnotations, type Annotation } from '$lib/utils/annotations';
   import { getSentimentColor } from '$lib/utils/colorUtils';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
@@ -41,6 +42,8 @@
     date_end: string;
     sources: string[];
     created_at: string;
+    /** Notes as stored: an array, or older double-encoded JSON text; read with parseAnnotations */
+    annotations?: unknown;
     query_config?: {
       keywords?: string[];
       dateStart?: string;
@@ -377,6 +380,8 @@
       const result = await response.json();
       if (result.success && result.investigation) {
         investigation = result.investigation;
+        annotations = parseAnnotations(investigation?.annotations);
+        savedSnapshot = JSON.stringify(annotations);
         const config = investigation?.query_config || {};
         keywords = investigation?.keywords || config.keywords || [];
         // The queries need both dates, so a blank range falls back to the last 90 days
@@ -614,35 +619,45 @@
 
 
   // Annotations
-  let annotations: { id: string; text: string; timestamp: string }[] = [];
+  let annotations: Annotation[] = [];
   let newAnnotation = '';
   let showAnnotations = false;
-  let saveStatus = '';
+  let saveStatus: '' | 'saving' | 'saved' | 'error' = '';
+  let savedSnapshot = '[]';
+  // Notes that exist on screen but not yet in the database
+  $: unsaved = JSON.stringify(annotations) !== savedSnapshot;
 
+  // Adding or removing a note saves straight away, so nothing written here can be lost by leaving the page
   function addAnnotation() {
     if (!newAnnotation.trim()) return;
     annotations = [...annotations, { id: crypto.randomUUID(), text: newAnnotation.trim(), timestamp: new Date().toISOString() }];
     newAnnotation = '';
+    void handleSave();
   }
 
   function removeAnnotation(id: string) {
     annotations = annotations.filter(a => a.id !== id);
+    void handleSave();
   }
 
   async function handleSave() {
     saveStatus = 'saving';
+    const toSave = annotations;
     try {
-      await fetch('/api/investigations', {
+      const response = await fetch('/api/investigations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: investigationId,
           query_config: { ...investigation?.query_config, keywords, dateStart, dateEnd },
-          annotations: JSON.stringify(annotations)
+          annotations: toSave
         })
       });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error ?? `HTTP ${response.status}`);
+      savedSnapshot = JSON.stringify(toSave);
       saveStatus = 'saved';
-      setTimeout(() => { saveStatus = ''; }, 2000);
+      setTimeout(() => { if (saveStatus === 'saved') saveStatus = ''; }, 2000);
     } catch (error) {
       console.error('Error saving investigation:', error);
       saveStatus = 'error';
@@ -746,9 +761,13 @@
       </button>
       <button
         on:click={handleSave}
-        class="p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
-        title="Save"
+        class="relative p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'error' ? 'text-red-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
+        title={saveStatus === 'error' ? 'Could not save. Click to try again' : unsaved ? 'Save (you have unsaved changes)' : 'Save'}
+        aria-label={saveStatus === 'error' ? 'Could not save. Try again' : unsaved ? 'Save, you have unsaved changes' : 'Save'}
       >
+        {#if unsaved && saveStatus !== 'saving'}
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full" aria-hidden="true"></span>
+        {/if}
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {#if saveStatus === 'saved'}
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -774,6 +793,9 @@
               <span class="text-[9px] text-slate-600">No notes yet</span>
             {/if}
           </div>
+          <span role="status" class="text-[9px] {saveStatus === 'error' ? 'text-red-400' : 'text-slate-500'}">
+            {#if saveStatus === 'error'}Could not save notes. Try again.{:else if saveStatus === 'saving'}Saving…{:else if unsaved}Unsaved{:else if annotations.length > 0}Saved, {annotations.length} note{annotations.length === 1 ? '' : 's'}{/if}
+          </span>
           <input
             bind:value={newAnnotation}
             placeholder="Add note..."
