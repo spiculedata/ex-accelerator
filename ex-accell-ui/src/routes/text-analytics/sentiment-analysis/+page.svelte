@@ -260,7 +260,7 @@
     // Clicking a segment opens the posts behind it
     sentimentChart.off('click');
     sentimentChart.on('click', (params: { name?: string }) => {
-      if (params?.name) drilldown = { title: `${params.name} posts`, filters: { sentiment: params.name, ...filtersFromParams(currentFilterParams) } };
+      if (params?.name) drilldown = { title: `${params.name} posts`, filters: { sentiment: params.name, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } };
     });
   }
 

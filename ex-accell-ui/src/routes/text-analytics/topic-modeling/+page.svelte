@@ -538,7 +538,7 @@
 
   function selectTopic(topic: Topic) {
     selectedTopic = topic;
-    drilldown = { title: `Topic: ${topic.name}`, filters: { topic: String(topic.id), ...filtersFromParams(currentFilterParams) } };
+    drilldown = { title: `Topic: ${topic.name}`, filters: { topic: String(topic.id), ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } };
   }
 </script>
 

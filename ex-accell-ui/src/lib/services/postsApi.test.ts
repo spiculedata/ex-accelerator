@@ -27,8 +27,15 @@ describe('buildPostsQuery', () => {
     expect(new URLSearchParams(buildPostsQuery({ workspaceId: '3' })).get('workspace_id')).toBe('3');
   });
 
-  it('omits an empty platform list so the request is not filtered to nothing', () => {
-    expect(new URLSearchParams(buildPostsQuery({ platforms: [] })).has('platforms')).toBe(false);
+  it('sends an empty platform list as platforms= so the server returns nothing, as the page does', () => {
+    const params = new URLSearchParams(buildPostsQuery({ platforms: [] }));
+
+    expect(params.has('platforms')).toBe(true);
+    expect(params.get('platforms')).toBe('');
+  });
+
+  it('leaves platforms out entirely when none was chosen', () => {
+    expect(new URLSearchParams(buildPostsQuery({})).has('platforms')).toBe(false);
   });
 });
 
@@ -42,7 +49,11 @@ describe('filtersFromParams', () => {
     });
   });
 
-  it('leaves out empty values and ignores everything else', () => {
-    expect(filtersFromParams({ platforms: '', source: 'x' })).toEqual({});
+  it('keeps an empty platform list as an empty list, because the page treats it as every platform switched off', () => {
+    expect(filtersFromParams({ platforms: '', source: 'x' })).toEqual({ platforms: [] });
+  });
+
+  it('leaves out values that are not set and ignores everything else', () => {
+    expect(filtersFromParams({ source: 'x' })).toEqual({});
   });
 });

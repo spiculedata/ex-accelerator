@@ -26,6 +26,7 @@
   let loading = $state(false);
   let loadingMore = $state(false);
   let errorMessage = $state('');
+  let unavailable = $state(false);
 
   let panel: HTMLElement | undefined = $state();
   let closeButton: HTMLButtonElement | undefined = $state();
@@ -39,6 +40,7 @@
     const current = ++requestId;
     loading = true;
     errorMessage = '';
+    unavailable = false;
     posts = [];
     total = 0;
     try {
@@ -46,6 +48,7 @@
       if (current !== requestId) return;
       posts = page.posts;
       total = page.total;
+      unavailable = !!page.unavailable;
     } catch (error) {
       if (current !== requestId) return;
       errorMessage = error instanceof Error ? error.message : 'Could not load posts.';
@@ -68,7 +71,7 @@
       if (current !== requestId) return;
       errorMessage = error instanceof Error ? error.message : 'Could not load more posts.';
     } finally {
-      loadingMore = false;
+      if (current === requestId) loadingMore = false;
     }
   }
 
@@ -171,8 +174,13 @@
           </div>
         {:else if posts.length === 0}
           <div role="status" class="rounded-lg border border-ink-200 p-6 text-center">
-            <p class="font-medium text-ink-900">No posts match.</p>
-            <p class="mt-1 text-sm text-ink-600">Nothing in this project has this topic, tag or phrase yet.</p>
+            {#if unavailable}
+              <p class="font-medium text-ink-900">Post data is not available yet.</p>
+              <p class="mt-1 text-sm text-ink-600">Posts appear here once data has been loaded into this installation.</p>
+            {:else}
+              <p class="font-medium text-ink-900">No posts match.</p>
+              <p class="mt-1 text-sm text-ink-600">Nothing in this project has this topic, tag or phrase yet.</p>
+            {/if}
           </div>
         {:else}
           <ul class="space-y-3">

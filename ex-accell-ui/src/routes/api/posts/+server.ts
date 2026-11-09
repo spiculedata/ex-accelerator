@@ -4,7 +4,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
-import { buildPostSearch, type PostSearchFilters } from '$lib/server/postSearch';
+import { buildPostSearch, POST_SEARCH_DEFAULT_LIMIT, type PostSearchFilters } from '$lib/server/postSearch';
 import { resolveWorkspaceScope } from '$lib/services/workspaceContextResolver';
 import { queryErrorResponse } from '$lib/server/queryErrors';
 
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ url }) => {
   // A `platforms` parameter that is present but empty means every platform is switched off.
   const explicitPlatforms = params.get('platforms');
   const chosen = explicitPlatforms?.split(',').map((p) => p.trim()).filter(Boolean);
-  const emptyPage = { posts: [], total: 0, limit: 25, offset: offset ?? 0 };
+  const emptyPage = { posts: [], total: 0, limit: POST_SEARCH_DEFAULT_LIMIT, offset: offset ?? 0 };
   if (explicitPlatforms !== null && chosen && chosen.length === 0) {
     return json({ success: true, data: emptyPage });
   }

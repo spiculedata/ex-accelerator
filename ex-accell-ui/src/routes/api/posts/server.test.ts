@@ -128,4 +128,10 @@ describe('GET /api/posts', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it('reports the default page size on early empty responses too', async () => {
+    const body = await (await call('?platforms=')).json();
+
+    expect(body.data.limit).toBe(25);
+  });
 });

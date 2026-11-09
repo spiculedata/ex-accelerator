@@ -272,7 +272,7 @@
                   <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-3">
                       <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">#{i + 1}</span>
-                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: { q: trigram.trigram } })}>"{trigram.trigram}"</button></h3>
+                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: { q: trigram.trigram, ...(workspaceId ? { workspaceId } : {}) } })}>"{trigram.trigram}"</button></h3>
                     </div>
                     <div class="flex items-center space-x-2">
                       <svg class="w-4 h-4 {getTrendColor(trigram.trend)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -383,4 +383,4 @@
   </div>
 </div>
 
-<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing this exact phrase. The counts on this page ignore punctuation and case, so they can differ." onclose={() => (drilldown = null)} />
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing this text. The counts on this page ignore punctuation and case, so they can differ." onclose={() => (drilldown = null)} />

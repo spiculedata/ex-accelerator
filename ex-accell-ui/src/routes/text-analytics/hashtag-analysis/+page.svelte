@@ -238,7 +238,7 @@
               {#each filteredHashtags as h}
                 {@const maxCount = Math.max(...filteredHashtags.slice(0, 1).map(x => parseInt(x.count)), 1)}
                 <tr class="hover:bg-purple-50/50">
-                  <td class="px-4 py-2.5 font-semibold"><button type="button" class="text-primary-700 hover:underline" on:click={() => (drilldown = { title: `#${h.hashtag}`, filters: { hashtag: h.hashtag, ...filtersFromParams(currentFilterParams) } })}>#{h.hashtag}</button></td>
+                  <td class="px-4 py-2.5 font-semibold"><button type="button" class="text-primary-700 hover:underline" on:click={() => (drilldown = { title: `#${h.hashtag}`, filters: { hashtag: h.hashtag, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } })}>#{h.hashtag}</button></td>
                   <td class="px-4 py-2.5 text-right text-gray-900">{formatNumber(parseInt(h.count))}</td>
                   <td class="px-4 py-2.5 text-right text-gray-600">{formatNumber(parseInt(h.post_count))}</td>
                   <td class="px-4 py-2.5">
