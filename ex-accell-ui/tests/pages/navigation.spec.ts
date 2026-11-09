@@ -34,6 +34,8 @@ test.describe('Navigation', () => {
 
   test('logo link is visible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('nav').getByText('SE Social Explorer')).toBeVisible();
+    const logo = page.locator('nav').getByRole('link', { name: 'Social Explorer home' });
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveAttribute('href', '/');
   });
 });

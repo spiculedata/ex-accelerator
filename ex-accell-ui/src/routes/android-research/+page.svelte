@@ -225,7 +225,7 @@
         if (temporalChartInstance) {
           temporalChartInstance.dispose();
         }
-        temporalChartInstance = echarts.init(temporalChart);
+        temporalChartInstance = echarts.init(temporalChart, 'social-explorer');
         temporalChartInstance.setOption(getTemporalChartOption());
       } else {
         console.log('Temporal chart container not ready or not on temporal tab');
@@ -234,7 +234,7 @@
       // App Network Chart
       if (appNetworkChart && appNetworkChart.offsetWidth > 0) {
         console.log('Initializing app network chart');
-        appNetworkChartInstance = echarts.init(appNetworkChart);
+        appNetworkChartInstance = echarts.init(appNetworkChart, 'social-explorer');
         appNetworkChartInstance.setOption(getAppNetworkOption());
       } else {
         console.log('App network chart container not ready');
@@ -243,7 +243,7 @@
       // Attention Span Distribution Chart
       if (attentionChart && attentionChart.offsetWidth > 0) {
         console.log('Initializing attention chart');
-        attentionChartInstance = echarts.init(attentionChart);
+        attentionChartInstance = echarts.init(attentionChart, 'social-explorer');
         attentionChartInstance.setOption(getAttentionChartOption());
       } else {
         console.log('Attention chart container not ready');
@@ -252,7 +252,7 @@
       // Content Engagement Chart
       if (engagementChart && engagementChart.offsetWidth > 0) {
         console.log('Initializing engagement chart');
-        engagementChartInstance = echarts.init(engagementChart);
+        engagementChartInstance = echarts.init(engagementChart, 'social-explorer');
         engagementChartInstance.setOption(getEngagementChartOption());
       } else {
         console.log('Engagement chart container not ready');
@@ -261,7 +261,7 @@
       // App Transition Flow Chart
       if (transitionChart && transitionChart.offsetWidth > 0) {
         console.log('Initializing transition chart');
-        transitionChartInstance = echarts.init(transitionChart);
+        transitionChartInstance = echarts.init(transitionChart, 'social-explorer');
         getTransitionFlowOption().then(option => {
           transitionChartInstance.setOption(option);
         });
@@ -275,7 +275,7 @@
         if (heatmapChartInstance) {
           heatmapChartInstance.dispose();
         }
-        heatmapChartInstance = echarts.init(heatmapChart);
+        heatmapChartInstance = echarts.init(heatmapChart, 'social-explorer');
         heatmapChartInstance.setOption(getHeatmapOption());
       } else {
         console.log('Heatmap chart container not ready or not on temporal tab');

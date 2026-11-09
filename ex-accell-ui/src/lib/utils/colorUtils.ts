@@ -34,28 +34,32 @@ export function getStatusIcon(status: string): string {
 
 // ─── Sentiment Colors ───────────────────────────────────────────────────────
 
+// Brand sentiment scale (see docs-site/brand/data-visualisation): blue for positive through grey to
+// orange for negative. It stays distinguishable for common forms of colour blindness, so it replaces the
+// earlier green/pink/purple set. Colour is never the only cue: pair it with a label or icon.
 const sentimentHex: Record<string, string> = {
-  'very positive': '#06d6a0',
-  'positive': '#26d0ce',
-  'neutral': '#8b5cf6',
-  'negative': '#ff6b9d',
-  'very negative': '#f72585',
+  'very positive': '#0072b2',
+  'positive': '#56b4e9',
+  'neutral': '#98a2ae',
+  'negative': '#e69f00',
+  'very negative': '#d55e00',
 };
 
+// Tinted badges with dark text: the hue sits in the fill and ring, so the label keeps full contrast
 const sentimentTailwind: Record<string, string> = {
-  'very positive': 'bg-green-100 text-green-800',
-  'positive': 'bg-emerald-100 text-emerald-800',
-  'neutral': 'bg-purple-100 text-purple-800',
-  'negative': 'bg-orange-100 text-orange-800',
-  'very negative': 'bg-red-100 text-red-800',
+  'very positive': 'bg-sentiment-very-positive/15 text-ink-900 ring-1 ring-sentiment-very-positive/40',
+  'positive': 'bg-sentiment-positive/20 text-ink-900 ring-1 ring-sentiment-positive/50',
+  'neutral': 'bg-sentiment-neutral/20 text-ink-900 ring-1 ring-sentiment-neutral/50',
+  'negative': 'bg-sentiment-negative/20 text-ink-900 ring-1 ring-sentiment-negative/50',
+  'very negative': 'bg-sentiment-very-negative/15 text-ink-900 ring-1 ring-sentiment-very-negative/40',
 };
 
 export function getSentimentColor(sentiment: string, format: 'hex' | 'tailwind' = 'hex'): string {
   const key = sentiment?.toLowerCase() || '';
   if (format === 'tailwind') {
-    return sentimentTailwind[key] || 'bg-gray-100 text-gray-800';
+    return sentimentTailwind[key] || sentimentTailwind.neutral;
   }
-  return sentimentHex[key] || '#8b5cf6';
+  return sentimentHex[key] || sentimentHex.neutral;
 }
 
 export function getSentimentIcon(sentiment: string): string {
@@ -105,7 +109,7 @@ export function getConfidenceColor(confidence: number): string {
 
 export function getHealthColor(health: number): string {
   if (health >= 95) return 'text-green-600';
-  if (health >= 90) return 'text-yellow-600';
+  if (health >= 90) return 'text-signal-800';
   return 'text-red-600';
 }
 

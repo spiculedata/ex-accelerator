@@ -17,6 +17,7 @@
 
 <script lang="ts">
 	import { onMount, createEventDispatcher } from 'svelte';
+	import { getSentimentColor } from '$lib/utils/colorUtils';
 	import * as d3 from 'd3';
 
 	export let data: TimelineEntry[] = [];
@@ -38,11 +39,11 @@
 
 	const colors = {
 		gdeltBar: '#64748b',
-		goldsteinNeg: '#ef4444',
-		goldsteinPos: '#22c55e',
-		positive: '#06d6a0',
-		negative: '#f72585',
-		neutral: '#8b5cf6'
+		goldsteinNeg: '#d55e00',
+		goldsteinPos: '#0072b2',
+		positive: getSentimentColor('positive'),
+		negative: getSentimentColor('negative'),
+		neutral: getSentimentColor('neutral')
 	};
 
 	onMount(() => {

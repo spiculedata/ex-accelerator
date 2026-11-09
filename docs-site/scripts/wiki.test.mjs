@@ -34,6 +34,12 @@ test('convertLinks leaves external, anchor-only and mailto links alone', () => {
   assert.equal(convertLinks(input, 'x.md'), input);
 });
 
+test('convertLinks moves brand assets into the wiki images folder, in markdown and HTML', () => {
+  assert.equal(convertLinks('[logo](/brand/logo.svg)', 'x.md'), '[logo](images/brand/logo.svg)');
+  assert.equal(convertLinks('<img src="/brand/mark.svg" alt="m">', 'x.md'), '<img src="images/brand/mark.svg" alt="m">');
+  assert.equal(convertLinks('<img src="/screenshots/home.png">', 'x.md'), '<img src="images/home.png">');
+});
+
 test('convertLinks moves screenshots into the wiki images folder', () => {
   assert.equal(convertLinks('![alt](/screenshots/tutorials/new-project.png)', 'x.md'), '![alt](images/tutorials/new-project.png)');
   assert.equal(convertLinks('![alt](/screenshots/home.png)', 'x.md'), '![alt](images/home.png)');

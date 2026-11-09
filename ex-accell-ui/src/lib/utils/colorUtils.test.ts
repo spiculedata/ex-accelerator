@@ -53,32 +53,52 @@ describe('getStatusIcon', () => {
 });
 
 describe('getSentimentColor', () => {
+  // The brand sentiment scale: blue (positive) to orange (negative), safe for common colour blindness
   it.each([
-    ['very positive', '#06d6a0'],
-    ['positive', '#26d0ce'],
-    ['neutral', '#8b5cf6'],
-    ['negative', '#ff6b9d'],
-    ['very negative', '#f72585'],
+    ['very positive', '#0072b2'],
+    ['positive', '#56b4e9'],
+    ['neutral', '#98a2ae'],
+    ['negative', '#e69f00'],
+    ['very negative', '#d55e00'],
   ])('returns correct hex for "%s"', (sentiment, expected) => {
     expect(getSentimentColor(sentiment)).toBe(expected);
   });
 
-  it('returns default hex for unknown sentiment', () => {
-    expect(getSentimentColor('unknown')).toBe('#8b5cf6');
+  it('returns the neutral hex for unknown sentiment', () => {
+    expect(getSentimentColor('unknown')).toBe('#98a2ae');
+  });
+
+  it('keeps positive on the blue side and negative on the warm side, with no green anywhere', () => {
+    const hexes = ['very positive', 'positive', 'neutral', 'negative', 'very negative'].map((s) => getSentimentColor(s));
+    const isGreen = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return g > r + 20 && g > b + 20;
+    };
+    expect(hexes.some(isGreen)).toBe(false);
+
+    const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (const level of ['very positive', 'positive']) {
+      const [r, , b] = channels(getSentimentColor(level));
+      expect(b).toBeGreaterThan(r);
+    }
+    for (const level of ['negative', 'very negative']) {
+      const [r, , b] = channels(getSentimentColor(level));
+      expect(r).toBeGreaterThan(b);
+    }
   });
 
   it.each([
-    ['very positive', 'bg-green-100 text-green-800'],
-    ['positive', 'bg-emerald-100 text-emerald-800'],
-    ['neutral', 'bg-purple-100 text-purple-800'],
-    ['negative', 'bg-orange-100 text-orange-800'],
-    ['very negative', 'bg-red-100 text-red-800'],
+    ['very positive', 'bg-sentiment-very-positive/15 text-ink-900 ring-1 ring-sentiment-very-positive/40'],
+    ['positive', 'bg-sentiment-positive/20 text-ink-900 ring-1 ring-sentiment-positive/50'],
+    ['neutral', 'bg-sentiment-neutral/20 text-ink-900 ring-1 ring-sentiment-neutral/50'],
+    ['negative', 'bg-sentiment-negative/20 text-ink-900 ring-1 ring-sentiment-negative/50'],
+    ['very negative', 'bg-sentiment-very-negative/15 text-ink-900 ring-1 ring-sentiment-very-negative/40'],
   ])('returns correct tailwind for "%s"', (sentiment, expected) => {
     expect(getSentimentColor(sentiment, 'tailwind')).toBe(expected);
   });
 
-  it('returns default tailwind for unknown sentiment', () => {
-    expect(getSentimentColor('unknown', 'tailwind')).toBe('bg-gray-100 text-gray-800');
+  it('returns the neutral tailwind classes for unknown sentiment', () => {
+    expect(getSentimentColor('unknown', 'tailwind')).toBe('bg-sentiment-neutral/20 text-ink-900 ring-1 ring-sentiment-neutral/50');
   });
 });
 
@@ -139,8 +159,8 @@ describe('getHealthColor', () => {
   });
 
   it('returns yellow for >= 90', () => {
-    expect(getHealthColor(90)).toBe('text-yellow-600');
-    expect(getHealthColor(94)).toBe('text-yellow-600');
+    expect(getHealthColor(90)).toBe('text-signal-800');
+    expect(getHealthColor(94)).toBe('text-signal-800');
   });
 
   it('returns red for < 90', () => {
