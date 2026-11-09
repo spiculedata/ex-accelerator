@@ -28,4 +28,10 @@ describe('parseAnnotations', () => {
     expect(typeof result[0].id).toBe('string');
     expect(result[0].id.length).toBeGreaterThan(0);
   });
+
+  it('makes duplicate ids unique so removing one note cannot remove another', () => {
+    const result = parseAnnotations([{ id: 'same', text: 'one' }, { id: 'same', text: 'two' }]);
+
+    expect(new Set(result.map((n) => n.id)).size).toBe(2);
+  });
 });

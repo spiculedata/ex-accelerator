@@ -11,6 +11,7 @@ export interface Annotation {
  */
 export function parseAnnotations(raw: unknown): Annotation[] {
   let value: unknown = raw;
+  // Up to three decodes: a plain array, text, or text of text (the double-encoded saves). More is junk.
   for (let depth = 0; depth < 3 && typeof value === 'string'; depth++) {
     try {
       value = JSON.parse(value);
@@ -20,12 +21,16 @@ export function parseAnnotations(raw: unknown): Annotation[] {
   }
   if (!Array.isArray(value)) return [];
 
+  const seen = new Set<string>();
   return value.flatMap((entry, index) => {
     if (!entry || typeof entry !== 'object') return [];
     const { id, text, timestamp } = entry as Record<string, unknown>;
     if (typeof text !== 'string' || !text.trim()) return [];
+    let noteId = typeof id === 'string' && id ? id : `note-${index}`;
+    while (seen.has(noteId)) noteId = `${noteId}-${index}`;
+    seen.add(noteId);
     return [{
-      id: typeof id === 'string' && id ? id : `note-${index}`,
+      id: noteId,
       text,
       timestamp: typeof timestamp === 'string' ? timestamp : ''
     }];

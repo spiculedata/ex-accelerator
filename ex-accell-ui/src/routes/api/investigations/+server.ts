@@ -163,6 +163,14 @@ export const PATCH: RequestHandler = async ({ request }) => {
     const params: any[] = [];
     let paramIndex = 1;
 
+    // Notes are a list. Decode text from older clients first, then refuse anything else at the boundary
+    if (data.annotations !== undefined) {
+      const decoded = typeof data.annotations === 'string' ? safeJsonParse(data.annotations) : data.annotations;
+      if (!Array.isArray(decoded)) {
+        return json({ success: false, error: 'annotations must be a list of notes' }, { status: 400 });
+      }
+    }
+
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
         // JSON columns are encoded exactly once. Older clients sent annotations already stringified,

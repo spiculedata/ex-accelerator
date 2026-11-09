@@ -105,4 +105,19 @@ describe('PATCH /api/investigations annotations', () => {
 
     expect(updateCall()[1][0]).toBe(JSON.stringify([note]));
   });
+
+  it.each([[42], [{}], ['hello'], [true]])('rejects annotations that are not a list (%j)', async (annotations) => {
+    const response = await patch({ id: 1, annotations });
+
+    expect(response.status).toBe(400);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE investigations'))).toBe(false);
+  });
+
+  it('still encodes query_config exactly once when sent with annotations', async () => {
+    await patch({ id: 1, query_config: { keywords: ['tram'] }, annotations: [note] });
+
+    const params = updateCall()[1];
+    expect(params).toContain(JSON.stringify({ keywords: ['tram'] }));
+    expect(params).toContain(JSON.stringify([note]));
+  });
 });

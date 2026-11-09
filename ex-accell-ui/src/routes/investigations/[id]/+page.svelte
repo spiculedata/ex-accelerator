@@ -1,6 +1,8 @@
 <script lang="ts">
   import { resolveInvestigationRange } from '$lib/utils/investigationRange';
   import { parseAnnotations, type Annotation } from '$lib/utils/annotations';
+  import { createSingleFlight } from '$lib/utils/singleFlight';
+  import { beforeNavigate } from '$app/navigation';
   import { getSentimentColor } from '$lib/utils/colorUtils';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
@@ -627,29 +629,32 @@
   // Notes that exist on screen but not yet in the database
   $: unsaved = JSON.stringify(annotations) !== savedSnapshot;
 
-  // Adding or removing a note saves straight away, so nothing written here can be lost by leaving the page
+  // Adding or removing a note saves straight away. Saves are serialised so that two quick edits cannot
+  // finish out of order: a save that arrives while another is running is folded into one follow-up that
+  // sends the latest notes.
   function addAnnotation() {
     if (!newAnnotation.trim()) return;
     annotations = [...annotations, { id: crypto.randomUUID(), text: newAnnotation.trim(), timestamp: new Date().toISOString() }];
     newAnnotation = '';
-    void handleSave();
+    void saveNotes();
   }
 
   function removeAnnotation(id: string) {
     annotations = annotations.filter(a => a.id !== id);
-    void handleSave();
+    void saveNotes();
   }
 
-  async function handleSave() {
+  async function persist(includeConfig: boolean) {
     saveStatus = 'saving';
     const toSave = annotations;
     try {
       const response = await fetch('/api/investigations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        // Autosaving a note sends only the notes, so keyword and date edits being tried out are not saved with it
         body: JSON.stringify({
           id: investigationId,
-          query_config: { ...investigation?.query_config, keywords, dateStart, dateEnd },
+          ...(includeConfig ? { query_config: { ...investigation?.query_config, keywords, dateStart, dateEnd } } : {}),
           annotations: toSave
         })
       });
@@ -663,6 +668,24 @@
       saveStatus = 'error';
     }
   }
+
+  // Which payload the next run sends: an explicit Save also saves keywords and dates
+  let nextSaveIncludesConfig = false;
+  const runSave = createSingleFlight(() => {
+    const includeConfig = nextSaveIncludesConfig;
+    nextSaveIncludesConfig = false;
+    return persist(includeConfig);
+  });
+  const saveNotes = () => runSave();
+  function handleSave() {
+    nextSaveIncludesConfig = true;
+    return runSave();
+  }
+
+  // Leaving the page with notes that are unsaved, or whose save failed, would lose them
+  beforeNavigate(({ cancel }) => {
+    if ((unsaved || saveStatus === 'error') && !confirm('Your latest notes have not been saved. Leave this page anyway?')) cancel();
+  });
 
   async function handleExport() {
     const report = {
@@ -761,12 +784,12 @@
       </button>
       <button
         on:click={handleSave}
-        class="relative p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'error' ? 'text-red-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
+        class="relative p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'error' ? 'text-danger-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
         title={saveStatus === 'error' ? 'Could not save. Click to try again' : unsaved ? 'Save (you have unsaved changes)' : 'Save'}
         aria-label={saveStatus === 'error' ? 'Could not save. Try again' : unsaved ? 'Save, you have unsaved changes' : 'Save'}
       >
         {#if unsaved && saveStatus !== 'saving'}
-          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full" aria-hidden="true"></span>
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-signal-500 rounded-full" aria-hidden="true"></span>
         {/if}
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {#if saveStatus === 'saved'}
@@ -783,7 +806,7 @@
       <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50 px-3 py-1">
         <div class="flex items-center gap-2">
           <div class="flex-1 flex flex-wrap gap-1">
-            {#each annotations as annotation}
+            {#each annotations as annotation (annotation.id)}
               <div class="flex items-center gap-1 bg-slate-800 border border-slate-700/50 rounded px-1.5 py-0.5 max-w-[200px]">
                 <p class="text-[9px] text-slate-300 truncate">{annotation.text}</p>
                 <button on:click={() => removeAnnotation(annotation.id)} class="text-slate-600 hover:text-rose-400 text-[9px] flex-shrink-0">x</button>
@@ -793,7 +816,7 @@
               <span class="text-[9px] text-slate-600">No notes yet</span>
             {/if}
           </div>
-          <span role="status" class="text-[9px] {saveStatus === 'error' ? 'text-red-400' : 'text-slate-500'}">
+          <span role="status" class="text-[9px] {saveStatus === 'error' ? 'text-danger-400' : 'text-slate-500'}">
             {#if saveStatus === 'error'}Could not save notes. Try again.{:else if saveStatus === 'saving'}Saving…{:else if unsaved}Unsaved{:else if annotations.length > 0}Saved, {annotations.length} note{annotations.length === 1 ? '' : 's'}{/if}
           </span>
           <input
