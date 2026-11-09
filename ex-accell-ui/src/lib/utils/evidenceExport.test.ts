@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { socialPostRecord, toCsv } from './evidenceExport';
+import { CSV_BOM, socialPostRecord, toCsv } from './evidenceExport';
 
 const post = { id: 193, text: 'Another morning of tram delays', timestamp: '1794066618733', platform: 'telegram', author: 'demo_user_0036', sentiment_category: 'Negative', confidence_score: 0.865, emotions: 'Sadness', engagement_likes: 739, engagement_shares: 106, engagement_comments: 158 };
 
@@ -44,5 +44,19 @@ describe('toCsv', () => {
 
   it('writes an empty cell for null and undefined', () => {
     expect(toCsv([{ id: 1, text: null }], columns)).toBe('id,text\r\n1,\r\n');
+  });
+});
+
+describe('blank values', () => {
+  it('treats an empty timestamp or confidence as missing, not as zero', () => {
+    const record = socialPostRecord({ id: 1, timestamp: '  ', confidence_score: '' });
+    expect(record.posted_at).toBe('');
+    expect(record.confidence).toBeNull();
+  });
+});
+
+describe('CSV_BOM', () => {
+  it('is the UTF-8 byte order mark that makes Excel read non-ASCII text correctly', () => {
+    expect(CSV_BOM).toBe('\uFEFF');
   });
 });

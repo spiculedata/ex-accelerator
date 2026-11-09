@@ -31,7 +31,7 @@ export interface PostRecord {
 }
 
 const isoFromEpochMs = (value: SocialPost['timestamp']): string => {
-  const ms = typeof value === 'string' ? Number(value) : value;
+  const ms = typeof value === 'string' ? (value.trim() === '' ? null : Number(value)) : value;
   if (ms === null || ms === undefined || !Number.isFinite(ms)) return '';
   const date = new Date(ms);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
@@ -41,7 +41,9 @@ export function socialPostRecord(post: SocialPost): PostRecord {
   const platform = post.platform ?? '';
   const author = post.author ?? '';
   const posted_at = isoFromEpochMs(post.timestamp);
-  const confidence = post.confidence_score === null || post.confidence_score === undefined ? null : Number(post.confidence_score);
+  const rawConfidence = post.confidence_score;
+  const hasConfidence = rawConfidence !== null && rawConfidence !== undefined && String(rawConfidence).trim() !== '';
+  const confidence = hasConfidence ? Number(rawConfidence) : null;
   const citation = `${platform} post #${post.id}${author ? ` by ${author}` : ''}${posted_at ? `, ${posted_at}` : ''}`;
   return {
     id: post.id,
@@ -58,6 +60,9 @@ export function socialPostRecord(post: SocialPost): PostRecord {
     citation
   };
 }
+
+/** Excel only reads a CSV as UTF-8 (Arabic, Cyrillic, accents, emoji) when it starts with this mark. */
+export const CSV_BOM = '\uFEFF';
 
 // A spreadsheet runs a cell that starts with one of these as a formula, so exported text is prefixed with '
 const FORMULA_START = /^[=+\-@\t\r]/;

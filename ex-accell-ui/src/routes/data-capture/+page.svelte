@@ -12,10 +12,10 @@
   let activeTab = 'schedule';
   let errorMessage = '';
   
-  // Load job states from state store
   // Why job history could not be shown, in terms a person can act on
   let jobProblem: JobStateProblem | null = null;
 
+  // Load job states from state store
   async function loadJobStates(forceRefresh = false) {
     loadingJobStates = true;
     try {

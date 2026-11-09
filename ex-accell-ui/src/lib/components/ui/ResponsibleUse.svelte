@@ -19,8 +19,8 @@
   };
 </script>
 
-<aside class="mb-6 rounded-xl border border-ink-200 bg-ink-50 px-5 py-4" aria-label="Use {tool} responsibly">
-  <h2 class="text-sm font-semibold text-ink-900">Use {tool} responsibly</h2>
+<aside class="mb-6 rounded-xl border border-ink-200 bg-ink-50 px-5 py-4" aria-labelledby="responsible-use-heading">
+  <h2 id="responsible-use-heading" class="text-sm font-semibold text-ink-900">Use {tool} responsibly</h2>
   <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-700">
     {#each points[tool] as point}
       <li>{point}</li>
