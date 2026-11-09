@@ -4,6 +4,13 @@ sidebar: false
 aside: false
 title: Social Explorer
 titleTemplate: Open-source social media analytics and investigation
+head:
+  - - meta
+    - property: og:title
+      content: 'Social Explorer: follow a story across social, news and radio'
+  - - meta
+    - property: og:description
+      content: Open-source platform that brings posts, news events and broadcasts into one database and scores them for sentiment, topics and language. Try it with one command.
 
 hero:
   name: Social Explorer

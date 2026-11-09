@@ -90,7 +90,9 @@ secret() { # secret <file> <bytes>: create the file only if generation produced 
   [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret (need python3 or openssl)." >&2; exit 1; }
   (umask 077; printf '%s\n' "$value" > "$file")
 }
-had_db_password=0; [ -s "$STATE_DIR/db-password" ] && had_db_password=1
+# If a container exists, every saved secret must too, or the printed sign-in would not match the data
+had_secrets=1
+for f in admin-password db-password session-secret; do [ -s "$STATE_DIR/$f" ] || had_secrets=0; done
 secret admin-password 18
 secret session-secret 48
 secret db-password 18
@@ -100,7 +102,7 @@ DB_PASSWORD="$(cat "$STATE_DIR/db-password")"
 
 if exists; then
   guard
-  if [ "$had_db_password" = 0 ]; then
+  if [ "$had_secrets" = 0 ]; then
     echo "The demo database exists but its saved credentials are gone. Run: npm run demo -- --reset" >&2
     exit 1
   fi
@@ -121,7 +123,7 @@ fi
 
 printf "Waiting for the database"
 for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER" pg_isready -U postgres -d "$DB" >/dev/null 2>&1; then ready=1; break; fi
+  if docker exec "$CONTAINER" pg_isready -h 127.0.0.1 -U postgres -d "$DB" >/dev/null 2>&1; then ready=1; break; fi
   printf "."; sleep 1
 done
 echo
