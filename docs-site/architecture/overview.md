@@ -1,6 +1,6 @@
 # Architecture overview
 
-ex-accelerator is a monorepo of cooperating services around one PostgreSQL database.
+Social Explorer is a monorepo of cooperating services around one PostgreSQL database.
 
 ```
             ┌────────────┐      ┌──────────────────────────┐

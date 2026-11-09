@@ -40,7 +40,7 @@ Stop it (`docker stop dapr_scheduler`) or leave `dapr-placement` out of the comp
 reason. Administrators can add any dataset; other users need access to it, and granting access is an
 administrator action. The demo datasets are public.
 
-**A workspace card says "0 records" although I linked datasets** ([#102](https://github.com/spiculedata/ex-accelerator/issues/102)). Those counters track data sources
+**A workspace card says "0 records" although I linked datasets** ([#102](https://github.com/spiculedata/social-explorer/issues/102)). Those counters track data sources
 added through Data Capture. Linked datasets control what the dashboards show; the Workspace selector
 in the navigation shows their post count.
 
@@ -74,5 +74,5 @@ itself on first sign-in (see [Data model](/architecture/data-model)).
 edit projects, workspaces and investigations; viewers are read-only.
 
 **Something else is wrong.** Check the browser console and the server log, then
-[open an issue](https://github.com/spiculedata/ex-accelerator/issues/new/choose). Report security
+[open an issue](https://github.com/spiculedata/social-explorer/issues/new/choose). Report security
 problems privately as described in the security policy.

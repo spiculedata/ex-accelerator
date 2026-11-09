@@ -118,7 +118,7 @@ test('buildHome turns the home page hero and features into plain markdown', () =
   const index = `---
 layout: home
 hero:
-  name: ex-accelerator
+  name: Social Explorer
   text: Social media analytics, end to end
   tagline: Collect and analyse.
   actions:
@@ -133,7 +133,7 @@ features:
 ---
 `;
   const out = buildHome(index);
-  assert.match(out, /^# ex-accelerator/);
+  assert.match(out, /^# Social Explorer/);
   assert.ok(out.includes('Social media analytics, end to end'));
   assert.ok(out.includes('Collect and analyse.'));
   assert.ok(out.includes('**Collect**'));

@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
-  title: 'ex-accelerator',
+  title: 'Social Explorer',
   description: 'Open-source social media analytics platform for collecting, analysing and investigating online data.',
-  base: '/ex-accelerator/',
+  base: '/social-explorer/',
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
@@ -12,7 +12,7 @@ export default defineConfig({
       { text: 'Tutorials', link: '/tutorials/' },
       { text: 'Architecture', link: '/architecture/overview' },
       { text: 'Reference', link: '/reference/api' },
-      { text: 'Contributing', link: 'https://github.com/spiculedata/ex-accelerator/blob/main/CONTRIBUTING.md' }
+      { text: 'Contributing', link: 'https://github.com/spiculedata/social-explorer/blob/main/CONTRIBUTING.md' }
     ],
     sidebar: [
       {
@@ -52,9 +52,9 @@ export default defineConfig({
         items: [{ text: 'API', link: '/reference/api' }]
       }
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/ex-accelerator' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/social-explorer' }],
     editLink: {
-      pattern: 'https://github.com/spiculedata/ex-accelerator/edit/main/docs-site/:path',
+      pattern: 'https://github.com/spiculedata/social-explorer/edit/main/docs-site/:path',
       text: 'Edit this page on GitHub'
     },
     search: { provider: 'local' },

@@ -1,6 +1,6 @@
 # Authentication and roles
 
-ex-accelerator uses server-side sessions. Users are stored in PostgreSQL (`app_users`, created
+Social Explorer uses server-side sessions. Users are stored in PostgreSQL (`app_users`, created
 automatically) with passwords hashed using scrypt. Signing in sets an `HttpOnly`, `SameSite=Lax`
 session cookie that is signed with `SESSION_SECRET`.
 
@@ -41,4 +41,4 @@ combination. Responses do not reveal whether an email exists.
   expires (12 hours by default).
 - Access is by role, not per project or workspace.
 
-These are tracked in [issue #65](https://github.com/spiculedata/ex-accelerator/issues/65).
+These are tracked in [issue #65](https://github.com/spiculedata/social-explorer/issues/65).
