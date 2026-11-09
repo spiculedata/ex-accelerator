@@ -36,7 +36,22 @@
   $: workspaceParam = Number.parseInt($page.url.searchParams.get('workspace') ?? '', 10);
   $: workspaceId = Number.isInteger(workspaceParam) && workspaceParam > 0 ? workspaceParam : null;
 
+  // Opened from a workspace: list only that workspace's investigations and name it, so it is clear whose they are
+  let workspaceName = '';
+  async function loadWorkspaceName(id: number | null) {
+    workspaceName = '';
+    if (!id) return;
+    try {
+      const response = await fetch(`/api/workspace-overview?id=${id}`);
+      const result = await response.json();
+      if (result.success) workspaceName = result.workspace?.name ?? '';
+    } catch {
+      // The name is a convenience; the list and form still work without it
+    }
+  }
+
   onMount(async () => {
+    await loadWorkspaceName(workspaceId);
     await loadInvestigations();
     if (workspaceId) {
       openModal();
@@ -47,7 +62,7 @@
   async function loadInvestigations() {
     loading = true;
     try {
-      const response = await fetch('/api/investigations');
+      const response = await fetch(workspaceId ? `/api/investigations?workspace_id=${workspaceId}` : '/api/investigations');
       const result = await response.json();
       if (result.success) {
         investigations = result.investigations || [];
@@ -180,7 +195,9 @@
         </div>
         <div>
           <h1 class="text-2xl font-bold text-white">Research Investigations</h1>
-          <p class="text-sm text-indigo-300">Cross-dataset correlation analysis</p>
+          <p class="text-sm text-indigo-300">
+            {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>{:else}Cross-dataset correlation analysis{/if}
+          </p>
         </div>
       </div>
       <button
@@ -298,7 +315,12 @@
       <!-- Modal -->
       <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-bold text-gray-900">New Investigation</h2>
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">New Investigation</h2>
+            {#if createInWorkspace}
+              <p class="mt-0.5 text-sm text-ink-600">Will be created in workspace: <span class="font-medium text-ink-900">{workspaceName || `#${createInWorkspace}`}</span></p>
+            {/if}
+          </div>
           <button on:click={closeModal} class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close modal">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
