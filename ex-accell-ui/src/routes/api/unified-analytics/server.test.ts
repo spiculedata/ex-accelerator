@@ -444,11 +444,29 @@ describe('GET /api/unified-analytics date filters for cross-platform sentiment',
     expect(params).toEqual([Date.UTC(2026, 10, 2), Date.UTC(2026, 10, 9, 23, 59, 59, 999)]);
   });
 
-  it('rejects an invalid date with a 400 instead of failing in the database', async () => {
+  it('rejects an invalid date with a 400 and a clear message instead of failing in the database', async () => {
     const response = await call('cross-platform-sentiment', '&date_start=yesterday');
+    const body = await response.json();
 
     expect(response.status).toBe(400);
+    expect(body).toMatchObject({ success: false });
+    expect(body.error).toContain('date_start');
     expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('numbers the parameters correctly when only an end date is given, or a platform filter comes first', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('cross-platform-sentiment', '&date_end=2026-11-09');
+    const [endOnlySql, endOnlyParams] = duckdbQuery.mock.calls[0];
+    expect(String(endOnlySql)).toContain('timestamp <= $1');
+    expect(endOnlyParams).toEqual([Date.UTC(2026, 10, 9, 23, 59, 59, 999)]);
+
+    duckdbQuery.mockClear();
+    await call('cross-platform-sentiment', '&platforms=telegram&date_start=2026-11-02&date_end=2026-11-09');
+    const [sql] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('timestamp >= $2');
+    expect(String(sql)).toContain('timestamp <= $3');
   });
 
   it('still works with no dates', async () => {

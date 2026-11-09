@@ -35,11 +35,14 @@
   // No onMount load — FilterBar's onReady callback triggers the initial load
 
   // Comprehensive sentiment analysis data - loaded from database
-  let sentimentStats: any = {
+  const emptySentimentStats = () => ({
     positive: { count: 0, percentage: 0, confidence: 0 },
     negative: { count: 0, percentage: 0, confidence: 0 },
     neutral: { count: 0, percentage: 0, confidence: 0 }
-  };
+  });
+  let sentimentStats: any = emptySentimentStats();
+  // A failed load is not the same as an empty range, so the two are told apart in the page
+  let loadFailed = false;
 
   let totalPosts = 0;
 
@@ -57,6 +60,7 @@
 
   // Load sentiment analysis data from database service
   async function loadSentimentData() {
+    loadFailed = false;
     try {
       // Load all sentiment data from database service
       const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
@@ -83,7 +87,11 @@
       }
     } catch (error) {
       console.error('Error loading sentiment data:', error);
-      // No fallback - sentiment analysis requires database connection
+      // No fallback - sentiment analysis requires database connection. Clear the numbers so a failed reload
+      // does not leave the previous filter's figures on screen as if they were current.
+      loadFailed = true;
+      sentimentStats = emptySentimentStats();
+      totalPosts = 0;
       loading = false;
     }
   }
@@ -406,7 +414,12 @@
       </div>
     {:else}
 
-    {#if sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
+    {#if loadFailed}
+      <div role="alert" class="mb-6 rounded-xl border border-danger-200 bg-danger-50 px-6 py-5">
+        <p class="font-medium text-ink-900">We could not load sentiment data.</p>
+        <p class="mt-1 text-sm text-ink-700">Check that the database is running, then change a filter or reload the page to try again.</p>
+      </div>
+    {:else if sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
       <div role="status" class="mb-6 rounded-xl border border-ink-200 bg-white px-6 py-5">
         <p class="font-medium text-ink-900">No posts match these filters.</p>
         <p class="mt-1 text-sm text-ink-600">Try a wider date range, or turn on more sources in the bar above.</p>
