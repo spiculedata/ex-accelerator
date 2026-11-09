@@ -1,0 +1,79 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const query = vi.hoisted(() => vi.fn());
+
+vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
+vi.mock('$lib/utils/logger', () => ({ createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }));
+
+import { GET } from './+server';
+
+const call = (search = '') => GET({ url: new URL(`http://localhost/api/posts${search}`) } as unknown as Parameters<typeof GET>[0]);
+
+const row = (id: number, total = 3) => ({
+  id, text: `post ${id}`, platform: 'telegram', author: 'a', created_at: '2026-11-09T10:00:00.000Z',
+  sentiment_category: 'Negative', confidence_score: '0.91', engagement_likes: 5, engagement_shares: 1, engagement_comments: 2, total: String(total)
+});
+
+beforeEach(() => {
+  query.mockReset();
+  query.mockResolvedValue([row(1), row(2), row(3)]);
+});
+
+describe('GET /api/posts', () => {
+  it('returns the posts with the total number that match and the page that was asked for', async () => {
+    const body = await (await call('?topic=topic-transit&limit=2&offset=0')).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.total).toBe(3);
+    expect(body.data.limit).toBe(2);
+    expect(body.data.offset).toBe(0);
+    expect(body.data.posts).toHaveLength(3);
+    expect(body.data.posts[0]).toMatchObject({ id: 1, text: 'post 1', platform: 'telegram', confidence: 0.91 });
+    expect(body.data.posts[0]).not.toHaveProperty('total');
+  });
+
+  it('passes the filters to the query as parameters', async () => {
+    await call('?hashtag=TramDelays&sentiment=Negative&platforms=telegram,youtube&date_start=2026-11-02');
+
+    const [sql, params] = query.mock.calls[0];
+    expect(String(sql)).toContain('posts_with_sentiment');
+    expect(params).toContain('negative');
+    expect(params).toContainEqual(['telegram', 'youtube']);
+    expect(params).toContain(Date.UTC(2026, 10, 2));
+  });
+
+  it('returns zero posts and a zero total when nothing matches', async () => {
+    query.mockResolvedValue([]);
+
+    const body = await (await call('?q=nothing')).json();
+
+    expect(body.data).toMatchObject({ posts: [], total: 0 });
+  });
+
+  it.each([['?topic=a%20b'], ['?hashtag=a%20b'], ['?date_end=nope'], ['?limit=abc'], ['?offset=-2']])('answers 400 for invalid input %s without touching the database', async (search) => {
+    const response = await call(search);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).success).toBe(false);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('flags the result unavailable when the posts view does not exist yet', async () => {
+    query.mockRejectedValue(Object.assign(new Error('relation "posts_with_sentiment" does not exist'), { code: '42P01' }));
+
+    const response = await call();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ success: true, data: { posts: [], total: 0 }, meta: { unavailable: true } });
+  });
+
+  it('returns a generic 500 without leaking the database error', async () => {
+    query.mockRejectedValue(new Error('password authentication failed for user postgres'));
+
+    const response = await call();
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain('password');
+  });
+});

@@ -1,5 +1,9 @@
 <script lang="ts">
+  // The posts behind a number: set when a topic, tag, phrase or segment is chosen
+  let drilldown: { title: string; filters: PostFilters } | null = null;
   import { page } from '$app/stores';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -267,7 +271,7 @@
                   <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-3">
                       <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">#{i + 1}</span>
-                      <h3 class="text-lg font-semibold text-gray-900">"{trigram.trigram}"</h3>
+                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: { q: trigram.trigram } })}>"{trigram.trigram}"</button></h3>
                     </div>
                     <div class="flex items-center space-x-2">
                       <svg class="w-4 h-4 {getTrendColor(trigram.trend)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,3 +381,5 @@
     </div>
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
@@ -43,6 +45,8 @@
   let sentimentStats: any = emptySentimentStats();
   // A failed load is not the same as an empty range, so the two are told apart in the page
   let loadFailed = false;
+  // The posts behind a number: set when a topic, tag, phrase or segment is chosen
+  let drilldown: { title: string; filters: PostFilters } | null = null;
 
   let totalPosts = 0;
 
@@ -253,6 +257,11 @@
     };
 
     sentimentChart.setOption(option);
+    // Clicking a segment opens the posts behind it
+    sentimentChart.off('click');
+    sentimentChart.on('click', (params: { name?: string }) => {
+      if (params?.name) drilldown = { title: `${params.name} posts`, filters: { sentiment: params.name, ...filtersFromParams(currentFilterParams) } };
+    });
   }
 
   function updateEmotionChart() {
@@ -565,3 +574,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />
