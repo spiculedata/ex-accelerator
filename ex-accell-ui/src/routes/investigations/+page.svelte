@@ -52,7 +52,18 @@
     }
   }
 
+  // "Show all" drops ?workspace=, which is a same-page navigation: reload the list and the name when it changes
+  let loadedWorkspace: number | null | undefined;
+  $: if (mounted && workspaceId !== loadedWorkspace) {
+    loadedWorkspace = workspaceId;
+    void loadWorkspaceName(workspaceId);
+    void loadInvestigations();
+  }
+
+  let mounted = false;
   onMount(async () => {
+    mounted = true;
+    loadedWorkspace = workspaceId;
     await loadWorkspaceName(workspaceId);
     await loadInvestigations();
     if (workspaceId) {

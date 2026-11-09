@@ -148,6 +148,9 @@
   }
 
   function openAddSourceModal() {
+    // A fresh dialog starts clean: no old error, and the earlier confirmation has done its job
+    linkError = '';
+    linkNotice = '';
     showAddSourceModal = true;
   }
 
@@ -393,7 +396,7 @@
           <span class="text-lg font-bold text-emerald-600">{formatNumber(dataStats.totalRecordsCapture)}</span>
         </button>
         <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
-        <button on:click={() => activeTab = 'workflows'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'workflows' ? 'bg-blue-50' : ''}">
+        <button on:click={() => { activeTab = 'workflows'; linkNotice = ''; }} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors {activeTab === 'workflows' ? 'bg-blue-50' : ''}">
           <span class="text-2xl mb-1">⚙️</span>
           <span class="text-xs font-medium text-gray-700">Workflows</span>
           <span class="text-lg font-bold text-purple-600">{workflows.length}</span>
@@ -693,7 +696,7 @@
       {#if previewDataset.source_platform}<dt class="text-ink-500">Platform</dt><dd class="col-span-2 text-ink-900">{previewDataset.source_platform}</dd>{/if}
       <dt class="text-ink-500">Records</dt><dd class="col-span-2 text-ink-900">{formatNumber(parseInt(String(previewDataset.record_count)) || previewDataset.records || 0)}</dd>
       {#if previewDataset.date_range_start}<dt class="text-ink-500">Date range</dt><dd class="col-span-2 text-ink-900">{String(previewDataset.date_range_start).slice(0, 10)} to {String(previewDataset.date_range_end ?? '').slice(0, 10)}</dd>{/if}
-      <dt class="text-ink-500">Status</dt><dd class="col-span-2 text-ink-900">{previewDataset.status}</dd>
+      <dt class="text-ink-500">{previewDataset.workspace_id ? 'Link status' : 'Status'}</dt><dd class="col-span-2 text-ink-900">{previewDataset.status}</dd>
     </dl>
   {/if}
   <svelte:fragment slot="footer">
