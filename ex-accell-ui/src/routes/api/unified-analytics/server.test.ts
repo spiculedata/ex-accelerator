@@ -20,8 +20,8 @@ vi.mock('$lib/utils/logger', () => ({
 import { GET } from './+server';
 import { WORKFLOW_DATASET_COUNT_QUERIES } from '$lib/server/workflowDatasets';
 
-const call = (type: string) =>
-  GET({ url: new URL(`http://localhost/api/unified-analytics?type=${type}`) } as Parameters<typeof GET>[0]);
+const call = (type: string, query = '') =>
+  GET({ url: new URL(`http://localhost/api/unified-analytics?type=${type}${query}`) } as Parameters<typeof GET>[0]);
 
 beforeEach(() => {
   duckdbQuery.mockReset();
@@ -430,5 +430,32 @@ describe('GET /api/unified-analytics investigation-timeline', () => {
     const sql = timelineSql();
     expect(sql).toContain('FROM gdelt_events');
     expect(sql).toContain('FROM radio_transcripts');
+  });
+});
+
+describe('GET /api/unified-analytics date filters for cross-platform sentiment', () => {
+  it('compares the epoch-millisecond timestamp column with epoch milliseconds, not ISO strings', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('cross-platform-sentiment', '&date_start=2026-11-02&date_end=2026-11-09');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('timestamp >=');
+    expect(params).toEqual([Date.UTC(2026, 10, 2), Date.UTC(2026, 10, 9, 23, 59, 59, 999)]);
+  });
+
+  it('rejects an invalid date with a 400 instead of failing in the database', async () => {
+    const response = await call('cross-platform-sentiment', '&date_start=yesterday');
+
+    expect(response.status).toBe(400);
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('still works with no dates', async () => {
+    duckdbQuery.mockResolvedValue([{ sentiment_category: 'Negative', post_count: '5', avg_confidence: '0.9', platform: 'x' }]);
+
+    const body = await (await call('cross-platform-sentiment')).json();
+
+    expect(body.success).toBe(true);
   });
 });

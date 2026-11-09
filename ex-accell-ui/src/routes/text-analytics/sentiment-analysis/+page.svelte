@@ -406,6 +406,13 @@
       </div>
     {:else}
 
+    {#if sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
+      <div role="status" class="mb-6 rounded-xl border border-ink-200 bg-white px-6 py-5">
+        <p class="font-medium text-ink-900">No posts match these filters.</p>
+        <p class="mt-1 text-sm text-ink-600">Try a wider date range, or turn on more sources in the bar above.</p>
+      </div>
+    {/if}
+
     <!-- Overview Stats. The large figures use the darker very-positive and very-negative tones: the lighter ones fall below 3:1 on white. -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">

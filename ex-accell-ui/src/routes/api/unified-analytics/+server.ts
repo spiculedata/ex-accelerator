@@ -9,6 +9,7 @@ import { languageQueries } from '$lib/server/languageQueries';
 import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
 import { computeTrigrams } from '$lib/server/trigrams';
+import { dateBoundToEpochMs } from '$lib/server/dateBounds';
 import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
@@ -192,17 +193,20 @@ export const GET: RequestHandler = async ({ url }) => {
           }
         }
 
-        // Date range filter
+        // Date range filter: the timestamp column is epoch milliseconds, so bounds are converted
         const dateStart = url.searchParams.get('date_start');
         const dateEnd = url.searchParams.get('date_end');
-        if (dateStart) {
-          conditions.push(`timestamp >= $${paramIndex}`);
-          params.push(dateStart);
-          paramIndex++;
-        }
-        if (dateEnd) {
-          conditions.push(`timestamp <= $${paramIndex}`);
-          params.push(dateEnd);
+        for (const [name, value, bound, op] of [
+          ['date_start', dateStart, 'start', '>='],
+          ['date_end', dateEnd, 'end', '<=']
+        ] as const) {
+          if (!value) continue;
+          const epochMs = dateBoundToEpochMs(value, bound);
+          if (epochMs === null) {
+            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp` }, { status: 400 });
+          }
+          conditions.push(`timestamp ${op} $${paramIndex}`);
+          params.push(epochMs);
           paramIndex++;
         }
 
