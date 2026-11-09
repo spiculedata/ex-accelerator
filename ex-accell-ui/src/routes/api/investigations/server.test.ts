@@ -83,7 +83,7 @@ describe('POST /api/investigations', () => {
 
 describe('POST /api/investigations date range', () => {
   it.each([
-    [{ date_start: '2026-10-01', date_end: '2026-09-01' }, 'before'],
+    [{ date_start: '2026-10-01', date_end: '2026-09-01' }, 'on or before'],
     [{ date_start: 'tomorrow' }, 'date_start'],
     [{ date_end: '2026-02-30' }, 'date_end']
   ])('rejects %j', async (dates, mention) => {
@@ -93,6 +93,12 @@ describe('POST /api/investigations date range', () => {
     expect(response.status).toBe(400);
     expect(body.error).toContain(mention);
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO investigations'))).toBe(false);
+  });
+
+  it('applies the same rules to dates sent inside query_config', async () => {
+    const response = await call({ name: 'x', query_config: { keywords: [], dateStart: '2026-10-01', dateEnd: '2026-09-01' } });
+
+    expect(response.status).toBe(400);
   });
 
   it('accepts a valid range, an equal start and end, and blank dates', async () => {
