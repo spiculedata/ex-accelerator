@@ -1,9 +1,9 @@
 #!/bin/bash
-# Startup script for Ex-Accelerator UI with Jupyter integration
+# Startup script for Social Explorer UI with Jupyter integration
 
 cd "$(dirname "$0")/.."
 
-echo "🚀 Starting Ex-Accelerator UI with Jupyter Lab..."
+echo "🚀 Starting Social Explorer UI with Jupyter Lab..."
 
 # Install dependencies first
 echo "📦 Installing Python dependencies..."

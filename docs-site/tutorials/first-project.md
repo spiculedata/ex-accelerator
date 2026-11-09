@@ -39,7 +39,7 @@ Choose **+ New Workspace**.
 The records and sources counters on the project and workspace pages count data sources added through
 *Data Capture*. Datasets you link here do their work somewhere else: they decide which posts the
 dashboards show. The next step proves it. (Making these counters include linked datasets is tracked in
-[#102](https://github.com/spiculedata/ex-accelerator/issues/102).)
+[#102](https://github.com/spiculedata/social-explorer/issues/102).)
 :::
 
 If a dataset cannot be added, a notice under the workspaces heading says so and why. Administrators

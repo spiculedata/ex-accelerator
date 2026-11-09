@@ -1,4 +1,4 @@
-# Contributing to ex-accelerator
+# Contributing to Social Explorer
 
 Thanks for helping out! This guide covers setup, conventions and the pull request process.
 By participating you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -87,7 +87,7 @@ dependencies change.
 
 ## Licensing
 
-ex-accelerator is licensed under the [Apache License 2.0](LICENSE). By submitting a contribution
+Social Explorer is licensed under the [Apache License 2.0](LICENSE). By submitting a contribution
 you agree it is licensed under the same terms (section 5 of the license). Files under `wavepulse/`
 derive from third-party work; keep their copyright headers and modification notices intact.
 

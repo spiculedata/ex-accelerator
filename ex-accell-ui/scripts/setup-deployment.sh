@@ -1,7 +1,7 @@
 #!/bin/bash
-# Setup script for Ex-Accelerator Dapr Deployment with Telegram Scraper
+# Setup script for Social Explorer Dapr Deployment with Telegram Scraper
 
-echo "🚀 Setting up Ex-Accelerator Dapr deployment..."
+echo "🚀 Setting up Social Explorer Dapr deployment..."
 
 # Set paths
 # Crawler checkout; override with TELEGRAM_SCRAPER_PATH=/path/to/crawler

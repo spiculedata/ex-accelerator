@@ -1,6 +1,6 @@
-# ex-accelerator
+# Social Explorer
 
-[![Tests](https://github.com/spiculedata/ex-accelerator/actions/workflows/test.yml/badge.svg)](https://github.com/spiculedata/ex-accelerator/actions/workflows/test.yml)
+[![Tests](https://github.com/spiculedata/social-explorer/actions/workflows/test.yml/badge.svg)](https://github.com/spiculedata/social-explorer/actions/workflows/test.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A social media research platform: collect posts from several platforms, load them into one
@@ -51,8 +51,8 @@ flowchart LR
 You need [Docker](https://docs.docker.com/get-docker/) with Compose v2.
 
 ```bash
-git clone https://github.com/spiculedata/ex-accelerator.git
-cd ex-accelerator
+git clone https://github.com/spiculedata/social-explorer.git
+cd social-explorer
 
 cp .env.example .env
 # Edit .env: set SESSION_SECRET (openssl rand -hex 32), ADMIN_PASSWORD (12+ characters)
@@ -98,7 +98,7 @@ set of checks and commit conventions.
 
 ## Documentation
 
-- Documentation site: <https://spiculedata.github.io/ex-accelerator/> (published once the project is public)
+- Documentation site: <https://spiculedata.github.io/social-explorer/>
 - Source for the site lives in [`docs-site/`](docs-site); run `npm run docs:dev` inside it to preview.
 
 ## Security

@@ -1,6 +1,6 @@
 # Documentation Directory
 
-This directory contains organized documentation for the ex-accelerator UI project.
+This directory contains organized documentation for the Social Explorer UI project.
 
 ## Structure
 

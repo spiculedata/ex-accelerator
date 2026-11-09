@@ -166,7 +166,7 @@ export function buildWiki(docsDir, outputDir) {
   writeFileSync(join(outputDir, '_Sidebar.md'), buildSidebar(readFileSync(join(docsDir, '.vitepress', 'config.ts'), 'utf8')));
   writeFileSync(
     join(outputDir, '_Footer.md'),
-    'This wiki is generated from [`docs-site/`](https://github.com/spiculedata/ex-accelerator/tree/main/docs-site). Edit the docs there; changes made here are overwritten.\n'
+    'This wiki is generated from [`docs-site/`](https://github.com/spiculedata/social-explorer/tree/main/docs-site). Edit the docs there; changes made here are overwritten.\n'
   );
 
   const screenshots = join(docsDir, 'public', 'screenshots');

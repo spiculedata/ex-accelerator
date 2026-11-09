@@ -1,4 +1,4 @@
-# NOTE: This file was added by ex-accelerator contributors and is not part of upstream
+# NOTE: This file was added by Social Explorer contributors and is not part of upstream
 # NYU-DICE-Lab/WavePulse (Apache-2.0). It is distributed with that derived work; see NOTICE and README.md.
 """
 Configurable transcription backends for WavePulse.

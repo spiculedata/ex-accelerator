@@ -295,7 +295,7 @@ def warn_about_legacy_global_config():
 
 def main():
     """Main bootstrap function"""
-    print("🏗️  Bootstrapping Jupyter notebook environment for Ex-Accelerator UI")
+    print("🏗️  Bootstrapping Jupyter notebook environment for Social Explorer UI")
     print("=" * 60)
     
     try:

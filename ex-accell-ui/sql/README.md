@@ -4,7 +4,7 @@
 > sign-in (see the data model docs). The files here are reference material from earlier
 > DuckDB-based work; several are DuckDB-dialect and do not apply to PostgreSQL unchanged.
 
-This directory contains all SQL-related files for the ex-accelerator UI project.
+This directory contains all SQL-related files for the Social Explorer UI project.
 
 ## Contents
 

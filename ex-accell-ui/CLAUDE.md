@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Guidance for Claude Code (and humans) working in `ex-accell-ui/`, the web app of the
-ex-accelerator monorepo. See the root `README.md` and `CONTRIBUTING.md` for the wider project.
+Social Explorer monorepo. See the root `README.md` and `CONTRIBUTING.md` for the wider project.
 
 ## Stack
 

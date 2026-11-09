@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: ex-accelerator
+  name: Social Explorer
   text: Social media analytics, end to end
   tagline: Collect data from social platforms, analyse sentiment, topics and language, and investigate what you find, in one open-source platform.
   actions:
@@ -14,7 +14,7 @@ hero:
       link: /architecture/overview
     - theme: alt
       text: View on GitHub
-      link: https://github.com/spiculedata/ex-accelerator
+      link: https://github.com/spiculedata/social-explorer
 
 features:
   - title: Collect

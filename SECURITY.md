@@ -5,7 +5,7 @@
 **Please do not open a public issue for security problems.**
 
 Report privately through GitHub: go to the repository's **Security** tab and choose
-**Report a vulnerability** (<https://github.com/spiculedata/ex-accelerator/security/advisories/new>).
+**Report a vulnerability** (<https://github.com/spiculedata/social-explorer/security/advisories/new>).
 
 Include what you found, how to reproduce it, and the impact you expect. We will acknowledge
 your report as soon as we can, keep you updated while we investigate, and credit you in the
@@ -17,7 +17,7 @@ The project is pre-1.0. Security fixes are made on the `main` branch only.
 
 ## Deployment hardening
 
-If you run ex-accelerator yourself:
+If you run Social Explorer yourself:
 
 - **Set `SESSION_SECRET`** to a random value of at least 32 characters (`openssl rand -hex 32`).
   Production refuses to start without it.
