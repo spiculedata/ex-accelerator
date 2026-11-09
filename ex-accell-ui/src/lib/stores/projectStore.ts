@@ -23,48 +23,51 @@ export const currentProject = writable<Project | null>(null);
 // A one-line explanation shown when the project had to change by itself (for example a saved project was deleted)
 export const projectNotice = writable<string | null>(null);
 
-// Whether the last project lookup reached the server and found nothing, or could not reach it at all
-let lastLookup: 'found' | 'missing' | 'unreachable' = 'found';
+type Lookup = { status: 'found'; project: Project } | { status: 'missing' } | { status: 'unreachable' };
+
+// Only an answer that says "there is no such project" counts as missing. A failed request, a server error or an
+// expired session says nothing about the project, so it must never be taken as a reason to forget the selection.
+async function lookupProject(projectId: string): Promise<Lookup> {
+  try {
+    const response = await fetch(`/api/projects?id=${projectId}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) return { status: 'unreachable' };
+    if (!result.project) return { status: 'missing' };
+
+    // Normalize the project data from database schema
+    const project: Project = {
+      id: result.project.id.toString(),
+      name: result.project.name,
+      description: result.project.description || '',
+      type: result.project.project_type || 'general',
+      status: result.project.status || 'active',
+      createdAt: result.project.created_at || new Date().toISOString(),
+      updatedAt: result.project.updated_at || new Date().toISOString(),
+      dataSources: [], // TODO: Load from workspace data sources
+      totalPosts: result.project.total_data_sources || 0,
+      teamMembers: result.project.member_count ? Array(result.project.member_count).fill('member') : [],
+      owner: result.project.created_by || ''
+    };
+    return { status: 'found', project };
+  } catch (error) {
+    console.error('Error loading project:', error);
+    return { status: 'unreachable' };
+  }
+}
+
+function openProject(project: Project): void {
+  currentProject.set(project);
+  // Persist to localStorage
+  localStorage.setItem('currentProject', project.id);
+}
 
 // Function to set the current project
 export async function setCurrentProject(projectId: string): Promise<boolean> {
-  if (typeof window !== 'undefined') {
-    try {
-      // Fetch project details from API
-      const response = await fetch(`/api/projects?id=${projectId}`);
-      const result = await response.json();
-
-      if (result.success && result.project) {
-        // Normalize the project data from database schema
-        const project: Project = {
-          id: result.project.id.toString(),
-          name: result.project.name,
-          description: result.project.description || '',
-          type: result.project.project_type || 'general',
-          status: result.project.status || 'active',
-          createdAt: result.project.created_at || new Date().toISOString(),
-          updatedAt: result.project.updated_at || new Date().toISOString(),
-          dataSources: [], // TODO: Load from workspace data sources
-          totalPosts: result.project.total_data_sources || 0,
-          teamMembers: result.project.member_count ? Array(result.project.member_count).fill('member') : [],
-          owner: result.project.created_by || ''
-        };
-
-        currentProject.set(project);
-        // Persist to localStorage
-        localStorage.setItem('currentProject', projectId);
-        lastLookup = 'found';
-        return true;
-      }
-      lastLookup = 'missing';
-      return false;
-    } catch (error) {
-      console.error('Error loading project:', error);
-      lastLookup = 'unreachable';
-      return false;
-    }
-  }
-  return false;
+  if (typeof window === 'undefined') return false;
+  const found = await lookupProject(projectId);
+  if (found.status !== 'found') return false;
+  openProject(found.project);
+  return true;
 }
 
 // Function to load project from localStorage on app init
@@ -74,14 +77,18 @@ export async function loadCurrentProject(): Promise<boolean> {
 
   const savedProjectId = localStorage.getItem('currentProject');
   if (savedProjectId) {
-    if (await setCurrentProject(savedProjectId)) return true;
-    // Only a project the server says is gone is stale; a failed request must not change anything
-    if (lastLookup !== 'missing') return false;
+    // An id that is not a number can never match a project
+    const found: Lookup = /^\d+$/.test(savedProjectId) ? await lookupProject(savedProjectId) : { status: 'missing' };
+    if (found.status === 'found') {
+      openProject(found.project);
+      return true;
+    }
+    if (found.status === 'unreachable') return false;
     localStorage.removeItem('currentProject');
   }
 
   const selected = await selectFirstProject();
-  if (selected && savedProjectId) {
+  if (selected !== null && savedProjectId) {
     projectNotice.set(`Your previously selected project is no longer available, so ${selected} is open instead.`);
   }
   return selected !== null;

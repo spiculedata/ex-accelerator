@@ -8,7 +8,8 @@
   import { projectNotice } from '$lib/stores/projectStore';
 
   // Failures belong to the page that requested the data; don't carry them to the next one
-  beforeNavigate(() => dismissApiErrors());
+  // A notice about the project has been seen by the time the visitor moves on
+  beforeNavigate(() => { dismissApiErrors(); projectNotice.set(null); });
 
   // Hide nav on full-screen investigation workbench and the login page
   $: isFullScreen = $page.url.pathname.match(/^\/investigations\/\d+/) || $page.url.pathname === '/login';
@@ -21,11 +22,14 @@
 
 <main id="main-content">
   {#if !isFullScreen}<ApiErrorBanner />{/if}
-  {#if !isFullScreen && $projectNotice}
-    <div role="status" class="mx-auto mt-4 flex max-w-7xl items-start justify-between gap-3 rounded-lg border border-signal-300 bg-signal-50 px-4 py-3 text-sm text-ink-900">
-      <p>{$projectNotice}</p>
-      <button type="button" class="shrink-0 font-medium text-primary-700 hover:underline" on:click={() => projectNotice.set(null)}>Dismiss</button>
-    </div>
-  {/if}
+  <!-- The live region is always present so a notice added later is announced -->
+  <div role="status" aria-live="polite">
+    {#if !isFullScreen && $projectNotice}
+      <div class="mx-auto mt-4 flex max-w-7xl items-start justify-between gap-3 rounded-lg border border-signal-300 bg-signal-50 px-4 py-3 text-sm text-ink-900">
+        <p>{$projectNotice}</p>
+        <button type="button" class="shrink-0 font-medium text-primary-700 hover:underline" on:click={() => projectNotice.set(null)}>Dismiss</button>
+      </div>
+    {/if}
+  </div>
   <slot />
 </main>

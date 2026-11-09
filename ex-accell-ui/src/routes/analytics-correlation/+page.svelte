@@ -323,13 +323,13 @@
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <h2 class="text-sm font-bold text-ink-900">Do sentiments rise and fall together?</h2>
         <p class="mt-1 text-xs text-ink-600">
-          Correlation of daily post counts by sentiment over the last 30 days. +1 means two sentiments rise and fall on the same days,
+          Correlation of the daily post counts by sentiment, on days with posts in the last 30 days. +1 means two sentiments rise and fall on the same days,
           -1 means one rises as the other falls, and 0 means no pattern. When overall volume drives the numbers all three move together; values near 0 mean no clear pattern.
         </p>
         {#if hasMatrix}
           <div id="corr-matrix" class="w-full h-64"></div>
         {:else}
-          <p class="py-16 text-center text-sm text-ink-500">Not enough days with data to compare sentiments yet. At least three days are needed.</p>
+          <p class="py-16 text-center text-sm text-ink-500">Not enough variation to compare sentiments yet. At least three days with different counts are needed.</p>
         {/if}
       </div>
     </div>

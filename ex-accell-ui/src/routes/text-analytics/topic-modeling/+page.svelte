@@ -180,8 +180,9 @@
   const NETWORK_COLOURS = ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'];
   const LABEL_LIMIT = 14;
   // A category has the same colour in the network, the treemap and the legend
-  // The order is the sorted names, so it cannot differ between the two charts
-  $: categoryOrder = [...new Set(topicsData.map(topic => topic.category).filter(Boolean))].sort();
+  // The order is the sorted names of every category, not just those left after a filter, so a category keeps its
+  // colour when the filters change and cannot differ between the two charts
+  $: categoryOrder = [...new Set([...topicCategories.map(cat => cat.category), ...topicsData.map(topic => topic.category)].filter(Boolean))].sort();
   const colourOfCategory = (name: string) => NETWORK_COLOURS[Math.max(0, categoryOrder.indexOf(name)) % NETWORK_COLOURS.length];
   const colourByCategory = (nodes: any[]) =>
     nodes.map(group => ({ ...group, children: group.children?.map((topic: any) => ({ ...topic, itemStyle: { ...topic.itemStyle, color: colourOfCategory(group.name) } })) }));
