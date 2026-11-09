@@ -2,6 +2,7 @@
 // CRUD operations for investigation configurations
 
 import { json } from '@sveltejs/kit';
+import { validateDayRange } from '$lib/utils/calendarDay';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 
@@ -88,6 +89,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     if (!data.name) {
       return json({ success: false, error: 'name is required' }, { status: 400 });
+    }
+
+    // The date range is optional, but when given it must be real days with the start not after the end.
+    // It can arrive as flat fields or inside query_config, so both are checked.
+    const rangeProblem = validateDayRange(data.date_start, data.date_end) ?? validateDayRange(data.query_config?.dateStart, data.query_config?.dateEnd);
+    if (rangeProblem) {
+      return json({ success: false, error: rangeProblem }, { status: 400 });
     }
 
     // workspace_id is optional, but when present it must name an existing workspace

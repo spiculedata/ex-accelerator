@@ -83,7 +83,6 @@ class ProjectsDatabase {
     description: string;
     project_type: string;
     created_by: string;
-    data_sources?: string[];
     team_members?: string[];
   }): Promise<Project | null> {
     try {
