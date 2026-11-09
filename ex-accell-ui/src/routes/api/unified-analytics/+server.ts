@@ -648,14 +648,16 @@ export const GET: RequestHandler = async ({ url }) => {
 
         const data = await executeQuery(`
           SELECT
-            topic1_id,
-            topic2_id,
-            similarity_score,
-            relationship_type,
-            strength
-          FROM topic_relationships
-          WHERE similarity_score >= $1
-          ORDER BY similarity_score DESC
+            t1.topic_id AS topic1_id,
+            t2.topic_id AS topic2_id,
+            tr.similarity_score,
+            tr.relationship_type,
+            tr.strength
+          FROM topic_relationships tr
+          JOIN topics t1 ON t1.id = tr.topic1_id
+          JOIN topics t2 ON t2.id = tr.topic2_id
+          WHERE tr.similarity_score >= $1
+          ORDER BY tr.similarity_score DESC
         `, [safeThreshold]);
 
         return json({ success: true, data: data || [] });

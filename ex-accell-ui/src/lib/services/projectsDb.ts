@@ -73,8 +73,9 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Project>('SELECT * FROM project_overview WHERE id = $1', [id]);
       return rows[0] || null;
     } catch (error) {
+      // A failed query is not "no such project": let the route answer 500 so callers do not treat it as deleted
       console.error('Error fetching project:', error);
-      return null;
+      throw error;
     }
   }
 
