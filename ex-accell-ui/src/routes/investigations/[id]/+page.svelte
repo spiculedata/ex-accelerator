@@ -683,8 +683,12 @@
   }
 
   // Leaving the page with notes that are unsaved, or whose save failed, would lose them
-  beforeNavigate(({ cancel }) => {
-    if ((unsaved || saveStatus === 'error') && !confirm('Your latest notes have not been saved. Leave this page anyway?')) cancel();
+  // Closing the tab or going to another site ('leave') cannot show our own dialog, so cancelling lets the
+  // browser ask; in-app navigation can ask here. An unsaved list already covers a failed save.
+  beforeNavigate(({ cancel, type }) => {
+    if (!unsaved) return;
+    if (type === 'leave') cancel();
+    else if (!confirm('Your latest notes have not been saved. Leave this page anyway?')) cancel();
   });
 
   async function handleExport() {

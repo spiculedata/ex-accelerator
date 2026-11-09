@@ -169,15 +169,15 @@ export const PATCH: RequestHandler = async ({ request }) => {
       if (!Array.isArray(decoded)) {
         return json({ success: false, error: 'annotations must be a list of notes' }, { status: 400 });
       }
+      data.annotations = decoded; // decoded once; the loop below only encodes
     }
 
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
         // JSON columns are encoded exactly once. Older clients sent annotations already stringified,
         // which stored a JSON string inside the JSON column, so a string is decoded first.
-        const raw = field === 'annotations' && typeof data[field] === 'string' ? safeJsonParse(data[field]) : data[field];
         const value = ['query_config', 'layout_config', 'pinned_views', 'annotations'].includes(field)
-          ? JSON.stringify(raw)
+          ? JSON.stringify(data[field])
           : data[field];
         setClauses.push(`${field} = $${paramIndex}`);
         params.push(value);
