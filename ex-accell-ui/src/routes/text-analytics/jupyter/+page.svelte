@@ -3,6 +3,7 @@
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
+  import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
   
   // Redirect to projects if no current project
   onMount(() => {
@@ -171,18 +172,20 @@
             <p class="text-gray-600 mb-6 max-w-md">Jupyter Lab server is not currently running. Please start it to access the interactive Python environment.</p>
             
             <div class="space-y-4">
-              <div class="bg-gray-100 rounded-xl p-4 text-left max-w-lg mx-auto">
-                <p class="font-medium text-gray-900 mb-2">Start Jupyter Lab:</p>
-                <code class="block bg-gray-900 text-blue-400 p-3 rounded text-sm font-mono">
-                  npm run jupyter:start
-                </code>
-              </div>
-              
-              <div class="bg-gray-100 rounded-xl p-4 text-left max-w-lg mx-auto">
-                <p class="font-medium text-gray-900 mb-2">Or start full development environment:</p>
-                <code class="block bg-gray-900 text-blue-400 p-3 rounded text-sm font-mono">
-                  npm run dev:jupyter
-                </code>
+              <div class="max-w-lg mx-auto text-left space-y-3">
+                <div>
+                  <p class="mb-1 font-medium text-ink-900">1. First time only: set Jupyter up</p>
+                  <CopyCommand command="npm run jupyter:bootstrap" />
+                </div>
+                <div>
+                  <p class="mb-1 font-medium text-ink-900">2. Start it</p>
+                  <CopyCommand command="npm run jupyter:start" />
+                </div>
+                <p class="text-sm text-ink-600">
+                  Or use the Start Jupyter Lab button on the
+                  <a class="text-primary-700 underline" href="/text-analytics/research-investigation">Research page</a>.
+                  See the <a class="text-primary-700 underline" href="https://spiculedata.github.io/social-explorer/tutorials/jupyter" target="_blank" rel="noopener">Jupyter guide</a>.
+                </p>
               </div>
             </div>
             

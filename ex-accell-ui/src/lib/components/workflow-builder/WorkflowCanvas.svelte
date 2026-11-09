@@ -294,7 +294,7 @@
       <!-- Status Indicator -->
       <div class="mt-2 text-center">
         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {getStatusColor(step.status)}">
-          {step.status}
+          {step.status === 'needs-setup' ? 'needs setup' : step.status}
         </span>
       </div>
     </div>

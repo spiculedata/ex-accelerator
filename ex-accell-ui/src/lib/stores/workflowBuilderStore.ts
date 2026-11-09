@@ -6,6 +6,7 @@
  */
 
 import { writable, derived, type Readable } from 'svelte/store';
+import { stepStatus } from '$lib/utils/workflowSteps';
 
 // ===================================================================
 // Type Definitions
@@ -22,7 +23,7 @@ export interface WorkflowStep {
   outputs: string[];
   config: Record<string, any>;
   position: { x: number; y: number };
-  status: 'configured' | 'running' | 'completed' | 'error';
+  status: 'configured' | 'needs-setup' | 'running' | 'completed' | 'error';
 }
 
 export interface WorkflowConnection {
@@ -74,6 +75,11 @@ export interface Dataset {
 // ===================================================================
 // Store Creation
 // ===================================================================
+
+/** Keeps a step's ready/needs-setup status in step with its settings, leaving run states alone. */
+function withStatus(step: WorkflowStep): WorkflowStep {
+  return step.status === 'configured' || step.status === 'needs-setup' ? { ...step, status: stepStatus(step) } : step;
+}
 
 function createWorkflowBuilderStore() {
   const initialState: WorkflowBuilderState = {
@@ -143,7 +149,8 @@ function createWorkflowBuilderStore() {
     loadWorkflow(workflow: Workflow) {
       update(state => ({
         ...state,
-        workflow,
+        // A saved status can be out of date, so each step's readiness is worked out again from its settings
+        workflow: { ...workflow, steps: workflow.steps.map(withStatus) },
         selectedStep: null,
         selectedStepId: null,
         showStepConfig: false
@@ -169,8 +176,10 @@ function createWorkflowBuilderStore() {
         outputs: stepTemplate.outputs,
         config: { ...stepTemplate.config },
         position: { x: Math.max(0, x - 75), y: Math.max(0, y - 40) },
-        status: 'configured'
+        status: 'needs-setup'
       };
+      // Ready only once its required settings are filled in; a new step usually is not
+      newStep.status = stepStatus(newStep);
 
       update(state => ({
         ...state,
@@ -239,12 +248,12 @@ function createWorkflowBuilderStore() {
           ...state.workflow,
           steps: state.workflow.steps.map(step =>
             step.id === stepId
-              ? { ...step, config: { ...step.config, ...config } }
+              ? withStatus({ ...step, config: { ...step.config, ...config } })
               : step
           )
         },
         selectedStep: state.selectedStepId === stepId
-          ? { ...state.selectedStep!, config: { ...state.selectedStep!.config, ...config } }
+          ? withStatus({ ...state.selectedStep!, config: { ...state.selectedStep!.config, ...config } })
           : state.selectedStep
       }));
     },

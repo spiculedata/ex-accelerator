@@ -15,6 +15,7 @@
 
   import { goto } from '$app/navigation';
   import { workflowBuilder, type Dataset } from '$lib/stores/workflowBuilderStore';
+  import { setupProblems } from '$lib/utils/workflowSteps';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount, onDestroy } from 'svelte';
 
@@ -73,6 +74,10 @@
 
   // Subscribe to workflow state
   let workflow = $derived($workflowBuilder.workflow);
+
+  // Steps that are not ready yet; they block Generate, Publish and Run until finished
+  const problems = $derived(setupProblems(workflow.steps));
+  const blockedReason = $derived(workflow.steps.length === 0 ? 'Add a step first' : problems.length > 0 ? `Finish setting up: ${problems.join('; ')}` : '');
   let showCodeExport = $derived($workflowBuilder.showCodeExport);
   let showPublishDialog = $derived($workflowBuilder.showPublishDialog);
   let showExecuteDialog = $derived($workflowBuilder.showExecuteDialog);
@@ -433,7 +438,8 @@
           </button>
           <button
             onclick={generateDaprCode}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
@@ -442,7 +448,8 @@
           </button>
           <button
             onclick={publishWorkflow}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -451,7 +458,8 @@
           </button>
           <button
             onclick={runWorkflow}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-7-9h6M12 5V3"></path>
