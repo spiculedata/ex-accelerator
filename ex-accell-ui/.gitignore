@@ -46,3 +46,4 @@ scripts/populate_iran_data.sql
 
 # Project-local Jupyter config
 /.jupyter
+/.demo

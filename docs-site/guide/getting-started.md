@@ -2,6 +2,11 @@
 
 This page gets the web app running locally for development or evaluation.
 
+::: tip Just want to look around?
+`npm run demo` starts everything with sample data in one command. See
+[Try it with demo data](./demo-data#the-fastest-way).
+:::
+
 ::: tip What you need
 - **Node 22**
 - **Docker** (for PostgreSQL with the `pg_duckdb` extension)

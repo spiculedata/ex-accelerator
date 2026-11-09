@@ -46,9 +46,23 @@ flowchart LR
 | [`deploy/`](deploy), [`docker-compose.yml`](docker-compose.yml) | Dapr components and the compose stack |
 | [`docs-site/`](docs-site) | Documentation site source (VitePress) |
 
+## Try it in one command
+
+Needs Node 22 and Docker. This starts a throwaway database, loads synthetic demo data about a
+fictional city and runs the app on <http://localhost:5173>, reachable only from your machine:
+
+```bash
+git clone https://github.com/spiculedata/social-explorer.git
+cd social-explorer/ex-accell-ui
+npm run demo
+```
+
+The sign-in is printed in the terminal. `npm run demo -- --stop` stops the database and
+`npm run demo -- --reset` deletes it (then run `npm run demo` for a fresh one).
+
 ## Quickstart
 
-You need [Docker](https://docs.docker.com/get-docker/) with Compose v2.
+To run the full stack yourself, you need [Docker](https://docs.docker.com/get-docker/) with Compose v2.
 
 ```bash
 git clone https://github.com/spiculedata/social-explorer.git

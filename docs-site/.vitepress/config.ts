@@ -5,6 +5,13 @@ export default defineConfig({
   description: 'Open-source social media analytics platform for collecting, analysing and investigating online data.',
   base: '/social-explorer/',
   cleanUrls: true,
+  head: [
+    // og:title and og:description come from each page (the landing page sets its own in index.md)
+    ['meta', { property: 'og:type', content: 'website' }],
+    // Absolute URL: link previews need one. Forks or a custom domain should change it.
+    ['meta', { property: 'og:image', content: 'https://spiculedata.github.io/social-explorer/screenshots/sentiment-analysis.png' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
+  ],
   lastUpdated: true,
   themeConfig: {
     nav: [

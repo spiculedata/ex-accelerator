@@ -1,28 +1,39 @@
 ---
-layout: home
+layout: landing
+sidebar: false
+aside: false
+title: Social Explorer
+titleTemplate: Open-source social media analytics and investigation
+head:
+  - - meta
+    - property: og:title
+      content: 'Social Explorer: follow a story across social, news and radio'
+  - - meta
+    - property: og:description
+      content: Open-source platform that brings posts, news events and broadcasts into one database and scores them for sentiment, topics and language. Try it with one command.
 
 hero:
   name: Social Explorer
-  text: Social media analytics, end to end
-  tagline: Collect data from social platforms, analyse sentiment, topics and language, and investigate what you find, in one open-source platform.
+  text: Follow a story across social, news and radio
+  tagline: Social Explorer brings posts, news events and broadcasts into one database, scores them for sentiment, topics and language, and gives you a workbench to find out what is driving the conversation.
   actions:
     - theme: brand
-      text: Get started
-      link: /guide/getting-started
+      text: Try the demo
+      link: /guide/demo-data
     - theme: alt
-      text: Architecture
-      link: /architecture/overview
+      text: Read the docs
+      link: /guide/getting-started
     - theme: alt
       text: View on GitHub
       link: https://github.com/spiculedata/social-explorer
 
 features:
   - title: Collect
-    details: Schedule crawls of Telegram and YouTube, ingest GDELT and other datasets, and capture radio broadcasts with transcription.
+    details: Bring posts in from Telegram, YouTube and Bluesky, pull GDELT news events, load your own datasets and capture radio with transcription.
   - title: Analyse
-    details: Sentiment, topic modelling, language detection and engagement analytics, queried through PostgreSQL with the pg_duckdb analytical engine.
+    details: Sentiment, emotion, topics and language for every post, with engagement, hashtag and phrase analysis on top.
   - title: Investigate
-    details: Organise work into projects and workspaces, cross-filter dashboards, and build investigations across social posts, news events and radio segments.
+    details: Group work into projects and workspaces, then follow a keyword across social, news and radio on one timeline.
   - title: Research
-    details: Built-in Jupyter notebooks and workflow generation for repeatable analysis.
+    details: Built-in Jupyter notebooks, plus a visual workflow builder (early preview).
 ---
