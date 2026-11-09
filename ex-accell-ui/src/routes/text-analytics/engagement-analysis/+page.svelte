@@ -9,7 +9,7 @@
   import { onMount } from 'svelte';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { ErrorAlert } from '$lib/components/ui';
-  import { currentRangeQuery } from '$lib/utils/filterRange';
+  import { rangeReloader } from '$lib/utils/filterRange';
   import { getSentimentColor } from '$lib/utils/colorUtils';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
@@ -23,14 +23,10 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
-    // A new date range changes every figure on the page, so load them again
-    const range = JSON.stringify(currentRangeQuery());
-    if (!loading && range !== loadedRange) {
-      loadedRange = range;
-      loadEngagementAnalysisData();
-    }
+    // A new date range changes every figure on the page; the reloader makes sure the newest range wins
+    rangeSync.sync();
   }
-  let loadedRange = JSON.stringify(currentRangeQuery());
+  const rangeSync = rangeReloader(loadEngagementAnalysisData, () => loading);
   
   // Loading state
   let loading = true;
@@ -38,7 +34,9 @@
 
   onMount(async () => {
     // Load engagement analysis data from database
+    rangeSync.markLoaded();
     await loadEngagementAnalysisData();
+    await rangeSync.sync();
   });
 
   // Engagement analysis data - loaded from database
@@ -309,7 +307,7 @@
           name: c.type,
           value: c.engagementRate,
           itemStyle: {
-            color: getSentimentColor(c.sentiment === 'positive' ? 'positive' : 'neutral')
+            color: getSentimentColor(c.sentiment === 'mixed' ? 'neutral' : c.sentiment)
           }
         })),
         emphasis: {

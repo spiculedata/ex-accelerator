@@ -3,7 +3,7 @@ import { engagementQueries } from './engagementQueries';
 import { languageQueries } from './languageQueries';
 import { trigramPostsQuery } from './trigramQueries';
 
-const range = ['p.created_at >= $2', 'p.created_at <= $3'];
+const range = ['p.created_at >= $2', 'p.created_at < $3'];
 
 describe('date range conditions', () => {
   it('restrict every engagement query alongside the platform filter', () => {
@@ -15,7 +15,7 @@ describe('date range conditions', () => {
       engagementQueries.topPosts(true, '$4', range),
       engagementQueries.trends(true, 7, range)
     ]) {
-      expect(sql).toContain('ds.platform = ANY($1) AND p.created_at >= $2 AND p.created_at <= $3');
+      expect(sql).toContain('ds.platform = ANY($1) AND p.created_at >= $2 AND p.created_at < $3');
     }
   });
 

@@ -62,3 +62,32 @@ export function currentRangeQuery(): Record<string, string> {
   try { store = window.sessionStorage; } catch { /* blocked */ }
   return rangeQuery(readRange(new URLSearchParams(window.location.search), store));
 }
+
+/**
+ * Reloads a page's data when the date range changes. Changes made while a load is running are not lost: the loop
+ * runs again until the data matches the range last set, so the newest range always wins and loads never overlap.
+ */
+export function rangeReloader(load: () => Promise<void>, isBusy: () => boolean = () => false) {
+  let loaded = JSON.stringify(currentRangeQuery());
+  let running = false;
+  return {
+    /** Call just before the first load, so later changes are compared with the range that load used. */
+    markLoaded(): void {
+      loaded = JSON.stringify(currentRangeQuery());
+    },
+    async sync(): Promise<void> {
+      if (running || isBusy()) return;
+      running = true;
+      try {
+        for (;;) {
+          const wanted = JSON.stringify(currentRangeQuery());
+          if (wanted === loaded) return;
+          loaded = wanted;
+          await load();
+        }
+      } finally {
+        running = false;
+      }
+    }
+  };
+}

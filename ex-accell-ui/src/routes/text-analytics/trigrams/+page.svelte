@@ -10,7 +10,7 @@
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
   import { platformOptions } from '$lib/utils/platformOptions';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
-  import { currentRangeQuery } from '$lib/utils/filterRange';
+  import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
 
   // The phrase the visitor chose; its posts open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
@@ -43,8 +43,13 @@
   // Filtering
   let filteredTrigrams: TrigramData[] = [];
   
+  // A date change made while a load runs is picked up afterwards, and the newest range wins
+  const rangeSync = rangeReloader(loadTrigramsData, () => loading);
+
   onMount(async () => {
+    rangeSync.markLoaded();
     await loadTrigramsData();
+    await rangeSync.sync();
   });
 
   async function loadTrigramsData() {
@@ -182,7 +187,7 @@
 
   <!-- Dates: the same bar as the other analysis pages; with no dates set the last 7 days are analysed -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-    <FilterBar datesOnly compact on:change={() => { hasRange = Object.keys(currentRangeQuery()).length > 0; if (!loading) loadTrigramsData(); }} />
+    <FilterBar datesOnly compact on:change={() => { hasRange = Object.keys(currentRangeQuery()).length > 0; rangeSync.sync(); }} />
     {#if !hasRange}
       <p class="mt-2 text-xs text-ink-600">Showing the last 7 days. Pick dates above to analyse a different period.</p>
     {/if}

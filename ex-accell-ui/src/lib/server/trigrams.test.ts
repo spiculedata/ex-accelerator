@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTrigrams, sentimentScore, tokenize, type TrigramPost } from './trigrams';
+import { computeTrigrams, sentimentScore, tokenize, trendWindow, type TrigramPost } from './trigrams';
 
 const DAY = 86_400_000;
 const NOW = new Date('2026-06-15T12:00:00Z');
@@ -158,5 +158,33 @@ describe('computeTrigrams', () => {
     const [row] = computeTrigrams([early, late, ...later], { ...options, windowStart });
 
     expect(row.trend).toBe('stable'); // 2 early vs 3 recent is not a clear rise
+  });
+});
+
+describe('trendWindow', () => {
+  const now = new Date('2026-11-09T12:00:00.000Z');
+  const none = { start: null, end: null };
+
+  it('is the last N days when no range is chosen', () => {
+    const w = trendWindow(none, 7, now, Date.parse('2026-11-08T00:00:00Z'), false);
+    expect(w.start.toISOString()).toBe('2026-11-02T12:00:00.000Z');
+    expect(w.end).toEqual(now);
+  });
+
+  it('is the chosen range, so an old period is split at its own midpoint', () => {
+    const w = trendWindow({ start: '2025-01-01T00:00:00.000Z', end: '2025-02-01T00:00:00.000Z' }, 7, now, Date.parse('2025-01-05T00:00:00Z'), false);
+    expect(w.start.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect(w.end.toISOString()).toBe('2025-02-01T00:00:00.000Z');
+  });
+
+  it('starts from the oldest post kept when the scan was cut short or only an end is set', () => {
+    const oldest = Date.parse('2026-10-20T00:00:00Z');
+    expect(trendWindow(none, 7, now, oldest, true).start.getTime()).toBe(oldest);
+    expect(trendWindow({ start: null, end: '2026-11-01T00:00:00.000Z' }, 7, now, oldest, false).start.getTime()).toBe(oldest);
+  });
+
+  it('measures a range cut short by the scan cap from the oldest post kept', () => {
+    const oldest = Date.parse('2025-01-20T00:00:00Z');
+    expect(trendWindow({ start: '2025-01-01T00:00:00.000Z', end: null }, 7, now, oldest, true).start.getTime()).toBe(oldest);
   });
 });

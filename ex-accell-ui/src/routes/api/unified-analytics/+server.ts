@@ -8,7 +8,7 @@ import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagemen
 import { languageQueries } from '$lib/server/languageQueries';
 import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
-import { computeTrigrams } from '$lib/server/trigrams';
+import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
 import { dateBoundToEpochMs } from '$lib/server/dateBounds';
 import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
 import { parseDateWindow, windowConditions } from '$lib/server/dateWindow';
@@ -1400,13 +1400,12 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         // When the scan hit its cap, the oldest posts were dropped: measure trends from the oldest one kept
         const now = new Date();
         const truncated = rows.length >= TRIGRAM_MAX_POSTS;
-        const nominalStart = new Date(now.getTime() - days * 86_400_000);
         const oldestKept = posts.reduce((oldest, p) => Math.min(oldest, p.createdAt.getTime()), now.getTime());
-        const windowStart = truncated ? new Date(oldestKept) : nominalStart;
+        const trendPeriod = trendWindow(parsed.window, days, now, oldestKept, truncated);
 
         const data = computeTrigrams(posts, {
-          now,
-          windowStart,
+          now: trendPeriod.end,
+          windowStart: trendPeriod.start,
           minFrequency: intParam('minFrequency', 1, 1, 1000),
           maxResults: intParam('maxResults', 100, 1, 500),
           search: url.searchParams.get('search') || undefined,

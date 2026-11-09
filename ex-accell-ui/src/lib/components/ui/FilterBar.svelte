@@ -243,6 +243,8 @@
         <input
           type="date"
           aria-label="Start date"
+          aria-invalid={rangeProblem ? 'true' : undefined}
+          aria-describedby={rangeProblem ? 'filter-range-problem' : undefined}
           bind:value={dateStart}
           on:change={emitChange}
           class="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
@@ -251,6 +253,8 @@
         <input
           type="date"
           aria-label="End date"
+          aria-invalid={rangeProblem ? 'true' : undefined}
+          aria-describedby={rangeProblem ? 'filter-range-problem' : undefined}
           bind:value={dateEnd}
           on:change={emitChange}
           class="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
@@ -263,10 +267,10 @@
           </div>
         {/if}
         {#if rangeProblem}
-          <span class="text-xs text-danger-700" role="alert">{rangeProblem.includes('on or before') ? 'The start date must be on or before the end date' : 'Enter a valid date'}</span>
+          <span id="filter-range-problem" class="text-xs text-danger-700" role="alert">{rangeProblem.includes('on or before') ? 'The start date must be on or before the end date' : 'Enter a valid date'}</span>
         {/if}
         {#if dateStart || dateEnd}
-          <button on:click={clearDates} class="text-[10px] text-red-500 hover:text-red-700 ml-1">Reset</button>
+          <button on:click={clearDates} class="text-xs text-danger-700 hover:text-danger-900 ml-1">Reset</button>
         {/if}
       </div>
     </div>

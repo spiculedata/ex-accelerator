@@ -10,7 +10,7 @@
   import { getConfidenceColor } from '$lib/utils/colorUtils';
   import { ErrorAlert } from '$lib/components/ui';
   import { platformOptions } from '$lib/utils/platformOptions';
-  import { currentRangeQuery } from '$lib/utils/filterRange';
+  import { rangeReloader } from '$lib/utils/filterRange';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
@@ -23,14 +23,10 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
-    // A new date range changes every figure on the page, so load them again
-    const range = JSON.stringify(currentRangeQuery());
-    if (!loading && range !== loadedRange) {
-      loadedRange = range;
-      loadLanguageDetectionData();
-    }
+    // A new date range changes every figure on the page; the reloader makes sure the newest range wins
+    rangeSync.sync();
   }
-  let loadedRange = JSON.stringify(currentRangeQuery());
+  const rangeSync = rangeReloader(loadLanguageDetectionData, () => loading);
   
   // Loading state
   let loading = true;
@@ -38,7 +34,9 @@
 
   onMount(async () => {
     // Load language detection data from database
+    rangeSync.markLoaded();
     await loadLanguageDetectionData();
+    await rangeSync.sync();
   });
 
   // Language detection data - loaded from database

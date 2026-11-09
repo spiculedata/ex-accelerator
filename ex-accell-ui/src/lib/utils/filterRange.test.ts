@@ -65,3 +65,39 @@ describe('currentRangeQuery', () => {
     expect(currentRangeQuery()).toEqual({});
   });
 });
+
+describe('rangeReloader', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const setUrl = (search: string) => vi.stubGlobal('window', { location: { search }, sessionStorage: memory() });
+
+  it('reloads for a change made while a load is running, and the newest range wins', async () => {
+    setUrl('?date_start=2026-11-01&date_end=2026-11-02');
+    const { rangeReloader } = await import('./filterRange');
+    const seen: string[] = [];
+    const reloader = rangeReloader(async () => {
+      seen.push(window.location.search);
+      if (seen.length === 1) setUrl('?date_start=2026-11-05&date_end=2026-11-06'); // changed mid-load
+      await Promise.resolve();
+    });
+    reloader.markLoaded();
+    setUrl('?date_start=2026-11-03&date_end=2026-11-04');
+    await reloader.sync();
+    expect(seen).toEqual(['?date_start=2026-11-03&date_end=2026-11-04', '?date_start=2026-11-05&date_end=2026-11-06']);
+  });
+
+  it('does nothing when the range is unchanged or the page is still busy', async () => {
+    setUrl('?date_start=2026-11-01&date_end=2026-11-02');
+    const { rangeReloader } = await import('./filterRange');
+    const load = vi.fn(async () => {});
+    let busy = true;
+    const reloader = rangeReloader(load, () => busy);
+    reloader.markLoaded();
+    await reloader.sync();
+    setUrl('?date_start=2026-11-03&date_end=2026-11-04');
+    await reloader.sync();
+    expect(load).not.toHaveBeenCalled();
+    busy = false;
+    await reloader.sync();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+});
