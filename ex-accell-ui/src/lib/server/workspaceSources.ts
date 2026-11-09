@@ -3,6 +3,7 @@
 // datasets, so the project, workspace and home counters must count both.
 //
 // Columns: kind, id, workspace_id, source_type, source_name, status, record_count, last_sync, created_at.
+// (kind, id) is the identity: a captured source and a linked dataset can share an id.
 // A linked dataset reports 'active' while it is 'available' so one status filter covers both kinds.
 export const WORKSPACE_SOURCES_SQL = `
   SELECT 'capture' AS kind, id, workspace_id, source_type, source_name, status,

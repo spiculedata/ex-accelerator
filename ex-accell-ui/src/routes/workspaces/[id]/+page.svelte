@@ -12,6 +12,7 @@
 
   // ---------- types ----------
   interface DataSource {
+    kind: 'capture' | 'dataset';
     id: number;
     source_type: string;
     source_name: string;
@@ -231,7 +232,7 @@
           </div>
         {:else}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {#each dataSources as ds}
+            {#each dataSources as ds (`${ds.kind}-${ds.id}`)}
               <div class="bg-white rounded-xl shadow-sm p-5 border border-transparent">
                 <!-- Name + type -->
                 <div class="flex items-center justify-between mb-3">

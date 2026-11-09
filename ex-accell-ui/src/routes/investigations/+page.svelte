@@ -31,8 +31,9 @@
   let creating = false;
 
   // Opened from a workspace page (?workspace=<id>): create the investigation inside that workspace
-  const workspaceParam = Number.parseInt($page.url.searchParams.get('workspace') ?? '', 10);
-  const workspaceId = Number.isInteger(workspaceParam) && workspaceParam > 0 ? workspaceParam : null;
+  // Reactive: the page is reused on same-route navigation, so a stale workspace must not stick
+  $: workspaceParam = Number.parseInt($page.url.searchParams.get('workspace') ?? '', 10);
+  $: workspaceId = Number.isInteger(workspaceParam) && workspaceParam > 0 ? workspaceParam : null;
 
   onMount(async () => {
     await loadInvestigations();
