@@ -9,6 +9,7 @@
   import { onMount } from 'svelte';
   import { getConfidenceColor } from '$lib/utils/colorUtils';
   import { ErrorAlert } from '$lib/components/ui';
+  import { platformOptions } from '$lib/utils/platformOptions';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
@@ -89,6 +90,17 @@
   
   let selectedLanguage = 'all';
   let selectedPlatform = 'all';
+  // Only the platforms the project's datasets actually come from are offered
+  let platformChoices: { value: string; label: string }[] = [];
+  async function loadPlatformChoices() {
+    try {
+      const result = await (await fetch('/api/datasets?status=available')).json();
+      platformChoices = platformOptions((result.datasets ?? []).map((d: any) => d.source_platform));
+    } catch {
+      platformChoices = [];
+    }
+  }
+  onMount(loadPlatformChoices);
   let confidenceThreshold = 0.5;
   let timeRange = '7d';
 
@@ -265,13 +277,9 @@
           <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
           <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500">
             <option value="all">All Platforms</option>
-            <option value="twitter">Twitter</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-            <option value="reddit">Reddit</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="telegram">Telegram</option>
-            <option value="whatsapp">WhatsApp</option>
+            {#each platformChoices as choice}
+              <option value={choice.value}>{choice.label}</option>
+            {/each}
           </select>
         </div>
         

@@ -67,7 +67,7 @@
     loadFailed = false;
     try {
       // Load all sentiment data from database service
-      const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
+      const fp = requestFilters();
       const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp);
       sentimentStats = stats;
       totalPosts = stats.total;
@@ -125,20 +125,25 @@
   let selectedSentiment = 'all';
   let selectedPlatform = 'all';
   let confidenceThreshold = 0.7;
-  let timeRange = '7d';
+  // Used when the date bar is empty; the date bar wins when it is set
+  let timeRange = '30d';
   let showEmotions = true;
 
-  // Reactive statements for filter changes
-  $: if (selectedSentiment || selectedPlatform || confidenceThreshold || timeRange) {
+  // The filters every request carries: the workspace and the shared filter bar (sources and dates)
+  const requestFilters = () => ({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams });
+
+  // Reload when a page-level filter changes. The key is compared first, so the block does nothing when it
+  // re-runs only because `loading` changed, and the trends carry the same filters as the first load.
+  let lastFilterKey = '';
+  $: filterKey = [selectedSentiment, selectedPlatform, confidenceThreshold, timeRange].join('|');
+  $: if (filterKey !== lastFilterKey) {
+    lastFilterKey = filterKey;
     if (!loading) {
       loadFilteredPosts();
-      // Also reload trends if time range changed
-      if (timeRange) {
-        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined).then(trends => {
-          sentimentTrends = trends;
-          updateTrendChart();
-        });
-      }
+      sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, requestFilters()).then(trends => {
+        sentimentTrends = trends;
+        updateTrendChart();
+      });
     }
   }
 
@@ -232,9 +237,22 @@
         trigger: 'item',
         formatter: '{b}: {c} posts ({d}%)'
       },
+      // A legend with the count beside each name replaces labels on the slices, which truncated and collided with the title
+      legend: {
+        bottom: 0,
+        itemWidth: 12,
+        itemHeight: 12,
+        formatter: (name: string) => {
+          const item = detailedSentiments.find((d: any) => d.label === name);
+          return item ? `${name}: ${item.count.toLocaleString()} (${item.percentage}%)` : name;
+        }
+      },
       series: [{
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: ['38%', '62%'],
+        center: ['50%', '45%'],
+        label: { show: false },
+        labelLine: { show: false },
         data: detailedSentiments.map(item => ({
           name: item.label,
           value: item.count,
@@ -248,10 +266,6 @@
             shadowOffsetX: 0,
             shadowColor: 'rgba(0, 0, 0, 0.5)'
           }
-        },
-        label: {
-          show: true,
-          formatter: '{b}\n{d}%'
         }
       }]
     };
@@ -320,7 +334,7 @@
     
     const option = {
       title: {
-        text: 'Sentiment Trends Over Time',
+        text: 'Posts per day by sentiment',
         left: 'center',
         textStyle: {
           fontSize: 16,
@@ -339,14 +353,15 @@
         data: dates,
         axisLabel: {
           formatter: function(value: any) {
-            return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            // Days are UTC calendar days, so they are shown in UTC (local time would move them a day west of UTC)
+            return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
           }
         }
       },
       yAxis: {
         type: 'value',
-        name: 'Percentage',
-        max: 100
+        name: 'Posts per day',
+        minInterval: 1
       },
       series: [
         {
@@ -361,7 +376,11 @@
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
           itemStyle: { color: getSentimentColor('negative') },
-          lineStyle: { width: 3 }
+          lineStyle: { width: 3 },
+          // Label the busiest day for negative posts, so a spike is named, not just drawn
+          markPoint: sentimentTrends.some(t => t.negative > 0)
+            ? { data: [{ type: 'max', name: 'Peak' }], symbolSize: 44, label: { formatter: (p: { value: number }) => `Peak ${p.value}` } }
+            : undefined
         },
         {
           name: 'Neutral',

@@ -186,20 +186,16 @@ describe('getSentimentTrends', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns data in chronological order (reversed from API)', async () => {
-    const data = [
-      { date: '2024-01-03', positive: 10, negative: 5, neutral: 20 },
-      { date: '2024-01-02', positive: 8, negative: 3, neutral: 15 },
-      { date: '2024-01-01', positive: 12, negative: 7, neutral: 18 }
-    ];
-    mockFetch({ 'sentiment-trends': data });
+  it.each([
+    ['oldest first, as the API returns it', ['2024-01-01', '2024-01-02', '2024-01-03']],
+    ['newest first', ['2024-01-03', '2024-01-02', '2024-01-01']],
+    ['shuffled', ['2024-01-02', '2024-01-03', '2024-01-01']]
+  ])('always returns days oldest to newest, whatever the order it receives (%s)', async (_label, dates) => {
+    mockFetch({ 'sentiment-trends': dates.map((date) => ({ date, positive: 1, negative: 1, neutral: 1 })) });
 
     const trends = await sentimentAnalysisDb.getSentimentTrends();
 
-    // API data is newest-first; service reverses to chronological
-    expect(trends[0].date).toBe('2024-01-01');
-    expect(trends[1].date).toBe('2024-01-02');
-    expect(trends[2].date).toBe('2024-01-03');
+    expect(trends.map((t) => t.date)).toEqual(['2024-01-01', '2024-01-02', '2024-01-03']);
   });
 
   it('calculates total from positive+negative+neutral', async () => {
@@ -219,13 +215,13 @@ describe('getSentimentTrends', () => {
     expect(parsed.searchParams.get('timeRange')).toBe('30d');
   });
 
-  it('uses default timeRange of 7d', async () => {
+  it('uses default timeRange of 30d', async () => {
     mockFetch({ 'sentiment-trends': [] });
     await sentimentAnalysisDb.getSentimentTrends();
 
     const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('timeRange')).toBe('7d');
+    expect(parsed.searchParams.get('timeRange')).toBe('30d');
   });
 });
 

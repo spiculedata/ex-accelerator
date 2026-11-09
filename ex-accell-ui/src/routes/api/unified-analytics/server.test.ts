@@ -477,3 +477,53 @@ describe('GET /api/unified-analytics date filters for cross-platform sentiment',
     expect(body.success).toBe(true);
   });
 });
+
+describe('GET /api/unified-analytics sentiment-trends range', () => {
+  it('uses the date bar (epoch ms bounds) when it is set, instead of the fixed number of days', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=7d&date_start=2026-10-01&date_end=2026-10-31');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('timestamp >=');
+    expect(String(sql)).not.toContain('CURRENT_DATE');
+    expect(params).toEqual([Date.UTC(2026, 9, 1), Date.UTC(2026, 9, 31, 23, 59, 59, 999)]);
+  });
+
+  it('falls back to the number of days when there are no dates', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=30d');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    expect(String(sql)).toContain('CURRENT_TIMESTAMP');
+    expect(params[0]).toBe(30);
+  });
+
+  it.each([
+    ['both a date window and a platform filter', '&date_start=2026-10-01&date_end=2026-10-31&platforms=telegram', ['timestamp >= $1', 'timestamp <= $2', '= ANY($3)']],
+    ['an end date only', '&date_end=2026-10-31', ['timestamp <= $1']],
+    ['dates only (no platform parameter)', '&date_start=2026-10-01', ['timestamp >= $1']]
+  ])('numbers placeholders correctly for %s', async (_label, query, expected) => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', query);
+
+    const sql = String(duckdbQuery.mock.calls[0][0]).replace(/\s+/g, ' ');
+    for (const fragment of expected) expect(sql).toContain(fragment);
+  });
+
+  it('groups days in UTC so the buckets match the epoch-ms window', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=7d');
+
+    expect(String(duckdbQuery.mock.calls[0][0])).toContain("AT TIME ZONE 'UTC'");
+  });
+
+  it('rejects an invalid date with a 400', async () => {
+    const response = await call('sentiment-trends', '&date_start=soon');
+
+    expect(response.status).toBe(400);
+  });
+});
