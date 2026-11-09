@@ -214,7 +214,7 @@
   }
 
   function editWorkflow(workflow: any) {
-    goto(`/data-management/workflow-builder?workflow=${workflow.id}`);
+    goto(`/data-management/workflow-builder?workflow=${encodeURIComponent(workflow.id)}`);
   }
 
   // ─── WavePulse Radio Functions ───────────────────────────────────────────
@@ -580,9 +580,11 @@
                         {#if workflow.created}<span>📅 {formatTimestamp(workflow.created)}</span>{/if}
                       </div>
                     </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(workflow.status)}">
-                      {getStatusIcon(workflow.status)} {workflow.status}
-                    </span>
+                    <div class="flex flex-col items-end gap-2">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(workflow.status)}">
+                        {getStatusIcon(workflow.status)} {workflow.status}
+                      </span>
+                    </div>
                   </div>
 
                   <div class="flex items-center justify-between mb-4">
@@ -612,7 +614,7 @@
                       {#if workflow.status === 'draft'}
                         <button 
                           on:click={() => editWorkflow(workflow)}
-                          class="text-sm text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                          class="text-sm text-blue-600 hover:text-blue-800 font-medium">{workflow.status === 'draft' ? 'Open in builder' : 'Edit'}</button>
                         <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Run</button>
                       {:else if workflow.status === 'running'}
                         <button class="text-sm text-red-600 hover:text-red-800 font-medium">Stop</button>

@@ -133,6 +133,54 @@ class ServerWorkflowService {
   }
 
   /**
+   * Save a workflow as a draft. Drafts skip code generation, so a half-built workflow can be saved and
+   * reopened. Passing the id of an existing draft updates it; a published workflow is never overwritten,
+   * so saving over one creates a new draft instead.
+   */
+  async saveDraft(
+    workflowDefinition: any,
+    metadata: { name: string; description: string; createdBy: string },
+    existingId?: string
+  ): Promise<{ id: string; name: string; status: 'draft'; updatedAt: string }> {
+    try {
+      const now = new Date().toISOString();
+      const workflowMetadata = {
+        stepCount: workflowDefinition.steps.length,
+        estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
+        datasetRequirements: this.extractDatasetRequirements(workflowDefinition),
+        tags: [] as string[]
+      };
+
+      if (existingId) {
+        // One statement: it only matches the caller's own row, and only while it is still a draft, so a
+        // concurrent publish or someone else's draft is never overwritten
+        const updated = await postgresPool.query(
+          `UPDATE published_workflows
+           SET name = $1, description = $2, workflow_definition = $3, metadata = $4, updated_at = $5
+           WHERE id = $6 AND status = 'draft' AND created_by = $7
+           RETURNING id`,
+          [metadata.name, metadata.description, JSON.stringify(workflowDefinition), JSON.stringify(workflowMetadata), now, existingId, metadata.createdBy]
+        );
+        if (updated.length > 0) {
+          return { id: existingId, name: metadata.name, status: 'draft', updatedAt: now };
+        }
+      }
+
+      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await postgresPool.query(
+        `INSERT INTO published_workflows
+          (id, name, description, version, status, workflow_definition, generated_code, metadata, created_by, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [id, metadata.name, metadata.description, '0.1.0', 'draft', JSON.stringify(workflowDefinition), JSON.stringify({}), JSON.stringify(workflowMetadata), metadata.createdBy, now, now]
+      );
+      return { id, name: metadata.name, status: 'draft', updatedAt: now };
+    } catch (error) {
+      console.error('Error saving workflow draft:', error);
+      throw new Error(`Failed to save workflow draft: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
    * Publish a workflow
    */
   async publishWorkflow(
@@ -364,6 +412,9 @@ class ServerWorkflowService {
     const workflow = await this.getPublishedWorkflow(workflowId);
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
+    }
+    if (workflow.status !== 'published') {
+      throw new Error(`Workflow ${workflowId} is a ${workflow.status}. Only published workflows can be run: publish it first.`);
     }
 
     // Create execution record
@@ -608,7 +659,7 @@ class ServerWorkflowService {
     const requirements: string[] = [];
 
     workflowDefinition.steps.forEach((step: any) => {
-      if (step.type === 'dataset_input' && step.config.dataset_id) {
+      if (step.type === 'dataset_input' && step.config?.dataset_id) {
         requirements.push(step.config.dataset_id);
       }
     });
