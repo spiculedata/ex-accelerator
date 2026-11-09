@@ -4,6 +4,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
 export const GET: RequestHandler = async ({ url }) => {
   const workspaceId = url.searchParams.get('id');
@@ -34,10 +35,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const workspace = workspaces[0];
 
-    // 2. Get data sources for this workspace
+    // 2. Get data sources for this workspace: captured sources plus linked datasets
     const dataSources = await postgresPool.query(
-      `SELECT id, source_type, source_name, status, record_count, last_sync, created_at
-       FROM workspace_data_sources
+      `SELECT kind, id, source_type, source_name, status, record_count, last_sync, created_at
+       FROM (${WORKSPACE_SOURCES_SQL}) s
        WHERE workspace_id = $1
        ORDER BY created_at DESC`,
       [id]
@@ -53,7 +54,9 @@ export const GET: RequestHandler = async ({ url }) => {
     );
 
     // 4. Build summary
-    const totalRecords = dataSources.reduce(
+    // Like the project and home rollups, only active sources count towards the totals
+    const activeSources = dataSources.filter((ds: any) => ds.status === 'active');
+    const totalRecords = activeSources.reduce(
       (sum: number, ds: any) => sum + (Number(ds.record_count) || 0),
       0
     );
@@ -71,6 +74,7 @@ export const GET: RequestHandler = async ({ url }) => {
         created_at: workspace.created_at
       },
       data_sources: dataSources.map((ds: any) => ({
+        kind: ds.kind,
         id: ds.id,
         source_type: ds.source_type,
         source_name: ds.source_name,
@@ -89,7 +93,7 @@ export const GET: RequestHandler = async ({ url }) => {
       })),
       summary: {
         total_records: totalRecords,
-        total_data_sources: dataSources.length,
+        total_data_sources: activeSources.length,
         total_investigations: investigations.length
       }
     });

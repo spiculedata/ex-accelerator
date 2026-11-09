@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
 
   interface Investigation {
     id: string;
@@ -28,9 +29,19 @@
   let newSources = { gdelt: true, radio: true, social: true };
   let createError = '';
   let creating = false;
+  let createInWorkspace: number | null = null;
+
+  // Opened from a workspace page (?workspace=<id>): create the investigation inside that workspace
+  // Reactive: the page is reused on same-route navigation, so a stale workspace must not stick
+  $: workspaceParam = Number.parseInt($page.url.searchParams.get('workspace') ?? '', 10);
+  $: workspaceId = Number.isInteger(workspaceParam) && workspaceParam > 0 ? workspaceParam : null;
 
   onMount(async () => {
     await loadInvestigations();
+    if (workspaceId) {
+      openModal();
+      createInWorkspace = workspaceId;
+    }
   });
 
   async function loadInvestigations() {
@@ -75,6 +86,7 @@
     newDateStart = '';
     newDateEnd = '';
     newSources = { gdelt: true, radio: true, social: true };
+    createInWorkspace = null;
     showNewModal = true;
   }
 
@@ -101,7 +113,8 @@
           keywords: newKeywords,
           date_start: newDateStart,
           date_end: newDateEnd,
-          sources
+          sources,
+          ...(createInWorkspace ? { workspace_id: createInWorkspace } : {})
         })
       });
       const result = await response.json().catch(() => ({}));

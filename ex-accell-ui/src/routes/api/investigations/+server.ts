@@ -90,6 +90,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       return json({ success: false, error: 'name is required' }, { status: 400 });
     }
 
+    // workspace_id is optional, but when present it must name an existing workspace
+    let workspaceId: number | null = null;
+    if (data.workspace_id !== undefined && data.workspace_id !== null) {
+      if (!Number.isInteger(data.workspace_id) || data.workspace_id < 1) {
+        return json({ success: false, error: 'workspace_id must be a positive integer' }, { status: 400 });
+      }
+      const found = await postgresPool.query('SELECT id FROM workspaces WHERE id = $1', [data.workspace_id]);
+      if (!found.length) {
+        return json({ success: false, error: 'Workspace not found' }, { status: 404 });
+      }
+      workspaceId = data.workspace_id;
+    }
+
     // The New Investigation form sends flat fields; everything downstream reads this shape
     const queryConfig = data.query_config ?? {
       keywords: Array.isArray(data.keywords) ? data.keywords : [],
@@ -106,7 +119,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         data.name,
         data.description || null,
         JSON.stringify(queryConfig),
-        data.workspace_id || null,
+        workspaceId,
         locals.user?.email ?? null
       ]
     );
