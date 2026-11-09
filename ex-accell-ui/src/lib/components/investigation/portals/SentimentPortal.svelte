@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import * as d3 from 'd3';
   import AnalyticalPortal from '../AnalyticalPortal.svelte';
   import SentimentDistribution from '../SentimentDistribution.svelte';
@@ -89,9 +90,9 @@
       else neutral++;
     }
     return [
-      { label: 'Positive', value: positive, color: '#06d6a0' },
-      { label: 'Negative', value: negative, color: '#f72585' },
-      { label: 'Neutral', value: neutral, color: '#8b5cf6' },
+      { label: 'Positive', value: positive, color: getSentimentColor('positive') },
+      { label: 'Negative', value: negative, color: getSentimentColor('negative') },
+      { label: 'Neutral', value: neutral, color: getSentimentColor('neutral') },
     ];
   })();
 
@@ -142,7 +143,7 @@
         .attr('cx', d => xScale(d.parsedDate))
         .attr('cy', d => yScale(d.score))
         .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
-        .attr('fill', d => d.score > 0.05 ? '#06d6a0' : d.score < -0.05 ? '#f72585' : '#8b5cf6')
+        .attr('fill', d => d.score > 0.05 ? getSentimentColor('positive') : d.score < -0.05 ? getSentimentColor('negative') : getSentimentColor('neutral'))
         .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
         .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
         .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
@@ -159,9 +160,9 @@
 
       // Labels
       g.append('text').attr('x', w).attr('y', yScale(0.8)).attr('text-anchor', 'end')
-        .attr('fill', '#06d6a0').attr('font-size', '8px').attr('opacity', 0.6).text('positive');
+        .attr('fill', getSentimentColor('positive')).attr('font-size', '8px').attr('opacity', 0.6).text('positive');
       g.append('text').attr('x', w).attr('y', yScale(-0.8)).attr('text-anchor', 'end')
-        .attr('fill', '#f72585').attr('font-size', '8px').attr('opacity', 0.6).text('negative');
+        .attr('fill', getSentimentColor('negative')).attr('font-size', '8px').attr('opacity', 0.6).text('negative');
 
     } else if (activeView === 'by-source') {
       const yScale = d3.scaleLinear().domain([-1, 1]).range([h, 0]);

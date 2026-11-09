@@ -102,11 +102,11 @@ describe('getDetailedSentiments', () => {
     const positive = categories.find((c) => c.label === 'Positive');
     expect(positive).toBeDefined();
     expect(positive!.count).toBe(80);
-    expect(positive!.color).toBe('#84cc16');
+    expect(positive!.color).toBe('#56b4e9');
     expect(positive!.percentage).toBe(80);
 
     const negative = categories.find((c) => c.label === 'Negative');
-    expect(negative!.color).toBe('#f97316');
+    expect(negative!.color).toBe('#e69f00');
   });
 
   it('assigns correct colors for all known categories', async () => {
@@ -122,11 +122,11 @@ describe('getDetailedSentiments', () => {
     const categories = await sentimentAnalysisDb.getDetailedSentiments();
 
     const colorMap: Record<string, string> = {
-      'Very Positive': '#22c55e',
-      Positive: '#84cc16',
-      Neutral: '#6b7280',
-      Negative: '#f97316',
-      'Very Negative': '#ef4444'
+      'Very Positive': '#0072b2',
+      Positive: '#56b4e9',
+      Neutral: '#98a2ae',
+      Negative: '#e69f00',
+      'Very Negative': '#d55e00'
     };
 
     categories.forEach((cat) => {

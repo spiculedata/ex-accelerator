@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolveInvestigationRange } from '$lib/utils/investigationRange';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { highlightKeywords } from '$lib/utils/highlight';
@@ -358,9 +359,9 @@
     }
 
     return [
-      { label: 'Positive', value: positive, color: '#06d6a0' },
-      { label: 'Negative', value: negative, color: '#f72585' },
-      { label: 'Neutral', value: neutral, color: '#8b5cf6' }
+      { label: 'Positive', value: positive, color: getSentimentColor('positive') },
+      { label: 'Negative', value: negative, color: getSentimentColor('negative') },
+      { label: 'Neutral', value: neutral, color: getSentimentColor('neutral') }
     ];
   }
 

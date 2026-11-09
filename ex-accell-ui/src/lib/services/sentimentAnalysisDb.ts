@@ -2,6 +2,7 @@
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
 import { BaseDatabaseService } from './baseDatabaseService';
+import { getSentimentColor } from '$lib/utils/colorUtils';
 import type {
   SentimentStats,
   SentimentCategory,
@@ -382,14 +383,6 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    * Transform to detailed sentiment categories
    */
   private transformToDetailedSentiments(data: any[]): SentimentCategory[] {
-    const sentimentColors: Record<string, string> = {
-      'Very Positive': '#22c55e',
-      'Positive': '#84cc16',
-      'Neutral': '#6b7280',
-      'Negative': '#f97316',
-      'Very Negative': '#ef4444'
-    };
-
     const sentimentTotals = new Map<string, number>();
     let totalPosts = 0;
 
@@ -405,7 +398,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
     return Array.from(sentimentTotals.entries()).map(([category, count]) => ({
       label: category,
       count: count,
-      color: sentimentColors[category] || '#6b7280',
+      color: getSentimentColor(category),
       percentage: totalPosts > 0 ? Math.round((count / totalPosts * 100) * 100) / 100 : 0
     }));
   }

@@ -331,21 +331,21 @@
           name: 'Positive',
           type: 'line',
           data: sentimentTrends.map(t => t.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') },
           lineStyle: { width: 3 }
         },
         {
           name: 'Negative',
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
-          itemStyle: { color: '#f72585' },
+          itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 3 }
         },
         {
           name: 'Neutral',
           type: 'line',
           data: sentimentTrends.map(t => t.neutral),
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: getSentimentColor('neutral') },
           lineStyle: { width: 3 }
         }
       ]
@@ -409,12 +409,12 @@
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-emerald-600 mb-1">{sentimentStats.positive.percentage}%</div>
+        <div class="text-2xl font-bold text-sentiment-very-positive mb-1">{sentimentStats.positive.percentage}%</div>
         <div class="text-sm text-gray-600">Positive Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.positive.count.toLocaleString()} posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-red-600 mb-1">{sentimentStats.negative.percentage}%</div>
+        <div class="text-2xl font-bold text-sentiment-very-negative mb-1">{sentimentStats.negative.percentage}%</div>
         <div class="text-sm text-gray-600">Negative Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.negative.count.toLocaleString()} posts</div>
       </div>

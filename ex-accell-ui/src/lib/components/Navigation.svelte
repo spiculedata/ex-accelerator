@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BrandMark from '$lib/components/ui/BrandMark.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -354,19 +355,17 @@
   }));
 </script>
 
-<nav aria-label="Main navigation" class="bg-white shadow-lg border-b border-gray-200">
+<nav aria-label="Main navigation" class="bg-white border-b border-ink-200">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
       <!-- Left: Logo + Nav Links -->
       <div class="flex items-center">
         <!-- Logo -->
-        <a href="/" class="flex items-center mr-8">
-          <div class="h-8 w-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
-            <span class="text-white font-bold text-lg">SE</span>
-          </div>
-          <h1 class="ml-3 text-xl font-bold text-gray-900 whitespace-nowrap hidden sm:block">
+        <a href="/" class="flex items-center mr-8 text-primary-700" aria-label="Social Explorer home">
+          <BrandMark size={32} />
+          <span class="ml-2.5 font-sans text-xl font-semibold tracking-tight text-ink-900 whitespace-nowrap hidden sm:block">
             Social Explorer
-          </h1>
+          </span>
         </a>
 
         <!-- Desktop Nav Links -->

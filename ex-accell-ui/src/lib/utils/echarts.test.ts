@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const fakeEcharts = vi.hoisted(() => ({
-  init: vi.fn(() => ({ dispose: vi.fn() })),
-  getInstanceByDom: vi.fn(() => null)
+  init: vi.fn((..._args: unknown[]) => ({ dispose: vi.fn() })),
+  getInstanceByDom: vi.fn(() => null),
+  registerTheme: vi.fn()
 }));
 
 vi.mock('echarts', () => fakeEcharts);
@@ -12,6 +13,7 @@ import { initChart, waitForEcharts } from './echarts';
 beforeEach(() => {
   delete (window as any).echarts;
   fakeEcharts.init.mockClear();
+  fakeEcharts.registerTheme.mockClear();
   fakeEcharts.getInstanceByDom.mockReset();
   fakeEcharts.getInstanceByDom.mockReturnValue(null);
 });
@@ -89,5 +91,25 @@ describe('waitForEcharts after a failed load', () => {
     expect(echarts.init).toBe(fakeEcharts.init);
     expect(attempts).toBe(2);
     vi.doUnmock('echarts');
+  });
+});
+
+describe('brand chart theme', () => {
+  it('registers the Social Explorer theme and initialises charts with it', async () => {
+    await waitForEcharts();
+
+    initChart(visibleContainer());
+
+    expect(fakeEcharts.registerTheme).toHaveBeenCalledWith('social-explorer', expect.any(Object));
+    expect(fakeEcharts.init.mock.calls[0][1]).toBe('social-explorer');
+  });
+
+  it('uses the brand sans for chart text and the colour-blind-safe series palette first', async () => {
+    await waitForEcharts();
+    initChart(visibleContainer());
+
+    const theme = fakeEcharts.registerTheme.mock.calls[0][1] as any;
+    expect(theme.textStyle.fontFamily).toContain('Atkinson Hyperlegible Next');
+    expect(theme.color.slice(0, 3)).toEqual(['#0072b2', '#e69f00', '#009e73']);
   });
 });
