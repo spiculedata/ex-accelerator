@@ -67,7 +67,7 @@
     loadFailed = false;
     try {
       // Load all sentiment data from database service
-      const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
+      const fp = requestFilters();
       const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp);
       sentimentStats = stats;
       totalPosts = stats.total;
@@ -129,17 +129,21 @@
   let timeRange = '30d';
   let showEmotions = true;
 
-  // Reactive statements for filter changes
-  $: if (selectedSentiment || selectedPlatform || confidenceThreshold || timeRange) {
+  // The filters every request carries: the workspace and the shared filter bar (sources and dates)
+  const requestFilters = () => ({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams });
+
+  // Reload when a page-level filter changes. The key is compared first, so the block does nothing when it
+  // re-runs only because `loading` changed, and the trends carry the same filters as the first load.
+  let lastFilterKey = '';
+  $: filterKey = [selectedSentiment, selectedPlatform, confidenceThreshold, timeRange].join('|');
+  $: if (filterKey !== lastFilterKey) {
+    lastFilterKey = filterKey;
     if (!loading) {
       loadFilteredPosts();
-      // Also reload trends if time range changed
-      if (timeRange) {
-        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined).then(trends => {
-          sentimentTrends = trends;
-          updateTrendChart();
-        });
-      }
+      sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, requestFilters()).then(trends => {
+        sentimentTrends = trends;
+        updateTrendChart();
+      });
     }
   }
 
@@ -374,7 +378,9 @@
           itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 3 },
           // Label the busiest day for negative posts, so a spike is named, not just drawn
-          markPoint: { data: [{ type: 'max', name: 'Peak' }], symbolSize: 44, label: { formatter: (p: { value: number }) => `Peak ${p.value}` } }
+          markPoint: sentimentTrends.some(t => t.negative > 0)
+            ? { data: [{ type: 'max', name: 'Peak' }], symbolSize: 44, label: { formatter: (p: { value: number }) => `Peak ${p.value}` } }
+            : undefined
         },
         {
           name: 'Neutral',

@@ -254,7 +254,7 @@ export const GET: RequestHandler = async ({ url }) => {
         let paramIndex = params.length + 1;
         const windowClause = dateBounds.length > 0
           ? dateBounds.map(([op], i) => `timestamp ${op} $${i + 1}`).join(' AND ')
-          : "DATE(to_timestamp(timestamp/1000)) >= CURRENT_DATE - $1::integer";
+          : "DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC') >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date - $1::integer";
 
         const explicitPlatforms = url.searchParams.get('platforms');
         if (explicitPlatforms !== null) {
@@ -278,7 +278,7 @@ export const GET: RequestHandler = async ({ url }) => {
         // Query live data from posts_with_sentiment instead of stale pre-aggregated table
         const data = await executeQuery(`
           SELECT
-            DATE(to_timestamp(timestamp/1000)) as date,
+            DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC') as date,
             COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) as positive,
             COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) as negative,
             COUNT(*) FILTER (WHERE sentiment_category = 'Neutral') as neutral,
@@ -287,7 +287,7 @@ export const GET: RequestHandler = async ({ url }) => {
           WHERE timestamp IS NOT NULL
             AND ${windowClause}
             ${whereClause}
-          GROUP BY DATE(to_timestamp(timestamp/1000))
+          GROUP BY DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC')
           ORDER BY date
         `, params);
 

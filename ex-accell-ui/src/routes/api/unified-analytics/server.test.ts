@@ -496,8 +496,29 @@ describe('GET /api/unified-analytics sentiment-trends range', () => {
     await call('sentiment-trends', '&timeRange=30d');
 
     const [sql, params] = duckdbQuery.mock.calls[0];
-    expect(String(sql)).toContain('CURRENT_DATE');
+    expect(String(sql)).toContain('CURRENT_TIMESTAMP');
     expect(params[0]).toBe(30);
+  });
+
+  it.each([
+    ['both a date window and a platform filter', '&date_start=2026-10-01&date_end=2026-10-31&platforms=telegram', ['timestamp >= $1', 'timestamp <= $2', '= ANY($3)']],
+    ['an end date only', '&date_end=2026-10-31', ['timestamp <= $1']],
+    ['dates only (no platform parameter)', '&date_start=2026-10-01', ['timestamp >= $1']]
+  ])('numbers placeholders correctly for %s', async (_label, query, expected) => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', query);
+
+    const sql = String(duckdbQuery.mock.calls[0][0]).replace(/\s+/g, ' ');
+    for (const fragment of expected) expect(sql).toContain(fragment);
+  });
+
+  it('groups days in UTC so the buckets match the epoch-ms window', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    await call('sentiment-trends', '&timeRange=7d');
+
+    expect(String(duckdbQuery.mock.calls[0][0])).toContain("AT TIME ZONE 'UTC'");
   });
 
   it('rejects an invalid date with a 400', async () => {
