@@ -13,9 +13,11 @@
     /** What was chosen, for example "Topic: Public Transit". Shown as the panel title. */
     title: string;
     filters: PostFilters;
+    /** An optional line under the count, for example how a phrase is matched */
+    note?: string;
     onclose: () => void;
   }
-  let { open, title, filters, onclose }: Props = $props();
+  let { open, title, filters, note = '', onclose }: Props = $props();
 
   const PAGE_SIZE = 25;
 
@@ -58,7 +60,9 @@
     try {
       const page = await fetchPosts(filters, { limit: PAGE_SIZE, offset: posts.length });
       if (current !== requestId) return;
-      posts = [...posts, ...page.posts];
+      // New posts arriving between pages shift the offsets, so skip any that are already listed
+      const listed = new Set(posts.map((p) => p.id));
+      posts = [...posts, ...page.posts.filter((p) => !listed.has(p.id))];
       total = page.total;
     } catch (error) {
       if (current !== requestId) return;
@@ -121,7 +125,8 @@
   const count = (n: number | null) => (n ?? 0).toLocaleString();
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<!-- Capture phase, so Esc closes this panel before any other handler on the page sees it -->
+<svelte:window onkeydowncapture={onKeydown} />
 
 {#if open}
   <div class="fixed inset-0 z-50 flex justify-end">
@@ -140,6 +145,7 @@
           <p class="mt-0.5 text-sm text-ink-600" aria-live="polite">
             {#if loading}Loading posts…{:else if errorMessage && posts.length === 0}Could not load posts{:else}{total.toLocaleString()} post{total === 1 ? '' : 's'} match{total === 1 ? 'es' : ''}{#if posts.length > 0 && posts.length < total}, showing {posts.length.toLocaleString()}{/if}{/if}
           </p>
+          {#if note}<p class="mt-1 text-xs text-ink-500">{note}</p>{/if}
         </div>
         <button bind:this={closeButton} type="button" onclick={onclose} class="rounded-md p-2 text-ink-500 hover:bg-ink-100 hover:text-ink-900" aria-label="Close">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>

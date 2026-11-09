@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const query = vi.hoisted(() => vi.fn());
 
+const resolveWorkspaceScope = vi.hoisted(() => vi.fn());
+
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
+vi.mock('$lib/services/workspaceContextResolver', () => ({ resolveWorkspaceScope }));
 vi.mock('$lib/utils/logger', () => ({ createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }));
 
 import { GET } from './+server';
@@ -15,6 +18,8 @@ const row = (id: number, total = 3) => ({
 });
 
 beforeEach(() => {
+  resolveWorkspaceScope.mockReset();
+  resolveWorkspaceScope.mockResolvedValue(null);
   query.mockReset();
   query.mockResolvedValue([row(1), row(2), row(3)]);
 });
@@ -75,5 +80,52 @@ describe('GET /api/posts', () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(await response.json())).not.toContain('password');
+  });
+
+  describe('workspace scope', () => {
+    it("uses the workspace's social platforms when none are chosen, like the page endpoints", async () => {
+      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['Telegram'] });
+
+      await call('?workspace_id=3&hashtag=TramDelays');
+
+      expect(query.mock.calls[0][1]).toContainEqual(['telegram']);
+    });
+
+    it('lets an explicit platform choice override the workspace', async () => {
+      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram'] });
+
+      await call('?workspace_id=3&platforms=bluesky');
+
+      expect(query.mock.calls[0][1]).toContainEqual(['bluesky']);
+      expect(query.mock.calls[0][1]).not.toContainEqual(['telegram']);
+    });
+
+    it('returns nothing, without querying, for a workspace with no social datasets', async () => {
+      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: false, socialPlatforms: [] });
+
+      const body = await (await call('?workspace_id=3')).json();
+
+      expect(body.data).toMatchObject({ posts: [], total: 0 });
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('returns nothing when every platform is switched off (platforms present but empty)', async () => {
+      const body = await (await call('?platforms=')).json();
+
+      expect(body.data).toMatchObject({ posts: [], total: 0 });
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
+  it('reports the page size that was applied, not the one requested', async () => {
+    const body = await (await call('?limit=500')).json();
+
+    expect(body.data.limit).toBe(100);
+  });
+
+  it('rejects an over-long sentiment value', async () => {
+    const response = await call(`?sentiment=${'x'.repeat(60)}`);
+
+    expect(response.status).toBe(400);
   });
 });

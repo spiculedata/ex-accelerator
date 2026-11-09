@@ -533,7 +533,7 @@
     }
   }
 
-  // The posts behind a number: set when a topic, tag, phrase or segment is chosen
+  // The topic whose posts are open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
 
   function selectTopic(topic: Topic) {

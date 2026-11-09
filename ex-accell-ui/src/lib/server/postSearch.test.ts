@@ -75,6 +75,13 @@ describe('buildPostSearch', () => {
     expect(ok(filters).params.slice(-2)[0]).toBe(expected);
   });
 
+  it('returns the page size and offset it actually applied', () => {
+    const result = ok({ limit: 500, offset: 30 });
+
+    expect(result.limit).toBe(100);
+    expect(result.offset).toBe(30);
+  });
+
   it('adds a total count so the page can say how many posts match', () => {
     expect(ok({}).sql).toContain('COUNT(*) OVER() AS total');
   });
@@ -89,6 +96,7 @@ describe('buildPostSearch', () => {
     [{ q: 'x'.repeat(201) }, 'q'],
     [{ dateStart: 'soon' }, 'date_start'],
     [{ dateEnd: '2026-02-30' }, 'date_end'],
+    [{ sentiment: 'x'.repeat(51) }, 'sentiment'],
     [{ offset: -1 }, 'offset']
   ])('rejects invalid input %j', (filters, field) => {
     const result = buildPostSearch(filters as Parameters<typeof buildPostSearch>[0]);

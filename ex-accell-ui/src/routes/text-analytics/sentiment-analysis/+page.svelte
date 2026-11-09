@@ -45,7 +45,7 @@
   let sentimentStats: any = emptySentimentStats();
   // A failed load is not the same as an empty range, so the two are told apart in the page
   let loadFailed = false;
-  // The posts behind a number: set when a topic, tag, phrase or segment is chosen
+  // The sentiment segment whose posts are open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
 
   let totalPosts = 0;

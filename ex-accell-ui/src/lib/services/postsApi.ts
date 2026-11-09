@@ -1,6 +1,8 @@
 // Client for GET /api/posts: the posts behind a number
 
 export interface PostFilters {
+  /** Scopes the posts to a workspace's datasets, as the page's own queries are */
+  workspaceId?: string;
   topic?: string;
   hashtag?: string;
   q?: string;
@@ -32,6 +34,7 @@ export interface PostPage {
 
 export function buildPostsQuery(filters: PostFilters, page: { limit?: number; offset?: number } = {}): string {
   const params = new URLSearchParams();
+  if (filters.workspaceId) params.set('workspace_id', filters.workspaceId);
   if (filters.topic) params.set('topic', filters.topic);
   if (filters.hashtag) params.set('hashtag', filters.hashtag.replace(/^#/, ''));
   if (filters.q) params.set('q', filters.q);
@@ -52,10 +55,11 @@ export async function fetchPosts(filters: PostFilters, page: { limit?: number; o
   return result.data as PostPage;
 }
 
-/** Reads the platform and date filters out of the params the shared filter bar produces. */
-export function filtersFromParams(params: Record<string, string>): Pick<PostFilters, 'platforms' | 'dateStart' | 'dateEnd'> {
+/** Reads the workspace, platform and date filters out of the params the shared filter bar produces. */
+export function filtersFromParams(params: Record<string, string>): Pick<PostFilters, 'workspaceId' | 'platforms' | 'dateStart' | 'dateEnd'> {
   const platforms = params.platforms ? params.platforms.split(',').map((p) => p.trim()).filter(Boolean) : [];
   return {
+    ...(params.workspace_id ? { workspaceId: params.workspace_id } : {}),
     ...(platforms.length > 0 ? { platforms } : {}),
     ...(params.date_start ? { dateStart: params.date_start } : {}),
     ...(params.date_end ? { dateEnd: params.date_end } : {})

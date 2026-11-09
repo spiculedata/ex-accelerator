@@ -23,6 +23,10 @@ describe('buildPostsQuery', () => {
     expect(params.get('q')).toBe('a & b');
   });
 
+  it('sends the workspace so the posts match the page\'s scope', () => {
+    expect(new URLSearchParams(buildPostsQuery({ workspaceId: '3' })).get('workspace_id')).toBe('3');
+  });
+
   it('omits an empty platform list so the request is not filtered to nothing', () => {
     expect(new URLSearchParams(buildPostsQuery({ platforms: [] })).has('platforms')).toBe(false);
   });
@@ -31,6 +35,7 @@ describe('buildPostsQuery', () => {
 describe('filtersFromParams', () => {
   it('carries the shared filter bar\'s platforms and dates into a drill-down', () => {
     expect(filtersFromParams({ workspace_id: '3', platforms: 'telegram,bluesky', date_start: '2026-11-02', date_end: '2026-11-09' })).toEqual({
+      workspaceId: '3',
       platforms: ['telegram', 'bluesky'],
       dateStart: '2026-11-02',
       dateEnd: '2026-11-09'
@@ -38,6 +43,6 @@ describe('filtersFromParams', () => {
   });
 
   it('leaves out empty values and ignores everything else', () => {
-    expect(filtersFromParams({ platforms: '', workspace_id: '3' })).toEqual({});
+    expect(filtersFromParams({ platforms: '', source: 'x' })).toEqual({});
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, highlightKeywords, splitHighlight, splitHighlight } from './highlight';
+import { escapeHtml, highlightKeywords, splitHighlight } from './highlight';
 
 describe('escapeHtml', () => {
   it('escapes the five HTML-significant characters', () => {

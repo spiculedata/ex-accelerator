@@ -17,11 +17,13 @@ export interface PostSearchFilters {
   offset?: number;
 }
 
-export type PostSearch = { ok: true; sql: string; params: unknown[] } | { ok: false; error: string };
+/** `limit` and `offset` are the values actually applied (the limit is clamped), for the response to report. */
+export type PostSearch = { ok: true; sql: string; params: unknown[]; limit: number; offset: number } | { ok: false; error: string };
 
 export const POST_SEARCH_DEFAULT_LIMIT = 25;
 export const POST_SEARCH_MAX_LIMIT = 100;
 const MAX_PHRASE_LENGTH = 200;
+const MAX_SENTIMENT_LENGTH = 50;
 const HASHTAG = /^[\p{L}\p{N}_]{1,100}$/u;
 const TOPIC_SLUG = /^[A-Za-z0-9_-]{1,100}$/;
 
@@ -55,6 +57,7 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
   }
 
   if (filters.sentiment !== undefined && filters.sentiment !== '') {
+    if (filters.sentiment.length > MAX_SENTIMENT_LENGTH) return { ok: false, error: `sentiment must be at most ${MAX_SENTIMENT_LENGTH} characters` };
     conditions.push(`LOWER(p.sentiment_category) = ${add(filters.sentiment.toLowerCase())}`);
   }
 
@@ -86,5 +89,5 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
     ORDER BY p.timestamp DESC, p.id DESC
     LIMIT ${add(limit)} OFFSET ${add(offset)}`;
 
-  return { ok: true, sql, params };
+  return { ok: true, sql, params, limit, offset };
 }

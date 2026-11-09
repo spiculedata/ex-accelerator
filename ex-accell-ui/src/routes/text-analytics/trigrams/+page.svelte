@@ -1,6 +1,4 @@
 <script lang="ts">
-  // The posts behind a number: set when a topic, tag, phrase or segment is chosen
-  let drilldown: { title: string; filters: PostFilters } | null = null;
   import { page } from '$app/stores';
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
@@ -10,6 +8,9 @@
   import { summarizeTrigrams, trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
   import { getTrendColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+
+  // The phrase the visitor chose; its posts open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
 
   $: workspaceId = $page.url.searchParams.get('workspace');
   
@@ -382,4 +383,4 @@
   </div>
 </div>
 
-<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing this exact phrase. The counts on this page ignore punctuation and case, so they can differ." onclose={() => (drilldown = null)} />
