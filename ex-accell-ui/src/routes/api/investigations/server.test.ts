@@ -4,7 +4,7 @@ const query = vi.hoisted(() => vi.fn());
 
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
 
-import { POST } from './+server';
+import { POST, PATCH } from './+server';
 
 const call = (body: unknown, email: string | null = 'ada@example.com') =>
   POST({
@@ -78,5 +78,46 @@ describe('POST /api/investigations', () => {
     const response = await call({ name: 'x', workspace_id: 99 });
 
     expect(response.status).toBe(404);
+  });
+});
+
+describe('PATCH /api/investigations annotations', () => {
+  const patch = (body: unknown) =>
+    PATCH({
+      request: new Request('http://localhost/api/investigations', { method: 'PATCH', body: JSON.stringify(body) }),
+      locals: { user: { email: 'ada@example.com' } }
+    } as unknown as Parameters<typeof PATCH>[0]);
+  const updateCall = () => query.mock.calls.find(([sql]) => String(sql).includes('UPDATE investigations'))!;
+  const note = { id: 'a1', text: 'note', timestamp: '2026-11-09T10:00:00.000Z' };
+
+  beforeEach(() => {
+    query.mockImplementation(async (sql: string) => (String(sql).includes('UPDATE investigations') ? [{ id: 1 }] : []));
+  });
+
+  it('stores an annotations array as one JSON document', async () => {
+    await patch({ id: 1, annotations: [note] });
+
+    expect(updateCall()[1][0]).toBe(JSON.stringify([note]));
+  });
+
+  it('does not encode twice when an older client sends a JSON string', async () => {
+    await patch({ id: 1, annotations: JSON.stringify([note]) });
+
+    expect(updateCall()[1][0]).toBe(JSON.stringify([note]));
+  });
+
+  it.each([[42], [{}], ['hello'], [true]])('rejects annotations that are not a list (%j)', async (annotations) => {
+    const response = await patch({ id: 1, annotations });
+
+    expect(response.status).toBe(400);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE investigations'))).toBe(false);
+  });
+
+  it('still encodes query_config exactly once when sent with annotations', async () => {
+    await patch({ id: 1, query_config: { keywords: ['tram'] }, annotations: [note] });
+
+    const params = updateCall()[1];
+    expect(params).toContain(JSON.stringify({ keywords: ['tram'] }));
+    expect(params).toContain(JSON.stringify([note]));
   });
 });

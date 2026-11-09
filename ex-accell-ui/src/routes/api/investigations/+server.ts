@@ -132,6 +132,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 };
 
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 /**
  * PATCH /api/investigations
  * Update an existing investigation
@@ -155,8 +163,19 @@ export const PATCH: RequestHandler = async ({ request }) => {
     const params: any[] = [];
     let paramIndex = 1;
 
+    // Notes are a list. Decode text from older clients first, then refuse anything else at the boundary
+    if (data.annotations !== undefined) {
+      const decoded = typeof data.annotations === 'string' ? safeJsonParse(data.annotations) : data.annotations;
+      if (!Array.isArray(decoded)) {
+        return json({ success: false, error: 'annotations must be a list of notes' }, { status: 400 });
+      }
+      data.annotations = decoded; // decoded once; the loop below only encodes
+    }
+
     for (const field of allowedFields) {
       if (data[field] !== undefined) {
+        // JSON columns are encoded exactly once. Older clients sent annotations already stringified,
+        // which stored a JSON string inside the JSON column, so a string is decoded first.
         const value = ['query_config', 'layout_config', 'pinned_views', 'annotations'].includes(field)
           ? JSON.stringify(data[field])
           : data[field];
