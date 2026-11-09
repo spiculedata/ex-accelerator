@@ -9,6 +9,8 @@
   import { getTrendColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
   import { platformOptions } from '$lib/utils/platformOptions';
+  import FilterBar from '$lib/components/ui/FilterBar.svelte';
+  import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
 
   // The phrase the visitor chose; its posts open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
@@ -31,7 +33,9 @@
     trendDistribution: { up: 0, stable: 0, down: 0 }
   };
   let selectedPlatform = 'all';
-  let selectedTimeRange = '7d';
+  // Phrases are counted over the last 7 days unless the date bar sets a range
+  const DEFAULT_TIME_RANGE = '7d';
+  let hasRange = false;
   let minFrequency = 5;
   let showChart = 'frequency';
   let searchQuery = '';
@@ -39,8 +43,13 @@
   // Filtering
   let filteredTrigrams: TrigramData[] = [];
   
+  // A date change made while a load runs is picked up afterwards, and the newest range wins
+  const rangeSync = rangeReloader(loadTrigramsData, () => loading);
+
   onMount(async () => {
+    rangeSync.markLoaded();
     await loadTrigramsData();
+    await rangeSync.sync();
   });
 
   async function loadTrigramsData() {
@@ -49,7 +58,7 @@
       
       const filters: TrigramFilters = {
         platform: selectedPlatform,
-        timeRange: selectedTimeRange,
+        timeRange: DEFAULT_TIME_RANGE,
         minFrequency,
         maxResults: 100,
         searchQuery
@@ -117,7 +126,7 @@
     try {
       const filters: TrigramFilters = {
         platform: selectedPlatform,
-        timeRange: selectedTimeRange,
+        timeRange: DEFAULT_TIME_RANGE,
         minFrequency,
         searchQuery
       };
@@ -176,6 +185,14 @@
     </svelte:fragment>
   </PageHeader>
 
+  <!-- Dates: the same bar as the other analysis pages; with no dates set the last 7 days are analysed -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <FilterBar datesOnly compact on:change={() => { hasRange = Object.keys(currentRangeQuery()).length > 0; rangeSync.sync(); }} />
+    {#if !hasRange}
+      <p class="mt-2 text-xs text-ink-600">Showing the last 7 days. Pick dates above to analyse a different period.</p>
+    {/if}
+  </div>
+
   <!-- Controls Section -->
   <div class="bg-white border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -189,16 +206,6 @@
               {#each platformChoices as choice}
                 <option value={choice.value}>{choice.label}</option>
               {/each}
-            </select>
-          </div>
-          
-          <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium text-gray-700">Time Range:</label>
-            <select bind:value={selectedTimeRange} class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-              <option value="1d">Last Day</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
             </select>
           </div>
           

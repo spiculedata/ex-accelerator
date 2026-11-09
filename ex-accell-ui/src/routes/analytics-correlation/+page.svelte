@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
@@ -105,18 +106,13 @@
       categories[cat] = (categories[cat] || 0) + (parseInt(d.post_count) || 0);
     });
 
-    const colorMap: Record<string, string> = {
-      'Very Positive': '#06d6a0', 'Positive': '#22c55e',
-      'Neutral': '#8b5cf6', 'Very Negative': '#f72585', 'Negative': '#ef4444',
-    };
-
     sentimentChart.setOption({
       title: { text: 'Sentiment Distribution', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       series: [{
         type: 'pie', radius: ['35%', '65%'],
         data: Object.entries(categories).map(([name, value]) => ({
-          name, value, itemStyle: { color: colorMap[name] || '#6b7280' }
+          name, value, itemStyle: { color: getSentimentColor(name) }
         })),
         label: { show: true, fontSize: 11 },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } }
@@ -203,9 +199,9 @@
       xAxis: { type: 'category', data: hours, axisLabel: { fontSize: 9 } },
       yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
       series: [
-        { name: 'Positive', type: 'line', data: positive, itemStyle: { color: '#06d6a0' }, smooth: true, areaStyle: { color: 'rgba(6,214,160,0.15)' } },
-        { name: 'Negative', type: 'line', data: negative, itemStyle: { color: '#f72585' }, smooth: true, areaStyle: { color: 'rgba(247,37,133,0.15)' } },
-        { name: 'Neutral', type: 'line', data: neutral, itemStyle: { color: '#8b5cf6' }, smooth: true, areaStyle: { color: 'rgba(139,92,246,0.15)' } },
+        { name: 'Positive', type: 'line', data: positive, itemStyle: { color: getSentimentColor('positive') }, lineStyle: { color: getSentimentColor('positive') }, smooth: true, areaStyle: { color: getSentimentColor('positive'), opacity: 0.15 } },
+        { name: 'Negative', type: 'line', data: negative, itemStyle: { color: getSentimentColor('negative') }, lineStyle: { color: getSentimentColor('negative') }, smooth: true, areaStyle: { color: getSentimentColor('negative'), opacity: 0.15 } },
+        { name: 'Neutral', type: 'line', data: neutral, itemStyle: { color: getSentimentColor('neutral') }, lineStyle: { color: getSentimentColor('neutral'), type: 'dashed' }, smooth: true, areaStyle: { color: getSentimentColor('neutral'), opacity: 0.1 } },
       ]
     });
   }

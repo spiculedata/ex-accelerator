@@ -234,6 +234,11 @@
 
   function updateSentimentChart() {
     if (!sentimentChart) return;
+    const sentimentCounts: Record<string, number> = {
+      Positive: textAnalytics.sentimentBreakdown.positive.count,
+      Negative: textAnalytics.sentimentBreakdown.negative.count,
+      Neutral: textAnalytics.sentimentBreakdown.neutral.count
+    };
 
     const option = {
       title: {
@@ -245,9 +250,12 @@
         trigger: 'item',
         formatter: '{b}: {c} ({d}%)'
       },
+      // Colour is never the only cue: each slice is named in the legend with its count
+      legend: { bottom: 0, textStyle: { fontSize: 11 }, formatter: (name: string) => `${name}: ${sentimentCounts[name] ?? 0}` },
       series: [{
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: ['40%', '65%'],
+        center: ['50%', '45%'],
         data: [
           { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: getSentimentColor('positive') } },
           { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: getSentimentColor('negative') } },

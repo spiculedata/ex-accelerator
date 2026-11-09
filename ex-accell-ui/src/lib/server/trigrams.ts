@@ -125,3 +125,21 @@ export function computeTrigrams(posts: readonly TrigramPost[], options: TrigramO
     .slice(0, options.maxResults)
     .map(([trigram, group]) => summarise(trigram, group, options));
 }
+
+/**
+ * The period phrase trends are measured over. A chosen date range is that range; otherwise it is the last
+ * `days`. When the scan hit its cap, or only an end date is set, the oldest post kept is the true start.
+ */
+export function trendWindow(
+  chosen: { start: string | null; end: string | null },
+  days: number,
+  now: Date,
+  oldestKeptMs: number,
+  truncated: boolean
+): { start: Date; end: Date } {
+  const end = chosen.end ? new Date(chosen.end) : now;
+  const hasRange = chosen.start !== null || chosen.end !== null;
+  if (truncated || (hasRange && !chosen.start)) return { start: new Date(oldestKeptMs), end };
+  const start = chosen.start ? new Date(chosen.start) : new Date(now.getTime() - days * 86_400_000);
+  return { start, end };
+}

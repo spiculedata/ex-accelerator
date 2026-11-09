@@ -1,6 +1,7 @@
 // Database connection and query service for Engagement Analysis data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
 import type {
   EngagementMetrics,
@@ -324,7 +325,7 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
   }
 
   private scope(workspaceId?: string): Record<string, string> {
-    return workspaceId ? { workspace_id: workspaceId } : {};
+    return { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() };
   }
 }
 

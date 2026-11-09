@@ -138,9 +138,9 @@
     if (!sentimentChart) return;
 
     const colorMap: Record<string, string> = {
-      positive: '#06d6a0',
-      negative: '#f72585',
-      neutral: '#8b5cf6'
+      positive: getSentimentColor('positive'),
+      negative: getSentimentColor('negative'),
+      neutral: getSentimentColor('neutral')
     };
 
     sentimentChart.setOption({
@@ -242,7 +242,8 @@
           name: 'Positive',
           type: 'line',
           data: sentimentTrends.map(t => t.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') }, // same palette as every sentiment chart
+
           lineStyle: { width: 2 },
           smooth: true
         },
@@ -250,7 +251,7 @@
           name: 'Negative',
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
-          itemStyle: { color: '#f72585' },
+          itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 2 },
           smooth: true
         },
@@ -258,8 +259,8 @@
           name: 'Neutral',
           type: 'line',
           data: sentimentTrends.map(t => t.neutral),
-          itemStyle: { color: '#8b5cf6' },
-          lineStyle: { width: 2 },
+          itemStyle: { color: getSentimentColor('neutral') },
+          lineStyle: { width: 2, type: 'dashed' },
           smooth: true
         }
       ]

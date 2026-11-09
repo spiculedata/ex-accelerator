@@ -3,7 +3,8 @@
 export const CONFIDENCE_BUCKETS = { veryHigh: 0.95, high: 0.85, medium: 0.7 } as const;
 
 export const languageQueries = {
-  stats: (): string => `
+  /** Conditions use positional parameters appended by the caller; they restrict by the post's date. */
+  stats: (conditions: string[] = []): string => `
     SELECT
       l.code AS language_code,
       l.name AS language,
@@ -16,6 +17,7 @@ export const languageQueries = {
       COALESCE(STDDEV_POP(ld.confidence_score), 0) AS confidence_stddev
     FROM language_detection ld
     JOIN languages l ON ld.language_id = l.id
+    ${conditions.length > 0 ? `JOIN posts p ON p.id = ld.post_id WHERE ${conditions.join(' AND ')}` : ''}
     GROUP BY l.code, l.name
     ORDER BY post_count DESC`,
 
@@ -41,7 +43,7 @@ export const languageQueries = {
     ORDER BY p.created_at DESC
     LIMIT ${limitParam}`,
 
-  mixing: (): string => `
+  mixing: (conditions: string[] = []): string => `
     SELECT
       l1.name AS primary_language,
       l2.name AS secondary_language,
@@ -49,6 +51,7 @@ export const languageQueries = {
     FROM language_mixing lm
     JOIN languages l1 ON l1.id = lm.primary_language_id
     JOIN languages l2 ON l2.id = lm.secondary_language_id
+    ${conditions.length > 0 ? `JOIN posts p ON p.id = lm.post_id WHERE ${conditions.join(' AND ')}` : ''}
     GROUP BY l1.name, l2.name
     ORDER BY occurrence_count DESC
     LIMIT 10`

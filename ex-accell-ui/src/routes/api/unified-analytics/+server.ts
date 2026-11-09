@@ -8,9 +8,10 @@ import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagemen
 import { languageQueries } from '$lib/server/languageQueries';
 import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
-import { computeTrigrams } from '$lib/server/trigrams';
+import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
 import { dateBoundToEpochMs } from '$lib/server/dateBounds';
 import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
+import { parseDateWindow, windowConditions } from '$lib/server/dateWindow';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
 /**
@@ -688,8 +689,11 @@ export const GET: RequestHandler = async ({ url }) => {
     
     // ─── Language Detection Endpoints ─────────────────────────────────────
     if (type === 'language-stats') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
-        const data = await executeQuery(languageQueries.stats());
+        const dated = windowConditions('p.created_at', parsed.window, 1);
+        const data = await executeQuery(languageQueries.stats(dated.conditions), dated.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language stats', error, []);
@@ -697,6 +701,8 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (type === 'language-posts') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
         const params: any[] = [];
         const conditions: string[] = [];
@@ -706,6 +712,9 @@ export const GET: RequestHandler = async ({ url }) => {
         if (platform && platform !== 'all') { params.push(platform); conditions.push(`ds.platform = $${params.length}`); }
         if (language && language !== 'all') { params.push(language); conditions.push(`l.code = $${params.length}`); }
         if (Number.isFinite(minConfidence)) { params.push(minConfidence); conditions.push(`ld.confidence_score >= $${params.length}`); }
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
+        conditions.push(...dated.conditions);
         params.push(Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 200));
 
         const data = await executeQuery(languageQueries.posts(conditions, `$${params.length}`), params);
@@ -716,8 +725,11 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (type === 'language-mixing') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
-        const data = await executeQuery(languageQueries.mixing());
+        const dated = windowConditions('p.created_at', parsed.window, 1);
+        const data = await executeQuery(languageQueries.mixing(dated.conditions), dated.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language mixing', error, []);
@@ -1315,23 +1327,28 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
     }
 
     if (type?.startsWith('engagement-')) {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
         const wsId = url.searchParams.get('workspace_id');
         let platforms: string[] = [];
         if (wsId && scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
         const filter = platforms.length > 0;
         const params: any[] = filter ? [platforms] : [];
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
+        const dateConditions = dated.conditions;
         const limitParam = `$${params.length + 1}`;
         const days = ENGAGEMENT_TRENDS_DAYS[url.searchParams.get('timeRange') || '7d'] ?? 7;
         const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10') || 10, 1), 100);
 
         const queries: Record<string, { sql: string; extra?: any[] }> = {
-          'engagement-stats': { sql: engagementQueries.stats(filter) },
-          'engagement-platforms': { sql: engagementQueries.platforms(filter) },
-          'engagement-content-types': { sql: engagementQueries.contentTypes(filter) },
-          'engagement-trends': { sql: engagementQueries.trends(filter, days) },
-          'engagement-top-posts': { sql: engagementQueries.topPosts(filter, limitParam), extra: [limit] },
-          'engagement-timing': { sql: engagementQueries.timing(filter) }
+          'engagement-stats': { sql: engagementQueries.stats(filter, dateConditions) },
+          'engagement-platforms': { sql: engagementQueries.platforms(filter, dateConditions) },
+          'engagement-content-types': { sql: engagementQueries.contentTypes(filter, dateConditions) },
+          'engagement-trends': { sql: engagementQueries.trends(filter, days, dateConditions) },
+          'engagement-top-posts': { sql: engagementQueries.topPosts(filter, limitParam, dateConditions), extra: [limit] },
+          'engagement-timing': { sql: engagementQueries.timing(filter, dateConditions) }
         };
         const query = queries[type];
         if (!query) return json({ success: false, error: `Unknown engagement query: ${type}` }, { status: 400 });
@@ -1344,6 +1361,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
     }
 
     if (type === 'trigrams') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
         const intParam = (name: string, fallback: number, min: number, max: number): number => {
           const parsed = parseInt(url.searchParams.get(name) || '');
@@ -1362,9 +1381,11 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         const params: any[] = [];
         if (workspacePlatforms.length > 0) params.push(workspacePlatforms);
         if (filterByPlatform) params.push(platform);
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
 
         const rows: TrigramPostRow[] = await executeQuery(
-          trigramPostsQuery({ workspacePlatforms: workspacePlatforms.length > 0, platform: filterByPlatform }, days),
+          trigramPostsQuery({ workspacePlatforms: workspacePlatforms.length > 0, platform: filterByPlatform }, days, dated.conditions),
           params
         );
         const posts = rows.map((row) => ({
@@ -1379,13 +1400,12 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         // When the scan hit its cap, the oldest posts were dropped: measure trends from the oldest one kept
         const now = new Date();
         const truncated = rows.length >= TRIGRAM_MAX_POSTS;
-        const nominalStart = new Date(now.getTime() - days * 86_400_000);
         const oldestKept = posts.reduce((oldest, p) => Math.min(oldest, p.createdAt.getTime()), now.getTime());
-        const windowStart = truncated ? new Date(oldestKept) : nominalStart;
+        const trendPeriod = trendWindow(parsed.window, days, now, oldestKept, truncated);
 
         const data = computeTrigrams(posts, {
-          now,
-          windowStart,
+          now: trendPeriod.end,
+          windowStart: trendPeriod.start,
           minFrequency: intParam('minFrequency', 1, 1, 1000),
           maxResults: intParam('maxResults', 100, 1, 500),
           search: url.searchParams.get('search') || undefined,

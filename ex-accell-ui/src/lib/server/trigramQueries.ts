@@ -16,7 +16,8 @@ export interface TrigramQueryFilters {
   platform: boolean;
 }
 
-export function trigramPostsQuery(filters: TrigramQueryFilters, days: number): string {
+/** `windowConditions` (a chosen date range) replace the relative `days` window when given. */
+export function trigramPostsQuery(filters: TrigramQueryFilters, days: number, windowConditions: string[] = []): string {
   if (!Number.isFinite(days) || days < 1) throw new Error('days must be a positive number');
   const safeDays = Math.trunc(days);
   let next = 1;
@@ -37,7 +38,7 @@ export function trigramPostsQuery(filters: TrigramQueryFilters, days: number): s
     FROM posts p
     JOIN data_sources ds ON ds.id = p.data_source_id
     WHERE p.content IS NOT NULL
-      AND p.created_at >= CURRENT_TIMESTAMP - INTERVAL '${safeDays} days'
+      ${windowConditions.length > 0 ? windowConditions.map((condition) => `AND ${condition}`).join('\n      ') : `AND p.created_at >= CURRENT_TIMESTAMP - INTERVAL '${safeDays} days'`}
       ${conditions.map((condition) => `AND ${condition}`).join('\n      ')}
     ORDER BY p.created_at DESC
     LIMIT ${TRIGRAM_MAX_POSTS}`;

@@ -1,6 +1,7 @@
 // Database connection and query service for Language Detection data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
 import type {
   LanguageStats,
@@ -92,7 +93,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageStats(workspaceId?: string): Promise<LanguageStats[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
 
     if (!data || data.length === 0) {
@@ -116,7 +117,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageAnalysis(workspaceId?: string): Promise<LanguageAnalysis[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
 
     if (!data || data.length === 0) {
@@ -172,6 +173,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
       endpoint: 'language-posts',
       params: {
         ...(workspaceId ? { workspace_id: workspaceId } : {}),
+        ...currentRangeQuery(),
         platform: f.platform || 'all',
         language: f.language || 'all',
         ...(typeof f.confidenceThreshold === 'number' ? { minConfidence: f.confidenceThreshold } : {}),
@@ -198,7 +200,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageMixing(workspaceId?: string): Promise<LanguageMixing[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-mixing',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
     const total = data.reduce((sum: number, row: any) => sum + toNumber(row.occurrence_count), 0);
 
@@ -224,7 +226,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageDetectionStats(workspaceId?: string): Promise<LanguageDetectionStats> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
     if (data.length === 0) return this.getDefaultDetectionStats();
 
