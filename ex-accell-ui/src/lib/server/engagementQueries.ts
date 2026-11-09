@@ -1,6 +1,6 @@
 /**
  * SQL for the Engagement Analysis dashboard, over the core post_engagement, posts and data_sources
- * tables. Every query accepts an optional platform filter as $1.
+ * tables. Every query accepts an optional platform filter as $1, then optional date window conditions.
  */
 
 const BASE_FROM = `
@@ -20,7 +20,7 @@ const where = (platformFilter: boolean, extra: string[] = []): string => {
 };
 
 export const engagementQueries = {
-  stats: (platformFilter: boolean): string => `
+  stats: (platformFilter: boolean, windowConditions: string[] = []): string => `
     SELECT
       COUNT(*) AS total_posts,
       COALESCE(SUM(${TOTAL_ENGAGEMENTS}), 0) AS total_engagements,
@@ -32,9 +32,9 @@ export const engagementQueries = {
       COALESCE(AVG(pe.comments_count), 0) AS avg_comments,
       COALESCE(AVG(pe.shares_count), 0) AS avg_shares
     ${BASE_FROM}
-    ${where(platformFilter)}`,
+    ${where(platformFilter, windowConditions)}`,
 
-  platforms: (platformFilter: boolean): string => `
+  platforms: (platformFilter: boolean, windowConditions: string[] = []): string => `
     SELECT
       ds.platform,
       COUNT(*) AS posts,
@@ -45,11 +45,11 @@ export const engagementQueries = {
       COALESCE(AVG(pe.comments_count), 0) AS avg_comments,
       COALESCE(AVG(pe.shares_count), 0) AS avg_shares
     ${BASE_FROM}
-    ${where(platformFilter)}
+    ${where(platformFilter, windowConditions)}
     GROUP BY ds.platform
     ORDER BY engagement_rate DESC`,
 
-  contentTypes: (platformFilter: boolean): string => `
+  contentTypes: (platformFilter: boolean, windowConditions: string[] = []): string => `
     SELECT
       COALESCE(ct.name, 'Unknown') AS content_type,
       COUNT(*) AS posts,
@@ -64,11 +64,11 @@ export const engagementQueries = {
       ) THEN 1.0 ELSE 0.0 END), 0) AS positive_share
     ${BASE_FROM}
     LEFT JOIN content_types ct ON ct.id = pe.content_type_id
-    ${where(platformFilter)}
+    ${where(platformFilter, windowConditions)}
     GROUP BY COALESCE(ct.name, 'Unknown')
     ORDER BY engagement_rate DESC`,
 
-  trends: (platformFilter: boolean, days: number): string => `
+  trends: (platformFilter: boolean, days: number, windowConditions: string[] = []): string => `
     SELECT
       CAST(CAST(p.created_at AS DATE) AS TEXT) AS date,
       COALESCE(SUM(pe.likes_count), 0) AS likes,
@@ -79,11 +79,11 @@ export const engagementQueries = {
       COALESCE(SUM(pe.reach), 0) AS reach,
       COALESCE(AVG(pe.engagement_rate), 0) AS engagement_rate
     ${BASE_FROM}
-    ${where(platformFilter, [`p.created_at >= CURRENT_DATE - INTERVAL '${Math.trunc(days)} days'`])}
+    ${where(platformFilter, windowConditions.length > 0 ? windowConditions : [`p.created_at >= CURRENT_DATE - INTERVAL '${Math.trunc(days)} days'`])}
     GROUP BY CAST(p.created_at AS DATE)
     ORDER BY date`,
 
-  topPosts: (platformFilter: boolean, limitParam: string): string => `
+  topPosts: (platformFilter: boolean, limitParam: string, windowConditions: string[] = []): string => `
     SELECT
       p.id,
       p.content AS text,
@@ -100,11 +100,11 @@ export const engagementQueries = {
       p.created_at AS timestamp
     ${BASE_FROM}
     LEFT JOIN content_types ct ON ct.id = pe.content_type_id
-    ${where(platformFilter)}
+    ${where(platformFilter, windowConditions)}
     ORDER BY ${TOTAL_ENGAGEMENTS} DESC
     LIMIT ${limitParam}`,
 
-  timing: (platformFilter: boolean): string => `
+  timing: (platformFilter: boolean, windowConditions: string[] = []): string => `
     SELECT
       CAST(EXTRACT(HOUR FROM p.created_at) AS INTEGER) AS hour_of_day,
       CAST(EXTRACT(DOW FROM p.created_at) AS INTEGER) AS day_of_week,
@@ -112,7 +112,7 @@ export const engagementQueries = {
       COUNT(*) AS total_posts,
       COALESCE(SUM(${TOTAL_ENGAGEMENTS}), 0) AS total_engagements
     ${BASE_FROM}
-    ${where(platformFilter)}
+    ${where(platformFilter, windowConditions)}
     GROUP BY 1, 2
     ORDER BY 2, 1`
 };

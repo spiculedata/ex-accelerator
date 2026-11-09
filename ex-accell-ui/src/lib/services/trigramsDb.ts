@@ -1,3 +1,4 @@
+import { currentRangeQuery } from '$lib/utils/filterRange';
 export interface TrigramData {
   trigram: string;
   frequency: number;
@@ -81,7 +82,7 @@ class TrigramsDatabase {
       maxSentiment: filters.sentimentRange?.[1],
       workspace_id: workspaceId
     };
-    for (const [key, value] of Object.entries(optional)) {
+    for (const [key, value] of Object.entries({ ...optional, ...currentRangeQuery() })) {
       if (value !== undefined && value !== '') params.set(key, String(value));
     }
 

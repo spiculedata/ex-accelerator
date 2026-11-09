@@ -10,6 +10,7 @@
   import { getConfidenceColor } from '$lib/utils/colorUtils';
   import { ErrorAlert } from '$lib/components/ui';
   import { platformOptions } from '$lib/utils/platformOptions';
+  import { currentRangeQuery } from '$lib/utils/filterRange';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
@@ -22,7 +23,14 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+    // A new date range changes every figure on the page, so load them again
+    const range = JSON.stringify(currentRangeQuery());
+    if (!loading && range !== loadedRange) {
+      loadedRange = range;
+      loadLanguageDetectionData();
+    }
   }
+  let loadedRange = JSON.stringify(currentRangeQuery());
   
   // Loading state
   let loading = true;
@@ -105,7 +113,7 @@
   let timeRange = '7d';
 
   // Reactive statements for filter changes
-  $: if ((selectedLanguage !== 'all' || selectedPlatform !== 'all' || confidenceThreshold !== 0.5 || timeRange !== '7d') && !loading) {
+  $: if ((selectedLanguage !== 'all' || selectedPlatform !== 'all' || confidenceThreshold !== 0.5) && !loading) {
     loadFilteredPosts();
   }
 
@@ -292,16 +300,6 @@
             max="1" 
             step="0.05"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="1d">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
         </div>
       </div>
     </div>
