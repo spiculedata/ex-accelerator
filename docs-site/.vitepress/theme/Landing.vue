@@ -235,7 +235,8 @@ async function copyCommands() {
 
 <style scoped>
 .landing { --radius: 14px; overflow-x: clip; }
-.landing h1, .landing h2, .landing h3 { font-weight: 650; }
+.landing h1, .landing h2 { font-family: var(--se-font-display); font-weight: 600; }
+.landing h3 { font-weight: 600; }
 .container { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
 
 /* Hero */
@@ -298,22 +299,22 @@ h1 { margin: 0; font-size: clamp(34px, 4.6vw, 54px); line-height: 1.08; letter-s
 .more-card:hover .thumb img { transform: scale(1.03); }
 
 /* Try it */
-.try { padding: 88px 0; color: #e7e9ee; background: linear-gradient(135deg, #14162a, #1d2150); }
-.try .kicker { color: #a5b4fc; }
+.try { padding: 88px 0; color: var(--se-ink-100); background: linear-gradient(135deg, var(--se-ink-950), var(--se-primary-900)); }
+.try .kicker { color: var(--se-primary-300); }
 .try h2 { color: #fff; }
 .try-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 56px; align-items: center; }
-.try-lede { margin: 0 0 20px; line-height: 1.65; color: #c3c8d8; }
-.checks li { color: #e7e9ee; }
-.checks li::before { border-color: #a5b4fc; }
+.try-lede { margin: 0 0 20px; line-height: 1.65; color: var(--se-ink-300); }
+.checks li { color: var(--se-ink-100); }
+.checks li::before { border-color: var(--se-primary-300); }
 .checks code { padding: 2px 6px; border-radius: 6px; font-size: 13px; color: #fff; background: rgba(255, 255, 255, .1); }
-.terminal { border-radius: var(--radius); overflow: hidden; background: #0b0d1a; border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .6); }
+.terminal { border-radius: var(--radius); overflow: hidden; background: var(--se-ink-950); border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .6); }
 .term-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 12px; color: #8b90a6; border-bottom: 1px solid rgba(255, 255, 255, .08); }
 .copy { padding: 3px 10px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 12px; color: #e7e9ee; background: transparent; cursor: pointer; }
 .copy:hover { background: rgba(255, 255, 255, .08); }
 .terminal pre { margin: 0; padding: 18px 20px; overflow-x: auto; }
 .terminal code { font-size: 13.5px; line-height: 1.9; color: #e7e9ee; background: transparent; }
 .terminal .c { color: #6b7194; }
-.terminal .p { color: #a5b4fc; user-select: none; }
+.terminal .p { color: var(--se-primary-300); user-select: none; }
 
 /* Stack */
 .stack { padding-block: 72px 24px; }

@@ -16,10 +16,16 @@ export function wikiPageName(docPath) {
 
 /** Rewrites page links (absolute or relative) to wiki page names and screenshots to the wiki images folder. */
 export function convertLinks(markdown, docPath = 'index.md') {
+  // Images written as HTML (logo tiles on the brand pages) need the same move as markdown images
+  const rewriteHtmlImages = (text) =>
+    text
+      .replace(/(src=")\/screenshots\//g, '$1images/')
+      .replace(/(src=")\/brand\//g, '$1images/brand/');
   const rewrite = (text) =>
-    text.replace(/(!?\[[^\]]*\]\()([^)\s]+)\)/g, (match, prefix, target) => {
+    rewriteHtmlImages(text).replace(/(!?\[[^\]]*\]\()([^)\s]+)\)/g, (match, prefix, target) => {
       if (/^(https?:|mailto:|#)/.test(target)) return match;
       if (target.startsWith('/screenshots/')) return `${prefix}images/${target.slice('/screenshots/'.length)})`;
+      if (target.startsWith('/brand/') && /\.(svg|png|jpe?g)$/.test(target)) return `${prefix}images${target})`;
 
       const [path, anchor] = target.split('#');
       const absolute = path.startsWith('/') ? path : posix.join(posix.dirname(docPath), path);
@@ -171,6 +177,8 @@ export function buildWiki(docsDir, outputDir) {
 
   const screenshots = join(docsDir, 'public', 'screenshots');
   if (existsSync(screenshots)) cpSync(screenshots, join(outputDir, 'images'), { recursive: true });
+  const brand = join(docsDir, 'public', 'brand');
+  if (existsSync(brand)) cpSync(brand, join(outputDir, 'images', 'brand'), { recursive: true });
   return pages;
 }
 

@@ -7,6 +7,7 @@ export default defineConfig({
   cleanUrls: true,
   head: [
     // og:title and og:description come from each page (the landing page sets its own in index.md)
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/social-explorer/brand/mark.svg' }],
     ['meta', { property: 'og:type', content: 'website' }],
     // Absolute URL: link previews need one. Forks or a custom domain should change it.
     ['meta', { property: 'og:image', content: 'https://spiculedata.github.io/social-explorer/screenshots/sentiment-analysis.png' }],
@@ -14,11 +15,13 @@ export default defineConfig({
   ],
   lastUpdated: true,
   themeConfig: {
+    logo: { light: '/brand/mark.svg', dark: '/brand/mark-on-dark.svg', alt: 'Social Explorer' },
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Tutorials', link: '/tutorials/' },
       { text: 'Architecture', link: '/architecture/overview' },
       { text: 'Reference', link: '/reference/api' },
+      { text: 'Brand', link: '/brand/' },
       { text: 'Contributing', link: 'https://github.com/spiculedata/social-explorer/blob/main/CONTRIBUTING.md' }
     ],
     sidebar: [
@@ -44,6 +47,18 @@ export default defineConfig({
           { text: 'Research in Jupyter', link: '/tutorials/jupyter' },
           { text: 'Troubleshooting and FAQ', link: '/tutorials/troubleshooting' },
           { text: 'Glossary', link: '/tutorials/glossary' }
+        ]
+      },
+      {
+        text: 'Brand',
+        items: [
+          { text: 'Overview', link: '/brand/' },
+          { text: 'Logo', link: '/brand/logo' },
+          { text: 'Colour', link: '/brand/colour' },
+          { text: 'Typography', link: '/brand/typography' },
+          { text: 'Layout and components', link: '/brand/components' },
+          { text: 'Data visualisation', link: '/brand/data-visualisation' },
+          { text: 'Voice and content', link: '/brand/voice' }
         ]
       },
       {

@@ -1,0 +1,62 @@
+/*
+ * Applies the Social Explorer brand to the docs site. The tokens are the same file the app uses, so the
+ * guidelines always show the real colours. Fonts are self-hosted (no third-party font requests).
+ */
+@import '@fontsource-variable/atkinson-hyperlegible-next';
+@import '@fontsource-variable/newsreader';
+@import '@fontsource-variable/jetbrains-mono';
+@import '../../../ex-accell-ui/src/lib/styles/brand-tokens.css';
+
+:root {
+  --vp-font-family-base: var(--se-font-sans);
+  --vp-font-family-mono: var(--se-font-mono);
+
+  --vp-c-brand-1: var(--se-primary-700);
+  --vp-c-brand-2: var(--se-primary-600);
+  --vp-c-brand-3: var(--se-primary-600);
+  --vp-c-brand-soft: color-mix(in srgb, var(--se-primary-500) 14%, transparent);
+  --vp-c-default-soft: var(--se-ink-100);
+  --vp-c-divider: var(--se-ink-200);
+  --vp-c-gutter: var(--se-ink-200);
+  --vp-c-text-1: var(--se-ink-900);
+  --vp-c-text-2: var(--se-ink-600);
+  --vp-c-text-3: var(--se-ink-500);
+  --vp-c-bg-soft: var(--se-ink-50);
+  --vp-c-bg-alt: var(--se-ink-50);
+  --vp-c-white: #ffffff;
+  --vp-code-font-size: 0.875em;
+}
+.dark {
+  --vp-c-brand-1: var(--se-primary-300);
+  --vp-c-brand-2: var(--se-primary-400);
+  --vp-c-brand-3: var(--se-primary-600);
+  --vp-c-brand-soft: color-mix(in srgb, var(--se-primary-400) 18%, transparent);
+  --vp-c-bg: var(--se-ink-950);
+  --vp-c-bg-soft: var(--se-ink-900);
+  --vp-c-bg-alt: var(--se-ink-900);
+  --vp-c-default-soft: var(--se-ink-800);
+  --vp-c-divider: var(--se-ink-800);
+  --vp-c-gutter: var(--se-ink-900);
+  --vp-c-text-1: var(--se-ink-100);
+  --vp-c-text-2: var(--se-ink-300);
+  --vp-c-text-3: var(--se-ink-400);
+}
+
+.vp-doc h1, .vp-doc h2, .vp-doc h3 { font-family: var(--se-font-display); font-weight: 600; letter-spacing: -0.005em; }
+.vp-doc h1 { font-size: 2.25rem; }
+.VPNavBarTitle .title { font-weight: 600; }
+.vp-doc code { font-family: var(--se-font-mono); }
+.vp-doc table { font-variant-numeric: tabular-nums; }
+
+/* Do / Don't pairs used across the brand pages */
+.do-dont { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; margin: 20px 0; }
+.do-dont > div { border: 1px solid var(--vp-c-divider); border-radius: 8px; padding: 14px 16px; border-top-width: 4px; }
+.do-dont .do { border-top-color: var(--se-success-600); }
+.do-dont .dont { border-top-color: var(--se-danger-600); }
+.do-dont b { display: block; margin-bottom: 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+.do-dont p { margin: 0; font-size: 14px; }
+.logo-tile { display: flex; align-items: center; justify-content: center; min-height: 140px; border: 1px solid var(--vp-c-divider); border-radius: 10px; padding: 24px; }
+.logo-tile.dark { background: var(--se-ink-900); border-color: var(--se-ink-900); }
+.logo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; margin: 20px 0; }
+.type-sample { border: 1px solid var(--vp-c-divider); border-radius: 10px; padding: 18px 22px; margin: 16px 0; }
+.type-sample small { color: var(--vp-c-text-3); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
