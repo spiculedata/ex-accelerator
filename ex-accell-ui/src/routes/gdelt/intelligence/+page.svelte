@@ -6,6 +6,7 @@
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { getCountryNameWithFallback } from '$lib/countryMapping';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 
   // Helper: resolve country code to full name
   function countryName(code: string): string {
@@ -33,6 +34,8 @@
   let conflicts: any[] = [];
   let topCountries: any[] = [];
   let summary: any = null;
+  // GDELT has not been loaded: explain it instead of showing three blank cards
+  let unavailable = false;
   let countryLoading = false;
 
   // Simple markdown to HTML for LLM output (bold, italic, lists)
@@ -104,6 +107,7 @@
       ]);
 
       const summaryData = await summaryRes.json();
+      unavailable = !!summaryData.meta?.unavailable || (summaryData.success && !summaryData.data?.length);
       const conflictsData = await conflictsRes.json();
       const countriesData = await countriesRes.json();
 
@@ -270,6 +274,12 @@
   {#if loading}
     <div class="flex items-center justify-center py-16">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+    </div>
+  {:else if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <DataUnavailable
+        title="No GDELT events are loaded"
+        description="The intelligence dashboard summarises GDELT news events by country and conflict. It fills in once GDELT data has been loaded into the database." />
     </div>
   {:else}
 

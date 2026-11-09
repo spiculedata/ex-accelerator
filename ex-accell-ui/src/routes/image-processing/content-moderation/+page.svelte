@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -8,6 +9,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let activeTab: 'dashboard' | 'review' = 'dashboard';
 
   let moderationStats: {
@@ -33,6 +35,8 @@
       ]);
 
       const statsData = await statsRes.json();
+
+      unavailable = !!statsData.meta?.unavailable;
       const resultsData = await resultsRes.json();
 
       if (statsData.success && statsData.data) {
@@ -156,6 +160,13 @@
   {#if errorMessage}
     <div class="mb-6">
       <ErrorAlert message={errorMessage} />
+    </div>
+  {/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
     </div>
   {/if}
 

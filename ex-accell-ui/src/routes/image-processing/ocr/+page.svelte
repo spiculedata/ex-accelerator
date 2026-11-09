@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -10,6 +11,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let ocrStats: any = { summary: {}, languages: [] };
   let results: any[] = [];
   let searchQuery = '';
@@ -25,6 +27,7 @@
         fetch('/api/image-processing?action=ocr-results&limit=20'),
       ]);
       const [statsData, resultsData] = await Promise.all([statsRes.json(), resultsRes.json()]);
+      unavailable = !!statsData.meta?.unavailable;
       if (statsData.success) ocrStats = statsData.data;
       if (resultsData.success) results = resultsData.data || [];
     } catch (err: any) { errorMessage = err.message; }
@@ -67,6 +70,13 @@
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <!-- Extract Panel -->
   <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">

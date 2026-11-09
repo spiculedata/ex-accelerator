@@ -800,8 +800,8 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
-          <span class="font-semibold text-amber-800">Demo Data</span>
-          <span class="text-amber-700 text-sm ml-2">No real Android device tables are available. The data shown below is derived from social analytics or generated for demonstration purposes.</span>
+          <span class="font-semibold text-amber-800">Example data, not findings</span>
+          <span class="text-amber-700 text-sm ml-2">No Android research data is connected to this installation. Every figure below is generated as an example of what this page shows and does not describe real participants.</span>
         </div>
       </div>
     {/if}
@@ -854,7 +854,9 @@
           </button>
           <button 
             on:click={exportResearchReport}
-            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors shadow-sm">
+            disabled={isDemo}
+            title={isDemo ? 'Export is available once Android research data is connected' : 'Export the research report'}
+            class="disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors shadow-sm">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>

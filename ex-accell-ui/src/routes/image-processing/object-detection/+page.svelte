@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -10,6 +11,7 @@
   let selectedTier = 'fast';
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let stats: { topClasses: any[]; cooccurrence: any[] } = { topClasses: [], cooccurrence: [] };
   let results: any[] = [];
   let imageUrl = '';
@@ -34,6 +36,8 @@
       ]);
 
       const statsData = await statsRes.json();
+
+      unavailable = !!statsData.meta?.unavailable;
       const resultsData = await resultsRes.json();
 
       if (statsData.success && statsData.data) {
@@ -132,6 +136,13 @@
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <!-- Analyze Panel -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">

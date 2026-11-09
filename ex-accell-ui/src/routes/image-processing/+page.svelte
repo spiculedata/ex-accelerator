@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -7,6 +8,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let stats: any = {};
 
   const modules = [
@@ -79,6 +81,7 @@
     try {
       const res = await fetch('/api/image-processing?action=stats');
       const data = await res.json();
+      unavailable = !!data.meta?.unavailable;
       if (data.success) stats = data.data || {};
     } catch (err: any) { errorMessage = err.message; }
     finally { loading = false; }
@@ -99,6 +102,13 @@
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   {#if loading}
     <div class="flex items-center justify-center py-16">

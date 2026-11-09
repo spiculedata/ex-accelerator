@@ -1,5 +1,6 @@
 // GDELT Events API — optimised for map display
 import { json } from '@sveltejs/kit';
+import { isMissingRelationError } from '$lib/server/queryErrors';
 import { postgresPool } from '$lib/services/postgres';
 
 export async function GET({ url }) {
@@ -87,6 +88,10 @@ export async function GET({ url }) {
 		return json({ events, count: events.length });
 
 	} catch (err) {
+		// No gdelt_events table means GDELT has not been loaded: report no events, flagged, not an error
+		if (isMissingRelationError(err)) {
+			return json({ events: [], count: 0, unavailable: true });
+		}
 		console.error('GDELT API Error:', err);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}

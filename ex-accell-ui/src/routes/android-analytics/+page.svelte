@@ -342,7 +342,9 @@
           </button>
           <button 
             on:click={exportData}
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+            disabled
+            title="Export is available once Android data is connected"
+            class="disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
             Export Analysis
           </button>
         </div>
@@ -358,8 +360,8 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
-          <p class="text-sm font-medium text-amber-800">Demo Mode</p>
-          <p class="text-xs text-amber-700">Android analytics data is not connected yet. Showing sample visualizations of the interface capabilities.</p>
+          <p class="text-sm font-medium text-amber-800">No Android data is connected</p>
+          <p class="text-xs text-amber-700">These charts stay empty until Android research data is loaded into this installation.</p>
         </div>
       </div>
     </div>
@@ -537,7 +539,6 @@
               <p><strong>Collection Method:</strong> Passive smartphone usage monitoring with automated screenshots every 3-5 seconds</p>
               <p><strong>Data Types:</strong> App accessibility events, app segment timing, screenshot OCR text extraction, and URL visits</p>
               <p><strong>Privacy:</strong> All data collection is participant-controlled and consent-based for research purposes</p>
-              <p><strong>User ID:</strong> 7324 • <strong>Session:</strong> 5db4bc90-8fcf-4d20-b6d7-4474def9786f • <strong>Date:</strong> April 14, 2025</p>
             </div>
           </div>
         </div>
