@@ -580,9 +580,14 @@
                         {#if workflow.created}<span>📅 {formatTimestamp(workflow.created)}</span>{/if}
                       </div>
                     </div>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(workflow.status)}">
-                      {getStatusIcon(workflow.status)} {workflow.status}
-                    </span>
+                    <div class="flex flex-col items-end gap-2">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {getStatusColor(workflow.status)}">
+                        {getStatusIcon(workflow.status)} {workflow.status}
+                      </span>
+                      {#if workflow.status === 'draft'}
+                        <a href="/data-management/workflow-builder?workflow={encodeURIComponent(workflow.id)}" class="text-sm font-medium text-primary-700 hover:underline">Open in builder</a>
+                      {/if}
+                    </div>
                   </div>
 
                   <div class="flex items-center justify-between mb-4">

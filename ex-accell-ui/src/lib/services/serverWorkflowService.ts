@@ -133,6 +133,47 @@ class ServerWorkflowService {
   }
 
   /**
+   * Save a workflow as a draft. Drafts skip code generation, so a half-built workflow can be saved and
+   * reopened. Passing the id of an existing draft updates it; a published workflow is never overwritten,
+   * so saving over one creates a new draft instead.
+   */
+  async saveDraft(
+    workflowDefinition: any,
+    metadata: { name: string; description: string; createdBy: string },
+    existingId?: string
+  ): Promise<{ id: string; name: string; status: 'draft'; updatedAt: string }> {
+    try {
+      const now = new Date().toISOString();
+      const workflowMetadata = { stepCount: workflowDefinition.steps.length, tags: [] as string[] };
+
+      if (existingId) {
+        const found = await postgresPool.query('SELECT id, status FROM published_workflows WHERE id = $1', [existingId]);
+        if (found[0]?.status === 'draft') {
+          await postgresPool.query(
+            `UPDATE published_workflows
+             SET name = $1, description = $2, workflow_definition = $3, metadata = $4, updated_at = $5, status = 'draft'
+             WHERE id = $6`,
+            [metadata.name, metadata.description, JSON.stringify(workflowDefinition), JSON.stringify(workflowMetadata), now, existingId]
+          );
+          return { id: existingId, name: metadata.name, status: 'draft', updatedAt: now };
+        }
+      }
+
+      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await postgresPool.query(
+        `INSERT INTO published_workflows
+          (id, name, description, version, status, workflow_definition, generated_code, metadata, created_by, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [id, metadata.name, metadata.description, '0.1.0', 'draft', JSON.stringify(workflowDefinition), JSON.stringify({}), JSON.stringify(workflowMetadata), metadata.createdBy, now, now]
+      );
+      return { id, name: metadata.name, status: 'draft', updatedAt: now };
+    } catch (error) {
+      console.error('Error saving workflow draft:', error);
+      throw new Error(`Failed to save workflow draft: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
    * Publish a workflow
    */
   async publishWorkflow(

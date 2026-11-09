@@ -46,6 +46,10 @@
   // Python workflow generation
   let pythonWorkflow: PythonDaprWorkflow | null = $state(null);
 
+  // Saving drafts: the id of the saved draft, so later saves update it instead of creating copies
+  let savedWorkflowId: string | null = $state(null);
+  let saveState: { kind: 'idle' | 'saving' | 'saved' | 'error'; message: string } = $state({ kind: 'idle', message: '' });
+
   // Publish workflow state
   let loadingPublish = $state(false);
   let publishMetadata = $state({
@@ -93,6 +97,10 @@
 
     // Load available datasets
     await loadAvailableDatasets();
+
+    // /data-management/workflow-builder?workflow=<id> reopens a saved workflow
+    const requestedId = new URLSearchParams(window.location.search).get('workflow');
+    if (requestedId) await openSavedWorkflow(requestedId);
   });
 
   onDestroy(() => {
@@ -131,9 +139,43 @@
   // Workflow Actions
   // ===================================================================
 
-  function saveWorkflow() {
-    console.log('Saving workflow:', workflow);
-    alert('Workflow saved successfully!');
+  async function openSavedWorkflow(id: string) {
+    try {
+      const response = await fetch(`/api/workflows/${encodeURIComponent(id)}`);
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.workflow?.definition) throw new Error(result?.message ?? `HTTP ${response.status}`);
+      workflowBuilder.loadWorkflow(result.workflow.definition);
+      // Only drafts are updated in place; saving a published workflow makes a new draft
+      savedWorkflowId = result.workflow.status === 'draft' ? result.workflow.id : null;
+      saveState = { kind: 'idle', message: '' };
+    } catch (error) {
+      console.error('Could not open the saved workflow:', error);
+      saveState = { kind: 'error', message: 'We could not open that workflow. It may have been deleted.' };
+    }
+  }
+
+  async function saveWorkflow() {
+    saveState = { kind: 'saving', message: 'Saving…' };
+    try {
+      const response = await fetch('/api/workflows/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: savedWorkflowId ?? undefined,
+          workflowDefinition: workflow,
+          name: workflow.name,
+          description: workflow.description
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error ?? `HTTP ${response.status}`);
+      savedWorkflowId = result.workflow.id;
+      const steps = workflow.steps.length;
+      saveState = { kind: 'saved', message: `Saved as a draft (${steps} step${steps === 1 ? '' : 's'})` };
+    } catch (error) {
+      console.error('Error saving workflow:', error);
+      saveState = { kind: 'error', message: 'We could not save this workflow. Try again.' };
+    }
   }
 
   function runWorkflow() {
@@ -382,10 +424,12 @@
         </div>
 
         <div class="flex items-center space-x-3">
+          <span role="status" class="text-sm {saveState.kind === 'error' ? 'text-red-700' : 'text-gray-600'}">{saveState.message}</span>
           <button
             onclick={saveWorkflow}
-            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-sm font-medium transition-colors">
-            Save Workflow
+            disabled={saveState.kind === 'saving'}
+            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors">
+            Save draft
           </button>
           <button
             onclick={generateDaprCode}
@@ -433,11 +477,13 @@
               bind:value={workflow.name}
               onchange={(e: Event) => workflowBuilder.setWorkflowInfo((e.target as HTMLInputElement).value, workflow.description)}
               class="text-lg font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2"
+              aria-label="Workflow name"
               placeholder="Workflow name">
             <input
               bind:value={workflow.description}
               onchange={(e: Event) => workflowBuilder.setWorkflowInfo(workflow.name, (e.target as HTMLInputElement).value)}
               class="block text-sm text-gray-600 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 mt-1"
+              aria-label="Workflow description"
               placeholder="Workflow description">
           </div>
           <div class="text-sm text-gray-500">

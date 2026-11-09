@@ -49,6 +49,41 @@ describe('publishWorkflow', () => {
   });
 });
 
+describe('saveDraft', () => {
+  const meta = { name: 'Transit sentiment', description: 'draft', createdBy: 'a@example.com' };
+
+  it('inserts a new draft without generating Python, so incomplete workflows can be saved', async () => {
+    const draft = await serverWorkflowService.saveDraft({ ...definition, steps: [definition.steps[0]], connections: [] }, meta);
+
+    expect(draft.status).toBe('draft');
+    expect(draft.id).toMatch(/^wf_/);
+    const [sql, params] = query.mock.calls[0];
+    expect(String(sql)).toContain('INSERT INTO published_workflows');
+    expect(params).toContain('draft');
+    expect(JSON.parse(params[6])).toEqual({});
+  });
+
+  it('updates an existing draft in place and keeps its id', async () => {
+    query.mockResolvedValueOnce([{ id: 'wf_9', status: 'draft' }]).mockResolvedValue([]);
+
+    const draft = await serverWorkflowService.saveDraft(definition, meta, 'wf_9');
+
+    expect(draft.id).toBe('wf_9');
+    const updateCall = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE published_workflows'))!;
+    expect(String(updateCall[0])).toContain("status = 'draft'");
+    expect(updateCall[1]).toContain('wf_9');
+  });
+
+  it('never overwrites a published workflow: it saves a new draft instead', async () => {
+    query.mockResolvedValueOnce([{ id: 'wf_7', status: 'published' }]).mockResolvedValue([]);
+
+    const draft = await serverWorkflowService.saveDraft(definition, meta, 'wf_7');
+
+    expect(draft.id).not.toBe('wf_7');
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE published_workflows'))).toBe(false);
+  });
+});
+
 describe('listing queries', () => {
   it('filters workflows by status on the workflows table', async () => {
     await serverWorkflowService.getPublishedWorkflows({ status: 'published' } as any);
