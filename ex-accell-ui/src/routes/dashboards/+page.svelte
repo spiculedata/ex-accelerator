@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import { dashboardDb } from '$lib/services/dashboardDb';
   import { ErrorAlert } from '$lib/components/ui';
-  import { getStatusColor, getStatusIcon, getTrendIcon, getHealthColor } from '$lib/utils/colorUtils';
+  import { getSentimentColor, getStatusColor, getStatusIcon, getTrendIcon, getHealthColor } from '$lib/utils/colorUtils';
   import { formatTimestamp, formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
@@ -249,9 +249,9 @@
         type: 'pie',
         radius: ['40%', '70%'],
         data: [
-          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: '#06d6a0' } },
-          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: '#f72585' } },
-          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: '#8b5cf6' } }
+          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: getSentimentColor('positive') } },
+          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: getSentimentColor('negative') } },
+          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: getSentimentColor('neutral') } }
         ],
         label: { show: false },
         emphasis: {
@@ -299,9 +299,10 @@
         data: dataSources.map((s, index) => ({
           value: s.posts,
           itemStyle: {
-            color: s.status === 'active' ? 
-              ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc', '#d946ef', '#e879f9', '#f0abfc'][index % 7] : 
-              '#f59e0b'
+            // Brand categorical series for active sources, grey for inactive ones
+            color: s.status === 'active' ?
+              ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442'][index % 7] :
+              '#98a2ae'
           }
         })),
         emphasis: {
@@ -354,15 +355,15 @@
           name: 'Positive',
           type: 'line',
           data: crawlingActivity.map(a => a.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(6, 214, 160, 0.3)' },
-                { offset: 1, color: 'rgba(6, 214, 160, 0.02)' }
+                { offset: 0, color: 'rgba(86, 180, 233, 0.3)' },
+                { offset: 1, color: 'rgba(86, 180, 233, 0.02)' }
               ]
             }
           },
@@ -372,15 +373,15 @@
           name: 'Negative',
           type: 'line',
           data: crawlingActivity.map(a => a.negative),
-          itemStyle: { color: '#f72585' },
+          itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(247, 37, 133, 0.3)' },
-                { offset: 1, color: 'rgba(247, 37, 133, 0.02)' }
+                { offset: 0, color: 'rgba(230, 159, 0, 0.3)' },
+                { offset: 1, color: 'rgba(230, 159, 0, 0.02)' }
               ]
             }
           },
@@ -390,15 +391,15 @@
           name: 'Neutral',
           type: 'line',
           data: crawlingActivity.map(a => a.neutral),
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: getSentimentColor('neutral') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
-                { offset: 1, color: 'rgba(139, 92, 246, 0.02)' }
+                { offset: 0, color: 'rgba(152, 162, 174, 0.3)' },
+                { offset: 1, color: 'rgba(152, 162, 174, 0.02)' }
               ]
             }
           },
@@ -459,7 +460,7 @@
         data: textAnalytics.topTopics.map((t: any) => ({
           value: t.posts,
           itemStyle: {
-            color: t.trend === 'up' ? '#06d6a0' : t.trend === 'down' ? '#f72585' : '#8b5cf6'
+            color: t.trend === 'up' ? '#0072b2' : t.trend === 'down' ? '#d55e00' : '#98a2ae'
           }
         })),
         emphasis: {
