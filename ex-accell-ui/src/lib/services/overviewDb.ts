@@ -1,6 +1,7 @@
 // Database connection and query service for Overview Dashboard data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { platformColour } from '$lib/utils/categoryColours';
 import { BaseDatabaseService } from './baseDatabaseService';
 
 import { CHART } from '$lib/utils/chartColors';
@@ -133,14 +134,6 @@ class OverviewDatabase extends BaseDatabaseService {
       return [];
     }
 
-    const platformColors: Record<string, string> = {
-      twitter: CHART.twitter,
-      facebook: CHART.facebook,
-      instagram: CHART.instagram,
-      youtube: CHART.danger500,
-      telegram: CHART.telegram,
-      reddit: CHART.catVermilion
-    };
 
     return this.safeTransform(
       data,
@@ -156,7 +149,7 @@ class OverviewDatabase extends BaseDatabaseService {
           totalProcessed: platform.total_posts,
           statusDisplay: isActive ? 'Active' : 'Idle',
           activityDisplay: `${platform.total_posts} posts analyzed`,
-          iconColor: platformColors[name] || CHART.ink500
+          iconColor: platformColour(name)
         };
       },
       []

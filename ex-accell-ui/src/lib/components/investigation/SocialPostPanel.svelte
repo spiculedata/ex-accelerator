@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { platformBadgeClass } from '$lib/utils/categoryColours';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { investigationSelection, toggleSelectedId, setHoveredId } from '$lib/stores/investigationStore';
   import type { InvestigationSelection } from '$lib/stores/investigationStore';
 
@@ -35,36 +37,8 @@
     return text.slice(0, len) + '...';
   }
 
-  function sentimentBadgeClass(sentiment?: string): string {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive':
-        return 'bg-emerald-100 text-emerald-700';
-      case 'negative':
-        return 'bg-rose-100 text-rose-700';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  }
-
-  function platformBadgeClass(platform?: string): string {
-    switch (platform?.toLowerCase()) {
-      case 'twitter':
-      case 'x':
-        return 'bg-sky-100 text-sky-700';
-      case 'facebook':
-        return 'bg-blue-100 text-blue-700';
-      case 'instagram':
-        return 'bg-pink-100 text-pink-700';
-      case 'reddit':
-        return 'bg-orange-100 text-orange-700';
-      case 'telegram':
-        return 'bg-cyan-100 text-cyan-700';
-      case 'youtube':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  }
+  // Sentiment takes the brand scale (blue to orange), platforms the categorical tokens; both badges carry their label
+  const sentimentBadgeClass = (sentiment?: string): string => getSentimentColor(sentiment ?? 'neutral', 'tailwind');
 
   function platformIcon(platform?: string): string {
     switch (platform?.toLowerCase()) {

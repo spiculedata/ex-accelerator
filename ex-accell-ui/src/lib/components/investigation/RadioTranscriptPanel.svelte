@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { investigationSelection, toggleSelectedId, setHoveredId } from '$lib/stores/investigationStore';
   import type { InvestigationSelection } from '$lib/stores/investigationStore';
 
@@ -48,16 +49,8 @@
     return text.slice(0, len) + '...';
   }
 
-  function sentimentBadgeClass(sentiment?: string): string {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive':
-        return 'bg-emerald-100 text-emerald-700';
-      case 'negative':
-        return 'bg-rose-100 text-rose-700';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  }
+  // Sentiment takes the brand scale (blue to orange), never green and red
+  const sentimentBadgeClass = (sentiment?: string): string => getSentimentColor(sentiment ?? 'neutral', 'tailwind');
 
   function formatDuration(seconds: number): string {
     const m = Math.floor(seconds / 60);

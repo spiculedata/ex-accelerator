@@ -244,64 +244,22 @@ export function searchSteps(query: string): StepTemplate[] {
 }
 
 /**
- * Tailwind color classes for step colors
+ * Tailwind classes for a step's colour name. The names are historical: several of them (blue, purple, indigo, pink,
+ * cyan) now resolve to the same primary ramp, so they take distinct categorical tokens (--se-cat-*) instead, with the
+ * label in ink so it stays readable on every tint. Each step also carries an icon and a category label.
  */
 export const stepColorClasses: Record<string, { bg: string; border: string; text: string }> = {
-  blue: {
-    bg: 'bg-blue-100',
-    border: 'border-blue-500',
-    text: 'text-blue-700'
-  },
-  green: {
-    bg: 'bg-green-100',
-    border: 'border-green-500',
-    text: 'text-green-700'
-  },
-  yellow: {
-    bg: 'bg-yellow-100',
-    border: 'border-yellow-500',
-    text: 'text-yellow-700'
-  },
-  purple: {
-    bg: 'bg-purple-100',
-    border: 'border-purple-500',
-    text: 'text-purple-700'
-  },
-  indigo: {
-    bg: 'bg-indigo-100',
-    border: 'border-indigo-500',
-    text: 'text-indigo-700'
-  },
-  orange: {
-    bg: 'bg-orange-100',
-    border: 'border-orange-500',
-    text: 'text-orange-700'
-  },
-  pink: {
-    bg: 'bg-pink-100',
-    border: 'border-pink-500',
-    text: 'text-pink-700'
-  },
-  emerald: {
-    bg: 'bg-emerald-100',
-    border: 'border-emerald-500',
-    text: 'text-emerald-700'
-  },
-  cyan: {
-    bg: 'bg-cyan-100',
-    border: 'border-cyan-500',
-    text: 'text-cyan-700'
-  },
-  rose: {
-    bg: 'bg-rose-100',
-    border: 'border-rose-500',
-    text: 'text-rose-700'
-  },
-  gray: {
-    bg: 'bg-gray-100',
-    border: 'border-gray-500',
-    text: 'text-gray-700'
-  }
+  blue: { bg: 'bg-cat-1/15', border: 'border-cat-1', text: 'text-ink-900' },
+  green: { bg: 'bg-success-100', border: 'border-success-500', text: 'text-success-800' },
+  yellow: { bg: 'bg-cat-7/25', border: 'border-cat-7', text: 'text-ink-900' },
+  purple: { bg: 'bg-cat-4/15', border: 'border-cat-4', text: 'text-ink-900' },
+  indigo: { bg: 'bg-cat-8/10', border: 'border-cat-8', text: 'text-ink-900' },
+  orange: { bg: 'bg-signal-100', border: 'border-signal-500', text: 'text-signal-800' },
+  pink: { bg: 'bg-cat-6/15', border: 'border-cat-6', text: 'text-ink-900' },
+  emerald: { bg: 'bg-cat-3/15', border: 'border-cat-3', text: 'text-ink-900' },
+  cyan: { bg: 'bg-cat-5/20', border: 'border-cat-5', text: 'text-ink-900' },
+  rose: { bg: 'bg-danger-100', border: 'border-danger-500', text: 'text-danger-800' },
+  gray: { bg: 'bg-ink-100', border: 'border-ink-500', text: 'text-ink-700' }
 };
 
 /**

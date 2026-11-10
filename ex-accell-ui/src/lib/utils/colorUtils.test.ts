@@ -8,8 +8,8 @@ import {
 
 describe('getStatusColor', () => {
   it.each([
-    ['active', 'bg-blue-100 text-blue-800'],
-    ['running', 'bg-blue-100 text-blue-800'],
+    ['active', 'bg-primary-100 text-primary-800'],
+    ['running', 'bg-primary-100 text-primary-800'],
     ['success', 'bg-green-100 text-green-800'],
     ['completed', 'bg-green-100 text-green-800'],
     ['paused', 'bg-yellow-100 text-yellow-800'],
@@ -20,7 +20,7 @@ describe('getStatusColor', () => {
     ['cancelled', 'bg-gray-100 text-gray-800'],
     ['archived', 'bg-gray-100 text-gray-800'],
     ['inactive', 'bg-gray-100 text-gray-800'],
-    ['info', 'bg-blue-100 text-blue-800'],
+    ['info', 'bg-primary-100 text-primary-800'],
   ])('returns correct color for "%s"', (status, expected) => {
     expect(getStatusColor(status)).toBe(expected);
   });
@@ -119,14 +119,19 @@ describe('getSentimentIcon', () => {
 });
 
 describe('getCategoryColor', () => {
-  it('returns correct color for known categories', () => {
-    expect(getCategoryColor('health')).toBe('#10b981');
-    expect(getCategoryColor('economy')).toBe('#8b5cf6');
-    expect(getCategoryColor('technology')).toBe('#3b82f6');
+  it('returns a categorical brand colour for known categories', () => {
+    expect(getCategoryColor('health')).toBe('#009e73');
+    expect(getCategoryColor('economy')).toBe('#f0e442');
+    expect(getCategoryColor('technology')).toBe('#0f1926');
   });
 
-  it('returns default gray for unknown category', () => {
-    expect(getCategoryColor('unknown')).toBe('#6b7280');
+  it('keeps conflict and politics apart without red and green', () => {
+    expect(getCategoryColor('security & conflict')).not.toBe(getCategoryColor('politics'));
+    expect(getCategoryColor('security & conflict')).not.toMatch(/^#(ef4444|dc2626)$/);
+  });
+
+  it('returns ink for an unknown category', () => {
+    expect(getCategoryColor('unknown')).toBe('#667384');
   });
 });
 

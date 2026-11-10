@@ -22,6 +22,7 @@ export const CHART = {
   primary400: '#46b5ce',
   primary500: '#0097b1',
   primary600: '#007b95',
+  primary700: '#006278',
   success600: '#247e56',
   danger500: '#e6443d',
   danger600: '#c51e21',
@@ -34,13 +35,7 @@ export const CHART = {
   catPink: '#cc79a7',
   catSky: '#56b4e9',
   catVermilion: '#d55e00',
-  catYellow: '#f0e442',
-
-  // The networks' own colours, where a mark stands for that network
-  twitter: '#1da1f2',
-  facebook: '#1877f2',
-  telegram: '#0088cc',
-  instagram: '#e4405f'
+  catYellow: '#f0e442'
 } as const;
 
 /** Series colours in the order a chart should use them. */

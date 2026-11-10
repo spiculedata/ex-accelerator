@@ -70,11 +70,12 @@
   ];
 
   const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
-    blue: { bg: 'bg-blue-50', border: 'border-blue-200 hover:border-blue-400', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' },
+    // blue and purple both resolve to primary now, so the two modules take categorical tints instead
+    blue: { bg: 'bg-cat-1/10', border: 'border-cat-1/40 hover:border-cat-1', text: 'text-ink-900', badge: 'bg-cat-1/15 text-ink-900' },
     emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200 hover:border-emerald-400', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
     red: { bg: 'bg-red-50', border: 'border-red-200 hover:border-red-400', text: 'text-red-700', badge: 'bg-red-100 text-red-700' },
     amber: { bg: 'bg-amber-50', border: 'border-amber-200 hover:border-amber-400', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700' },
-    purple: { bg: 'bg-purple-50', border: 'border-purple-200 hover:border-purple-400', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' },
+    purple: { bg: 'bg-cat-4/10', border: 'border-cat-4/40 hover:border-cat-4', text: 'text-ink-900', badge: 'bg-cat-4/15 text-ink-900' },
   };
 
   async function loadData() {

@@ -4,6 +4,7 @@
 </svelte:head>
 
 <script lang="ts">
+  import { workspaceTypeBadgeClass } from '$lib/utils/categoryColours';
   import { CHART } from '$lib/utils/chartColors';
   import { onMount, onDestroy } from 'svelte';
   import { typeLabel } from '$lib/utils/projectForm';
@@ -133,14 +134,7 @@
     }
   }
 
-  function typeBadgeColor(t: string): string {
-    switch (t) {
-      case 'analysis': return 'bg-indigo-100 text-indigo-800';
-      case 'exploration': return 'bg-emerald-100 text-emerald-800';
-      case 'reporting': return 'bg-amber-100 text-amber-800';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  }
+  const typeBadgeColor = (t: string): string => workspaceTypeBadgeClass(t);
 
   // ---------- data loading ----------
   async function loadData() {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dataSourceBadgeClass } from '$lib/utils/categoryColours';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -54,17 +55,6 @@
   $: platforms = [...new Set(activeDatasets.map((d: any) => d.source_platform).filter(Boolean))];
   $: derivedDatasetTypes = [...new Set(activeDatasets.map((d: any) => d.dataset_type).filter(Boolean))];
 
-  // Color map for dataset types
-  const typeColors: Record<string, { bg: string; text: string; border: string }> = {
-    social_media: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300' },
-    gdelt_events: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300' },
-    radio: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300' },
-    imported: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-300' },
-  };
-
-  function getTypeColor(type: string) {
-    return typeColors[type] || { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300' };
-  }
 
   let lastLoadKey = '';
 
@@ -212,12 +202,11 @@
         {#each visibleDatasets as dataset}
           {@const id = dataset.id ?? dataset.dataset_id}
           {@const enabled = enabledIds.has(id)}
-          {@const colors = getTypeColor(dataset.dataset_type)}
           <button
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all
               {enabled
-                ? `${colors.bg} ${colors.text} ${colors.border} shadow-sm`
-                : 'bg-gray-100 text-gray-600 border-gray-200'}"
+                ? `${dataSourceBadgeClass(dataset.dataset_type)} shadow-sm`
+                : 'bg-gray-100 text-gray-600 ring-1 ring-gray-200'}"
             on:click={() => toggleDataset(id)}
             title="{enabled ? 'Click to disable' : 'Click to enable'}: {dataset.name || dataset.dataset_name}"
           >
