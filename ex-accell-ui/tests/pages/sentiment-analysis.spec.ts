@@ -18,4 +18,17 @@ test.describe('Sentiment Analysis', () => {
     const text = await body.textContent();
     expect(text?.trim().length).toBeGreaterThan(0);
   });
+
+  // The analytics API is stubbed so these states do not depend on the database
+  test('says so, in a status banner, when no posts match', async ({ page }) => {
+    await page.route('**/api/unified-analytics**', (route) => route.fulfill({ json: { success: true, data: [] } }));
+    await page.goto('/text-analytics/sentiment-analysis');
+    await expect(page.getByRole('status').filter({ hasText: 'No posts match these filters' })).toBeVisible();
+  });
+
+  test('says so, in an alert, when the data cannot be loaded', async ({ page }) => {
+    await page.route('**/api/unified-analytics**', (route) => route.fulfill({ status: 500, json: { success: false, error: 'Request failed' } }));
+    await page.goto('/text-analytics/sentiment-analysis');
+    await expect(page.getByRole('alert').filter({ hasText: 'We could not load sentiment data' })).toBeVisible();
+  });
 });

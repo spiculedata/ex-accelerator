@@ -1,6 +1,7 @@
 // Investigations API Endpoint
 // CRUD operations for investigation configurations
 
+import { canModifyInvestigation } from '$lib/server/investigationAccess';
 import { investigationListQuery } from '$lib/server/investigationQuery';
 import { json } from '@sveltejs/kit';
 import { validateDayRange } from '$lib/utils/calendarDay';
@@ -70,9 +71,9 @@ export const GET: RequestHandler = async ({ url }) => {
     const investigations = await postgresPool.query(sql, params);
     return json({ success: true, investigations });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('GET /api/investigations error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    // The cause is logged; the browser gets a generic message, never database detail
+    console.error('GET /api/investigations error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, error: 'The investigation request failed. Try again in a moment.' }, { status: 500 });
   }
 };
 
@@ -133,9 +134,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     return json({ success: true, investigation: rows[0] });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('POST /api/investigations error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    // The cause is logged; the browser gets a generic message, never database detail
+    console.error('POST /api/investigations error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, error: 'The investigation request failed. Try again in a moment.' }, { status: 500 });
   }
 };
 
@@ -147,11 +148,18 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
+/** A 403 when the signed-in user may not change this investigation, or null when they may (or it does not exist yet to be refused). */
+async function refuseUnlessAllowed(id: unknown, user: { email: string; role?: string } | null | undefined): Promise<Response | null> {
+  const rows = await postgresPool.query('SELECT created_by FROM investigations WHERE id = $1', [parseInt(String(id))]);
+  if (rows.length === 0) return null; // the handler reports not found
+  return canModifyInvestigation(user, rows[0].created_by) ? null : json({ success: false, error: 'Only the person who created this investigation, or an admin, can change it.' }, { status: 403 });
+}
+
 /**
  * PATCH /api/investigations
  * Update an existing investigation
  */
-export const PATCH: RequestHandler = async ({ request }) => {
+export const PATCH: RequestHandler = async ({ request, locals }) => {
   try {
     await ensureTable();
 
@@ -160,6 +168,9 @@ export const PATCH: RequestHandler = async ({ request }) => {
     if (!data.id) {
       return json({ success: false, error: 'Investigation ID required' }, { status: 400 });
     }
+
+    const denied = await refuseUnlessAllowed(data.id, locals.user);
+    if (denied) return denied;
 
     // Build dynamic SET clause from provided fields
     const allowedFields = [
@@ -210,9 +221,9 @@ export const PATCH: RequestHandler = async ({ request }) => {
 
     return json({ success: true, investigation: rows[0] });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('PATCH /api/investigations error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    // The cause is logged; the browser gets a generic message, never database detail
+    console.error('PATCH /api/investigations error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, error: 'The investigation request failed. Try again in a moment.' }, { status: 500 });
   }
 };
 
@@ -220,7 +231,7 @@ export const PATCH: RequestHandler = async ({ request }) => {
  * DELETE /api/investigations?id=X
  * Delete an investigation
  */
-export const DELETE: RequestHandler = async ({ url }) => {
+export const DELETE: RequestHandler = async ({ url, locals }) => {
   try {
     await ensureTable();
 
@@ -229,6 +240,9 @@ export const DELETE: RequestHandler = async ({ url }) => {
     if (!id) {
       return json({ success: false, error: 'Investigation ID required' }, { status: 400 });
     }
+
+    const denied = await refuseUnlessAllowed(id, locals.user);
+    if (denied) return denied;
 
     const rows = await postgresPool.query(
       'DELETE FROM investigations WHERE id = $1 RETURNING id',
@@ -241,8 +255,8 @@ export const DELETE: RequestHandler = async ({ url }) => {
 
     return json({ success: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('DELETE /api/investigations error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    // The cause is logged; the browser gets a generic message, never database detail
+    console.error('DELETE /api/investigations error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, error: 'The investigation request failed. Try again in a moment.' }, { status: 500 });
   }
 };

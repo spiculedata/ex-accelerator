@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dateBoundToEpochMs } from './dateBounds';
+import { dateBoundToEpochMs, validateDateParams } from './dateBounds';
 
 describe('dateBoundToEpochMs', () => {
   it('turns a start date into midnight UTC in epoch milliseconds', () => {
@@ -31,5 +31,32 @@ describe('dateBoundToEpochMs', () => {
 
   it.each([['not-a-date'], [''], ['2026-13-45'], ['2026-11-9x']])('returns null for %j', (value) => {
     expect(dateBoundToEpochMs(value, 'start')).toBeNull();
+  });
+});
+
+describe('validateDateParams', () => {
+  const check = (query: string) => validateDateParams(new URLSearchParams(query));
+
+  it('accepts no dates, whole days, and timestamps with a zone', () => {
+    expect(check('')).toBeNull();
+    expect(check('date_start=2026-11-01&date_end=2026-11-30')).toBeNull();
+    expect(check('date_start=2026-11-01T00:00:00Z&date_end=2026-11-02T00:00:00Z')).toBeNull();
+    expect(check('date_start=2026-11-01')).toBeNull();
+  });
+
+  it('names the parameter that is not a real date', () => {
+    expect(check('date_start=2026-02-30')).toBe('date_start must be a date (YYYY-MM-DD)');
+    expect(check('date_end=yesterday')).toBe('date_end must be a date (YYYY-MM-DD)');
+  });
+
+  it('applies the same rules to the camel-case names the GDELT endpoints use', () => {
+    expect(check('dateStart=2026-11-01&dateEnd=2026-11-30')).toBeNull();
+    expect(check('dateStart=2026-13-01')).toBe('dateStart must be a date (YYYY-MM-DD)');
+    expect(check('dateStart=2026-11-05&dateEnd=2026-11-01')).toBe('dateStart must be on or before dateEnd');
+  });
+
+  it('rejects a start after the end, whichever form each is written in', () => {
+    expect(check('date_start=2026-11-05&date_end=2026-11-01')).toBe('date_start must be on or before date_end');
+    expect(check('date_start=2026-11-05T12:00:00Z&date_end=2026-11-05T11:00:00Z')).toBe('date_start must be on or before date_end');
   });
 });

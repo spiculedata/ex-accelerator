@@ -149,3 +149,41 @@ describe('PATCH /api/investigations annotations', () => {
     expect(params).toContain(JSON.stringify([note]));
   });
 });
+
+describe('investigations API failures', () => {
+  it('answers a database failure with a generic 500 and never the database message', async () => {
+    const mod = await import('./+server');
+    const failing = vi.fn().mockRejectedValue(new Error('relation "investigations" does not exist at 10.0.0.5'));
+    const { postgresPool } = await import('$lib/services/postgres');
+    const original = postgresPool.query;
+    (postgresPool as any).query = failing;
+    try {
+      const response = await mod.GET({ url: new URL('http://localhost/api/investigations') } as any);
+      expect(response.status).toBe(500);
+      const text = JSON.stringify(await response.json());
+      expect(text).not.toContain('relation');
+      expect(text).not.toContain('10.0.0.5');
+    } finally {
+      (postgresPool as any).query = original;
+    }
+  });
+});
+
+describe('investigations ownership', () => {
+  const asUser = (email: string, role = 'analyst') => ({ email, role });
+  const patch = (user: unknown, body: unknown) =>
+    PATCH({ request: new Request('http://localhost/api/investigations', { method: 'PATCH', body: JSON.stringify(body) }), locals: { user } } as unknown as Parameters<typeof PATCH>[0]);
+
+  it('refuses a change by someone who is not the creator or an admin, before changing anything', async () => {
+    query.mockImplementation(async (sql: string) => (String(sql).startsWith('SELECT created_by') ? [{ created_by: 'ada@example.com' }] : [{ id: 7 }]));
+    const response = await patch(asUser('bob@example.com'), { id: 7, name: 'Taken over' });
+    expect(response.status).toBe(403);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE investigations'))).toBe(false);
+  });
+
+  it('lets the creator and an admin through', async () => {
+    query.mockImplementation(async (sql: string) => (String(sql).startsWith('SELECT created_by') ? [{ created_by: 'ada@example.com' }] : [{ id: 7 }]));
+    expect((await patch(asUser('ada@example.com'), { id: 7, name: 'Mine' })).status).toBe(200);
+    expect((await patch(asUser('root@example.com', 'admin'), { id: 7, name: 'Admin edit' })).status).toBe(200);
+  });
+});

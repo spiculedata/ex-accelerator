@@ -4,6 +4,9 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
+import { BodyTooLargeError, readJsonLimited } from '$lib/server/requestBody';
+
+const MAX_WORKFLOW_BODY_BYTES = 1024 * 1024; // far more than any real workflow definition
 
 /**
  * GET /api/workflows
@@ -39,8 +42,14 @@ export const GET: RequestHandler = async ({ url }) => {
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
   try {
-    const body = await request.json();
-    const { workflowDefinition, metadata } = body;
+    let body: any;
+    try {
+      body = await readJsonLimited(request, MAX_WORKFLOW_BODY_BYTES);
+    } catch (error) {
+      if (error instanceof BodyTooLargeError) return json({ success: false, error: error.message }, { status: 413 });
+      return json({ success: false, error: 'Send a JSON body' }, { status: 400 });
+    }
+    const { workflowDefinition, metadata, draftId } = body;
 
     if (!workflowDefinition || !metadata) {
       return json({ success: false, error: 'Missing workflowDefinition or metadata' }, { status: 400 });
@@ -53,7 +62,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     // The creator is the signed-in user, never a name typed into the form
     const publishedWorkflow = await serverWorkflowService.publishWorkflow(workflowDefinition, {
       ...metadata,
-      createdBy: locals.user?.email ?? 'unknown'
+      createdBy: locals.user?.email ?? 'unknown',
+      ...(typeof draftId === 'string' && draftId ? { draftId } : {})
     });
 
     return json({

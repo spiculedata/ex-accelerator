@@ -163,4 +163,32 @@ describe('workflow tables', () => {
 
     for (const column of new Set(readFromWorkflow)) expect(known.has(column), `row.${column}`).toBe(true);
   });
+
+  it('turns a draft into the published workflow instead of leaving the draft behind', async () => {
+    await serverWorkflowService.publishWorkflow(definition, { name: 'Demo', description: 'd', createdBy: 'a@example.com', draftId: 'wf_draft1' });
+
+    const removal = query.mock.calls.find(([sql]) => String(sql).includes('DELETE FROM published_workflows'));
+    expect(removal).toBeDefined();
+    const [sql, params] = removal!;
+    // Only the publisher's own draft, and only while it is still a draft
+    expect(String(sql)).toContain("status = 'draft'");
+    expect(String(sql)).toContain('created_by');
+    expect(params).toEqual(['wf_draft1', 'a@example.com']);
+  });
+
+  it('removes nothing when there is no draft', async () => {
+    await serverWorkflowService.publishWorkflow(definition, { name: 'Demo', description: 'd', createdBy: 'a@example.com' });
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('DELETE FROM published_workflows'))).toBe(false);
+  });
+
+  it('still reports the publish when removing the draft fails, since the workflow is already stored', async () => {
+    query.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('DELETE FROM published_workflows')) throw new Error('db hiccup');
+      return [];
+    });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const published = await serverWorkflowService.publishWorkflow(definition, { name: 'Demo', description: 'd', createdBy: 'a@example.com', draftId: 'wf_draft1' });
+    expect(published.status).toBe('published');
+    log.mockRestore();
+  });
 });

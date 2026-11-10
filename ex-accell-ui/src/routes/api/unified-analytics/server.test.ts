@@ -527,3 +527,17 @@ describe('GET /api/unified-analytics sentiment-trends range', () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe('GET /api/unified-analytics date ranges', () => {
+  it.each(['emotion-stats', 'sample-posts', 'engagement-stats', 'language-stats', 'trigrams', 'sentiment-keywords'])(
+    'answers 400, without touching the database, for a bad or reversed range on %s',
+    async (type) => {
+      for (const query of ['&date_start=2026-02-30', '&date_start=2026-11-05&date_end=2026-11-01', '&dateStart=nope']) {
+        const response = await call(type, query);
+        expect(response.status).toBe(400);
+        expect((await response.json()).success).toBe(false);
+      }
+      expect(duckdbQuery).not.toHaveBeenCalled();
+    }
+  );
+});
