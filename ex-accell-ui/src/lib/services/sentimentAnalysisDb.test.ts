@@ -265,25 +265,30 @@ describe('getSamplePosts', () => {
     expect(result[0].author).toBe('user123');
   });
 
-  it('handles missing timestamp by using current date', async () => {
+  it('reads epoch-millisecond timestamps, as the posts view stores them, instead of replacing them with now', async () => {
+    mockFetch({ 'sample-posts': [{ id: '9', text: 'x', sentiment: 'neutral', confidence: 0.5, platform: 'fb', timestamp: '1762530618733' }] });
+    const result = await sentimentAnalysisDb.getSamplePosts();
+    expect(result[0].timestamp).toBe('2025-11-07T15:50:18.733Z');
+  });
+
+  it('leaves a missing timestamp empty rather than inventing one', async () => {
     const posts = [
       { id: '2', text: 'No timestamp', sentiment: 'neutral', confidence: 0.5, platform: 'reddit' }
     ];
     mockFetch({ 'sample-posts': posts });
 
     const result = await sentimentAnalysisDb.getSamplePosts();
-    // Should be a valid ISO string (current date fallback)
-    expect(new Date(result[0].timestamp).getTime()).not.toBeNaN();
+    expect(result[0].timestamp).toBe('');
   });
 
-  it('handles invalid timestamp by using current date', async () => {
+  it('leaves an unreadable timestamp empty rather than showing today', async () => {
     const posts = [
       { id: '3', text: 'Bad ts', sentiment: 'neutral', confidence: 0.5, platform: 'fb', timestamp: 'not-a-date' }
     ];
     mockFetch({ 'sample-posts': posts });
 
     const result = await sentimentAnalysisDb.getSamplePosts();
-    expect(new Date(result[0].timestamp).getTime()).not.toBeNaN();
+    expect(result[0].timestamp).toBe('');
   });
 
   it('defaults engagement to zeros when missing', async () => {

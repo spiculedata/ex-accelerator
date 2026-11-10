@@ -8,7 +8,7 @@ const fakeEcharts = vi.hoisted(() => ({
 
 vi.mock('echarts', () => fakeEcharts);
 
-import { initChart, waitForEcharts } from './echarts';
+import { brandChartTheme, initChart, waitForEcharts } from './echarts';
 
 beforeEach(() => {
   delete (window as any).echarts;
@@ -117,5 +117,11 @@ describe('brand chart theme', () => {
     const theme = fakeEcharts.registerTheme.mock.calls[0][1] as any;
     expect(theme.textStyle.fontFamily).toContain('Atkinson Hyperlegible Next');
     expect(theme.color.slice(0, 3)).toEqual(['#0072b2', '#e69f00', '#009e73']);
+  });
+});
+
+describe('chart accessibility', () => {
+  it('has ECharts describe every chart in text for screen readers', () => {
+    expect((brandChartTheme as { aria?: { enabled?: boolean } }).aria?.enabled).toBe(true);
   });
 });

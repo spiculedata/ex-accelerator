@@ -1,6 +1,8 @@
 // Database connection and query service for Sentiment Analysis data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { toIsoTimestamp } from '$lib/utils/timestamps';
+import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
 import { getSentimentColor } from '$lib/utils/colorUtils';
 import type {
@@ -141,7 +143,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(',') : [],
         platform: post.platform,
-        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
+        timestamp: toIsoTimestamp(post.timestamp),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,
@@ -258,10 +260,13 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    */
   async exportSentimentData(filters: FilterOptions = {}, workspaceId?: string): Promise<ExportData<SentimentPost>> {
     const wsParam = workspaceId ? { workspace_id: workspaceId } : {};
+    // The export honours the date bar and the confidence slider, not only the dropdowns
     const params = {
       ...wsParam,
+      ...currentRangeQuery(),
       sentiment: filters.sentiment || 'all',
       platform: filters.platform || 'all',
+      ...(typeof (filters as any).confidenceThreshold === 'number' ? { minConfidence: (filters as any).confidenceThreshold } : {}),
       timeRange: filters.timeRange || '7d'
     };
 
@@ -283,7 +288,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(';') : [],
         platform: post.platform,
-        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
+        timestamp: toIsoTimestamp(post.timestamp),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,

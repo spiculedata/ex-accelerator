@@ -3,6 +3,9 @@
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import MethodNote from '$lib/components/ui/MethodNote.svelte';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
@@ -106,18 +109,42 @@
     }
   }
 
+  // The list shows a page of posts at a time, and "Show more" asks for another page
+  const POST_PAGE = 50;
+  const POST_MAX = 500;
+  let postLimit = POST_PAGE;
+  let postsLoading = false;
+  let postRequest = 0; // only the newest request may set the list, so a slow older answer cannot overwrite it
+  // One extra post is requested, so "there is more" is known exactly rather than guessed from a full page
+  let postsAvailable = 0;
+  $: hasMorePosts = postsAvailable > postLimit && postLimit < POST_MAX;
+
+  function showMorePosts() {
+    if (postsLoading) return;
+    postLimit = Math.min(postLimit + POST_PAGE, POST_MAX);
+    return loadFilteredPosts();
+  }
+
   // Load filtered posts from database
   async function loadFilteredPosts() {
+    const request = ++postRequest;
+    postsLoading = true;
     try {
       const filters = {
+        limit: postLimit + 1,
         sentiment: selectedSentiment,
         platform: selectedPlatform,
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      const posts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      if (request !== postRequest) return;
+      postsAvailable = posts.length;
+      samplePosts = posts.slice(0, postLimit);
     } catch (error) {
       console.error('Error loading filtered posts:', error);
+    } finally {
+      if (request === postRequest) postsLoading = false;
     }
   }
 
@@ -139,6 +166,7 @@
   $: filterKey = [selectedSentiment, selectedPlatform, confidenceThreshold, timeRange].join('|');
   $: if (filterKey !== lastFilterKey) {
     lastFilterKey = filterKey;
+    postLimit = POST_PAGE; // a new filter starts again from the first page
     if (!loading) {
       loadFilteredPosts();
       sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, requestFilters()).then(trends => {
@@ -152,36 +180,24 @@
   $: filteredPosts = samplePosts;
 
 
-  async function exportSentimentData() {
-    try {
+  // Matches the limit the export endpoint applies
+  const EXPORT_MAX_ROWS = 10_000;
+  let exportState: ExportState = IDLE_EXPORT;
+
+  function exportSentimentData() {
+    return runExport(async () => {
       const filters = {
         sentiment: selectedSentiment,
         platform: selectedPlatform,
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      
       const exportData = await sentimentAnalysisDb.exportSentimentData(filters, workspaceId || undefined);
-      
-      // Create CSV from the exported data
-      const csvData = (exportData as any).posts.map((post: any) =>
-        `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
-      ).join('\n');
-      
-      const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sentiment_analysis_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting sentiment data:', error);
-      alert('Export failed: Database connection required');
-    }
+      const rows = exportData.data ?? [];
+      // toCsv quotes embedded commas, quotes and line breaks, and neutralises text a spreadsheet would run as a formula
+      downloadCsv('sentiment_analysis_report.csv', toCsv(rows, ['text', 'sentiment', 'confidence', 'platform', 'timestamp']));
+      return { rows: rows.length, capped: rows.length >= EXPORT_MAX_ROWS };
+    }, (state) => (exportState = state));
   }
 
   // Chart initialization
@@ -425,8 +441,9 @@
     <svelte:fragment slot="actions">
       <button
         on:click={exportSentimentData}
+        disabled={exportState.kind === 'working'}
         class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
-        Export Analysis
+        {exportState.kind === 'working' ? 'Exporting…' : 'Export Analysis'}
       </button>
     </svelte:fragment>
   </PageHeader>
@@ -435,6 +452,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->
@@ -508,7 +526,7 @@
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment <span class="font-normal text-gray-500">(filters the post list)</span></label>
           <select bind:value={selectedSentiment} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">All Sentiments</option>
             <option value="Very Positive">Very Positive</option>
@@ -605,6 +623,15 @@
       {#if filteredPosts.length === 0}
         <div class="text-center py-8">
           <p class="text-gray-500">No posts match your current filters.</p>
+        </div>
+      {:else}
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <p>
+            {#if hasMorePosts}Showing the first {filteredPosts.length} posts.{:else if postsAvailable > POST_MAX}Showing the first {POST_MAX} posts, the most this list shows. Narrow the filters to see others.{:else}All {filteredPosts.length} matching posts are shown.{/if}
+          </p>
+          {#if hasMorePosts}
+            <button type="button" on:click={showMorePosts} disabled={postsLoading} class="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">{postsLoading ? 'Loading…' : `Show ${POST_PAGE} more`}</button>
+          {/if}
         </div>
       {/if}
     </div>

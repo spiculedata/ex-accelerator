@@ -60,3 +60,9 @@ describe('CSV_BOM', () => {
     expect(CSV_BOM).toBe('\uFEFF');
   });
 });
+
+describe('toCsv numbers', () => {
+  it('keeps a negative number as a number and still protects negative-looking text', () => {
+    expect(toCsv([{ id: 1, score: -0.5, text: '-2+3' }], ['id', 'score', 'text'] as const)).toBe("id,score,text\r\n1,-0.5,'-2+3\r\n");
+  });
+});

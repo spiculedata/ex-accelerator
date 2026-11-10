@@ -293,11 +293,10 @@
       },
       yAxis: {
         type: 'value',
-        name: 'Posts (K)',
+        name: 'Posts',
         axisLabel: {
-          formatter: function(value: any) {
-            return (value / 1000).toFixed(0) + 'K';
-          }
+          // 1.5K, 2K, 800: whole thousands made every tick under 1,500 read "1K" or "0K"
+          formatter: (value: number) => formatNumber(value)
         }
       },
       series: [{

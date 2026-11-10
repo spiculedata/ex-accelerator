@@ -16,6 +16,8 @@ const SANS = "'Atkinson Hyperlegible Next Variable', ui-sans-serif, system-ui, s
 export const brandChartTheme = {
   color: ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'],
   backgroundColor: 'transparent',
+  // ECharts writes a generated text description (title, series, values) onto the chart for screen readers
+  aria: { enabled: true },
   textStyle: { fontFamily: SANS, color: '#344253' },
   title: { textStyle: { fontFamily: SANS, color: '#0f1926', fontWeight: 600 }, subtextStyle: { fontFamily: SANS, color: '#667384' } },
   legend: { textStyle: { fontFamily: SANS, color: '#344253' } },
