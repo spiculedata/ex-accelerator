@@ -9,6 +9,9 @@
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
@@ -34,6 +37,16 @@
   let totalPosts = 0;
   let searchQuery = '';
   let hashtagChart: any = null;
+
+  let exportState: ExportState = IDLE_EXPORT;
+  // Exports the hashtags as listed, including the search box filter
+  function exportHashtags() {
+    return runExport(async () => {
+      const rows = filteredHashtags.map((h) => ({ hashtag: `#${h.hashtag}`, mentions: Number(h.count), posts: Number(h.post_count) }));
+      downloadCsv('hashtag_analysis.csv', toCsv(rows, ['hashtag', 'mentions', 'posts']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
+  }
 
   $: filteredHashtags = hashtags.filter(h => {
     if (!searchQuery) return true;
@@ -119,7 +132,19 @@
   title="Hashtag Analysis"
   subtitle="Discover trending hashtags and co-occurrence patterns"
   accentColor="purple"
-/>
+>
+  <svelte:fragment slot="actions">
+    <button
+      type="button"
+      on:click={exportHashtags}
+      disabled={exportState.kind === 'working' || loading}
+      class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 disabled:opacity-60">
+      {exportState.kind === 'working' ? 'Exporting…' : 'Export CSV'}
+    </button>
+  </svelte:fragment>
+</PageHeader>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4"><ExportStatus state={exportState} /></div>
 
 <WorkspaceBanner />
 

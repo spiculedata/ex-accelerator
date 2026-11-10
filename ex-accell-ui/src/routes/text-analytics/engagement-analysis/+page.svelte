@@ -9,6 +9,9 @@
   import { onMount } from 'svelte';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { ErrorAlert } from '$lib/components/ui';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import { rangeReloader } from '$lib/utils/filterRange';
   import { getSentimentColor } from '$lib/utils/colorUtils';
 
@@ -183,21 +186,25 @@
     return new Date(timestamp).toLocaleString();
   }
 
+  let exportState: ExportState = IDLE_EXPORT;
+
+  // Exports the top posts as listed
   function exportEngagementData() {
-    const csvData = topPosts.map(post => 
-      `"${post.text}",${post.platform},${post.contentType},${post.engagement.likes},${post.engagement.comments},${post.engagement.shares},${post.engagement.rate},${post.reach},${post.timestamp}`
-    ).join('\n');
-    
-    const header = 'Text,Platform,Content Type,Likes,Comments,Shares,Engagement Rate,Reach,Timestamp\n';
-    const csv = header + csvData;
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'engagement_analysis_report.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    return runExport(async () => {
+      const rows = topPosts.map((post) => ({
+        text: post.text,
+        platform: post.platform,
+        contentType: post.contentType,
+        likes: post.engagement?.likes,
+        comments: post.engagement?.comments,
+        shares: post.engagement?.shares,
+        rate: post.engagement?.rate,
+        reach: post.reach,
+        timestamp: post.timestamp
+      }));
+      downloadCsv('engagement_analysis_report.csv', toCsv(rows, ['text', 'platform', 'contentType', 'likes', 'comments', 'shares', 'rate', 'reach', 'timestamp']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
   }
 
   // Initialize charts after data is loaded
@@ -430,6 +437,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->

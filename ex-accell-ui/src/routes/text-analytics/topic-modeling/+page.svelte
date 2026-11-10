@@ -9,6 +9,9 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount, tick } from 'svelte';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import { browser } from '$app/environment';
   import { getCategoryColor } from '$lib/utils/colorUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
@@ -479,35 +482,21 @@
     }, 100);
   }
 
-  async function exportTopicData() {
-    try {
-      const filters = {
-        category: selectedCategory,
-        search: searchQuery,
-        minSize: minTopicSize
-      };
-      
-      const exportData = await topicModelingDb.exportTopicData(filters as any, workspaceId || undefined);
+  let exportState: ExportState = IDLE_EXPORT;
 
-      // Create CSV from the exported data
-      const csvData = (exportData as any).topics.map((topic: any) =>
-        `"${topic.name}",${topic.category},${topic.size},${topic.weight},"${topic.keywords.join(';')}"`
-      ).join('\n');
-      
-      const header = 'Topic Name,Category,Post Count,Weight,Keywords\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'topic_modeling_analysis.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting topic data:', error);
-      alert('Export failed: Database connection required');
-    }
+  // Exports the topics as listed, after the category, search and size filters
+  function exportTopicData() {
+    return runExport(async () => {
+      const rows = filteredTopics.map((topic) => ({
+        name: topic.name,
+        category: topic.category,
+        posts: topic.size,
+        weight: topic.weight,
+        keywords: (topic.keywords ?? []).join('; ')
+      }));
+      downloadCsv('topic_modeling_analysis.csv', toCsv(rows, ['name', 'category', 'posts', 'weight', 'keywords']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
   }
 
   // The topic whose posts are open in the side panel
@@ -550,6 +539,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->

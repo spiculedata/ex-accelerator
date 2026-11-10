@@ -304,7 +304,8 @@ export const GET: RequestHandler = async ({ url }) => {
         const sentiment = url.searchParams.get('sentiment') || 'all';
         const platform = url.searchParams.get('platform') || 'all';
         const limit = parseInt(url.searchParams.get('limit') || '50');
-        const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 50;
+        // The sentiment page pages through up to 500 posts; nothing larger is useful in one response
+        const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 50;
 
         const conditions: string[] = ['1=1'];
         const params: any[] = [];

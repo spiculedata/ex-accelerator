@@ -7,6 +7,9 @@
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { languageDetectionDb } from '$lib/services/languageDetectionDb';
   import { onMount } from 'svelte';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import { getConfidenceColor } from '$lib/utils/colorUtils';
   import { ErrorAlert } from '$lib/components/ui';
   import { platformOptions } from '$lib/utils/platformOptions';
@@ -147,51 +150,15 @@
     return new Date(timestamp).toLocaleString();
   }
 
-  async function exportLanguageData() {
-    try {
-      const filters = {
-        language: selectedLanguage,
-        platform: selectedPlatform,
-        confidenceThreshold: confidenceThreshold,
-        timeRange: timeRange
-      };
-      
-      const exportData = await languageDetectionDb.exportLanguageData(filters, workspaceId || undefined);
-      
-      // Create CSV from the exported data
-      const csvData = (exportData as any).languages.map((lang: any) =>
-        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
-      ).join('\n');
-      
-      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'language_detection_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting language data:', error);
-      errorMessage = 'Failed to export language data. Using cached data instead.';
-      // Fallback to current data
-      const csvData = languageStats.map(lang => 
-        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
-      ).join('\n');
-      
-      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'language_detection_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
+  let exportState: ExportState = IDLE_EXPORT;
+
+  // Exports the languages as listed for the current filters
+  function exportLanguageData() {
+    return runExport(async () => {
+      const rows = filteredStats.map((lang) => ({ language: lang.name, code: lang.code, posts: lang.count, percentage: lang.percentage, confidence: lang.confidence }));
+      downloadCsv('language_detection_report.csv', toCsv(rows, ['language', 'code', 'posts', 'percentage', 'confidence']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
   }
 
   // Filtered stats for display
@@ -231,6 +198,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->

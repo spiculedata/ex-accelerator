@@ -182,3 +182,18 @@ describe('toNumber', () => {
     expect(toNumber(NaN)).toBe(0);
   });
 });
+
+describe('formatTimestamp with epoch milliseconds and bad input', () => {
+  it('reads epoch milliseconds given as a number or a numeric string, as the posts view stores them', () => {
+    const ms = Date.UTC(2026, 10, 7, 15, 50);
+    expect(formatTimestamp(ms as unknown as string)).toBe(formatTimestamp(new Date(ms)));
+    expect(formatTimestamp(String(ms))).toBe(formatTimestamp(new Date(ms)));
+    expect(formatTimestamp(String(ms))).not.toBe('Invalid Date');
+  });
+
+  it('shows a dash, never "Invalid Date", for anything that is not a date', () => {
+    expect(formatTimestamp('not a date')).toBe('—');
+    expect(formatTimestamp('')).toBe('—');
+    expect(formatTimestamp(null)).toBe('—');
+  });
+});
