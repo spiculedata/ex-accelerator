@@ -43,8 +43,17 @@ const OKLCH_TOKEN = /--se-([a-z]+)-(\d+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d
 // Only the data-visualisation tokens are written as hex; a role such as --se-surface (white) is an alias, not palette
 const HEX_TOKEN = /--se-((?:sentiment|cat)-[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})\b/g;
 
+/** The first `:root {` block: the light theme, which is the palette. The dark block re-declares the ink steps. */
+function lightBlock(css: string): string {
+  const start = css.indexOf(':root {');
+  if (start < 0) return css;
+  const end = css.indexOf('}', start);
+  return end < 0 ? css.slice(start) : css.slice(start, end);
+}
+
 /** Reads the colour tokens out of brand-tokens.css. Role aliases (surfaces, var(--se-...)) are not palette colours. */
-export function parseBrandTokens(css: string): BrandPalette {
+export function parseBrandTokens(fullCss: string): BrandPalette {
+  const css = lightBlock(fullCss);
   const ramps: Record<string, Record<string, string>> = {};
   for (const [, ramp, step, l, c, h] of css.matchAll(OKLCH_TOKEN)) {
     ramps[ramp] = { ...(ramps[ramp] ?? {}), [step]: oklchToHex(Number(l), Number(c), Number(h)) };

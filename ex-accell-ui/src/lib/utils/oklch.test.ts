@@ -36,8 +36,13 @@ describe('parseBrandTokens', () => {
       --se-bg: var(--se-ink-50);
     }
     :root[data-theme='dark'] {
+      --se-ink-50: oklch(0.130 0.028 255);
       --se-bg: var(--se-ink-950);
     }`;
+
+  it('reads the light theme only, so the dark block does not overwrite a ramp step', () => {
+    expect(parseBrandTokens(css).ramps.ink[50]).toBe('#f8fafd');
+  });
 
   it('converts each OKLCH ramp step to hex, grouped by ramp', () => {
     const { ramps } = parseBrandTokens(css);

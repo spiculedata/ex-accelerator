@@ -125,18 +125,57 @@
   --se-highlight: var(--se-signal-200);
 }
 
-/* Dark roles. The ramps are shared; only the roles flip. */
+/* Dark theme. Nothing sets data-theme yet (the switch is still to come), so this block is inert in the app today.
+   Pages are written with the ink ramp (through Tailwind's gray/slate/zinc names) and white surfaces, so dark mode
+   reverses the ink ramp and the white/black colours here: bg-gray-50 becomes near-black, text-gray-900 near-white,
+   bg-white a dark card, and the hundreds of light-only utilities flip without a dark: variant each. The primary,
+   signal, success and danger ramps stay as they are. The roles flip with the ramp. */
 :root[data-theme='dark'] {
-  --se-bg: var(--se-ink-950);
-  --se-surface: var(--se-ink-900);
-  --se-surface-sunken: var(--se-ink-950);
-  --se-border: var(--se-ink-800);
-  --se-border-strong: var(--se-ink-700);
-  --se-text: var(--se-ink-100);
-  --se-text-muted: var(--se-ink-400);
+  color-scheme: dark;
+  --se-ink-50: oklch(0.130 0.028 255);
+  --se-ink-100: oklch(0.210 0.030 255);
+  --se-ink-200: oklch(0.278 0.032 255);
+  --se-ink-300: oklch(0.373 0.034 255);
+  --se-ink-400: oklch(0.446 0.034 255);
+  --se-ink-500: oklch(0.707 0.022 255);
+  --se-ink-600: oklch(0.800 0.018 255);
+  --se-ink-700: oklch(0.872 0.014 255);
+  --se-ink-800: oklch(0.928 0.010 255);
+  --se-ink-900: oklch(0.967 0.006 255);
+  --se-ink-950: oklch(0.985 0.004 255);
+  --color-white: oklch(0.170 0.030 255);
+  --color-black: oklch(0.985 0.004 255);
+
+  --se-bg: var(--se-ink-50);
+  --se-surface: var(--se-ink-100);
+  --se-surface-sunken: var(--se-ink-50);
+  --se-border: var(--se-ink-200);
+  --se-border-strong: var(--se-ink-300);
+  --se-text: var(--se-ink-900);
+  --se-text-muted: var(--se-ink-500);
   --se-link: var(--se-primary-300);
   --se-action: var(--se-primary-500);
   --se-action-hover: var(--se-primary-400);
   --se-focus: var(--se-primary-400);
   --se-highlight: var(--se-signal-700);
+}
+
+/* A surface that is dark in both themes (the page header band, the investigation workbench) opts out of the
+   reversal with this class: inside it the ink ramp and white are the light-theme values again, so bg-ink-900 stays
+   dark and text-white stays white. */
+:root[data-theme='dark'] .theme-fixed {
+  color-scheme: light;
+  --se-ink-50: oklch(0.985 0.004 255);
+  --se-ink-100: oklch(0.967 0.006 255);
+  --se-ink-200: oklch(0.928 0.010 255);
+  --se-ink-300: oklch(0.872 0.014 255);
+  --se-ink-400: oklch(0.707 0.022 255);
+  --se-ink-500: oklch(0.551 0.030 255);
+  --se-ink-600: oklch(0.446 0.034 255);
+  --se-ink-700: oklch(0.373 0.034 255);
+  --se-ink-800: oklch(0.278 0.032 255);
+  --se-ink-900: oklch(0.210 0.030 255);
+  --se-ink-950: oklch(0.130 0.028 255);
+  --color-white: #ffffff;
+  --color-black: #000000;
 }
