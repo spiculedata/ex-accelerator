@@ -1,7 +1,5 @@
 import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
 
-const MS_PER_DAY = 86_400_000;
-
 interface Options {
   /** The phrase as the page counted it. */
   phrase: string;
@@ -11,14 +9,13 @@ interface Options {
   platform: string;
   /** How many days back the counts reach when no date range is chosen. */
   defaultDays: number;
-  now?: Date;
 }
 
 /**
  * The posts to open for a counted phrase: the same words, in the same period and platform as the count, so the number on
  * the page and the list behind it agree. The period is the date bar's range, or the last `defaultDays` days.
  */
-export function trigramDrilldownFilters({ phrase, params, platform, defaultDays, now = new Date() }: Options): PostFilters {
+export function trigramDrilldownFilters({ phrase, params, platform, defaultDays }: Options): PostFilters {
   const chosen = filtersFromParams(params);
   const hasRange = chosen.dateStart !== undefined || chosen.dateEnd !== undefined;
   return {
@@ -27,6 +24,7 @@ export function trigramDrilldownFilters({ phrase, params, platform, defaultDays,
     ...(platform !== 'all' ? { platforms: [platform] } : {}),
     ...(chosen.dateStart ? { dateStart: chosen.dateStart } : {}),
     ...(chosen.dateEnd ? { dateEnd: chosen.dateEnd } : {}),
-    ...(!hasRange ? { dateStart: new Date(now.getTime() - defaultDays * MS_PER_DAY).toISOString() } : {})
+    // The counts use the database's clock for "the last N days", so the list does too
+    ...(!hasRange ? { withinDays: defaultDays } : {})
   };
 }

@@ -6,6 +6,8 @@ export interface PostFilters {
   topic?: string;
   hashtag?: string;
   q?: string;
+  /** Only posts from the last N days, by the server's clock */
+  withinDays?: number;
   /** A counted phrase of two to six words, matched the way the phrase counts are */
   phrase?: string;
   sentiment?: string;
@@ -45,6 +47,7 @@ export function buildPostsQuery(filters: PostFilters, page: { limit?: number; cu
   if (filters.hashtag) params.set('hashtag', filters.hashtag.replace(/^#/, ''));
   if (filters.q) params.set('q', filters.q);
   if (filters.phrase) params.set('phrase', filters.phrase);
+  if (filters.withinDays) params.set('within_days', String(filters.withinDays));
   if (filters.sentiment) params.set('sentiment', filters.sentiment);
   // An empty list is kept: the server reads platforms= as every platform switched off, as the pages do
   if (filters.platforms) params.set('platforms', filters.platforms.join(','));

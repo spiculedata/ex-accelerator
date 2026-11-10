@@ -1,5 +1,5 @@
 // Posts behind a number: the evidence for a topic, hashtag, phrase or sentiment segment.
-// GET /api/posts?topic=&hashtag=&q=&phrase=&sentiment=&platforms=a,b&date_start=&date_end=&limit=&cursor=
+// GET /api/posts?topic=&hashtag=&q=&phrase=&within_days=&sentiment=&platforms=a,b&date_start=&date_end=&limit=&cursor=
 // Pages by keyset: each response carries `nextCursor` (null on the last page) to pass as `cursor`. Only the first page
 // (no cursor) counts the matches; later pages report `total: null`.
 
@@ -18,8 +18,9 @@ const integerParam = (value: string | null): number | undefined | null => {
 export const GET: RequestHandler = async ({ url }) => {
   const params = url.searchParams;
   const limit = integerParam(params.get('limit'));
-  if (limit === null) {
-    return json({ success: false, data: null, error: 'limit must be a whole number' }, { status: 400 });
+  const withinDays = integerParam(params.get('within_days'));
+  if (limit === null || withinDays === null) {
+    return json({ success: false, data: null, error: 'limit and within_days must be whole numbers' }, { status: 400 });
   }
 
   // Platforms follow the page endpoints: an explicit choice wins, then the workspace's social platforms.
@@ -41,6 +42,7 @@ export const GET: RequestHandler = async ({ url }) => {
     hashtag: params.get('hashtag') ?? undefined,
     q: params.get('q') ?? undefined,
     phrase: params.get('phrase') ?? undefined,
+    withinDays,
     sentiment: params.get('sentiment') ?? undefined,
     platforms: chosen && chosen.length > 0 ? chosen : scope?.socialPlatforms,
     dateStart: params.get('date_start') ?? undefined,
@@ -60,6 +62,8 @@ export const GET: RequestHandler = async ({ url }) => {
     const hasMore = rows.length > search.limit;
     const pageRows = hasMore ? rows.slice(0, search.limit) : rows;
     const last = pageRows[pageRows.length - 1];
+    // A post with no usable time cannot start the next page, so paging stops there rather than send a cursor that would be refused
+    const lastTime = last ? Number(last.timestamp) : NaN;
     const posts = pageRows.map(({ total: _total, timestamp: _timestamp, confidence_score, ...post }: any) => ({
       ...post,
       confidence: confidence_score === null || confidence_score === undefined ? null : Number(confidence_score)
@@ -70,7 +74,7 @@ export const GET: RequestHandler = async ({ url }) => {
         posts,
         total: search.withTotal ? (rows.length > 0 ? Number(rows[0].total) : 0) : null,
         limit: search.limit,
-        nextCursor: hasMore && last ? `${Number(last.timestamp)}_${Number(last.id)}` : null
+        nextCursor: hasMore && Number.isFinite(lastTime) && lastTime > 0 ? `${lastTime}_${Number(last.id)}` : null
       }
     });
   } catch (error) {

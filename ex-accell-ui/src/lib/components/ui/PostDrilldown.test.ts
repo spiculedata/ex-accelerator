@@ -78,6 +78,13 @@ describe('PostDrilldown', () => {
     expect(screen.queryByRole('button', { name: /more/ })).toBeNull(); // everything is shown
   });
 
+  it('says "Show more" rather than a wrong number when the first count is out of date', async () => {
+    const first = Array.from({ length: 25 }, (_, i) => i + 1);
+    fetchPosts.mockResolvedValueOnce(page(first, 20, 'c25')); // the count says 20 but there is a next page
+    render(PostDrilldown, props());
+    expect(await screen.findByRole('button', { name: 'Show more' })).toBeTruthy();
+  });
+
   it('explains a failure and tries again on request', async () => {
     fetchPosts.mockRejectedValueOnce(new Error('HTTP 500')).mockResolvedValueOnce(page([4], 1));
     render(PostDrilldown, props());

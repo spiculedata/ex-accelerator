@@ -20,7 +20,13 @@ const TEXTS = [
   "Don't stop the bus now, don't stop the bus now",
   'fare increase hard to justify. fare... increase... hard to justify',
   '🚋 service disruption on line 4 — service disruption again',
-  'Delays on the tram delays now'
+  'Delays on the tram delays now',
+  'big dog cat sat there',
+  "big dog cat's bed is here",
+  "o'big dog cat is odd",
+  "'big dog cat' she said",
+  'شاهد الترام، متأخر مرة أخرى؛ الترام متأخر',
+  'ट्राम देर से। ट्राम देर से आई'
 ];
 
 const posts: TrigramPost[] = TEXTS.map((text, id) => ({
@@ -30,10 +36,11 @@ const posts: TrigramPost[] = TEXTS.map((text, id) => ({
 const patternFor = (phrase: string): ((text: string) => boolean) => {
   const search = buildPostSearch({ phrase });
   if (!search.ok) throw new Error(search.error);
-  const pattern = String(search.params.find((p) => typeof p === 'string' && p.includes(phrase.split(' ')[0])));
-  const re = new RegExp(pattern, 'i');
-  // The SQL removes links before matching, as the word splitting does
-  return (text) => re.test(text.replace(/https?:\/\/\S+/gi, ' '));
+  const strings = search.params.filter((p): p is string => typeof p === 'string');
+  const separators = new RegExp(strings.find((p) => p.startsWith('[^'))!, 'g'); // anything that is not a letter or quote mark
+  const match = new RegExp(strings.find((p) => p.startsWith('(^| )'))!, 'i');
+  // The SQL removes links, then reduces the text to words separated by single spaces, before matching
+  return (text) => match.test(text.replace(/https?:\/\/\S+/gi, ' ').replace(separators, ' '));
 };
 
 describe('a trigram and the posts behind it', () => {

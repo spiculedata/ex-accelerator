@@ -17,6 +17,10 @@ describe('buildPostsQuery', () => {
     expect(params.has('date_end')).toBe(false);
   });
 
+  it('sends a recent-days window as within_days', () => {
+    expect(new URLSearchParams(buildPostsQuery({ withinDays: 7 })).get('within_days')).toBe('7');
+  });
+
   it('sends a counted phrase as phrase, not as free text', () => {
     const params = new URLSearchParams(buildPostsQuery({ phrase: 'tram delays now' }));
     expect(params.get('phrase')).toBe('tram delays now');

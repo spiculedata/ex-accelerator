@@ -1,4 +1,5 @@
 import { dateBoundToEpochMs } from './dateBounds';
+import { LETTER_RANGES, WORD_RANGES } from './letters';
 
 // Builds the query behind "show me the posts": the evidence under a topic, hashtag, phrase or sentiment
 // segment. Pure, so the SQL and its validation are tested without a database. Every request value is
@@ -9,6 +10,8 @@ export interface PostSearchFilters {
   topic?: string;
   hashtag?: string;
   q?: string;
+  /** Only posts from the last N days (1 to 366), by the database clock. */
+  withinDays?: number;
   /** Two to six words matched as the phrase counts do: any punctuation between them, any case, links ignored. */
   phrase?: string;
   sentiment?: string;
@@ -34,14 +37,11 @@ const PHRASE_WORD = /^[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*$/u;
 const MIN_PHRASE_WORDS = 2;
 const MAX_PHRASE_WORDS = 6;
 const MAX_SENTIMENT_LENGTH = 50;
-const HASHTAG = /^[\p{L}\p{N}_]{1,100}$/u;
-// What counts as part of a word next to a hashtag: ASCII letters and digits, the underscore and the letter blocks of Latin,
-// Greek, Cyrillic, Hebrew, Arabic, Indic and other scripts, kana, CJK and Hangul. Spelled out because [[:alnum:]] follows the
-// database's locale, and in a C-locale database "#tram" would then match inside "#tramé". Punctuation, quotes and emoji stay
-// boundaries. These are Postgres \u escapes, written here with a doubled backslash.
-const LETTER_RANGES = 'A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02AF\\u0300-\\u036F\\u0370-\\u1FFF\\u3040-\\u30FF\\u3400-\\u9FFF\\uAC00-\\uD7AF';
-const WORD_CHARS = `0-9_${LETTER_RANGES}`;
-const CURSOR = /^([1-9]\d{0,15})_([1-9]\d{0,17})$/;
+const HASHTAG = /^[\p{L}\p{M}\p{N}_]{1,100}$/u;
+// The timestamp is epoch milliseconds (13 digits today) and the id a 32-bit integer, so a larger value cannot be real
+const CURSOR = /^([1-9]\d{0,14})_([1-9]\d{0,9})$/;
+const MAX_POST_ID = 2_147_483_647;
+const MAX_WITHIN_DAYS = 366;
 const TOPIC_SLUG = /^[A-Za-z0-9_-]{1,100}$/;
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
@@ -64,7 +64,7 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
   if (filters.hashtag !== undefined) {
     if (!HASHTAG.test(filters.hashtag)) return { ok: false, error: 'hashtag must be letters, numbers or underscores, without the #' };
     // The tag, bounded on both sides, so #tram does not match #tramway
-    conditions.push(`p.text ~* ${add(`(^|[^${WORD_CHARS}])#${filters.hashtag}([^${WORD_CHARS}]|$)`)}`);
+    conditions.push(`p.text ~* ${add(`(^|[^${WORD_RANGES}])#${filters.hashtag}([^${WORD_RANGES}]|$)`)}`);
   }
 
   if (filters.q !== undefined) {
@@ -79,9 +79,22 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
     if (!isPhrase) return { ok: false, error: `phrase must be ${MIN_PHRASE_WORDS} to ${MAX_PHRASE_WORDS} words made of letters` };
     // The words split by anything that is not a letter, as the phrase counts split text into words; links are dropped first
     // because the counts drop them. Letters are the only characters allowed in a word, so nothing here needs escaping.
+    // The text is first reduced to its words separated by single spaces, which is how the counts see it: anything that is not a
+    // letter or an apostrophe becomes a space, and links are dropped. An apostrophe stays, so "cat's" is one word, and one that
+    // is not joined to a letter (a quote mark) is allowed around a word but never inside it.
+    const quote = `['’]`;
+    const between = `${quote}*( ${quote}*)+`;
+    const phrase = `(^| )${quote}*${words.join(between)}${quote}*( |$)`;
     conditions.push(
-      `regexp_replace(p.text, 'https?://\\S+', ' ', 'gi') ~* ${add(`(^|[^${LETTER_RANGES}])${words.join(`[^${LETTER_RANGES}]+`)}([^${LETTER_RANGES}]|$)`)}`
+      `regexp_replace(regexp_replace(p.text, 'https?://\\S+', ' ', 'gi'), ${add(`[^${LETTER_RANGES}'’]+`)}, ' ', 'g') ~* ${add(phrase)}`
     );
+  }
+
+  if (filters.withinDays !== undefined) {
+    if (!Number.isInteger(filters.withinDays) || filters.withinDays < 1 || filters.withinDays > MAX_WITHIN_DAYS) {
+      return { ok: false, error: `within_days must be a whole number from 1 to ${MAX_WITHIN_DAYS}` };
+    }
+    conditions.push(`p.created_at >= CURRENT_TIMESTAMP - make_interval(days => ${add(filters.withinDays)})`);
   }
 
   if (filters.sentiment !== undefined && filters.sentiment !== '') {
@@ -109,7 +122,7 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
   // does not shift when new posts arrive, unlike skipping a number of rows.
   if (filters.cursor !== undefined) {
     const match = CURSOR.exec(filters.cursor);
-    if (!match) return { ok: false, error: 'cursor must be the nextCursor of a previous page' };
+    if (!match || Number(match[2]) > MAX_POST_ID) return { ok: false, error: 'cursor must be the nextCursor of a previous page' };
     conditions.push(`(p.timestamp, p.id) < (${add(Number(match[1]))}, ${add(Number(match[2]))})`);
   }
   const withTotal = filters.cursor === undefined;

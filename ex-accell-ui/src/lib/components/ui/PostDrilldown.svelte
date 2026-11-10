@@ -218,7 +218,7 @@
           {#if nextCursor !== null}
             <div class="mt-4 text-center">
               <button type="button" onclick={() => void loadMore()} disabled={loadingMore} class="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60">
-                {loadingMore ? 'Loading…' : `Show ${Math.min(PAGE_SIZE, total - posts.length)} more`}
+                {loadingMore ? 'Loading…' : total > posts.length ? `Show ${Math.min(PAGE_SIZE, total - posts.length)} more` : 'Show more'}
               </button>
             </div>
           {/if}

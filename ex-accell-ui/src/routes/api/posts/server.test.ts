@@ -37,6 +37,18 @@ describe('GET /api/posts', () => {
     expect(body.data.posts[0]).not.toHaveProperty('total');
   });
 
+  it('stops paging rather than make a cursor from a post with no usable time', async () => {
+    query.mockResolvedValue([row(1), { ...row(2), timestamp: null }, row(3)]);
+    const body = await (await call('?limit=2')).json();
+    expect(body.data.posts).toHaveLength(2);
+    expect(body.data.nextCursor).toBeNull();
+  });
+
+  it('passes a within_days window to the query', async () => {
+    await call('?within_days=7');
+    expect(query.mock.calls[0][1]).toContain(7);
+  });
+
   it('has no next cursor on the last page', async () => {
     query.mockResolvedValue([row(1), row(2)]);
     const body = await (await call('?limit=2')).json();
@@ -71,7 +83,7 @@ describe('GET /api/posts', () => {
     expect(body.data).toMatchObject({ posts: [], total: 0 });
   });
 
-  it.each([['?topic=a%20b'], ['?hashtag=a%20b'], ['?date_end=nope'], ['?limit=abc'], ['?cursor=nope'], ['?phrase=one'], ['?phrase=a%3B%20b%20c'], ['?cursor=1_2_3']])('answers 400 for invalid input %s without touching the database', async (search) => {
+  it.each([['?topic=a%20b'], ['?hashtag=a%20b'], ['?date_end=nope'], ['?limit=abc'], ['?cursor=nope'], ['?within_days=0'], ['?within_days=abc'], ['?phrase=one'], ['?phrase=a%3B%20b%20c'], ['?cursor=1_2_3']])('answers 400 for invalid input %s without touching the database', async (search) => {
     const response = await call(search);
 
     expect(response.status).toBe(400);

@@ -50,6 +50,10 @@ describe('buildPostSearch', () => {
     expect(re.test('#TramDelaysAgain')).toBe(false);
   });
 
+  it.each(['टैग', 'وَسْم', 'café', 'ტრამვაი', 'трамвай', '電車', 'tram_2'])('accepts the tag %s, whatever script or combining marks it uses', (tag) => {
+    expect(buildPostSearch({ hashtag: tag }).ok).toBe(true);
+  });
+
   it('treats letters of any script as part of the tag, so #tram does not match #tramé or é#tram', () => {
     const re = hashtagPattern('tram');
     for (const text of ['x #tramé y', 'é#tram', '日本#tram', 'привет#tram', 'x#tram', '#tram1']) expect(re.test(text)).toBe(false);
@@ -68,7 +72,8 @@ describe('buildPostSearch', () => {
   it('matches a phrase by its words, ignoring punctuation, case and links, as the phrase counts do', () => {
     const { sql, params } = ok({ phrase: 'Tram Delays Now' });
 
-    expect(sql).toContain("regexp_replace(p.text, 'https?://\\S+', ' ', 'gi') ~*");
+    expect(sql).toContain("regexp_replace(p.text, 'https?://\\S+', ' ', 'gi')");
+    expect(sql).toContain('~*');
     expect(params.some((p) => typeof p === 'string' && p.includes('tram') && p.includes('delays') && p.includes('now'))).toBe(true);
     expect(sql).not.toContain('delays');
   });
@@ -139,6 +144,16 @@ describe('buildPostSearch', () => {
     expect(sql).not.toContain('1731146400000'); // bound, never written into the SQL
   });
 
+  it('accepts the largest id the posts table can hold', () => {
+    expect(ok({ cursor: '1731146400000_2147483647' }).ok).toBe(true);
+  });
+
+  it('limits to the last N days by the database clock, the way the phrase counts do', () => {
+    const { sql, params } = ok({ withinDays: 7 });
+    expect(sql).toContain('p.created_at >= CURRENT_TIMESTAMP - make_interval(days =>');
+    expect(params).toContain(7);
+  });
+
   it('selects the timestamp so the next cursor can be built from the last row', () => {
     expect(ok({}).sql).toMatch(/p\.timestamp/);
   });
@@ -157,7 +172,12 @@ describe('buildPostSearch', () => {
     [{ cursor: 'abc' }, 'cursor'],
     [{ cursor: '12_' }, 'cursor'],
     [{ cursor: '1_2; DROP TABLE posts' }, 'cursor'],
-    [{ cursor: '0_5' }, 'cursor']
+    [{ cursor: '0_5' }, 'cursor'],
+    [{ cursor: '1731146400000_2147483648' }, 'cursor'],
+    [{ cursor: '1731146400000000000_5' }, 'cursor'],
+    [{ withinDays: 0 }, 'within_days'],
+    [{ withinDays: 1.5 }, 'within_days'],
+    [{ withinDays: 400 }, 'within_days']
   ])('rejects invalid input %j', (filters, field) => {
     const result = buildPostSearch(filters as Parameters<typeof buildPostSearch>[0]);
 
