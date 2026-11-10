@@ -46,11 +46,13 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       return failure('The current password is not correct', 401);
     }
 
-    const version = await changePassword(stored.id, newPassword);
+    const account = await changePassword(stored.id, newPassword);
     loginThrottle.reset(throttleKey);
 
+    // Signed from what the database says now. The old cookie may carry a role that was taken away a moment ago.
     const config = getAuthConfig();
-    cookies.set(SESSION_COOKIE, createSessionToken(sessionUser, config.sessionSecret, config.sessionTtlSeconds, Date.now(), version), {
+    const renewed = { id: sessionUser.id, email: stored.email, name: account.name, role: account.role };
+    cookies.set(SESSION_COOKIE, createSessionToken(renewed, config.sessionSecret, config.sessionTtlSeconds, Date.now(), account.sessionVersion), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',

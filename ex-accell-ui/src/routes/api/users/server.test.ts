@@ -7,9 +7,12 @@ vi.mock('$lib/utils/logger', () => ({ createLogger: () => ({ debug: vi.fn(), inf
 
 import { GET, POST } from './+server';
 
+const admin = { user: { id: 'u1', role: 'admin' } };
+const notAdmin = { user: { id: 'u2', role: 'user' } };
+
 const created = { id: 'u9', email: 'new@x.co', name: 'New Person', role: 'user', passwordHash: 'scrypt$secret', sessionVersion: 0, isDisabled: false };
 const create = (body: unknown) =>
-  POST({ request: new Request('http://localhost/api/users', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) } as any);
+  POST({ locals: admin, request: new Request('http://localhost/api/users', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) } as any);
 const good = { email: 'new@x.co', name: 'New Person', role: 'user', password: 'a-long-password-1' };
 
 beforeEach(() => {
@@ -17,17 +20,27 @@ beforeEach(() => {
   repo.createUser.mockReset().mockResolvedValue(created);
 });
 
+describe('when the caller is not an admin', () => {
+  it('refuses in the handlers too, not only in the access guard', async () => {
+    expect((await GET({ locals: notAdmin } as any)).status).toBe(403);
+    const response = await POST({ locals: notAdmin, request: new Request('http://localhost/api/users', { method: 'POST', body: JSON.stringify(good) }) } as any);
+    expect(response.status).toBe(403);
+    expect(repo.listUsers).not.toHaveBeenCalled();
+    expect(repo.createUser).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /api/users', () => {
   it('lists people without any password data', async () => {
     repo.listUsers.mockResolvedValue([{ id: '1', email: 'a@b.co', name: 'A', role: 'admin', isDisabled: false, createdAt: null, lastLoginAt: null }]);
-    const body = await (await GET({} as any)).json();
+    const body = await (await GET({ locals: admin } as any)).json();
     expect(body.data.users).toHaveLength(1);
     expect(JSON.stringify(body)).not.toMatch(/password|hash/i);
   });
 
   it('answers a database failure with a generic message', async () => {
     repo.listUsers.mockRejectedValue(new Error('connection to 10.0.0.5 refused'));
-    const response = await GET({} as any);
+    const response = await GET({ locals: admin } as any);
     expect(response.status).toBe(500);
     expect(JSON.stringify(await response.json())).not.toContain('10.0.0.5');
   });

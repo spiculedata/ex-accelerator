@@ -33,7 +33,8 @@ account raise the version too.
 
 The version is checked on each request but remembered for **30 seconds**. On the instance where you sign out
 everywhere the change applies at once; on another instance a revoked session can keep working for up to those 30
-seconds. If the database cannot be asked, an answer remembered in the last five minutes is still used; past that, or
+seconds. This applies to role changes and disabled accounts too: on another instance, a demoted or disabled person can keep their
+old access for up to that long. If the database cannot be asked, an answer remembered in the last five minutes is still used; past that, or
 for someone never checked, the request gets `503` and the cookie is kept, so an outage never signs anyone out. Sessions issued before this existed count as version 0 and stay valid until their normal expiry.
 
 Writes (`POST`, `PUT`, `PATCH`, `DELETE`) sent by a page on another site are refused with `403`, signed in or not,
@@ -84,8 +85,8 @@ From there an admin can:
 - **Reset a password.** The person's sessions end.
 
 You cannot change your own role, disable yourself or reset your own password from this page, and the last active
-admin cannot be demoted or disabled, so the install cannot lock itself out. (Two admins demoting each other at the
-very same moment could still get past that check; do such changes one at a time.) The same actions are available as
+admin cannot be demoted or disabled, so the install cannot lock itself out (changes to admins take turns, so
+two made at the same moment cannot both pass that check). The same actions are available as
 `GET`/`POST /api/users` and `PATCH /api/users/<id>`, for admins only.
 
 ## Changing your password

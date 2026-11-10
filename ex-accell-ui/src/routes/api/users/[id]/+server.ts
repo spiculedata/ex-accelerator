@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { validatePasswordStrength } from '$lib/server/auth/password';
 import { changePassword, changeUserAccess } from '$lib/server/auth/revocation';
 import { prepareAuth } from '$lib/server/auth/runtime';
-import { isName, isRole, isUuid } from '$lib/server/auth/userInput';
+import { isAdmin, isName, isRole, isUuid } from '$lib/server/auth/userInput';
 import type { AccessChange } from '$lib/server/auth/userRepo';
 import { createLogger } from '$lib/utils/logger';
 
@@ -18,7 +18,10 @@ const failure = (error: string, status: number) => json({ success: false, data: 
  * active admin cannot be removed.
  */
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
+  if (!isAdmin(locals.user)) return failure('Only an admin can manage users', 403);
   if (!isUuid(params.id)) return failure('Not a valid user id', 400);
+  // UUIDs are case-insensitive, so compare them in one case or an upper-case id would slip past the self checks
+  const targetId = params.id.toLowerCase();
 
   let body: Record<string, unknown>;
   try {
@@ -50,7 +53,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   }
   if (Object.keys(change).length === 0 && password === undefined) return failure('Nothing to change', 400);
 
-  const isSelf = params.id === locals.user?.id;
+  const isSelf = targetId === locals.user?.id?.toLowerCase();
   if (isSelf && (change.role !== undefined || change.disabled !== undefined || password !== undefined)) {
     return failure('You cannot change your own role, disable yourself or reset your own password here', 400);
   }
@@ -58,11 +61,11 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   try {
     await prepareAuth();
     if (Object.keys(change).length > 0) {
-      const result = await changeUserAccess(params.id, change);
+      const result = await changeUserAccess(targetId, change);
       if (result === 'not-found') return failure('No such user', 404);
       if (result === 'last-admin') return failure('There must be at least one active admin', 409);
     }
-    if (typeof password === 'string') await changePassword(params.id, password);
+    if (typeof password === 'string') await changePassword(targetId, password);
     return json({ success: true, data: null, error: null });
   } catch (error: unknown) {
     if (error instanceof Error && error.message === 'No such user') return failure('No such user', 404);

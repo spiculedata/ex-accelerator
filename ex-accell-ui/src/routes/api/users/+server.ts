@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { validatePasswordStrength } from '$lib/server/auth/password';
 import { prepareAuth } from '$lib/server/auth/runtime';
-import { isEmail, isName, isRole } from '$lib/server/auth/userInput';
+import { isAdmin, isEmail, isName, isRole } from '$lib/server/auth/userInput';
 import { createUser, listUsers, type UserRecord } from '$lib/server/auth/userRepo';
 import { createLogger } from '$lib/utils/logger';
 
@@ -15,7 +15,8 @@ const UNIQUE_VIOLATION = '23505';
 const publicUser = (user: UserRecord) => ({ id: user.id, email: user.email, name: user.name, role: user.role, isDisabled: user.isDisabled });
 
 /** GET /api/users: everyone with an account. Admin-only (see the access guard). */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+  if (!isAdmin(locals.user)) return failure('Only an admin can manage users', 403);
   try {
     await prepareAuth();
     return json({ success: true, data: { users: await listUsers() }, error: null });
@@ -26,7 +27,8 @@ export const GET: RequestHandler = async () => {
 };
 
 /** POST /api/users: creates an account. Admin-only. */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+  if (!isAdmin(locals.user)) return failure('Only an admin can manage users', 403);
   let body: Record<string, unknown>;
   try {
     body = ((await request.json()) ?? {}) as Record<string, unknown>;

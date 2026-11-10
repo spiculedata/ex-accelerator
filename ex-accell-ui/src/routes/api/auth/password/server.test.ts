@@ -43,7 +43,7 @@ beforeEach(() => {
   mocks.blocked = false;
   mocks.findUserByEmail.mockReset().mockResolvedValue(stored);
   mocks.verifyPassword.mockReset().mockResolvedValue(true);
-  mocks.changePassword.mockReset().mockResolvedValue(2);
+  mocks.changePassword.mockReset().mockResolvedValue({ sessionVersion: 2, role: 'user', name: 'A' });
   mocks.recordFailure.mockClear();
   mocks.reset.mockClear();
   mocks.forgive.mockClear();
@@ -60,6 +60,14 @@ describe('POST /api/auth/password', () => {
     expect(verifySessionToken(token, 's'.repeat(32))).toMatchObject({ id: 'u1' });
     expect(token).toBeTruthy();
     expect(mocks.reset).toHaveBeenCalled();
+  });
+
+  it('signs the new session from the stored role and name, not from the old cookie', async () => {
+    // The cookie says admin, but the account was demoted a moment ago
+    mocks.changePassword.mockResolvedValue({ sessionVersion: 3, role: 'viewer', name: 'Renamed' });
+    const { cookies, response } = call(good, { ...user, role: 'admin' as never });
+    expect((await response).status).toBe(200);
+    expect(verifySessionToken(cookies.set.mock.calls[0][1], 's'.repeat(32))).toMatchObject({ id: 'u1', role: 'viewer', name: 'Renamed' });
   });
 
   it('refuses a wrong current password, counts it, and changes nothing', async () => {

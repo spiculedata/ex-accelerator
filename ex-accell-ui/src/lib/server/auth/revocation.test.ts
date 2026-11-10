@@ -61,9 +61,9 @@ describe('changePassword', () => {
   it('ends older sessions on this instance at once, not after the cache expires, and returns the version for a new session', async () => {
     repo.getSessionVersion.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
     expect(await isSessionCurrent('u1', 1)).toBe('current'); // now remembered
-    repo.setUserPassword.mockResolvedValue(2);
+    repo.setUserPassword.mockResolvedValue({ sessionVersion: 2, role: 'user', name: 'A' });
 
-    expect(await changePassword('u1', 'a-brand-new-password')).toBe(2);
+    expect(await changePassword('u1', 'a-brand-new-password')).toEqual({ sessionVersion: 2, role: 'user', name: 'A' });
 
     expect(repo.setUserPassword).toHaveBeenCalledWith('u1', 'a-brand-new-password');
     expect(await isSessionCurrent('u1', 1)).toBe('revoked');

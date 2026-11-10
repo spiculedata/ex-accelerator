@@ -18,6 +18,14 @@ beforeEach(() => {
   revocation.changePassword.mockReset().mockResolvedValue(3);
 });
 
+describe('PATCH /api/users/[id] when the caller is not an admin', () => {
+  it('refuses in the handler too, not only in the access guard', async () => {
+    const response = await PATCH({ params: { id: OTHER }, request: new Request('http://localhost/api/users/x', { method: 'PATCH', body: JSON.stringify({ role: 'admin' }) }), locals: { user: { id: ADMIN, role: 'user' } } } as any);
+    expect(response.status).toBe(403);
+    expect(revocation.changeUserAccess).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH /api/users/[id]', () => {
   it('changes role, name and whether the person may sign in', async () => {
     const response = await patch(OTHER, { role: 'viewer', name: 'Renamed', disabled: true });
@@ -54,6 +62,14 @@ describe('PATCH /api/users/[id]', () => {
     for (const body of [{ role: 'user' }, { disabled: true }, { password: 'a-brand-new-password' }]) {
       const response = await patch(ADMIN, body);
       expect(response.status).toBe(400);
+    }
+    expect(revocation.changeUserAccess).not.toHaveBeenCalled();
+    expect(revocation.changePassword).not.toHaveBeenCalled();
+  });
+
+  it('still treats the admin\'s own id as their own when written in capitals', async () => {
+    for (const body of [{ role: 'user' }, { disabled: true }, { password: 'a-brand-new-password' }]) {
+      expect((await patch(ADMIN.toUpperCase(), body)).status).toBe(400);
     }
     expect(revocation.changeUserAccess).not.toHaveBeenCalled();
     expect(revocation.changePassword).not.toHaveBeenCalled();

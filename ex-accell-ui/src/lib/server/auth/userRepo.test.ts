@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { query } = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock('$lib/services/postgres', () => ({ query }));
+const { query, clientQuery } = vi.hoisted(() => ({ query: vi.fn(), clientQuery: vi.fn() }));
+const transaction = vi.hoisted(() => vi.fn());
+vi.mock('$lib/services/postgres', () => ({ query, postgresPool: { transaction } }));
 
 import { bootstrapAdmin, findUserByEmail, createUser, getSessionVersion, bumpSessionVersion, ensureAuthSchema, listUsers, updateUserAccess, setUserPassword } from './userRepo';
 
 beforeEach(() => {
   query.mockReset();
+  clientQuery.mockReset();
+  transaction.mockReset().mockImplementation(async (callback: (client: { query: typeof clientQuery }) => unknown) => callback({ query: clientQuery }));
 });
 
 describe('findUserByEmail', () => {
@@ -125,40 +128,60 @@ describe('listUsers', () => {
 
 describe('updateUserAccess', () => {
   it('changes the role in one guarded statement that also ends the person\'s sessions', async () => {
-    query.mockResolvedValueOnce([{ id: 'u1' }]);
+    clientQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 'u1' }] });
     expect(await updateUserAccess('u1', { role: 'viewer' })).toBe('updated');
-    const [sql, params] = query.mock.calls[0];
+    const [sql, params] = clientQuery.mock.calls[1];
     expect(String(sql)).toContain('session_version = session_version + 1');
     expect(String(sql)).toContain("role = 'admin'"); // the last-admin guard lives in the same statement
     expect(params).toContain('u1');
     expect(params).toContain('viewer');
   });
 
+  it('takes the admin lock first, in the same transaction, so two changes cannot both pass the last-admin check', async () => {
+    clientQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ id: 'u1' }] });
+    await updateUserAccess('u1', { disabled: true });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(String(clientQuery.mock.calls[0][0])).toContain('pg_advisory_xact_lock');
+    expect(String(clientQuery.mock.calls[1][0])).toContain('UPDATE app_users');
+  });
+
+  it('does not take the lock for a rename, which cannot remove an admin', async () => {
+    clientQuery.mockResolvedValueOnce({ rows: [{ id: 'u1' }] });
+    await updateUserAccess('u1', { name: 'New name' });
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(String(clientQuery.mock.calls[0][0])).not.toContain('pg_advisory_xact_lock');
+    expect(String(clientQuery.mock.calls[0][0])).not.toContain('session_version = session_version + 1');
+  });
+
   it('says last-admin when the guard refused and the user exists', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'u1' }]);
+    clientQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    query.mockResolvedValueOnce([{ id: 'u1' }]);
     expect(await updateUserAccess('u1', { disabled: true })).toBe('last-admin');
   });
 
   it('says not-found when there is no such user', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    clientQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    query.mockResolvedValueOnce([]);
     expect(await updateUserAccess('nope', { role: 'user' })).toBe('not-found');
   });
 
   it('does nothing when there is nothing to change', async () => {
     expect(await updateUserAccess('u1', {})).toBe('updated');
-    expect(query).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
   });
 });
 
 describe('setUserPassword', () => {
   it('stores a hash and ends the sessions made with the old password, in one statement', async () => {
-    query.mockResolvedValueOnce([{ session_version: 4 }]);
-    const version = await setUserPassword('u1', 'a-brand-new-password');
+    query.mockResolvedValueOnce([{ session_version: 4, role: 'viewer', name: 'Vee' }]);
+    const result = await setUserPassword('u1', 'a-brand-new-password');
     const [sql, params] = query.mock.calls[0];
     expect(String(sql)).toContain('session_version = session_version + 1');
     expect((params as string[]).some((value) => String(value).startsWith('scrypt$'))).toBe(true);
     expect(params).not.toContain('a-brand-new-password');
-    expect(version).toBe(4);
+    // The role and name come back from the same statement, so a new session is signed from what is stored, not from an old cookie
+    expect(String(sql)).toContain('RETURNING session_version, role, name');
+    expect(result).toEqual({ sessionVersion: 4, role: 'viewer', name: 'Vee' });
   });
 
   it('refuses a weak password before touching the database', async () => {
