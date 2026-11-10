@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { CHART, DIVERGING } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import { onMount, tick } from 'svelte';
@@ -354,37 +355,11 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Research Header -->
-  <div class="relative bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/20 to-pink-900/20 opacity-60"></div>
-
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex min-w-0 items-center">
-          <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Android Research Analytics</h1>
-            <p class="text-slate-300 text-sm font-medium">Deep Behavioral Analysis • Digital Phenotyping • Attention Research</p>
-            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                🧠 Cognitive Analysis
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                📊 Interactive Visualizations
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                🔬 Research-Grade Metrics
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader
+    title="Android Research Analytics"
+    subtitle="Deep behavioural analysis, digital phenotyping and attention research"
+    showProject={false}
+    iconPath="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
 
   <!-- Research Toolbar -->
   <div class="bg-white border-b border-gray-200 shadow-sm">

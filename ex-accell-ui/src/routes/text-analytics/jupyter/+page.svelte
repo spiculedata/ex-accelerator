@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
@@ -63,68 +64,35 @@
 
 <div class="min-h-screen bg-gray-50 {showFullScreen ? 'fixed inset-0 z-50' : ''}">
   {#if !showFullScreen}
-    <!-- Page Header -->
-    <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-      <!-- Background pattern -->
-      <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
-      
-      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center">
-            <button
-              on:click={() => goto('/text-analytics')}
-              class="mr-4 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm"
-              aria-label="Go back to Text Analytics">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-              </svg>
-            </button>
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-red-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-              </svg>
-            </div>
-            <div>
-              <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Jupyter Lab</h1>
-              <p class="text-slate-300 text-sm font-medium">Interactive Python environment for text analytics research and data science</p>
-              {#if $currentProject}
-                <div class="flex items-center mt-2">
-                  <span class="text-sm text-slate-400">Project:</span>
-                  <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                    {$currentProject.name}
-                  </span>
-                </div>
-              {/if}
-            </div>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <div class="flex items-center space-x-2">
-              <div class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-blue-400' : 'bg-red-400'}"></div>
-              <span class="text-white text-sm">Jupyter Lab {isJupyterRunning ? 'Running' : 'Stopped'}</span>
-            </div>
-            
-            <button 
-              on:click={toggleFullScreen}
-              class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
-              <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
-              </svg>
-              Full Screen
-            </button>
-            
-            <button 
-              on:click={openInNewTab}
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
-              <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-              </svg>
-              Open in New Tab
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      title="Jupyter Lab"
+      subtitle="Interactive Python environment for text analytics research and data science"
+      backHref="/text-analytics"
+      iconPath="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+      <svelte:fragment slot="actions">
+        <span class="inline-flex items-center gap-2 text-sm text-white">
+          <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : 'bg-danger-400'}" aria-hidden="true"></span>
+          Jupyter Lab {isJupyterRunning ? 'Running' : 'Stopped'}
+        </span>
+        <button
+          on:click={toggleFullScreen}
+          class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+          </svg>
+          Full Screen
+        </button>
+        <button
+          on:click={openInNewTab}
+          class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-500 text-white transition-colors">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+          </svg>
+          Open in New Tab
+        </button>
+      </svelte:fragment>
+    </PageHeader>
+
   {:else}
     <!-- Full Screen Controls -->
     <div class="absolute top-4 right-4 z-10 flex items-center space-x-2">

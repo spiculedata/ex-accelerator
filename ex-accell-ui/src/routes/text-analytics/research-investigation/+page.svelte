@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
@@ -230,49 +231,18 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <button
-            on:click={() => goto('/text-analytics')}
-            class="mr-4 p-3 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors backdrop-blur-sm">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </button>
-          <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Research Notebooks</h1>
-            <p class="text-slate-300 text-sm font-medium">Interactive Jupyter notebooks for advanced text analytics research and experimentation</p>
-            {#if $currentProject}
-              <div class="flex items-center mt-2">
-                <span class="text-sm text-slate-400">Project:</span>
-                <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                  {$currentProject.name}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-2">
-            <div class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-green-400' : 'bg-red-400'}"></div>
-            <span class="text-white text-sm">JupyterLab {isJupyterRunning ? 'Running' : 'Stopped'}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader
+    title="Research Notebooks"
+    subtitle="Interactive Jupyter notebooks for advanced text analytics research and experimentation"
+    backHref="/text-analytics"
+    iconPath="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+    <svelte:fragment slot="actions">
+      <span class="inline-flex items-center gap-2 text-sm text-white">
+        <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : 'bg-danger-400'}" aria-hidden="true"></span>
+        JupyterLab {isJupyterRunning ? 'Running' : 'Stopped'}
+      </span>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

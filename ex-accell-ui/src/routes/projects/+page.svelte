@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { setCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
@@ -54,22 +55,22 @@
   <meta name="description" content="Manage your data analysis projects" />
 </svelte:head>
 
-<!-- Header -->
-<div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold text-white">Projects</h1>
-        <p class="text-blue-100 mt-2">Manage your data analysis workspaces</p>
-      </div>
-      <button 
-        on:click={() => goto('/projects/new')}
-        class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-white/30">
-        + New Project
-      </button>
-    </div>
-  </div>
-</div>
+<PageHeader
+  title="Projects"
+  subtitle="Manage your data analysis workspaces"
+  showProject={false}
+  iconPath="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z">
+  <svelte:fragment slot="actions">
+    <button
+      on:click={() => goto('/projects/new')}
+      class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-md transition-colors">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      New Project
+    </button>
+  </svelte:fragment>
+</PageHeader>
 
 <!-- Projects List -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

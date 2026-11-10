@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { jobSchedulerService } from '$lib/services/jobSchedulerService';
@@ -1378,66 +1379,26 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center">
-          <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Data Capture & Collection</h1>
-            <p class="text-slate-300 text-sm font-medium">Web Crawling • File Upload • Smart Data Integration</p>
-            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                🌐 Multi-Platform
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                📊 Real-time Monitoring
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                ⚡ High Performance
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
-            <div class="text-white text-sm font-medium">
-              {crawlJobs.filter(job => job.status === 'running').length} jobs running
-            </div>
-          </div>
-          <button 
-            on:click={() => loadJobStates(true)}
-            disabled={loadingJobStates}
-            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed">
-            <svg class="w-4 h-4 mr-2 {loadingJobStates ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            {loadingJobStates ? 'Refreshing...' : 'Refresh Jobs'}
-          </button>
-          <button 
-            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center border border-white/20">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            View Analytics
-          </button>
-          <button 
-            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
-            New Collection
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader
+    title="Data Capture &amp; Collection"
+    subtitle="Web crawling, file upload and data integration"
+    showProject={false}
+    iconPath="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10">
+    <svelte:fragment slot="actions">
+      <span class="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white">
+        {crawlJobs.filter(job => job.status === 'running').length} jobs running
+      </span>
+      <button
+        on:click={() => loadJobStates(true)}
+        disabled={loadingJobStates}
+        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4 mr-2 {loadingJobStates ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        {loadingJobStates ? 'Refreshing...' : 'Refresh Jobs'}
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Tab Navigation -->
   <div class="bg-white border-b border-gray-200">
