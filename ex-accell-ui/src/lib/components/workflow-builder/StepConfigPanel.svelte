@@ -121,7 +121,7 @@
               {#if availableDatasets.length === 0}
                 <div class="mt-2 p-3 bg-yellow-50 rounded-lg">
                   <div class="flex items-center space-x-2">
-                    <span class="text-yellow-600">⚠️</span>
+                    <span class="text-signal-700">⚠️</span>
                     <div>
                       <p class="text-sm font-medium text-yellow-800">No datasets available</p>
                       <p class="text-xs text-yellow-700">Run data collection or import datasets to get started</p>

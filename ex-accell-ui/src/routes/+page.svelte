@@ -72,7 +72,7 @@
   function freshness(dateStr: string): { label: string; color: string } {
     const hours = (Date.now() - new Date(dateStr).getTime()) / 3600000;
     if (hours < 24) return { label: 'just now', color: 'text-emerald-600' };
-    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-amber-600' };
+    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-signal-700' };
     return { label: `${Math.floor(hours / 168)}w ago`, color: 'text-slate-400' };
   }
 
@@ -95,7 +95,7 @@
       case 'data_ingestion':
         return { symbol: '●', bg: 'text-emerald-500' };
       case 'sentiment_shift':
-        return { symbol: '▲', bg: 'text-amber-500' };
+        return { symbol: '▲', bg: 'text-signal-700' };
       case 'system_health':
         return { symbol: '●', bg: 'text-red-500' };
       default:

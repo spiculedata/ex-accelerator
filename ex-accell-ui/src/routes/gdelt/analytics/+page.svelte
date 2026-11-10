@@ -162,7 +162,7 @@
     if (val == null || isNaN(val)) return 'text-gray-500';
     if (val > 2) return 'text-emerald-600';
     if (val < -2) return 'text-red-600';
-    return 'text-amber-600';
+    return 'text-signal-700';
   }
 
   let refreshingViews = false;

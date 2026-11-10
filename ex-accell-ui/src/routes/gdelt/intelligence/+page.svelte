@@ -206,14 +206,14 @@
   function getGoldsteinColor(value: number): string {
     if (value >= 5) return 'text-green-600';
     if (value >= 0) return 'text-blue-600';
-    if (value >= -5) return 'text-amber-600';
+    if (value >= -5) return 'text-signal-700';
     return 'text-red-600';
   }
 
   function getToneColor(value: number): string {
     if (value >= 2) return 'text-green-600';
     if (value >= 0) return 'text-blue-600';
-    if (value >= -2) return 'text-amber-600';
+    if (value >= -2) return 'text-signal-700';
     return 'text-red-600';
   }
 
