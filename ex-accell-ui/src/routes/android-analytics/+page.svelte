@@ -52,6 +52,7 @@
   let totalScreenshots = 0;
   let uniqueApps = new Set<string>();
   let sessionDuration = 0;
+  let avgScreenshotInterval = 0;
   let topApps: AppTotal[] = [];
   let appUsageTimeline: TimelineEntry[] = [];
   let userBehaviorPatterns: BehaviourPattern[] = [];
@@ -84,17 +85,22 @@
     loading = false;
   }
 
+  // BIGINT columns can arrive as strings, so every millisecond value goes through Number()
+  const segmentMs = (segment: AndroidAppSegment): number => Number(segment.duration_segment_ms) || 0;
+  const segmentStart = (segment: AndroidAppSegment): number => Number(segment.t_unix_ts_segment_start) || 0;
+
   function calculateAnalytics(summary: AndroidAnalyticsSummary) {
-    const totalSegmentMs = appSegmentData.reduce((sum, segment) => sum + segment.duration_segment_ms, 0);
+    const totalSegmentMs = appSegmentData.reduce((sum, segment) => sum + segmentMs(segment), 0);
 
     totalSessions = summary.totalSessions || new Set(appAccessibilityData.map((event) => event.id_session)).size;
     totalScreenshots = summary.totalScreenshots || screenshotData.length;
     uniqueApps = new Set(appSegmentData.map((segment) => segment.apk));
     sessionDuration = summary.sessionDuration || Math.round(totalSegmentMs / MS_PER_MINUTE);
+    avgScreenshotInterval = measureScreenshotInterval();
 
     const usageByApp = appSegmentData.reduce<Record<string, number>>((totals, segment) => {
       const name = getAppDisplayName(segment.apk);
-      return { ...totals, [name]: (totals[name] ?? 0) + segment.duration_segment_ms };
+      return { ...totals, [name]: (totals[name] ?? 0) + segmentMs(segment) };
     }, {});
 
     topApps = Object.entries(usageByApp)
@@ -109,13 +115,21 @@
     appUsageTimeline = appSegmentData
       .map((segment) => ({
         app: getAppDisplayName(segment.apk),
-        startTime: new Date(segment.t_unix_ts_segment_start).toLocaleTimeString(),
-        duration: Math.round(segment.duration_segment_ms / MS_PER_MINUTE),
-        timestamp: segment.t_unix_ts_segment_start
+        startTime: new Date(segmentStart(segment)).toLocaleTimeString(),
+        duration: Math.round(segmentMs(segment) / MS_PER_MINUTE),
+        timestamp: segmentStart(segment)
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
 
     userBehaviorPatterns = analyzeUserPatterns();
+  }
+
+  /** Mean seconds between the first and last screenshot, or 0 when there are fewer than two. */
+  function measureScreenshotInterval(): number {
+    const firstShot = Number(screenshotData[0]?.t_epoch_ts_ms);
+    const lastShot = Number(screenshotData[screenshotData.length - 1]?.t_epoch_ts_ms);
+    if (totalScreenshots < 2 || !Number.isFinite(firstShot) || !Number.isFinite(lastShot)) return 0;
+    return Math.round((lastShot - firstShot) / (totalScreenshots - 1) / MS_PER_SECOND);
   }
 
   function getAppDisplayName(apk: string | null): string {
@@ -135,12 +149,6 @@
   function analyzeUserPatterns(): BehaviourPattern[] {
     const textEntries = appAccessibilityData.filter((event) => event.type === 'SCREEN_TEXT' && event.text);
     const urlEntries = appAccessibilityData.filter((event) => event.type === 'URL');
-    const firstShot = screenshotData[0]?.t_epoch_ts_ms;
-    const lastShot = screenshotData[screenshotData.length - 1]?.t_epoch_ts_ms;
-    const avgScreenshotInterval =
-      totalScreenshots > 1 && firstShot !== undefined && lastShot !== undefined
-        ? Math.round((lastShot - firstShot) / (totalScreenshots - 1) / MS_PER_SECOND)
-        : 0;
 
     return [
       textEntries.length > 0 && {
@@ -171,7 +179,8 @@
   }
 
   function formatTimestamp(timestamp: number) {
-    return new Date(timestamp).toLocaleString();
+    const ms = Number(timestamp);
+    return Number.isFinite(ms) ? new Date(ms).toLocaleString() : 'Unknown time';
   }
 
   function exportData() {
@@ -269,9 +278,7 @@
     {:else if !hasData}
       <DataUnavailable
         title="No Android data yet"
-        description="This page fills in once data from the Princeton SMART / Screenlake research kit is loaded through Data Capture."
-        actionLabel="Open Data Capture"
-        actionHref="/data-capture" />
+        description="This page reads data from the Princeton SMART / Screenlake research kit. Loading that data is not available in this release, so there is nothing to show." />
     {:else}
 
       <!-- Key Metrics -->
@@ -284,7 +291,7 @@
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
           <div class="text-3xl font-bold text-blue-600 mb-1">{totalScreenshots}</div>
           <div class="text-sm text-gray-600">Screenshots Captured</div>
-          <div class="text-xs text-gray-500 mt-1">Every ~3-5 seconds</div>
+          <div class="text-xs text-gray-500 mt-1">{avgScreenshotInterval > 0 ? `Every ~${avgScreenshotInterval}s on average` : 'Interval not measured'}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
           <div class="text-3xl font-bold text-emerald-600 mb-1">{uniqueApps.size}</div>

@@ -417,6 +417,13 @@ describe('BaseDatabaseService', () => {
       await expect(service.publicQueryAPIOrThrow({ endpoint: 'network-fail' })).rejects.toThrow();
     });
 
+    it('throws when the body is not JSON', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => { throw new SyntaxError('Unexpected token <'); } })));
+
+      await service.connect();
+      await expect(service.publicQueryAPIOrThrow({ endpoint: 'html-error-page' })).rejects.toThrow(/Unexpected token/);
+    });
+
     it('leaves the global error banner alone, because the caller shows the failure', async () => {
       vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
 

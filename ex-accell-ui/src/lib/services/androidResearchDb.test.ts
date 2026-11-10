@@ -79,11 +79,11 @@ describe('androidResearchDb', () => {
       ]);
     });
 
-    it('maps content engagement rows', async () => {
-      mockFetch({ 'content-engagement': [{ content_category: 'Video', engagement_score: 80, avg_duration_minutes: 2, avg_interaction_depth: 4, avg_return_visits: 50 }] });
+    it('maps content engagement rows, keeping return visits as a count', async () => {
+      mockFetch({ 'content-engagement': [{ content_category: 'Video', engagement_score: 80, avg_duration_minutes: 2, avg_interaction_depth: 4, avg_return_visits: 3.5 }] });
 
       expect(await androidResearchDb.getContentEngagement()).toEqual({
-        data: [{ content: 'Video', engagementScore: 80, avgDuration: 120, interactionDepth: 4, returnRate: 0.5 }],
+        data: [{ content: 'Video', engagementScore: 80, avgDuration: 120, interactionDepth: 4, returnVisits: 3.5 }],
         hasData: true
       });
     });
@@ -139,11 +139,23 @@ describe('androidResearchDb', () => {
       });
     });
 
-    it('maps transition flow rows', async () => {
-      mockFetch({ 'transition-flow': [{ from_app_name: 'Launcher', to_app_name: 'YouTube', transition_count: 7 }] });
+    it('maps transition flow rows and drops rows without a count rather than inventing one', async () => {
+      mockFetch({
+        'transition-flow': [
+          { from_app_name: 'Launcher', to_app_name: 'YouTube', transition_count: 7 },
+          { from_app_name: 'YouTube', to_app_name: 'Chrome' },
+          { from_app_name: 'Chrome', to_app_name: 'Gmail', transition_count: 0 }
+        ]
+      });
 
       expect(await androidResearchDb.getTransitionFlow()).toEqual({ data: [{ source: 'Launcher', target: 'YouTube', value: 7 }], hasData: true });
     });
+  });
+
+  it('surfaces a malformed response as an error, not as an empty module', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => { throw new SyntaxError('Unexpected token <'); } })));
+
+    await expect(androidResearchDb.getAttentionSpans()).rejects.toThrow(/Unexpected token/);
   });
 
   it('has no fallback figures and no Android metrics derived from social data', () => {

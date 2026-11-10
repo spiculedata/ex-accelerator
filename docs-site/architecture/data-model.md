@@ -42,9 +42,10 @@ migrations. Until a table exists, the related dashboards show an empty state.
 | Engagement | `content_types`, `post_engagement`, `hashtag_engagement` |
 | Android | `android_devices`, `android_app_usage`, `android_system_metrics` |
 
-The Android pages (`/android-analytics` and `/android-research`) need data from the Princeton SMART /
-Screenlake research kit loaded through Data Capture. Until then they show an empty state; they never
-show sample or generated figures.
+The Android pages (`/android-analytics` and `/android-research`) read data from the Princeton SMART /
+Screenlake research kit. Loading that data is not available in this release (the Data Capture tab for
+it is a preview and the Android API endpoints are not implemented), so the pages show an empty state.
+They never show sample or generated figures.
 
 The workflow builder stores its definitions and run history in `published_workflows` and
 `workflow_executions` (deleting a workflow also deletes its runs). Separate schema files cover

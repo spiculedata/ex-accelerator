@@ -69,7 +69,13 @@ export function temporalUsageFromSessions(spans: readonly AttentionSpan[]): Temp
   });
 }
 
-/** Headline figures from the loaded sessions and transitions, or null when there are no sessions. */
+const utcDay = (timestamp: number): string => new Date(timestamp).toISOString().slice(0, 10);
+
+/**
+ * Headline figures from the loaded sessions and transitions, or null when there are no sessions.
+ * Usage and transitions are whole-dataset totals, so they are averaged over the distinct UTC days
+ * that have a timed session; with no timed session everything counts as one day.
+ */
 export function behaviouralMetrics(
   temporal: readonly TemporalUsagePattern[],
   spans: readonly AttentionSpan[],
@@ -78,16 +84,19 @@ export function behaviouralMetrics(
   const durations = spans.flatMap((span) => span.sessions.map((session) => session.duration));
   if (durations.length === 0) return null;
 
+  const daysRecorded = Math.max(1, new Set(timedSessions(spans).map((session) => utcDay(session.timestamp))).size);
+  const totalMinutes = sum(durations) / SECONDS_PER_MINUTE;
   const peak = temporal.reduce<TemporalUsagePattern | null>(
     (best, hour) => (best === null || hour.totalUsage > best.totalUsage ? hour : best),
     null
   );
 
   return {
-    totalDailyUsage: Math.round(sum(temporal.map((hour) => hour.totalUsage))),
+    daysRecorded,
+    totalDailyUsage: Math.round(totalMinutes / daysRecorded),
     peakUsageHour: peak?.hour ?? null,
     avgSessionLength: Math.round(sum(durations) / durations.length),
-    appSwitchingRate: roundTo1dp(sum(transitions.map((transition) => transition.value)) / HOURS_IN_DAY)
+    appSwitchingRate: roundTo1dp(sum(transitions.map((transition) => transition.value)) / (daysRecorded * HOURS_IN_DAY))
   };
 }
 

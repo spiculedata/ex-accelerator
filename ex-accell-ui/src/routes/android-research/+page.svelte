@@ -24,6 +24,7 @@
   const SECONDS_PER_MINUTE = 60;
   const PERCENT = 100;
   const NOT_CLASSIFIED = 'Not classified';
+  const NOTHING_RECORDED = 'Nothing recorded for this section yet.';
 
   type Analysis = 'temporal-patterns' | 'network-analysis' | 'attention-research' | 'engagement-analysis' | 'findings';
   const ANALYSES: Array<{ id: Analysis; label: string }> = [
@@ -261,12 +262,12 @@
       xAxis: { type: 'category', data: contentEngagement.map((entry) => entry.content) },
       yAxis: [
         { type: 'value', name: 'Engagement Score', position: 'left', axisLabel: { formatter: '{value}' }, max: PERCENT },
-        { type: 'value', name: 'Avg Duration (min)', position: 'right', axisLabel: { formatter: '{value}m' } }
+        { type: 'value', name: 'Minutes / visits', position: 'right' }
       ],
       series: [
         { name: 'Engagement Score', type: 'bar', data: contentEngagement.map((entry) => entry.engagementScore), itemStyle: { color: CHART.catBlue } },
-        { name: 'Avg Duration', type: 'line', yAxisIndex: 1, data: contentEngagement.map((entry) => entry.avgDuration / SECONDS_PER_MINUTE), itemStyle: { color: CHART.catGreen }, lineStyle: { width: 3 } },
-        { name: 'Return Rate', type: 'line', data: contentEngagement.map((entry) => entry.returnRate * PERCENT), itemStyle: { color: CHART.catOrange }, lineStyle: { width: 3 } }
+        { name: 'Avg Duration (min)', type: 'line', yAxisIndex: 1, data: contentEngagement.map((entry) => entry.avgDuration / SECONDS_PER_MINUTE), itemStyle: { color: CHART.catGreen }, lineStyle: { width: 3 } },
+        { name: 'Avg Return Visits', type: 'line', yAxisIndex: 1, data: contentEngagement.map((entry) => entry.returnVisits), itemStyle: { color: CHART.catOrange }, lineStyle: { width: 3 } }
       ]
     };
   }
@@ -427,17 +428,15 @@
     {:else if !hasData}
       <DataUnavailable
         title="No Android data yet"
-        description="This page fills in once data from the Princeton SMART / Screenlake research kit is loaded through Data Capture."
-        actionLabel="Open Data Capture"
-        actionHref="/data-capture" />
+        description="This page reads data from the Princeton SMART / Screenlake research kit. Loading that data is not available in this release, so there is nothing to show." />
     {:else}
       {#if metrics}
         <!-- Behavioural Metrics Overview -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-3xl font-bold text-indigo-600 mb-1">{metrics.totalDailyUsage}m</div>
-            <div class="text-sm text-gray-600">Daily Usage</div>
-            <div class="text-xs text-gray-500 mt-1">{digitalPhenotype?.behaviorType ?? NOT_CLASSIFIED}</div>
+            <div class="text-sm text-gray-600">Usage per day</div>
+            <div class="text-xs text-gray-500 mt-1">Over {metrics.daysRecorded} {metrics.daysRecorded === 1 ? 'day' : 'days'} recorded</div>
           </div>
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-3xl font-bold text-purple-600 mb-1">{metrics.peakUsageHour === null ? '—' : `${metrics.peakUsageHour}:00`}</div>
@@ -451,7 +450,7 @@
           </div>
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-3xl font-bold text-emerald-600 mb-1">{metrics.appSwitchingRate}</div>
-            <div class="text-sm text-gray-600">Switches/Hour</div>
+            <div class="text-sm text-gray-600">Transitions per hour</div>
             <div class="text-xs text-gray-500 mt-1">{digitalPhenotype?.multitaskingIndex ?? NOT_CLASSIFIED} multitasking</div>
           </div>
         </div>
@@ -475,14 +474,18 @@
         <div class="p-6">
 
           {#if activeAnalysis === 'temporal-patterns'}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div class="bg-gray-50 rounded-xl p-4">
-                <div bind:this={temporalChart} class="w-full h-96"></div>
+            {#if temporalUsage.length === 0}
+              <p class="text-sm text-gray-500">{NOTHING_RECORDED}</p>
+            {:else}
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-gray-50 rounded-xl p-4">
+                  <div bind:this={temporalChart} class="w-full h-96"></div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                  <div bind:this={heatmapChart} class="w-full h-96"></div>
+                </div>
               </div>
-              <div class="bg-gray-50 rounded-xl p-4">
-                <div bind:this={heatmapChart} class="w-full h-96"></div>
-              </div>
-            </div>
+            {/if}
             <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
               <h4 class="font-semibold text-blue-900 mb-2">Temporal Analysis</h4>
               <p class="text-blue-800 text-sm">Minutes spent in each app during each hour of the day, summed from the recorded sessions, and the same figures as a heatmap. Hours are in UTC.</p>
@@ -490,14 +493,18 @@
           {/if}
 
           {#if activeAnalysis === 'network-analysis'}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div class="bg-gray-50 rounded-xl p-4">
-                <div bind:this={appNetworkChart} class="w-full h-96"></div>
+            {#if appTransitions.length === 0}
+              <p class="text-sm text-gray-500">{NOTHING_RECORDED}</p>
+            {:else}
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-gray-50 rounded-xl p-4">
+                  <div bind:this={appNetworkChart} class="w-full h-96"></div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                  <div bind:this={transitionChart} class="w-full h-96"></div>
+                </div>
               </div>
-              <div class="bg-gray-50 rounded-xl p-4">
-                <div bind:this={transitionChart} class="w-full h-96"></div>
-              </div>
-            </div>
+            {/if}
             <div class="mt-6 bg-purple-50 border border-purple-200 rounded-xl p-4">
               <h4 class="font-semibold text-purple-900 mb-2">Network Analysis</h4>
               <p class="text-purple-800 text-sm">Each node is an app and each link counts the recorded moves from one app to the next. The Sankey diagram shows the same transitions with any cycles removed so the flow can be drawn.</p>
@@ -505,9 +512,13 @@
           {/if}
 
           {#if activeAnalysis === 'attention-research'}
-            <div class="bg-gray-50 rounded-xl p-4">
-              <div bind:this={attentionChart} class="w-full h-96"></div>
-            </div>
+            {#if attentionSpans.length === 0}
+              <p class="text-sm text-gray-500">{NOTHING_RECORDED}</p>
+            {:else}
+              <div class="bg-gray-50 rounded-xl p-4">
+                <div bind:this={attentionChart} class="w-full h-96"></div>
+              </div>
+            {/if}
             <div class="mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
               <h4 class="font-semibold text-emerald-900 mb-2">Attention Research</h4>
               <p class="text-emerald-800 text-sm">Mean session length against the number of sessions for each app; larger points mark more total time. Apps high on the chart hold attention for longer at a stretch.</p>
@@ -515,12 +526,16 @@
           {/if}
 
           {#if activeAnalysis === 'engagement-analysis'}
-            <div class="bg-gray-50 rounded-xl p-4">
-              <div bind:this={engagementChart} class="w-full h-96"></div>
-            </div>
+            {#if contentEngagement.length === 0}
+              <p class="text-sm text-gray-500">{NOTHING_RECORDED}</p>
+            {:else}
+              <div class="bg-gray-50 rounded-xl p-4">
+                <div bind:this={engagementChart} class="w-full h-96"></div>
+              </div>
+            {/if}
             <div class="mt-6 bg-pink-50 border border-pink-200 rounded-xl p-4">
               <h4 class="font-semibold text-pink-900 mb-2">Content Engagement</h4>
-              <p class="text-pink-800 text-sm">Engagement score, average time spent and return rate for each kind of content in the recorded sessions.</p>
+              <p class="text-pink-800 text-sm">Engagement score, average time spent and the average number of return visits for each kind of content in the recorded sessions.</p>
             </div>
           {/if}
 

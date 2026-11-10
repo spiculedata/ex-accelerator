@@ -45,7 +45,8 @@ export interface ContentEngagement {
   /** Seconds. */
   avgDuration: number;
   interactionDepth: number;
-  returnRate: number;
+  /** Average number of times participants came back to this kind of content. */
+  returnVisits: number;
 }
 
 export interface CognitiveLoad {
@@ -56,14 +57,17 @@ export interface CognitiveLoad {
   cognitiveEfficiency: number;
 }
 
-/** Headline figures derived from the loaded sessions and transitions. */
+/** Headline figures derived from the loaded sessions and transitions, averaged over the days recorded. */
 export interface BehaviouralMetrics {
-  /** Minutes. */
+  /** Distinct UTC days with a timed session; 1 when no session has a start time. */
+  daysRecorded: number;
+  /** Minutes per recorded day. */
   totalDailyUsage: number;
   /** Null when no session has a start time. */
   peakUsageHour: number | null;
   /** Seconds. */
   avgSessionLength: number;
+  /** Transitions per hour over the days recorded. */
   appSwitchingRate: number;
 }
 

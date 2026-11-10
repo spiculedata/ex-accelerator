@@ -18,7 +18,6 @@ import type {
 const HOURS_IN_DAY = 24;
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
-const PERCENT = 100;
 const NOT_CLASSIFIED = 'Not classified';
 
 interface AttentionSpanRow {
@@ -137,7 +136,7 @@ class AndroidResearchDatabase extends BaseDatabaseService {
         engagementScore: row.engagement_score ?? row.avg_engagement_score ?? 0,
         avgDuration: Math.round((row.avg_duration_minutes ?? 0) * SECONDS_PER_MINUTE),
         interactionDepth: row.avg_interaction_depth ?? row.interaction_depth ?? 0,
-        returnRate: row.avg_return_visits ? row.avg_return_visits / PERCENT : 0
+        returnVisits: row.avg_return_visits ?? 0
       }))
     );
   }
@@ -205,15 +204,18 @@ class AndroidResearchDatabase extends BaseDatabaseService {
     return listResult([...centrality].sort((a, b) => b.centralityScore - a.centralityScore));
   }
 
+  /** Transitions between apps; a row without a positive count is dropped rather than given a weight. */
   async getTransitionFlow(): Promise<DataResult<AppTransition[]>> {
     const rows = await this.rows<TransitionFlowRow>('transition-flow');
 
     return listResult(
-      rows.map((row) => ({
-        source: row.from_app_name ?? row.source ?? 'Unknown app',
-        target: row.to_app_name ?? row.target ?? 'Unknown app',
-        value: row.transition_count ?? row.value ?? 1
-      }))
+      rows
+        .map((row) => ({
+          source: row.from_app_name ?? row.source ?? 'Unknown app',
+          target: row.to_app_name ?? row.target ?? 'Unknown app',
+          value: Number(row.transition_count ?? row.value) || 0
+        }))
+        .filter((transition) => transition.value > 0)
     );
   }
 }

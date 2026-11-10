@@ -57,7 +57,7 @@ describe('behaviouralMetrics', () => {
     expect(behaviouralMetrics([], [], [])).toBeNull();
   });
 
-  it('summarises the loaded sessions and transitions', () => {
+  it('summarises one recorded day of sessions and transitions', () => {
     const spans = [span('YouTube', [[9, 120], [21, 300]]), span('Chrome', [[9, 60]])];
     const transitions = [
       { source: 'YouTube', target: 'Chrome', value: 12 },
@@ -65,10 +65,55 @@ describe('behaviouralMetrics', () => {
     ];
 
     expect(behaviouralMetrics(temporalUsageFromSessions(spans), spans, transitions)).toEqual({
+      daysRecorded: 1,
       totalDailyUsage: 8,
       peakUsageHour: 21,
       avgSessionLength: 160,
       appSwitchingRate: 1
+    });
+  });
+
+  it('divides usage and transitions by the number of UTC days recorded', () => {
+    const dayTwo = Date.UTC(2026, 3, 15, 9);
+    const spans: AttentionSpan[] = [
+      {
+        app: 'YouTube',
+        meanDuration: 240,
+        sessions: [
+          { duration: 120, timestamp: atUtcHour(9), taskSwitches: 0, interruptions: 0 },
+          { duration: 360, timestamp: dayTwo, taskSwitches: 0, interruptions: 0 }
+        ]
+      }
+    ];
+    const transitions = [{ source: 'YouTube', target: 'Chrome', value: 96 }];
+
+    expect(behaviouralMetrics(temporalUsageFromSessions(spans), spans, transitions)).toEqual({
+      daysRecorded: 2,
+      totalDailyUsage: 4,
+      peakUsageHour: 9,
+      avgSessionLength: 240,
+      appSwitchingRate: 2
+    });
+  });
+
+  it('treats sessions without timestamps as one unknown day and has no peak hour', () => {
+    const spans: AttentionSpan[] = [
+      {
+        app: 'Gmail',
+        meanDuration: 90,
+        sessions: [
+          { duration: 60, timestamp: 0, taskSwitches: 0, interruptions: 0 },
+          { duration: 120, timestamp: 0, taskSwitches: 0, interruptions: 0 }
+        ]
+      }
+    ];
+
+    expect(behaviouralMetrics(temporalUsageFromSessions(spans), spans, [{ source: 'Gmail', target: 'Chrome', value: 48 }])).toEqual({
+      daysRecorded: 1,
+      totalDailyUsage: 3,
+      peakUsageHour: null,
+      avgSessionLength: 90,
+      appSwitchingRate: 2
     });
   });
 });
