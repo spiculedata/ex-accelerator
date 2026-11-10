@@ -135,6 +135,25 @@ describe('workflow executions', () => {
   });
 });
 
+describe('data sharing', () => {
+  it.each([
+    ['/api/data-sharing', 'POST'],
+    ['/api/data-sharing/', 'POST'],
+    ['/api/%64ata-sharing', 'POST'],
+    ['/api//data-sharing', 'POST']
+  ])('only an admin may publish, import or generate a package via %s (%s)', (path, method) => {
+    expect(req(path, method, member).action).toBe('forbidden');
+    expect(req(path, method, viewer).action).toBe('forbidden');
+    expect(req(path, method, admin).action).toBe('allow');
+  });
+
+  it('lets any signed-in role read the package list and the registry', () => {
+    for (const user of [admin, member, viewer]) {
+      expect(req('/api/data-sharing', 'GET', user, '?action=registry').action).toBe('allow');
+    }
+  });
+});
+
 describe('account management', () => {
   it('lets any signed-in role change their own password', () => {
     for (const user of [admin, member, viewer]) expect(req('/api/auth/password', 'POST', user).action).toBe('allow');
