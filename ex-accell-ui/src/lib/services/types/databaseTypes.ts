@@ -260,7 +260,16 @@ export interface LanguageMixing {
 }
 
 /**
- * Android Analytics Types
+ * A loaded collection plus whether anything was there, so a page can tell an empty module
+ * (nothing loaded yet) from a populated one. A failed request throws instead.
+ */
+export interface DataResult<T> {
+  data: T;
+  hasData: boolean;
+}
+
+/**
+ * Android Analytics Types (Princeton SMART / Screenlake research kit)
  */
 export interface AndroidAnalyticsSummary {
   totalSessions: number;
@@ -271,20 +280,34 @@ export interface AndroidAnalyticsSummary {
   activeUsers: number;
 }
 
-export interface AppUsage {
-  app_name: string;
-  package_name?: string;
-  usage_time: number;
-  session_count: number;
-  last_used: string;
+/** One accessibility event: a session start, the text on a screen, a URL visit and so on. */
+export interface AndroidAccessibilityEvent {
+  id_user: string;
+  type: string;
+  t_unix_ts_ms: number;
+  apk: string | null;
+  id_session: string;
+  text: string | null;
 }
 
-export interface ScreenData {
-  screen_id: string | number;
-  timestamp: string;
-  screen_text: string[];
-  app_context: string;
-  user_interaction?: string;
+/** One stretch of time spent in an app. */
+export interface AndroidAppSegment {
+  apk: string;
+  t_unix_ts_segment_start: number;
+  duration_segment_ms: number;
+  id_session: string;
+  id_user: string;
+}
+
+/** One screenshot with the text read from it. */
+export interface AndroidScreenshot {
+  id_user: string;
+  file: string;
+  apk: string;
+  app: string;
+  text: string;
+  t_epoch_ts_ms: number;
+  t_natural_day_ts: string;
 }
 
 /**

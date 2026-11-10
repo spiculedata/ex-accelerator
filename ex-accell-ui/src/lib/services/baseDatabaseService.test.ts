@@ -16,6 +16,10 @@ class TestService extends BaseDatabaseService {
     return this.queryAPI<T>(options);
   }
 
+  public async publicQueryAPIOrThrow<T>(options: QueryOptions) {
+    return this.queryAPIOrThrow<T>(options);
+  }
+
   public publicSafeTransform<TInput, TOutput>(
     data: TInput[],
     transformer: (item: TInput, index: number) => TOutput,
@@ -367,6 +371,59 @@ describe('BaseDatabaseService', () => {
 
       const calledUrl = mockFetch.mock.calls[0][0] as string;
       expect(calledUrl).toContain('/api/custom?');
+    });
+  });
+
+  // ─── queryAPIOrThrow() ────────────────────────────────────────────
+
+  describe('queryAPIOrThrow()', () => {
+    beforeEach(() => dismissApiErrors());
+
+    const okResponse = (body: unknown) => vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => body }));
+
+    it('returns the rows on success', async () => {
+      vi.stubGlobal('fetch', okResponse({ success: true, data: [{ id: 1 }] }));
+
+      await service.connect();
+      expect(await service.publicQueryAPIOrThrow({ endpoint: 'rows' })).toEqual([{ id: 1 }]);
+    });
+
+    it('returns an empty list for a module that is not set up, which is not a failure', async () => {
+      vi.stubGlobal('fetch', okResponse({ success: true, data: [], meta: { unavailable: true } }));
+
+      await service.connect();
+      expect(await service.publicQueryAPIOrThrow({ endpoint: 'unused-module' })).toEqual([]);
+      expect(get(apiErrors)).toEqual([]);
+    });
+
+    it('throws on an HTTP failure instead of returning an empty list', async () => {
+      vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+
+      await service.connect();
+      await expect(service.publicQueryAPIOrThrow({ endpoint: 'failing' })).rejects.toThrow(/500/);
+    });
+
+    it('throws when the body says the query failed', async () => {
+      vi.stubGlobal('fetch', okResponse({ success: false, error: 'Query failed' }));
+
+      await service.connect();
+      await expect(service.publicQueryAPIOrThrow({ endpoint: 'bad-query' })).rejects.toThrow('Query failed');
+    });
+
+    it('throws on a network failure', async () => {
+      vi.stubGlobal('fetch', createNetworkError());
+
+      await service.connect();
+      await expect(service.publicQueryAPIOrThrow({ endpoint: 'network-fail' })).rejects.toThrow();
+    });
+
+    it('leaves the global error banner alone, because the caller shows the failure', async () => {
+      vi.stubGlobal('fetch', createFetchError(500, 'Internal Server Error'));
+
+      await service.connect();
+      await service.publicQueryAPIOrThrow({ endpoint: 'failing' }).catch(() => undefined);
+
+      expect(get(apiErrors)).toEqual([]);
     });
   });
 
