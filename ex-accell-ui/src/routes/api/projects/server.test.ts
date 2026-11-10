@@ -39,6 +39,22 @@ describe('POST /api/projects', () => {
     );
   });
 
+  it('stores team members trimmed, lower-cased and once each', async () => {
+    await call({ name: 'p', team_members: [' Bob@Example.com ', 'bob@example.com', 'cy@example.com'] }, { email: 'ada@example.com' });
+    expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ team_members: ['bob@example.com', 'cy@example.com'] }));
+  });
+
+  it.each([
+    ['a string instead of a list', 'bob@example.com'],
+    ['an entry that is not an email', ['nobody']],
+    ['a non-text entry', [5]],
+    ['too many people', Array.from({ length: 101 }, (_, i) => `p${i}@example.com`)]
+  ])('refuses team_members given as %s, creating nothing', async (_label, team) => {
+    const response = await call({ name: 'p', team_members: team }, { email: 'ada@example.com' });
+    expect(response.status).toBe(400);
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
   it('ignores a created_by supplied by the client', async () => {
     await call({ name: 'p', created_by: 'someone-else@example.com' }, { email: 'ada@example.com' });
 

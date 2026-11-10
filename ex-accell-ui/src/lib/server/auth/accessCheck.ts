@@ -11,6 +11,9 @@ interface Cached<T> {
   at: number;
 }
 
+// Raised whenever membership is forgotten, so a lookup that began before the change cannot store its stale answer after it
+let generation = 0;
+
 const projectCache = new Map<number, Cached<ProjectAccessInfo>>();
 const workspaceCache = new Map<number, Cached<number>>();
 
@@ -19,8 +22,9 @@ const workspaceCache = new Map<number, Cached<number>>();
 async function cached<K, V>(cache: Map<K, Cached<V>>, key: K, load: (key: K) => Promise<V | null>): Promise<V | null> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+  const startedAt = generation;
   const value = await load(key);
-  if (value !== null) cache.set(key, { value, at: Date.now() });
+  if (value !== null && startedAt === generation) cache.set(key, { value, at: Date.now() });
   return value;
 }
 
@@ -48,12 +52,14 @@ export async function checkAccess(user: Pick<SessionUser, 'email' | 'role'>, res
 
 /** Forgets remembered membership, for example after someone is added to or removed from a project. */
 export function forgetProjectAccess(projectId?: number): void {
+  generation++;
   if (projectId === undefined) projectCache.clear();
   else projectCache.delete(projectId);
 }
 
 /** For tests: forget everything that was remembered. */
 export function resetAccessCacheForTests(): void {
+  generation++;
   projectCache.clear();
   workspaceCache.clear();
 }

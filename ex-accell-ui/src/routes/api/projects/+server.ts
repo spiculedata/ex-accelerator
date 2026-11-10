@@ -4,6 +4,7 @@
 import { canManageProject, parseResourceId } from '$lib/server/auth/access';
 import { refuseIfNoAccess, visibleProjectIds } from '$lib/server/auth/accessGuard';
 import { loadProjectAccessInfo } from '$lib/server/auth/accessRepo';
+import { isEmail } from '$lib/server/auth/userInput';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { projectsDb } from '$lib/services/projectsDb';
@@ -36,9 +37,26 @@ export const GET: RequestHandler = async ({ url, locals }) => {
  * POST /api/projects
  * Create a new project
  */
+const MAX_TEAM_MEMBERS = 100;
+
+/** Team members as clean lower-case emails, each once, or null when the list is not a list of emails. */
+function cleanTeam(value: unknown): string[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > MAX_TEAM_MEMBERS) return null;
+  const emails = new Set<string>();
+  for (const entry of value) {
+    const email = typeof entry === 'string' ? entry.trim() : entry;
+    if (!isEmail(email)) return null;
+    emails.add(email.toLowerCase());
+  }
+  return [...emails];
+}
+
 export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const data = await request.json();
+    const team = cleanTeam(data.team_members);
+    if (team === null) return json({ success: false, error: 'team_members must be a list of up to 100 email addresses' }, { status: 400 });
 
     const project = await projectsDb.createProject({
       name: data.name,
@@ -46,7 +64,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       project_type: data.project_type || 'social-media',
       // Creator comes from the session, never from the request body
       created_by: locals.user?.email ?? 'unknown',
-      team_members: data.team_members || []
+      team_members: team
     });
 
     return json({ success: true, project });

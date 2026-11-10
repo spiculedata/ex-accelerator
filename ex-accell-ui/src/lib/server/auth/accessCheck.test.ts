@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const repo = vi.hoisted(() => ({ loadProjectAccessInfo: vi.fn(), projectIdOfWorkspace: vi.fn() }));
 vi.mock('./accessRepo', () => repo);
 
-import { checkAccess, resetAccessCacheForTests } from './accessCheck';
+import { checkAccess, forgetProjectAccess, resetAccessCacheForTests } from './accessCheck';
 
 const user = (email: string, role: 'admin' | 'user' | 'viewer' = 'user') => ({ id: 'u', email, name: 'N', role });
 const members = { createdBy: 'ada@example.com', memberEmails: ['ada@example.com'] };
@@ -74,5 +74,23 @@ describe('checkAccess', () => {
     repo.projectIdOfWorkspace.mockResolvedValueOnce(1);
     repo.loadProjectAccessInfo.mockResolvedValue({ createdBy: 'ada@example.com', memberEmails: ['ada@example.com'] });
     expect((await checkAccess(user('mallory@example.com'), { projects: [], workspaces: [8], malformed: [] })).allowed).toBe(false);
+  });
+});
+
+describe('removing someone while a lookup is in flight', () => {
+  it('does not let that lookup put the old membership back in the cache', async () => {
+    let finishStale!: (value: typeof members) => void;
+    repo.loadProjectAccessInfo
+      .mockImplementationOnce(() => new Promise((resolve) => { finishStale = resolve; })) // started before the removal
+      .mockResolvedValue({ createdBy: 'ada@example.com', memberEmails: ['ada@example.com'] }); // after: bob is gone
+
+    const bob = user('bob@example.com');
+    const inFlight = checkAccess(bob, { projects: [1], workspaces: [], malformed: [] });
+    forgetProjectAccess(1); // the removal commits and the cache entry is forgotten while the lookup is still running
+    finishStale({ createdBy: 'ada@example.com', memberEmails: ['ada@example.com', 'bob@example.com'] });
+    expect((await inFlight).allowed).toBe(true); // this one request saw the old answer
+
+    // the next request must ask again rather than trust the stale answer
+    expect(await checkAccess(bob, { projects: [1], workspaces: [], malformed: [] })).toEqual({ allowed: false, what: 'project' });
   });
 });
