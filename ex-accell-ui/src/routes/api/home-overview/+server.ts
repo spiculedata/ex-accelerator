@@ -259,7 +259,6 @@ export const GET: RequestHandler = async () => {
       summary: {
         total_projects: enrichedProjects.length,
         total_events: totalEvents,
-        active_crawlers: 0,
         alerts
       }
     });

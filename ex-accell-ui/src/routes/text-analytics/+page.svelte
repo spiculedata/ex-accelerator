@@ -84,7 +84,7 @@
           </div>
           <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Available</span>
         </div>
-        <p class="text-gray-600 mb-4">Analyze emotional tone and sentiment across social media posts with AI-powered classification.</p>
+        <p class="text-gray-600 mb-4">Analyze emotional tone and sentiment across your social media posts.</p>
         <div class="flex items-center justify-between">
           <div class="space-y-2 flex-1">
             <div class="flex justify-between text-sm">

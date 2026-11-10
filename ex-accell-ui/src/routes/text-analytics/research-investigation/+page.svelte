@@ -70,7 +70,7 @@
     {
       id: 'ollama_gdelt_integration',
       name: 'Ollama + GDELT Intelligence',
-      description: 'LLM-powered geopolitical analysis using Gemma via Ollama and 23M+ GDELT events',
+      description: 'LLM-powered geopolitical analysis using Gemma via Ollama and the GDELT events you have loaded',
       file: 'ollama_gdelt_integration.ipynb'
     },
     {
@@ -225,7 +225,7 @@
 </script>
 
 <svelte:head>
-  <title>Research Investigation - Text Analytics - Social Explorer</title>
+  <title>Research Notebooks - Text Analytics - Social Explorer</title>
   <meta name="description" content="Interactive Jupyter notebooks for text analytics research and experimentation" />
 </svelte:head>
 
@@ -251,7 +251,7 @@
             </svg>
           </div>
           <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Research Investigation</h1>
+            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Research Notebooks</h1>
             <p class="text-slate-300 text-sm font-medium">Interactive Jupyter notebooks for advanced text analytics research and experimentation</p>
             {#if $currentProject}
               <div class="flex items-center mt-2">
@@ -321,8 +321,8 @@
                     <strong>⚠️ Setup Required:</strong> Run <code class="bg-amber-100 px-1 rounded">poetry run openllm serve deepseek:r1-llama3.1-8b --port 3000</code> first
                   </div>
                 {:else if template.id.includes('ollama')}
-                  <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
-                    <strong>✅ Setup Required:</strong> Install <a href="https://ollama.ai/" target="_blank" class="underline">Ollama</a> then run <code class="bg-green-100 px-1 rounded">ollama pull llama3.3:8b</code>
+                  <div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                    <strong>⚠️ Setup Required:</strong> Install <a href="https://ollama.ai/" target="_blank" class="underline">Ollama</a> then run <code class="bg-amber-100 px-1 rounded">ollama pull llama3.3:8b</code>
                   </div>
                 {/if}
               </div>
@@ -482,8 +482,8 @@
               </svg>
             </div>
             <div>
-              <h4 class="font-medium text-gray-900">Real-time Collaboration</h4>
-              <p class="text-sm text-gray-600">Share notebooks and collaborate with team members</p>
+              <h4 class="font-medium text-gray-900">Notebooks you can keep and share</h4>
+              <p class="text-sm text-gray-600">Notebooks are saved as files you can download and send to colleagues</p>
             </div>
           </div>
         </div>
@@ -565,7 +565,7 @@
         <div class="h-6 w-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-2">
           <span class="text-white font-bold text-sm">SE</span>
         </div>
-        <span class="text-sm text-gray-600">Social Explorer - Research Investigation</span>
+        <span class="text-sm text-gray-600">Social Explorer - Research Notebooks</span>
       </div>
       
       <!-- Links -->

@@ -1,4 +1,5 @@
 // Image Processing API — object detection, face detection, OCR, classification, moderation
+import { imageUrlProblem } from '$lib/server/imageUrl';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
@@ -287,7 +288,8 @@ export const POST: RequestHandler = async ({ request }) => {
     // ── Analyze single image via Ollama Gemma 3 multimodal ─────────────
     if (action === 'analyze') {
       const imageUrl = body.image_url;
-      if (!imageUrl) return json({ success: false, error: 'image_url required' }, { status: 400 });
+      const urlProblem = imageUrlProblem(imageUrl);
+      if (urlProblem) return json({ success: false, error: urlProblem }, { status: 400 });
 
       const ollamaHost = process.env.OLLAMA_HOST || 'http://ollama:11434';
 
@@ -303,11 +305,11 @@ export const POST: RequestHandler = async ({ request }) => {
         });
         clearTimeout(timeout);
         if (!imgResponse.ok) {
-          return json({ success: false, error: `Failed to download image: HTTP ${imgResponse.status}` }, { status: 400 });
+          return json({ success: false, error: `That address did not return an image (it answered HTTP ${imgResponse.status}).` }, { status: 400 });
         }
         const imgBuffer = await imgResponse.arrayBuffer();
         if (imgBuffer.byteLength === 0) {
-          return json({ success: false, error: 'Downloaded image is empty' }, { status: 400 });
+          return json({ success: false, error: 'That address returned an empty file, not an image.' }, { status: 400 });
         }
         if (imgBuffer.byteLength > 10 * 1024 * 1024) {
           return json({ success: false, error: 'Image too large (max 10MB). Use a smaller image or resize first.' }, { status: 400 });
@@ -321,7 +323,8 @@ export const POST: RequestHandler = async ({ request }) => {
         }
       } catch (dlErr: any) {
         console.error('Image download error:', dlErr);
-        return json({ success: false, error: `Image download failed: ${dlErr.message}` }, { status: 400 });
+        // The cause is logged above; the browser gets a sentence it can act on
+        return json({ success: false, error: 'The image could not be downloaded. Check the address, and that the site allows downloads.' }, { status: 400 });
       }
 
       // Step 2: Send to Ollama with base64 image

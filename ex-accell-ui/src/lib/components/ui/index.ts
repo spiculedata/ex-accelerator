@@ -13,3 +13,4 @@ export { default as DataUnavailable } from './DataUnavailable.svelte';
 export { default as Modal } from './Modal.svelte';
 export { default as ResponsibleUse } from './ResponsibleUse.svelte';
 export { default as CopyCommand } from './CopyCommand.svelte';
+export { default as MethodNote } from './MethodNote.svelte';

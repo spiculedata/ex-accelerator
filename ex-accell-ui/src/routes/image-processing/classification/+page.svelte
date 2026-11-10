@@ -107,7 +107,7 @@
   <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
     <h2 class="text-lg font-semibold text-gray-900 mb-3">Classify Image</h2>
     <div class="mb-3">
-      <ModelTierSelector bind:selectedTier disabled={analyzing} />
+      <ModelTierSelector tool="classification" bind:selectedTier disabled={analyzing} />
     </div>
     <div class="flex gap-3 mb-4">
       <input type="text" bind:value={imageUrl} placeholder="Paste image URL..." disabled={analyzing}

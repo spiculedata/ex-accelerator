@@ -15,7 +15,7 @@ function titleOf(href: string): string | null {
 describe('navigation labels', () => {
   it('finds the menu items', () => expect(items.length).toBeGreaterThan(15));
 
-  it.each(items.filter((i) => i.href !== '/' && i.name !== 'Research' && i.name !== 'Investigations'))('$name opens a page titled the same', ({ name, href }) => {
+  it.each(items.filter((i) => i.href !== '/'))('$name opens a page titled the same', ({ name, href }) => {
     const title = titleOf(href);
     expect(title).not.toBeNull();
     // Section pages add their section ("Engagement Analysis - Text Analytics"); the page name leads the title
