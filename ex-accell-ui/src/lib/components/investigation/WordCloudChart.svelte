@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount, createEventDispatcher, tick } from 'svelte';
 	import * as d3 from 'd3';
-	import cloud from 'd3-cloud';
 
 	import type { CrossFilter } from '$lib/stores/investigationStore';
+	import { layoutWordCloud, type WordCloudPlacement } from '$lib/utils/wordCloudLayout';
 
 	export let words: { text: string; size: number }[] = [];
 	export let crossFilter: CrossFilter | null = null;
@@ -21,6 +21,9 @@
 
 	export let height: number = 250;
 	const colors = ['#06d6a0', '#f72585', '#8b5cf6', '#3b82f6', '#f59e0b'];
+	const FONT_FAMILY = 'Inter, system-ui, sans-serif';
+	const WORD_PADDING = 4;
+	const ROTATED_SHARE = 0.4;
 
 	onMount(() => {
 		const ro = new ResizeObserver((entries) => {
@@ -61,19 +64,17 @@
 			rawSize: w.size
 		}));
 
-		const layout = cloud()
-			.size([effectiveWidth, height])
-			.words(layoutWords as any)
-			.padding(4)
-			.rotate(() => (Math.random() > 0.6 ? 90 : 0))
-			.font('Inter, system-ui, sans-serif')
-			.fontSize((d: any) => d.size)
-			.spiral('archimedean')
-			.on('end', draw);
+		const placedWords = layoutWordCloud(layoutWords, {
+			width: effectiveWidth,
+			height,
+			font: FONT_FAMILY,
+			padding: WORD_PADDING,
+			rotate: () => (Math.random() < ROTATED_SHARE ? 90 : 0)
+		});
 
-		layout.start();
+		draw(placedWords);
 
-		function draw(placedWords: any[]) {
+		function draw(placedWords: WordCloudPlacement[]) {
 			const g = svgEl
 				.attr('width', effectiveWidth)
 				.attr('height', height)
@@ -85,34 +86,34 @@
 				.enter()
 				.append('text')
 				.attr('text-anchor', 'middle')
-				.attr('transform', (d: any) => `translate(${d.x},${d.y}) rotate(${d.rotate})`)
-				.attr('font-size', (d: any) => d.size + 'px')
-				.attr('font-family', 'Inter, system-ui, sans-serif')
-				.attr('font-weight', (d: any) => (d.size > 36 ? '700' : '500'))
-				.attr('fill', (d: any) => highlightedKeywords.size > 0 && highlightedKeywords.has(d.text) ? '#818cf8' : colorScale(d.text))
-				.attr('opacity', (d: any) => highlightedKeywords.size > 0 ? (highlightedKeywords.has(d.text) ? 1 : 0.25) : 0.9)
+				.attr('transform', (d) => `translate(${d.x},${d.y}) rotate(${d.rotate})`)
+				.attr('font-size', (d) => d.size + 'px')
+				.attr('font-family', FONT_FAMILY)
+				.attr('font-weight', (d) => (d.size > 36 ? '700' : '500'))
+				.attr('fill', (d) => highlightedKeywords.size > 0 && highlightedKeywords.has(d.text) ? '#818cf8' : colorScale(d.text))
+				.attr('opacity', (d) => highlightedKeywords.size > 0 ? (highlightedKeywords.has(d.text) ? 1 : 0.25) : 0.9)
 				.attr('stroke', 'none')
 				.style('cursor', 'pointer')
-				.text((d: any) => d.text)
-				.on('mouseenter', function (event: MouseEvent, d: any) {
+				.text((d) => d.text)
+				.on('mouseenter', function (event: MouseEvent, d) {
 					d3.select(this).attr('opacity', 1).attr('font-weight', '800');
 					showTooltip(event, d);
 				})
 				.on('mousemove', (event: MouseEvent) => moveTooltip(event))
-				.on('mouseleave', function (event: MouseEvent, d: any) {
+				.on('mouseleave', function (event: MouseEvent, d) {
 					d3.select(this)
 						.attr('opacity', 0.9)
 						.attr('font-weight', d.size > 36 ? '700' : '500');
 					hideTooltip();
 				})
-				.on('click', (_: MouseEvent, d: any) => {
+				.on('click', (_: MouseEvent, d) => {
 					dispatch('wordClick', { text: d.text, size: d.rawSize });
 					dispatch('crossfilter', { dimension: 'keyword', value: d.text, label: d.text });
 				});
 		}
 	}
 
-	function showTooltip(event: MouseEvent, d: any) {
+	function showTooltip(event: MouseEvent, d: WordCloudPlacement) {
 		if (!tooltipEl) return;
 		tooltipEl.style.display = 'block';
 		tooltipEl.innerHTML = `
