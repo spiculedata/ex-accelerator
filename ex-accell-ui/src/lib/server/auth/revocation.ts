@@ -3,7 +3,7 @@
 // revocation made on another instance takes at most this long to apply; on this instance it applies at once.
 import { createLogger } from '$lib/utils/logger';
 import { createSessionVersionCache } from './sessionVersionCache';
-import { bumpSessionVersion, ensureAuthSchema, getSessionVersion } from './userRepo';
+import { bumpSessionVersion, ensureAuthSchema, getSessionVersion, setUserPassword, updateUserAccess, type AccessChange, type AccessChangeResult } from './userRepo';
 
 const log = createLogger('auth');
 
@@ -37,6 +37,20 @@ export async function revokeSessions(userId: string): Promise<number> {
   const version = await bumpSessionVersion(userId);
   cache.invalidate(userId);
   return version;
+}
+
+/** Sets a new password and ends every older session at once. Returns the new version, for signing the caller's replacement session. */
+export async function changePassword(userId: string, password: string): Promise<number> {
+  const version = await setUserPassword(userId, password);
+  cache.invalidate(userId);
+  return version;
+}
+
+/** Changes a person's role, name or ability to sign in. A role or disabled change ends their sessions, here and at once. */
+export async function changeUserAccess(userId: string, change: AccessChange): Promise<AccessChangeResult> {
+  const result = await updateUserAccess(userId, change);
+  if (result === 'updated') cache.invalidate(userId);
+  return result;
 }
 
 /** For tests: forget everything that was remembered. */

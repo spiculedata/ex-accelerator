@@ -16,12 +16,14 @@ export interface AccessRequest {
 const LOGIN_PATH = '/login';
 const PUBLIC_EXACT = new Set([LOGIN_PATH, '/api/auth/login', '/api/auth/logout', '/api/health']);
 const PUBLIC_PATTERNS = [/^\/_app\//, /^\/favicon\.(svg|ico|png)$/];
-// Needs a session but is open to every role: it only ends the caller's own sessions, which a read-only viewer may do too
-const SELF_SERVICE = new Set(['/api/auth/logout-all']);
+// Needs a session but is open to every role: these only affect the caller's own account, which a read-only viewer may manage too
+const SELF_SERVICE = new Set(['/api/auth/logout-all', '/api/auth/password']);
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-/** Endpoints that deploy or run code, or start processes, are admin-only. */
+/** Endpoints that deploy or run code, start processes or manage user accounts are admin-only. */
 const ADMIN_ONLY_PATTERNS = [
+  /^\/api\/users(\/|$)/,
+  /^\/settings\/users(\/|$)/,
   /^\/api\/deploy-workflow(\/|$)/,
   /^\/api\/generate-python-workflow(\/|$)/,
   /^\/api\/jupyter(\/|$)/,
