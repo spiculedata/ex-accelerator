@@ -4,10 +4,30 @@
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-/** The hosts this app is reachable at for one request: the URL's, the Host header and, behind a proxy, X-Forwarded-Host. */
-export function requestHosts(request: Request, url: URL): string[] {
+// Lower-cased, with a default port dropped (an Origin's own host is normalised the same way by the URL parser)
+const hostOf = (value: string): string | null => {
+  const host = value.trim().toLowerCase().replace(/:(80|443)$/, '');
+  return /^[a-z0-9.\-\[\]:]+$/.test(host) && host.length > 0 ? host : null;
+};
+
+/**
+ * The hosts this app is reachable at for one request. When `ORIGIN` is configured it is the only one, a fixed allow-list
+ * that a forwarded or rebound host cannot widen. Otherwise: the URL's host, the Host header and, behind a proxy,
+ * X-Forwarded-Host (a client can only set that for its own requests, never for a victim's browser).
+ */
+export function requestHosts(request: Request, url: URL, configuredOrigin?: string): string[] {
+  if (configuredOrigin) {
+    try {
+      return [new URL(configuredOrigin).host.toLowerCase()];
+    } catch {
+      // Not a URL: fall back to the request's own hosts rather than locking everyone out
+    }
+  }
   const forwarded = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  return [url.host, request.headers.get('host'), forwarded].filter((host): host is string => !!host);
+  return [url.host, request.headers.get('host'), forwarded]
+    .filter((host): host is string => !!host)
+    .map((host) => hostOf(host))
+    .filter((host): host is string => host !== null);
 }
 
 /**

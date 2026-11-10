@@ -32,7 +32,7 @@ function withSecurityHeaders(response: Response, isSecure: boolean): Response {
 
 const authorize: Handle = async ({ event, resolve }) => {
   // A write sent by a page on another site is refused before anything else, signed in or not
-  if (isCrossSiteWrite(event.request, requestHosts(event.request, event.url))) {
+  if (isCrossSiteWrite(event.request, requestHosts(event.request, event.url, process.env.ORIGIN))) {
     return denial('Cross-site requests are not allowed', 403);
   }
 

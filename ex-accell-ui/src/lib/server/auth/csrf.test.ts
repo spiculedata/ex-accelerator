@@ -43,3 +43,33 @@ describe('behind a proxy', () => {
     expect(isCrossSiteWrite(req('POST', { origin: 'http://app.example.com' }), hosts)).toBe(false);
   });
 });
+
+describe('host normalisation', () => {
+  it('compares hosts without regard to case or a default port', () => {
+    const request = new Request('https://app.example.com/api/x', { method: 'POST', headers: { origin: 'https://app.example.com:443', host: 'App.Example.com', 'x-forwarded-host': 'APP.example.com:443' } });
+    const hosts = requestHosts(request, new URL('https://app.example.com/api/x'));
+    expect(hosts).toContain('app.example.com');
+    expect(hosts.every((h) => h === h.toLowerCase() && !h.endsWith(':443'))).toBe(true);
+    expect(isCrossSiteWrite(request, hosts)).toBe(false);
+  });
+});
+
+describe('a configured ORIGIN', () => {
+  it('is the only host accepted, so a rebound or forwarded host cannot widen it', () => {
+    const request = new Request('http://internal:3000/api/x', { method: 'POST', headers: { origin: 'https://attacker.tld', host: 'attacker.tld', 'x-forwarded-host': 'attacker.tld' } });
+    const hosts = requestHosts(request, new URL('http://internal:3000/api/x'), 'https://app.example.com');
+    expect(hosts).toEqual(['app.example.com']);
+    expect(isCrossSiteWrite(request, hosts)).toBe(true);
+  });
+
+  it('still accepts the app\'s own origin, and falls back to request hosts when ORIGIN is not a URL', () => {
+    const own = new Request('http://internal:3000/api/x', { method: 'POST', headers: { origin: 'https://app.example.com' } });
+    expect(isCrossSiteWrite(own, requestHosts(own, new URL('http://internal:3000/api/x'), 'https://app.example.com'))).toBe(false);
+    expect(requestHosts(own, new URL('http://internal:3000/api/x'), 'not a url')).toContain('internal:3000');
+  });
+
+  it('treats an Origin of "null" and a write with no browser headers as the module documents', () => {
+    expect(isCrossSiteWrite(req('POST', { origin: 'null' }), hosts)).toBe(true);
+    expect(isCrossSiteWrite(req('POST'), hosts)).toBe(false);
+  });
+});
