@@ -1,4 +1,5 @@
 // Image Processing API — object detection, face detection, OCR, classification, moderation
+import { fetchPublic, readCapped, TooLargeError, UnsafeUrlError } from '$lib/server/safeFetch';
 import { imageUrlProblem } from '$lib/server/imageUrl';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -280,6 +281,9 @@ export const GET: RequestHandler = async ({ url }) => {
 /**
  * POST /api/image-processing — analyze single image or trigger batch
  */
+const DOWNLOAD_TIMEOUT_MS = 30_000;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json();
   const { action } = body;
@@ -296,23 +300,21 @@ export const POST: RequestHandler = async ({ request }) => {
       // Step 1: Download the image and convert to base64
       let imageBase64: string;
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
-        const imgResponse = await fetch(imageUrl, {
-          signal: controller.signal,
-          redirect: 'follow',
+        // One deadline covers the connection, any redirects and the whole body, so a slow drip cannot hold the request open
+        const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+        // Only public addresses: the server must not be made to read its own network on a visitor's behalf
+        const imgResponse = await fetchPublic(imageUrl, {
+          signal,
           headers: { 'User-Agent': 'SocialExplorer/1.0' }
         });
-        clearTimeout(timeout);
         if (!imgResponse.ok) {
+          await imgResponse.body?.cancel();
           return json({ success: false, error: `That address did not return an image (it answered HTTP ${imgResponse.status}).` }, { status: 400 });
         }
-        const imgBuffer = await imgResponse.arrayBuffer();
+        // The size is enforced while reading, not after: a missing or false Content-Length cannot be trusted
+        const imgBuffer = await readCapped(imgResponse, MAX_IMAGE_BYTES);
         if (imgBuffer.byteLength === 0) {
           return json({ success: false, error: 'That address returned an empty file, not an image.' }, { status: 400 });
-        }
-        if (imgBuffer.byteLength > 10 * 1024 * 1024) {
-          return json({ success: false, error: 'Image too large (max 10MB). Use a smaller image or resize first.' }, { status: 400 });
         }
         imageBase64 = Buffer.from(imgBuffer).toString('base64');
         const sizeMB = (imgBuffer.byteLength / 1024 / 1024).toFixed(2);
@@ -322,6 +324,7 @@ export const POST: RequestHandler = async ({ request }) => {
           console.warn(`Large image (${sizeMB}MB) — vision processing may take several minutes on CPU`);
         }
       } catch (dlErr: any) {
+        if (dlErr instanceof UnsafeUrlError || dlErr instanceof TooLargeError) return json({ success: false, error: dlErr.message }, { status: 400 });
         console.error('Image download error:', dlErr);
         // The cause is logged above; the browser gets a sentence it can act on
         return json({ success: false, error: 'The image could not be downloaded. Check the address, and that the site allows downloads.' }, { status: 400 });
