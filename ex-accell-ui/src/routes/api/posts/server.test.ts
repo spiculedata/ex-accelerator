@@ -13,7 +13,7 @@ import { GET } from './+server';
 const call = (search = '') => GET({ url: new URL(`http://localhost/api/posts${search}`) } as unknown as Parameters<typeof GET>[0]);
 
 const row = (id: number, total = 3) => ({
-  id, text: `post ${id}`, platform: 'telegram', author: 'a', created_at: '2026-11-09T10:00:00.000Z',
+  id, timestamp: String(1731146400000 - id * 1000), text: `post ${id}`, platform: 'telegram', author: 'a', created_at: '2026-11-09T10:00:00.000Z',
   sentiment_category: 'Negative', confidence_score: '0.91', engagement_likes: 5, engagement_shares: 1, engagement_comments: 2, total: String(total)
 });
 
@@ -25,16 +25,44 @@ beforeEach(() => {
 });
 
 describe('GET /api/posts', () => {
-  it('returns the posts with the total number that match and the page that was asked for', async () => {
-    const body = await (await call('?topic=topic-transit&limit=2&offset=0')).json();
+  it('returns one page, the total that match, and a cursor for the next page', async () => {
+    const body = await (await call('?topic=topic-transit&limit=2')).json();
 
     expect(body.success).toBe(true);
     expect(body.data.total).toBe(3);
     expect(body.data.limit).toBe(2);
-    expect(body.data.offset).toBe(0);
-    expect(body.data.posts).toHaveLength(3);
+    expect(body.data.posts).toHaveLength(2); // the extra row only says that there is more
+    expect(body.data.nextCursor).toBe(`${1731146400000 - 2000}_2`);
     expect(body.data.posts[0]).toMatchObject({ id: 1, text: 'post 1', platform: 'telegram', confidence: 0.91 });
     expect(body.data.posts[0]).not.toHaveProperty('total');
+  });
+
+  it('stops paging rather than make a cursor from a post with no usable time', async () => {
+    query.mockResolvedValue([row(1), { ...row(2), timestamp: null }, row(3)]);
+    const body = await (await call('?limit=2')).json();
+    expect(body.data.posts).toHaveLength(2);
+    expect(body.data.nextCursor).toBeNull();
+  });
+
+  it('passes a within_days window to the query', async () => {
+    await call('?within_days=7');
+    expect(query.mock.calls[0][1]).toContain(7);
+  });
+
+  it('has no next cursor on the last page', async () => {
+    query.mockResolvedValue([row(1), row(2)]);
+    const body = await (await call('?limit=2')).json();
+    expect(body.data.posts).toHaveLength(2);
+    expect(body.data.nextCursor).toBeNull();
+  });
+
+  it('continues after a cursor without counting again', async () => {
+    const body = await (await call(`?limit=2&cursor=${1731146400000 - 2000}_2`)).json();
+
+    const [sql, params] = query.mock.calls[0];
+    expect(String(sql)).not.toContain('COUNT(');
+    expect(params).toContain(2);
+    expect(body.data.total).toBeNull();
   });
 
   it('passes the filters to the query as parameters', async () => {
@@ -55,7 +83,7 @@ describe('GET /api/posts', () => {
     expect(body.data).toMatchObject({ posts: [], total: 0 });
   });
 
-  it.each([['?topic=a%20b'], ['?hashtag=a%20b'], ['?date_end=nope'], ['?limit=abc'], ['?offset=-2']])('answers 400 for invalid input %s without touching the database', async (search) => {
+  it.each([['?topic=a%20b'], ['?hashtag=a%20b'], ['?date_end=nope'], ['?limit=abc'], ['?cursor=nope'], ['?within_days=0'], ['?within_days=abc'], ['?phrase=one'], ['?phrase=a%3B%20b%20c'], ['?cursor=1_2_3']])('answers 400 for invalid input %s without touching the database', async (search) => {
     const response = await call(search);
 
     expect(response.status).toBe(400);

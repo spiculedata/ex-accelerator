@@ -6,6 +6,10 @@ export interface PostFilters {
   topic?: string;
   hashtag?: string;
   q?: string;
+  /** Only posts from the last N days, by the server's clock */
+  withinDays?: number;
+  /** A counted phrase of two to six words, matched the way the phrase counts are */
+  phrase?: string;
   sentiment?: string;
   platforms?: string[];
   dateStart?: string;
@@ -29,29 +33,33 @@ export interface PostPage {
   /** True when the posts view does not exist yet, so an empty list does not mean "no matches" */
   unavailable?: boolean;
   posts: Post[];
-  total: number;
+  /** How many posts match. Only the first page reports it; later pages give null, so keep the first page's count. */
+  total: number | null;
   limit: number;
-  offset: number;
+  /** Pass as `cursor` to get the next page; null on the last page. */
+  nextCursor: string | null;
 }
 
-export function buildPostsQuery(filters: PostFilters, page: { limit?: number; offset?: number } = {}): string {
+export function buildPostsQuery(filters: PostFilters, page: { limit?: number; cursor?: string } = {}): string {
   const params = new URLSearchParams();
   if (filters.workspaceId) params.set('workspace_id', filters.workspaceId);
   if (filters.topic) params.set('topic', filters.topic);
   if (filters.hashtag) params.set('hashtag', filters.hashtag.replace(/^#/, ''));
   if (filters.q) params.set('q', filters.q);
+  if (filters.phrase) params.set('phrase', filters.phrase);
+  if (filters.withinDays) params.set('within_days', String(filters.withinDays));
   if (filters.sentiment) params.set('sentiment', filters.sentiment);
   // An empty list is kept: the server reads platforms= as every platform switched off, as the pages do
   if (filters.platforms) params.set('platforms', filters.platforms.join(','));
   if (filters.dateStart) params.set('date_start', filters.dateStart);
   if (filters.dateEnd) params.set('date_end', filters.dateEnd);
   if (page.limit !== undefined) params.set('limit', String(page.limit));
-  if (page.offset !== undefined) params.set('offset', String(page.offset));
+  if (page.cursor !== undefined) params.set('cursor', page.cursor);
   return params.toString();
 }
 
 /** Fetches one page of posts. Throws an Error with a user-readable message when the request fails. */
-export async function fetchPosts(filters: PostFilters, page: { limit?: number; offset?: number } = {}): Promise<PostPage> {
+export async function fetchPosts(filters: PostFilters, page: { limit?: number; cursor?: string } = {}): Promise<PostPage> {
   const response = await fetch(`/api/posts?${buildPostsQuery(filters, page)}`);
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.success) throw new Error(result?.error ?? `Request failed (HTTP ${response.status})`);
