@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { platformBadgeClass } from '$lib/utils/categoryColours';
+  // The platform badge sits beside the sentiment badge, and the categorical tints share hues with the sentiment
+  // scale, so the platform is named in neutral ink and told apart by its icon and label
+  import { NEUTRAL_BADGE } from '$lib/utils/categoryColours';
   import { getSentimentColor } from '$lib/utils/colorUtils';
   import { investigationSelection, toggleSelectedId, setHoveredId } from '$lib/stores/investigationStore';
   import type { InvestigationSelection } from '$lib/stores/investigationStore';
@@ -37,7 +39,7 @@
     return text.slice(0, len) + '...';
   }
 
-  // Sentiment takes the brand scale (blue to orange), platforms the categorical tokens; both badges carry their label
+  // Sentiment takes the brand scale (blue to orange); the badge carries its label
   const sentimentBadgeClass = (sentiment?: string): string => getSentimentColor(sentiment ?? 'neutral', 'tailwind');
 
   function platformIcon(platform?: string): string {
@@ -134,7 +136,7 @@
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
               {#if post.platform}
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {platformBadgeClass(post.platform)}">
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded {NEUTRAL_BADGE}">
                   {platformIcon(post.platform)}
                 </span>
               {/if}

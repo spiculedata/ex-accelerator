@@ -142,8 +142,8 @@ describe('getConfidenceColor', () => {
   });
 
   it('returns blue for >= 0.7', () => {
-    expect(getConfidenceColor(0.8)).toBe('bg-blue-100 text-blue-800');
-    expect(getConfidenceColor(0.7)).toBe('bg-blue-100 text-blue-800');
+    expect(getConfidenceColor(0.8)).toBe('bg-primary-100 text-primary-800');
+    expect(getConfidenceColor(0.7)).toBe('bg-primary-100 text-primary-800');
   });
 
   it('returns yellow for >= 0.5', () => {

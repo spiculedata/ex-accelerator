@@ -4,7 +4,6 @@
 import { platformColour } from '$lib/utils/categoryColours';
 import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
-import { CHART } from '$lib/utils/chartColors';
 import type {
   EngagementMetrics,
   PostEngagement,

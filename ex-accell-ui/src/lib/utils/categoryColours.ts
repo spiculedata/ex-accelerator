@@ -18,14 +18,24 @@ const BADGE_CLASSES = [
   'bg-cat-7/15 text-ink-900 ring-1 ring-cat-7/50',
   'bg-cat-8/15 text-ink-900 ring-1 ring-cat-8/50'
 ] as const;
-const DOT_CLASSES = ['bg-cat-1', 'bg-cat-2', 'bg-cat-3', 'bg-cat-4', 'bg-cat-5', 'bg-cat-6', 'bg-cat-7', 'bg-cat-8'] as const;
+// A thin ink ring so the lighter tokens (yellow, sky) still read as a dot on white
+const DOT_CLASSES = [
+  'bg-cat-1 ring-1 ring-ink-300',
+  'bg-cat-2 ring-1 ring-ink-300',
+  'bg-cat-3 ring-1 ring-ink-300',
+  'bg-cat-4 ring-1 ring-ink-300',
+  'bg-cat-5 ring-1 ring-ink-300',
+  'bg-cat-6 ring-1 ring-ink-300',
+  'bg-cat-7 ring-1 ring-ink-300',
+  'bg-cat-8 ring-1 ring-ink-300'
+] as const;
 
 /** A category that has no colour of its own, or is not known. */
 export const NEUTRAL_BADGE = 'bg-ink-100 text-ink-700 ring-1 ring-ink-300';
-const NEUTRAL_DOT = 'bg-ink-400';
+const NEUTRAL_DOT = 'bg-ink-400 ring-1 ring-ink-300';
 // Bluesky is the ninth platform, so it takes the brand accent rather than a ninth categorical colour
 const PRIMARY_BADGE = 'bg-primary-500/15 text-ink-900 ring-1 ring-primary-500/50';
-const PRIMARY_DOT = 'bg-primary-500';
+const PRIMARY_DOT = 'bg-primary-500 ring-1 ring-ink-300';
 
 /** A tinted badge with dark text: the hue sits in the fill and ring, so the label keeps full contrast. */
 export function categoryBadgeClass(index: CategoryIndex): string {
@@ -81,13 +91,16 @@ export function platformColour(platform?: string): string {
   return index ? categoryColour(index) : CHART.ink500;
 }
 
-// Data sources: the dataset types a workspace can hold. Short names are what the investigations list sends.
+// Data sources: the dataset types a workspace can hold. Short names are what the investigations list sends. The
+// navigation lists dataset types and platforms side by side, so these avoid the indices of the platforms it names
+// (telegram 3, youtube 6). Four of the eight tokens are also sentiment colours (the brand shares the Okabe-Ito set), so
+// a page that shows a sentiment badge beside a category uses NEUTRAL_BADGE for the category instead.
 const SOURCE_INDEX: Record<string, CategoryIndex> = {
   social: 1,
   social_media: 1,
   gdelt: 2,
   gdelt_events: 2,
-  android: 3,
+  android: 8,
   radio: 4
 };
 

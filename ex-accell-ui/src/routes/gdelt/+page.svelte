@@ -251,10 +251,10 @@
 	
 
 	// GDELT Event Type Mappings (based on CAMEO codes). Cooperation takes the blue family (sky for verbal, blue for
-	// material, teal for diplomacy and agreements), conflict the orange family (orange for verbal, vermilion for
-	// material, yellow for protests), armed and political action the greys; media and the economy take the two
-	// categorical colours left. Red and green are not used: they read as bad and good, and many people cannot tell
-	// them apart. The legend beside the map names every type.
+	// material, dark teal for diplomacy, green for agreements), conflict the orange family (orange for verbal,
+	// vermilion for material, yellow for protests, dark red for violence), political and military action the two
+	// ends of the grey ramp, media pink and the economy light teal. Red and green are not paired as bad and good
+	// anywhere, since many people cannot tell them apart. The legend beside the map names every type.
 	const eventTypes: Record<string, any> = {
 		'verbal_cooperation': { 
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'],
@@ -283,13 +283,13 @@
 		'diplomacy': {
 			codes: ['30', '31', '32', '33', '34', '35', '36', '37'], 
 			label: 'Diplomacy',
-			color: CHART.primary500,
+			color: CHART.primary700,
 			description: 'Express intent to cooperate, consult, support'
 		},
 		'support': {
 			codes: ['40', '41', '42', '43', '44', '45', '46'],
 			label: 'Support & Agreements',
-			color: CHART.primary700,
+			color: CHART.catGreen,
 			description: 'Cooperate, agree, provide support'
 		},
 		'information': {
@@ -301,19 +301,19 @@
 		'economic': {
 			codes: ['60', '61', '62', '63', '64', '65', '66', '67'],
 			label: 'Economic Actions',
-			color: CHART.catGreen,
+			color: CHART.primary400,
 			description: 'Economic cooperation, trade, sanctions'
 		},
 		'political': {
 			codes: ['70', '71', '72', '73', '74', '75', '76'],
 			label: 'Political Actions',
-			color: CHART.ink500,
+			color: CHART.ink400,
 			description: 'Provide diplomatic cooperation, host meetings'
 		},
 		'military': {
 			codes: ['80', '81', '82', '83', '84', '85', '86', '87'],
 			label: 'Military Actions',
-			color: CHART.ink700,
+			color: CHART.ink900,
 			description: 'Military cooperation, exercises, operations'
 		},
 		'protests': {
@@ -325,7 +325,7 @@
 		'violence': {
 			codes: ['17', '18', '19', '190', '193', '194', '195'],
 			label: 'Violence & Conflict',
-			color: CHART.ink900,
+			color: CHART.danger700,
 			description: 'Violence, fighting, armed conflict'
 		}
 	};

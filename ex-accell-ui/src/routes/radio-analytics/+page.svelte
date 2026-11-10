@@ -125,8 +125,9 @@
   }
 
   function getPoliticalBadgeClasses(isPolitical: boolean): string {
-    // "Political" is a topic, not an error, so it takes a categorical tint rather than danger red
-    return isPolitical ? categoryBadgeClass(2) : NEUTRAL_BADGE;
+    // "Political" is a topic, not an error, so it takes a categorical tint rather than danger red; the sentiment badge
+    // sits beside it, so the tint is one the sentiment scale does not use
+    return isPolitical ? categoryBadgeClass(4) : NEUTRAL_BADGE;
   }
 
   function truncateText(text: string, maxLength: number): string {

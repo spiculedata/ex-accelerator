@@ -34,7 +34,7 @@ describe('platform colours', () => {
     for (const platform of MAIN_PLATFORMS) {
       const index = Number(platformBadgeClass(platform).match(/bg-cat-(\d)/)?.[1]);
       expect(platformColour(platform)).toBe(CATEGORICAL[index - 1]);
-      expect(platformDotClass(platform)).toBe(`bg-cat-${index}`);
+      expect(platformDotClass(platform)).toBe(`bg-cat-${index} ring-1 ring-ink-300`);
     }
   });
 
@@ -44,10 +44,10 @@ describe('platform colours', () => {
     expect(platformBadgeClass('bluesky')).not.toBe(NEUTRAL_BADGE);
     expect(platformBadgeClass(undefined)).toBe(NEUTRAL_BADGE);
     expect(platformColour('unknown')).toBe(CHART.ink500);
-    expect(platformDotClass(undefined)).toBe('bg-ink-400');
+    expect(platformDotClass(undefined)).toBe('bg-ink-400 ring-1 ring-ink-300');
   });
 
-  it('never use a platform brand colour or a sentiment colour', () => {
+  it('never use a platform brand colour', () => {
     for (const platform of MAIN_PLATFORMS) {
       expect(platformColour(platform)).not.toMatch(/^#(1da1f2|1877f2|0088cc|e4405f)$/i);
     }
@@ -58,6 +58,11 @@ describe('data source badges', () => {
   it('keep social, GDELT, radio and Android apart', () => {
     const classes = ['social_media', 'gdelt_events', 'radio', 'android'].map((t) => dataSourceBadgeClass(t));
     expect(new Set(classes).size).toBe(4);
+  });
+
+  it('keep every type the navigation names apart from the platforms it names', () => {
+    const named = ['social_media', 'gdelt_events', 'android', 'radio', 'telegram', 'youtube'];
+    expect(new Set(named.map((t) => dataSourceBadgeClass(t))).size).toBe(named.length);
   });
 
   it('accept the short names the investigations list uses', () => {
@@ -92,7 +97,7 @@ describe('GDELT mention type badges', () => {
 // Every category badge in the app comes from this module, and sentiment badges from getSentimentColor
 describe('category badges in pages and components', () => {
   it.each([
-    ['src/lib/components/investigation/SocialPostPanel.svelte', 'platformBadgeClass('],
+    ['src/lib/components/investigation/SocialPostPanel.svelte', 'NEUTRAL_BADGE'],
     ['src/lib/components/investigation/SocialPostPanel.svelte', "getSentimentColor("],
     ['src/lib/components/investigation/RadioTranscriptPanel.svelte', "getSentimentColor("],
     ['src/routes/workspaces/[id]/+page.svelte', 'platformBadgeClass('],
