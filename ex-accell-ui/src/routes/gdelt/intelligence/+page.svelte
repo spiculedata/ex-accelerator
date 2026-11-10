@@ -204,19 +204,17 @@
     }, 500);
   }
 
-  function getGoldsteinColor(value: number): string {
-    if (value >= 5) return 'text-green-600';
-    if (value >= 0) return 'text-blue-600';
-    if (value >= -5) return 'text-signal-700';
-    return 'text-red-600';
+  // Average Goldstein and tone are large bold figures, so they may take the two ends of the brand sentiment scale
+  // (blue positive, orange negative; both pass 3:1 at 20px bold) rather than green and red. The sign on the number is
+  // the primary cue; values within one point of zero stay ink.
+  const NEUTRAL_TONE = 1;
+  function toneTextClass(value: number): string {
+    if (value > NEUTRAL_TONE) return 'text-sentiment-very-positive';
+    if (value < -NEUTRAL_TONE) return 'text-sentiment-very-negative';
+    return 'text-ink-700';
   }
-
-  function getToneColor(value: number): string {
-    if (value >= 2) return 'text-green-600';
-    if (value >= 0) return 'text-blue-600';
-    if (value >= -2) return 'text-signal-700';
-    return 'text-red-600';
-  }
+  const getGoldsteinColor = toneTextClass;
+  const getToneColor = toneTextClass;
 
   $: if (dateStart || dateEnd) onDateChange();
 </script>
@@ -369,11 +367,11 @@
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm text-gray-500">Avg Goldstein</span>
-            <span class="text-lg font-bold {getGoldsteinColor(summary.avg_goldstein || 0)}">{(summary.avg_goldstein || 0).toFixed(2)}</span>
+            <span class="text-xl font-bold {getGoldsteinColor(summary.avg_goldstein || 0)}">{(summary.avg_goldstein || 0).toFixed(2)}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm text-gray-500">Avg Tone</span>
-            <span class="text-lg font-bold {getToneColor(summary.avg_tone || 0)}">{(summary.avg_tone || 0).toFixed(2)}</span>
+            <span class="text-xl font-bold {getToneColor(summary.avg_tone || 0)}">{(summary.avg_tone || 0).toFixed(2)}</span>
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm text-gray-500">Date Range</span>

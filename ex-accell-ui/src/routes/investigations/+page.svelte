@@ -1,5 +1,6 @@
 <script lang="ts">
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { dataSourceBadgeClass } from '$lib/utils/categoryColours';
   import { onMount } from 'svelte';
   import { formatDay } from '$lib/utils/dayFormat';
   import { commitKeywords } from '$lib/utils/keywords';
@@ -194,14 +195,7 @@
     }
   }
 
-  function getSourceBadgeColor(source: string): string {
-    switch (source) {
-      case 'gdelt': return 'bg-amber-100 text-amber-800';
-      case 'radio': return 'bg-emerald-100 text-emerald-800';
-      case 'social': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  }
+  const getSourceBadgeColor = (source: string): string => dataSourceBadgeClass(source);
 
   function getSourceLabel(source: string): string {
     switch (source) {

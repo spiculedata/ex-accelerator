@@ -4,6 +4,7 @@
 </svelte:head>
 
 <script lang="ts">
+  import { platformBadgeClass, platformDotClass, workspaceTypeBadgeClass } from '$lib/utils/categoryColours';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -73,29 +74,14 @@
     return `${Math.floor(hours / 168)}w ago`;
   }
 
-  function platformColor(sourceType: string): string {
+  // A source type may be "twitter_posts" or similar, so find the platform name inside it
+  const PLATFORM_NAMES = ['twitter', 'reddit', 'telegram', 'youtube', 'facebook', 'instagram', 'bluesky', 'linkedin', 'tiktok'];
+  function platformOf(sourceType: string): string | undefined {
     const t = (sourceType || '').toLowerCase();
-    if (t.includes('twitter')) return 'bg-sky-500';
-    if (t.includes('reddit')) return 'bg-orange-500';
-    if (t.includes('telegram')) return 'bg-sky-400';
-    if (t.includes('youtube')) return 'bg-red-500';
-    if (t.includes('facebook')) return 'bg-blue-600';
-    if (t.includes('instagram')) return 'bg-pink-500';
-    if (t.includes('bluesky')) return 'bg-blue-400';
-    return 'bg-slate-400';
+    return PLATFORM_NAMES.find((name) => t.includes(name));
   }
-
-  function platformTextColor(sourceType: string): string {
-    const t = (sourceType || '').toLowerCase();
-    if (t.includes('twitter')) return 'text-sky-700 bg-sky-100';
-    if (t.includes('reddit')) return 'text-orange-700 bg-orange-100';
-    if (t.includes('telegram')) return 'text-sky-700 bg-sky-100';
-    if (t.includes('youtube')) return 'text-red-700 bg-red-100';
-    if (t.includes('facebook')) return 'text-blue-700 bg-blue-100';
-    if (t.includes('instagram')) return 'text-pink-700 bg-pink-100';
-    if (t.includes('bluesky')) return 'text-blue-700 bg-blue-100';
-    return 'text-slate-700 bg-slate-100';
-  }
+  const platformColor = (sourceType: string): string => platformDotClass(platformOf(sourceType));
+  const platformTextColor = (sourceType: string): string => platformBadgeClass(platformOf(sourceType));
 
   function statusBadge(status: string): string {
     switch ((status || '').toLowerCase()) {
@@ -106,14 +92,7 @@
     }
   }
 
-  function typeBadgeColor(t: string): string {
-    switch (t) {
-      case 'analysis': return 'bg-indigo-100 text-indigo-800';
-      case 'exploration': return 'bg-emerald-100 text-emerald-800';
-      case 'reporting': return 'bg-amber-100 text-amber-800';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  }
+  const typeBadgeColor = (t: string): string => workspaceTypeBadgeClass(t);
 
   // ---------- data loading ----------
   async function loadData() {

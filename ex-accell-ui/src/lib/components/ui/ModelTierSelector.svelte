@@ -23,9 +23,10 @@
       icon: '\uD83C\uDFAF',
       desc: 'CLIP + YOLOv8s',
       speed: '2-5s',
-      bgActive: 'bg-blue-50',
-      borderActive: 'border-blue-300',
-      textActive: 'text-blue-700',
+      // blue and purple both resolve to primary now, so the two tiers take categorical tints
+      bgActive: 'bg-cat-1/10',
+      borderActive: 'border-cat-1',
+      textActive: 'text-ink-900',
     },
     {
       id: 'accurate',
@@ -33,9 +34,9 @@
       icon: '\uD83D\uDD2C',
       desc: 'YOLOv8m + RetinaFace',
       speed: '30s+',
-      bgActive: 'bg-purple-50',
-      borderActive: 'border-purple-300',
-      textActive: 'text-purple-700',
+      bgActive: 'bg-cat-4/10',
+      borderActive: 'border-cat-4',
+      textActive: 'text-ink-900',
     },
   ];
 </script>

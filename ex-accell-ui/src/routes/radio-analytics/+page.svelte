@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NEUTRAL_BADGE, categoryBadgeClass } from '$lib/utils/categoryColours';
   import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -124,7 +125,9 @@
   }
 
   function getPoliticalBadgeClasses(isPolitical: boolean): string {
-    return isPolitical ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600';
+    // "Political" is a topic, not an error, so it takes a categorical tint rather than danger red; the sentiment badge
+    // sits beside it, so the tint is one the sentiment scale does not use
+    return isPolitical ? categoryBadgeClass(4) : NEUTRAL_BADGE;
   }
 
   function truncateText(text: string, maxLength: number): string {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dataSourceBadgeClass } from '$lib/utils/categoryColours';
   import { signOut, signOutEverywhere } from '$lib/utils/signOut';
   import ChangePasswordForm from '$lib/components/ChangePasswordForm.svelte';
   import { initials } from '$lib/utils/initials';
@@ -231,16 +232,16 @@
       return [];
     }
 
-    const badgeMap: Record<string, { label: string; color: string }> = {
-      'social_media': { label: 'Social', color: 'blue' },
-      'gdelt_events': { label: 'GDELT', color: 'amber' },
-      'android': { label: 'Android', color: 'purple' },
-      'telegram': { label: 'Telegram', color: 'sky' },
-      'youtube': { label: 'YouTube', color: 'red' }
+    const labels: Record<string, string> = {
+      'social_media': 'Social',
+      'gdelt_events': 'GDELT',
+      'android': 'Android',
+      'telegram': 'Telegram',
+      'youtube': 'YouTube'
     };
 
     return summary.types
-      .map((type: string) => badgeMap[type] || { label: type, color: 'gray' })
+      .map((type: string) => ({ label: labels[type] ?? type, color: dataSourceBadgeClass(type) }))
       .slice(0, 3); // Limit to 3 badges
   }
 
@@ -617,7 +618,7 @@
                               {#if badges.length > 0}
                                 <div class="flex items-center space-x-1 mt-1.5">
                                   {#each badges as badge, bi}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{badge.color}-100 text-{badge.color}-800">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {badge.color}">
                                       {badge.label}
                                     </span>
                                   {/each}

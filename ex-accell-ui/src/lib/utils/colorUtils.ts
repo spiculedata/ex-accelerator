@@ -1,10 +1,11 @@
 // Consolidated color utilities — single source of truth for all status, sentiment, category colors
+import { CHART } from './chartColors';
 
 // ─── Status Colors ──────────────────────────────────────────────────────────
 
 const statusTailwind: Record<string, string> = {
-  active: 'bg-blue-100 text-blue-800',
-  running: 'bg-blue-100 text-blue-800',
+  active: 'bg-primary-100 text-primary-800',
+  running: 'bg-primary-100 text-primary-800',
   success: 'bg-green-100 text-green-800',
   completed: 'bg-green-100 text-green-800',
   paused: 'bg-yellow-100 text-yellow-800',
@@ -17,7 +18,7 @@ const statusTailwind: Record<string, string> = {
   cancelled: 'bg-gray-100 text-gray-800',
   archived: 'bg-gray-100 text-gray-800',
   inactive: 'bg-gray-100 text-gray-800',
-  info: 'bg-blue-100 text-blue-800',
+  info: 'bg-primary-100 text-primary-800',
 };
 
 export function getStatusColor(status: string): string {
@@ -111,35 +112,38 @@ export function getSentimentIcon(sentiment: string): string {
 
 // ─── Topic Category Colors ──────────────────────────────────────────────────
 
+// Topic categories take the categorical series (docs-site/brand/data-visualisation), which stays distinguishable
+// for common forms of colour blindness. Related categories share a colour on purpose, since there are more
+// categories than colours; the badge always carries the label.
 const categoryColors: Record<string, string> = {
-  'security & conflict': '#ef4444',
-  'social unrest': '#f97316',
-  'crisis & disaster': '#dc2626',
-  'health': '#10b981',
-  'society': '#3b82f6',
-  'economy': '#8b5cf6',
-  'environment': '#22c55e',
-  'politics': '#6366f1',
-  'media & tech': '#06b6d4',
-  'culture': '#ec4899',
-  'governance': '#6366f1',
-  'general': '#94a3b8',
-  'technology': '#3b82f6',
-  'business': '#f59e0b',
-  'education': '#0891b2',
-  'science': '#6366f1',
-  'energy': '#eab308',
+  'security & conflict': CHART.catVermilion,
+  'crisis & disaster': CHART.catVermilion,
+  'social unrest': CHART.catOrange,
+  'politics': CHART.catBlue,
+  'governance': CHART.catBlue,
+  'society': CHART.catSky,
+  'culture': CHART.catPink,
+  'health': CHART.catGreen,
+  'environment': CHART.catGreen,
+  'economy': CHART.catYellow,
+  'business': CHART.catYellow,
+  'energy': CHART.catYellow,
+  'media & tech': CHART.ink900,
+  'technology': CHART.ink900,
+  'science': CHART.ink900,
+  'education': CHART.ink900,
+  'general': CHART.ink400
 };
 
 export function getCategoryColor(category: string): string {
-  return categoryColors[category?.toLowerCase()] || '#6b7280';
+  return categoryColors[category?.toLowerCase()] || CHART.ink500;
 }
 
 // ─── Confidence Colors ──────────────────────────────────────────────────────
 
 export function getConfidenceColor(confidence: number): string {
   if (confidence >= 0.9) return 'bg-green-100 text-green-800';
-  if (confidence >= 0.7) return 'bg-blue-100 text-blue-800';
+  if (confidence >= 0.7) return 'bg-primary-100 text-primary-800';
   if (confidence >= 0.5) return 'bg-yellow-100 text-yellow-800';
   return 'bg-red-100 text-red-800';
 }

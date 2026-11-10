@@ -361,6 +361,16 @@
   --color-sentiment-negative: var(--se-sentiment-negative);
   --color-sentiment-very-negative: var(--se-sentiment-very-negative);
 
+  /* Categorical series, for badges and chips that tell categories apart (platforms, data sources, types) */
+  --color-cat-1: var(--se-cat-1);
+  --color-cat-2: var(--se-cat-2);
+  --color-cat-3: var(--se-cat-3);
+  --color-cat-4: var(--se-cat-4);
+  --color-cat-5: var(--se-cat-5);
+  --color-cat-6: var(--se-cat-6);
+  --color-cat-7: var(--se-cat-7);
+  --color-cat-8: var(--se-cat-8);
+
   --radius-sm: var(--se-radius-sm);
   --radius-md: var(--se-radius-md);
   --radius-lg: var(--se-radius-lg);

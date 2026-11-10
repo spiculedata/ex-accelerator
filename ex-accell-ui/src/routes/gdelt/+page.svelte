@@ -1,5 +1,6 @@
 <script lang="ts">
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { gdeltMentionTypeBadgeClass } from '$lib/utils/categoryColours';
   import { CHART } from '$lib/utils/chartColors';
   // Tailwind-only styling for the dual-handle range sliders (thumb and track pseudo-elements)
   const rangeSliderClass =
@@ -133,14 +134,7 @@
 		return 'Very Negative';
 	}
 
-	function getMentionTypeColor(mentionType: number): string {
-		const colorMap: { [key: number]: string } = {
-			1: 'bg-blue-100 text-blue-800',      // Web News
-			2: 'bg-gray-100 text-gray-800',     // Print News
-			3: 'bg-blue-100 text-blue-800'  // Broadcast News
-		};
-		return colorMap[mentionType] || 'bg-gray-100 text-gray-800';
-	}
+	const getMentionTypeColor = (mentionType: number): string => gdeltMentionTypeBadgeClass(mentionType);
 
 	// Helper functions for date conversion
 	function gdeltDateToInputDate(gdeltDate: number): string {
@@ -256,18 +250,22 @@
 	$: eventsForCountryCounts = getEventsExcludingCountryFilter(events, activeEventTypes, goldsteinRange, toneRange, dateRange);
 	
 
-	// GDELT Event Type Mappings (based on CAMEO codes)
+	// GDELT Event Type Mappings (based on CAMEO codes). Cooperation takes the blue family (sky for verbal, blue for
+	// material, dark teal for diplomacy, green for agreements), conflict the orange family (orange for verbal,
+	// vermilion for material, yellow for protests, dark red for violence), political and military action the two
+	// ends of the grey ramp, media pink and the economy light teal. Red and green are not paired as bad and good
+	// anywhere, since many people cannot tell them apart. The legend beside the map names every type.
 	const eventTypes: Record<string, any> = {
 		'verbal_cooperation': { 
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'],
 			label: 'Verbal Cooperation',
-			color: CHART.catGreen,
+			color: CHART.catSky,
 			description: 'Make statement, comment, consult, engage in diplomatic cooperation'
 		},
 		'material_cooperation': {
 			codes: ['20', '21', '22', '23', '24', '25', '26', '27'],
-			label: 'Material Cooperation', 
-			color: CHART.catSky,
+			label: 'Material Cooperation',
+			color: CHART.catBlue,
 			description: 'Appeal, express intent to cooperate, provide aid'
 		},
 		'verbal_conflict': {
@@ -279,19 +277,19 @@
 		'material_conflict': {
 			codes: ['18', '19', '20'],
 			label: 'Material Conflict',
-			color: CHART.danger500,
+			color: CHART.catVermilion,
 			description: 'Exhibit force, reduce relations, coerce'
 		},
 		'diplomacy': {
 			codes: ['30', '31', '32', '33', '34', '35', '36', '37'], 
 			label: 'Diplomacy',
-			color: CHART.catBlue,
+			color: CHART.primary700,
 			description: 'Express intent to cooperate, consult, support'
 		},
 		'support': {
 			codes: ['40', '41', '42', '43', '44', '45', '46'],
 			label: 'Support & Agreements',
-			color: CHART.primary500,
+			color: CHART.catGreen,
 			description: 'Cooperate, agree, provide support'
 		},
 		'information': {
@@ -303,31 +301,31 @@
 		'economic': {
 			codes: ['60', '61', '62', '63', '64', '65', '66', '67'],
 			label: 'Economic Actions',
-			color: CHART.success600,
+			color: CHART.primary400,
 			description: 'Economic cooperation, trade, sanctions'
 		},
 		'political': {
 			codes: ['70', '71', '72', '73', '74', '75', '76'],
-			label: 'Political Actions', 
-			color: CHART.ink600,
+			label: 'Political Actions',
+			color: CHART.ink400,
 			description: 'Provide diplomatic cooperation, host meetings'
 		},
 		'military': {
 			codes: ['80', '81', '82', '83', '84', '85', '86', '87'],
 			label: 'Military Actions',
-			color: CHART.danger700,
+			color: CHART.ink900,
 			description: 'Military cooperation, exercises, operations'
 		},
 		'protests': {
 			codes: ['14', '141', '142', '143', '144', '145'],
 			label: 'Protests & Demonstrations',
-			color: CHART.catVermilion,
+			color: CHART.catYellow,
 			description: 'Protests, demonstrations, strikes'
 		},
 		'violence': {
 			codes: ['17', '18', '19', '190', '193', '194', '195'],
 			label: 'Violence & Conflict',
-			color: CHART.ink900,
+			color: CHART.danger700,
 			description: 'Violence, fighting, armed conflict'
 		}
 	};
