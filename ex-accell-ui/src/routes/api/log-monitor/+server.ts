@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { jobStateStore } from '$lib/services/jobStateStore.js';
-import { spawn } from 'child_process';
 
 /**
  * Log monitoring endpoint that can parse live console output from dapr run

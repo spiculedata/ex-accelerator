@@ -135,4 +135,44 @@ describe('security headers', () => {
       expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     });
   });
+
+  describe('cross-site writes', () => {
+    const write = async (headers: Record<string, string>, user: SessionUser | undefined = admin) => {
+      const resolve = vi.fn().mockResolvedValue(new Response('ok'));
+      const token = user ? createSessionToken(user, SECRET, 3600) : undefined;
+      const event = {
+        url: new URL('http://localhost/api/projects'),
+        request: new Request('http://localhost/api/projects', { method: 'POST', headers }),
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined) },
+        locals: {} as { user: SessionUser | null }
+      };
+      const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
+      return { response, resolve };
+    };
+
+    it('refuses a write another site sent with the user\'s cookie, without reaching the route', async () => {
+      const { response, resolve } = await write({ origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' });
+      expect(response.status).toBe(403);
+      expect(resolve).not.toHaveBeenCalled();
+    });
+
+    it('lets the app\'s own writes through', async () => {
+      const { response, resolve } = await write({ origin: 'http://localhost', 'sec-fetch-site': 'same-origin' });
+      expect(response.status).toBe(200);
+      expect(resolve).toHaveBeenCalled();
+    });
+
+    it('refuses a cross-site sign-in attempt too, so a login cannot be forced', async () => {
+      const resolve = vi.fn();
+      const event = {
+        url: new URL('http://localhost/api/auth/login'),
+        request: new Request('http://localhost/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example' } }),
+        cookies: { get: () => undefined },
+        locals: {} as { user: SessionUser | null }
+      };
+      const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
+      expect(response.status).toBe(403);
+      expect(resolve).not.toHaveBeenCalled();
+    });
+  });
 });

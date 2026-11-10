@@ -32,5 +32,7 @@ test.describe('Sentiment Analysis', () => {
     await page.goto('/text-analytics/sentiment-analysis');
     // The message names what failed, so an unrelated alert cannot satisfy this
     await expect(page.getByRole('alert').filter({ hasText: /sentiment/i }).first()).toBeVisible();
+    // A failure is not "no data": the empty-state message must not appear beside the error
+    await expect(page.getByRole('status').filter({ hasText: 'No posts match these filters' })).toHaveCount(0);
   });
 });

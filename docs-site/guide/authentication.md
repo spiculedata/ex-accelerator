@@ -4,6 +4,11 @@ Social Explorer uses server-side sessions. Users are stored in PostgreSQL (`app_
 automatically) with passwords hashed using scrypt. Signing in sets an `HttpOnly`, `SameSite=Lax`
 session cookie that is signed with `SESSION_SECRET`.
 
+Writes (`POST`, `PUT`, `PATCH`, `DELETE`) sent by a page on another site are refused with `403`, signed in or not,
+as a second layer beside `SameSite`. The check uses the `Sec-Fetch-Site` and `Origin` headers the browser attaches
+itself; the `Origin` host must be the one the app is served from (or the one a reverse proxy forwards in
+`X-Forwarded-Host`). If you set `ORIGIN` (recommended behind a proxy), it is the only host accepted. Scripts and tools that send neither header are unaffected. If every write returns `403` behind a reverse proxy, set `ORIGIN` to the public address.
+
 ## What is protected
 
 Every page and every `/api/*` route requires a session, except the login page, the auth endpoints
