@@ -22,31 +22,69 @@ export function canAccessProject(user: Pick<SessionUser, 'email' | 'role'>, proj
 export interface RequestResources {
   projects: number[];
   workspaces: number[];
+  /** Names of parameters (or "path") that name a resource but are not a plain positive whole number. */
+  malformed: string[];
+}
+
+const CANONICAL_ID = /^[1-9]\d*$/;
+
+/**
+ * The one way an id naming a project or workspace is read: a positive whole number, as a number or as plain digits.
+ * `null` when there is no value; `'invalid'` for anything else (spaces, a sign, a leading zero, letters). Routes read
+ * ids more loosely (`parseInt('9abc')` is 9, and Postgres accepts ' 9'), so a value that is not exactly this must be
+ * refused, not ignored, or it can name a project the check never looked at.
+ */
+export function parseResourceId(value: unknown): number | null | 'invalid' {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return Number.isSafeInteger(value) && value > 0 ? value : 'invalid';
+  if (typeof value === 'string' && CANONICAL_ID.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : 'invalid';
+  }
+  return 'invalid';
 }
 
 const WORKSPACE_PARAMS = ['workspace_id', 'workspace', 'workspaceId'];
 const PROJECT_PARAMS = ['project_id', 'project', 'projectId'];
 
-const wholeNumber = (value: string | null): number | null => {
-  if (value === null || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-};
+/** Endpoints whose own `id` parameter is the project or workspace they are about. */
+const PROJECT_ID_ENDPOINTS = new Set(['/api/projects', '/api/project-overview']);
+const WORKSPACE_ID_ENDPOINTS = new Set(['/api/workspaces', '/api/workspace-overview']);
 
-const unique = (values: Array<number | null>): number[] => [...new Set(values.filter((v): v is number => v !== null))];
+/** The path as it was sent and as the router sees it: percent-decoded, with doubled slashes collapsed. */
+function pathVariants(pathname: string): string[] {
+  try {
+    return [pathname, decodeURIComponent(pathname).replace(/\/{2,}/g, '/')];
+  } catch {
+    return [pathname];
+  }
+}
 
-/** The projects and workspaces a request names, in its path or query string. Ids that are not whole numbers are ignored. */
+/** The projects and workspaces a request names, in its path or query string, and any id that is named but malformed. */
 export function resourcesInRequest(url: URL): RequestResources {
   const { pathname, searchParams } = url;
-  const workspaces: Array<number | null> = WORKSPACE_PARAMS.map((name) => wholeNumber(searchParams.get(name)));
-  const projects: Array<number | null> = PROJECT_PARAMS.map((name) => wholeNumber(searchParams.get(name)));
+  const variants = pathVariants(pathname);
+  const projects: number[] = [];
+  const workspaces: number[] = [];
+  const malformed = new Set<string>();
 
-  // Endpoints whose `id` parameter is the resource itself
-  if (pathname === '/api/projects') projects.push(wholeNumber(searchParams.get('id')));
-  if (pathname === '/api/workspaces' || pathname === '/api/workspace-overview') workspaces.push(wholeNumber(searchParams.get('id')));
+  const note = (into: number[], name: string, raw: unknown) => {
+    const id = parseResourceId(raw);
+    if (id === 'invalid') malformed.add(name);
+    else if (id !== null) into.push(id);
+  };
 
-  const inPath = /^\/(?:api\/)?(projects|workspaces)\/(\d+)(?:\/|$)/.exec(pathname);
-  if (inPath) (inPath[1] === 'projects' ? projects : workspaces).push(wholeNumber(inPath[2]));
+  for (const name of WORKSPACE_PARAMS) note(workspaces, name, searchParams.get(name));
+  for (const name of PROJECT_PARAMS) note(projects, name, searchParams.get(name));
+  if (variants.some((path) => PROJECT_ID_ENDPOINTS.has(path))) note(projects, 'id', searchParams.get('id'));
+  if (variants.some((path) => WORKSPACE_ID_ENDPOINTS.has(path))) note(workspaces, 'id', searchParams.get('id'));
 
-  return { projects: unique(projects), workspaces: unique(workspaces) };
+  // The router matches the decoded path, so that is the one whose ids count (an encoded digit is the digit)
+  const routed = variants[variants.length - 1];
+  const inPath = /^\/(?:api\/)?(projects|workspaces)\/([^/]+)(?:\/|$)/.exec(routed);
+  if (inPath && !(inPath[1] === 'projects' && inPath[2] === 'new')) {
+    note(inPath[1] === 'projects' ? projects : workspaces, 'path', inPath[2]); // 'new' is the new-project page, which has no id
+  }
+
+  return { projects: [...new Set(projects)], workspaces: [...new Set(workspaces)], malformed: [...malformed] };
 }

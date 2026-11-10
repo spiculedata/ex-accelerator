@@ -18,7 +18,7 @@ describe('refuseIfNoAccess', () => {
   it('is null when the user may see what the route is about', async () => {
     check.checkAccess.mockResolvedValue({ allowed: true });
     expect(await refuseIfNoAccess(bob, { workspaces: [3] })).toBeNull();
-    expect(check.checkAccess).toHaveBeenCalledWith(bob, { projects: [], workspaces: [3] });
+    expect(check.checkAccess).toHaveBeenCalledWith(bob, { projects: [], workspaces: [3], malformed: [] });
   });
 
   it('is a 403 with the resource named when they may not', async () => {
@@ -37,10 +37,18 @@ describe('refuseIfNoAccess', () => {
     expect((await refuseIfNoAccess(null, { projects: [1] }))?.status).toBe(401);
   });
 
-  it('ignores ids that were not given or are not whole numbers, so a malformed body reaches the route\'s own validation', async () => {
+  it('ignores ids that are missing, so a route\'s own required-field check answers', async () => {
     check.checkAccess.mockResolvedValue({ allowed: true });
-    expect(await refuseIfNoAccess(bob, { projects: [undefined, 'x', null, 4] })).toBeNull();
-    expect(check.checkAccess).toHaveBeenCalledWith(bob, { projects: [4], workspaces: [] });
+    expect(await refuseIfNoAccess(bob, { projects: [undefined, null, '', 4] })).toBeNull();
+    expect(check.checkAccess).toHaveBeenCalledWith(bob, { projects: [4], workspaces: [], malformed: [] });
+  });
+
+  it.each([' 9', '9 ', '+9', '09', '9abc', '9.5', 0, -1, 1.5, '1e3', {}, true])('refuses with 400, without checking, an id like %j that a route could read more loosely than the check does', async (bad) => {
+    for (const ids of [{ projects: [bad] }, { workspaces: [bad] }]) {
+      const response = await refuseIfNoAccess(bob, ids as never);
+      expect(response?.status).toBe(400);
+    }
+    expect(check.checkAccess).not.toHaveBeenCalled();
   });
 });
 

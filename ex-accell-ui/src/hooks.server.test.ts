@@ -263,7 +263,7 @@ describe('security headers', () => {
       expect(response.status).toBe(403);
       expect((await response.json()).error).toContain('workspace');
       expect(resolve).not.toHaveBeenCalled();
-      expect(checkAccess).toHaveBeenCalledWith(expect.objectContaining({ email: 'bob@example.com' }), { projects: [], workspaces: [9] });
+      expect(checkAccess).toHaveBeenCalledWith(expect.objectContaining({ email: 'bob@example.com' }), { projects: [], workspaces: [9], malformed: [] });
     });
 
     it('shows a page request for a project the user may not see as a 403 page, not JSON', async () => {
@@ -273,6 +273,21 @@ describe('security headers', () => {
       expect(response.headers.get('content-type')).toContain('text/html');
       expect(await response.text()).toContain('do not have access');
       expect(resolve).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      '/api/project-overview?id=9abc', '/api/workspace-overview?id=%209', '/api/unified-analytics?type=x&workspace_id=9abc',
+      '/api/workspaces/9abc/dataset-summary', '/api/workspaces/%209/dataset-summary', '/api/posts?workspace_id=%2B9'
+    ])('refuses %s as a malformed id with 400 before the route can read it more loosely', async (path) => {
+      const { response, resolve } = await get(path);
+      expect(response.status).toBe(400);
+      expect(resolve).not.toHaveBeenCalled();
+      expect(checkAccess).not.toHaveBeenCalled();
+    });
+
+    it('checks a request that hides the id in the path with encoding or doubled slashes, as the router would read it', async () => {
+      await get('/api/%77orkspaces/%39/dataset-summary');
+      expect(checkAccess).toHaveBeenCalledWith(expect.anything(), { projects: [], workspaces: [9], malformed: [] });
     });
 
     it('lets a permitted request through', async () => {

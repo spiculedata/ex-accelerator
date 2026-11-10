@@ -15,6 +15,11 @@ and analytics that belong to them; administrators see everything.
 - A project from before accounts existed has no real member (its owner is a placeholder such as `default_user`), so it
   stays open to every signed-in user until a real person is added to it. This keeps an upgrade from hiding existing
   work.
+- An id that is not a plain whole number (`9abc`, ` 9`, `+9`, `09`) is refused with `400` rather than guessed at.
+- **What this does not cover:** raw posts and analytics requested *without* a workspace (`/api/posts`,
+  `/api/unified-analytics`, `/api/datasets`), GDELT, image processing, crawling jobs and workflows are
+  installation-wide, not project-scoped. Anyone signed in can read them; only the project, workspace and
+  investigation views above are limited by membership.
 - Membership is remembered for 30 seconds, so adding or removing a member takes effect within that time.
 - If membership cannot be checked (the database is unreachable) the request gets `503`, not a refusal.
 

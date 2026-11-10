@@ -48,6 +48,8 @@ async function refuseUnlessMember(event: Parameters<Handle>[0]['event']): Promis
   const user = event.locals.user;
   if (!user) return null; // a public route reached while signed out
   const resources = resourcesInRequest(event.url);
+  // An id that is not a plain whole number is refused, not ignored: a route may read it more loosely than this does
+  if (resources.malformed.length > 0) return denial('Invalid project or workspace id', 400);
   if (resources.projects.length === 0 && resources.workspaces.length === 0) return null;
   try {
     const result = await checkAccess(user, resources);

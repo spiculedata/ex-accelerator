@@ -1,15 +1,12 @@
 // For routes that read a project or workspace id from the request body, or list projects, where the request hook cannot
 // see the id (or must not hide the whole list): the same rule, applied inside the route.
 import { json } from '@sveltejs/kit';
-import { canAccessProject } from './access';
+import { canAccessProject, parseResourceId } from './access';
 import { checkAccess } from './accessCheck';
 import { listProjectAccessInfo } from './accessRepo';
 import type { SessionUser } from './session';
 
 type User = Pick<SessionUser, 'email' | 'role'>;
-
-const wholeNumbers = (values: unknown[] | undefined): number[] =>
-  (values ?? []).map((v) => (typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : NaN)).filter((n) => Number.isSafeInteger(n) && n > 0);
 
 /**
  * A 403 JSON response when the user may not see the project or workspace the route is about, a 503 when that cannot be
@@ -20,8 +17,21 @@ export async function refuseIfNoAccess(
   ids: { projects?: unknown[]; workspaces?: unknown[] }
 ): Promise<Response | null> {
   if (!user) return json({ success: false, data: null, error: 'Authentication required' }, { status: 401 });
+
+  // A missing id is the route's own validation to report. One that is present but not a plain whole number is refused
+  // here: a route may read it more loosely (parseInt('9abc') is 9) and reach a project this check never looked at.
+  const projects: number[] = [];
+  const workspaces: number[] = [];
+  for (const [list, values] of [[projects, ids.projects], [workspaces, ids.workspaces]] as const) {
+    for (const value of values ?? []) {
+      const id = parseResourceId(value);
+      if (id === 'invalid') return json({ success: false, data: null, error: 'Invalid project or workspace id' }, { status: 400 });
+      if (id !== null) list.push(id);
+    }
+  }
+
   try {
-    const result = await checkAccess(user, { projects: wholeNumbers(ids.projects), workspaces: wholeNumbers(ids.workspaces) });
+    const result = await checkAccess(user, { projects, workspaces, malformed: [] });
     return result.allowed ? null : json({ success: false, data: null, error: `You do not have access to this ${result.what}` }, { status: 403 });
   } catch {
     return json({ success: false, data: null, error: 'The service is temporarily unavailable. Try again in a moment.' }, { status: 503 });
@@ -42,7 +52,7 @@ export async function filterByWorkspaceAccess<T>(user: User, rows: T[], workspac
   for (const row of rows) {
     const workspaceId = workspaceOf(row);
     if (workspaceId && !verdicts.has(workspaceId)) {
-      verdicts.set(workspaceId, (await checkAccess(user, { projects: [], workspaces: [workspaceId] })).allowed);
+      verdicts.set(workspaceId, (await checkAccess(user, { projects: [], workspaces: [workspaceId], malformed: [] })).allowed);
     }
   }
   return rows.filter((row) => {

@@ -11,14 +11,16 @@ interface Cached<T> {
   at: number;
 }
 
-const projectCache = new Map<number, Cached<ProjectAccessInfo | null>>();
-const workspaceCache = new Map<number, Cached<number | null>>();
+const projectCache = new Map<number, Cached<ProjectAccessInfo>>();
+const workspaceCache = new Map<number, Cached<number>>();
 
-async function cached<K, V>(cache: Map<K, Cached<V>>, key: K, load: (key: K) => Promise<V>): Promise<V> {
+// A "does not exist" answer is not remembered: a project created a moment after someone asked about its id must not be
+// open to everyone for the rest of the window
+async function cached<K, V>(cache: Map<K, Cached<V>>, key: K, load: (key: K) => Promise<V | null>): Promise<V | null> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
   const value = await load(key);
-  cache.set(key, { value, at: Date.now() });
+  if (value !== null) cache.set(key, { value, at: Date.now() });
   return value;
 }
 

@@ -47,6 +47,6 @@ describe('POST /api/workspaces and project membership', () => {
     const response = await call({ project_id: 1, name: 'w' }, { email: 'bob@example.com' });
     expect(response.status).toBe(403);
     expect(createWorkspace).not.toHaveBeenCalled();
-    expect(access.checkAccess).toHaveBeenCalledWith(expect.anything(), { projects: [1], workspaces: [] });
+    expect(access.checkAccess).toHaveBeenCalledWith(expect.anything(), { projects: [1], workspaces: [], malformed: [] });
   });
 });
