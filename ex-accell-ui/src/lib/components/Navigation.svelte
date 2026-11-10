@@ -6,6 +6,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { workspaceIdFromRoute } from '$lib/utils/workspaceRoute';
   import { currentProject, setCurrentProject, loadCurrentProject, clearCurrentProject } from '$lib/stores/projectStore';
 
   interface DropdownItem {
@@ -166,6 +167,25 @@
 
     // Navigate to the workspace detail page
     goto(`/workspaces/${workspace.id}`);
+  }
+
+  // The header names the workspace of the page you are on, however you got there (a link, a new workspace, the switcher)
+  let followedWorkspaceId: string | null = null;
+  $: routeWorkspaceId = workspaceIdFromRoute($page.route.id, $page.params, $page.url.searchParams);
+  $: if (routeWorkspaceId && routeWorkspaceId !== followedWorkspaceId && String(currentWorkspace?.id) !== routeWorkspaceId) followWorkspace(routeWorkspaceId);
+
+  async function followWorkspace(workspaceId: string) {
+    followedWorkspaceId = workspaceId; // one attempt per workspace, so a missing one is not asked for again and again
+    try {
+      const result = await (await fetch(`/api/workspaces?id=${workspaceId}`)).json();
+      if (result.success && result.workspace) {
+        currentWorkspace = result.workspace;
+        if (typeof window !== 'undefined') localStorage.setItem('currentWorkspace', workspaceId);
+        loadWorkspaceDatasets(workspaceId);
+      }
+    } catch (error) {
+      console.error('Error loading workspace:', error);
+    }
   }
 
   // Reload workspaces when project changes

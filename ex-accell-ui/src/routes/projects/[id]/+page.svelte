@@ -5,6 +5,7 @@
 
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { typeLabel } from '$lib/utils/projectForm';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
@@ -64,6 +65,8 @@
   let error = '';
   // Shown inline when a workspace was created but some datasets could not be linked
   let workspaceNotice = '';
+  // Confirms what just happened, so creating a workspace is not silent
+  let workspaceCreated = '';
   let project: ProjectData | null = null;
   let workspaces: Workspace[] = [];
   let activity: Activity[] = [];
@@ -198,6 +201,7 @@
       const result = await response.json();
       if (result.success && result.workspace) {
         const workspaceId = result.workspace.id;
+        const createdName = newWorkspaceName.trim();
         let linkProblem = '';
         if (selectedDatasets.length > 0) {
           const failures: string[] = [];
@@ -227,6 +231,7 @@
         selectedDatasets = [];
         await loadData();
         workspaceNotice = linkProblem;
+        workspaceCreated = `Workspace "${createdName}" created.`;
       }
     } catch (e) {
       console.error('Error creating workspace:', e);
@@ -307,7 +312,7 @@
         </button>
         <h1 class="text-lg font-semibold text-slate-900 truncate">{project.name}</h1>
         {#if project.project_type}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-800 shrink-0">{project.project_type}</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-800 shrink-0">{typeLabel(project.project_type)}</span>
         {/if}
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -344,6 +349,13 @@
             + New Workspace
           </button>
         </div>
+
+        {#if workspaceCreated}
+          <div role="status" class="mb-4 flex items-start justify-between gap-3 rounded-lg border border-success-300 bg-success-50 px-4 py-3 text-xs text-success-900">
+            <span>{workspaceCreated}</span>
+            <button type="button" class="shrink-0 font-medium underline" onclick={() => (workspaceCreated = '')}>Dismiss</button>
+          </div>
+        {/if}
 
         {#if workspaceNotice}
           <div role="alert" class="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
@@ -430,6 +442,7 @@
 
         <!-- Workspace cards grid -->
         {#if workspaces.length === 0}
+          {#if !showCreateWorkspace}
           <div class="flex flex-col items-center justify-center py-20 text-center">
             <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-4">
               <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -437,8 +450,9 @@
               </svg>
             </div>
             <p class="text-slate-600 font-medium mb-1">No workspaces yet</p>
-            <p class="text-sm text-slate-400">Create a workspace to organize your analysis</p>
+            <p class="text-sm text-slate-500">Create a workspace to organize your analysis</p>
           </div>
+          {/if}
         {:else}
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {#each workspaces as ws (ws.id)}
@@ -451,7 +465,7 @@
                 <!-- Top: name + type badge -->
                 <div class="flex items-center justify-between gap-2 mb-1.5">
                   <h3 class="text-sm font-semibold text-slate-900 truncate">{ws.name}</h3>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 {typeBadgeColor(ws.workspace_type)}">{ws.workspace_type}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 {typeBadgeColor(ws.workspace_type)}">{typeLabel(ws.workspace_type)}</span>
                 </div>
 
                 <!-- Source name pills + freshness -->
