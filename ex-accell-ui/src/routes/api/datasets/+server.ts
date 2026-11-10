@@ -1,6 +1,7 @@
 // Dataset API Endpoints
 // RESTful API for managing datasets, permissions, and workspace associations
 
+import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { datasetsDb } from '$lib/services/datasetsDb';
@@ -130,6 +131,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const { workspace_id, dataset_id, settings } = body;
       // Who is linking comes from the session, never from the request body
       const addedBy = locals.user?.email;
+      // Datasets are linked only into a workspace of a project the person belongs to
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [workspace_id] });
+      if (refused) return refused;
 
       if (!workspace_id || !dataset_id || !addedBy) {
         return json(

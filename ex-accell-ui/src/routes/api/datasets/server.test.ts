@@ -7,6 +7,8 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/services/datasetsDb', () => ({ datasetsDb: db }));
+const access = vi.hoisted(() => ({ checkAccess: vi.fn() }));
+vi.mock('$lib/server/auth/accessCheck', () => access);
 
 import { POST } from './+server';
 
@@ -20,6 +22,8 @@ const call = (body: unknown, sessionUser: ReturnType<typeof user> | null) =>
   } as unknown as Parameters<typeof POST>[0]);
 
 beforeEach(() => {
+  access.checkAccess.mockReset();
+  access.checkAccess.mockResolvedValue({ allowed: true });
   Object.values(db).forEach((fn) => fn.mockReset());
   db.checkUserAccess.mockResolvedValue({ hasAccess: false, accessLevel: null });
   db.linkDatasetToWorkspace.mockResolvedValue({ id: 1 });
@@ -73,5 +77,14 @@ describe('POST /api/datasets action=grant_permission', () => {
 
     expect(response.status).toBe(403);
     expect(db.grantDatasetPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/datasets action=link and project membership', () => {
+  it('refuses to link a dataset into a workspace of a project the person is not a member of', async () => {
+    access.checkAccess.mockResolvedValue({ allowed: false, what: 'workspace' });
+    const response = await call({ action: 'link', workspace_id: 3, dataset_id: 5 }, user('user', 'bob@example.com'));
+    expect(response.status).toBe(403);
+    expect(db.linkDatasetToWorkspace).not.toHaveBeenCalled();
   });
 });

@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const query = vi.hoisted(() => vi.fn());
 
+const access = vi.hoisted(() => ({ checkAccess: vi.fn() }));
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
+vi.mock('$lib/server/auth/accessCheck', () => access);
 
-import { POST, PATCH } from './+server';
+import { GET, POST, PATCH } from './+server';
 
 const call = (body: unknown, email: string | null = 'ada@example.com') =>
   POST({
@@ -15,6 +17,8 @@ const call = (body: unknown, email: string | null = 'ada@example.com') =>
 const insertCall = () => query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO investigations'))!;
 
 beforeEach(() => {
+  access.checkAccess.mockReset();
+  access.checkAccess.mockResolvedValue({ allowed: true });
   query.mockReset();
   query.mockImplementation(async (sql: string) => (String(sql).includes('INSERT INTO investigations') ? [{ id: 7 }] : []));
 });
@@ -185,5 +189,38 @@ describe('investigations ownership', () => {
     query.mockImplementation(async (sql: string) => (String(sql).startsWith('SELECT created_by') ? [{ created_by: 'ada@example.com' }] : [{ id: 7 }]));
     expect((await patch(asUser('ada@example.com'), { id: 7, name: 'Mine' })).status).toBe(200);
     expect((await patch(asUser('root@example.com', 'admin'), { id: 7, name: 'Admin edit' })).status).toBe(200);
+  });
+});
+
+describe('investigations and project membership', () => {
+  const deny = () => access.checkAccess.mockResolvedValue({ allowed: false, what: 'workspace' });
+
+  it('refuses to create an investigation in a workspace of a project the person is not in', async () => {
+    query.mockImplementation(async (sql: string) => (String(sql).includes('FROM workspaces') ? [{ id: 3 }] : []));
+    deny();
+    const response = await call({ name: 'Probe', workspace_id: 3, keywords: ['x'] });
+    expect(response.status).toBe(403);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO investigations'))).toBe(false);
+  });
+
+  it('refuses to open one from such a workspace', async () => {
+    query.mockResolvedValue([{ id: 7, workspace_id: 3, created_by: 'ada@example.com' }]);
+    deny();
+    const response = await GET({ url: new URL('http://localhost/api/investigations?id=7'), locals: { user: { email: 'bob@example.com', role: 'user' } } } as any);
+    expect(response.status).toBe(403);
+  });
+
+  it('lists only the investigations of workspaces the person may see', async () => {
+    query.mockResolvedValue([{ id: 1, workspace_id: 10 }, { id: 2, workspace_id: 20 }, { id: 3, workspace_id: null }]);
+    access.checkAccess.mockImplementation(async (_u: unknown, r: { workspaces: number[] }) => (r.workspaces[0] === 10 ? { allowed: true } : { allowed: false, what: 'workspace' }));
+    const response = await GET({ url: new URL('http://localhost/api/investigations'), locals: { user: { email: 'bob@example.com', role: 'user' } } } as any);
+    expect((await response.json()).investigations.map((i: { id: number }) => i.id)).toEqual([1, 3]);
+  });
+
+  it('refuses to change or delete an investigation in a workspace the person is not in, even their own', async () => {
+    query.mockResolvedValue([{ created_by: 'bob@example.com', workspace_id: 3 }]);
+    deny();
+    const response = await PATCH({ request: new Request('http://localhost/api/investigations', { method: 'PATCH', body: JSON.stringify({ id: 7, name: 'x' }) }), locals: { user: { email: 'bob@example.com', role: 'user' } } } as any);
+    expect(response.status).toBe(403);
   });
 });

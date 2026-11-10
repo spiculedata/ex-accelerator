@@ -1,6 +1,7 @@
 // Projects API Endpoint
 // CRUD operations for projects and workspaces
 
+import { refuseIfNoAccess, visibleProjectIds } from '$lib/server/auth/accessGuard';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { projectsDb } from '$lib/services/projectsDb';
@@ -9,7 +10,7 @@ import { projectsDb } from '$lib/services/projectsDb';
  * GET /api/projects
  * Get all projects or a specific project by ID
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
   try {
     const projectId = url.searchParams.get('id');
 
@@ -18,7 +19,10 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({ success: true, project });
     }
 
-    const projects = await projectsDb.getAllProjects();
+    // Only the projects this person may see
+    const visible = locals.user ? await visibleProjectIds(locals.user) : new Set<number>();
+    const all = await projectsDb.getAllProjects();
+    const projects = visible === null ? all : all.filter((project) => visible.has(Number(project.id)));
     return json({ success: true, projects });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -59,7 +63,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
  * PUT /api/projects
  * Update an existing project
  */
-export const PUT: RequestHandler = async ({ request }) => {
+export const PUT: RequestHandler = async ({ request, locals }) => {
   try {
     const data = await request.json();
     const { id, ...updates } = data;
@@ -67,6 +71,8 @@ export const PUT: RequestHandler = async ({ request }) => {
     if (!id) {
       return json({ success: false, error: 'Project ID required' }, { status: 400 });
     }
+    const refused = await refuseIfNoAccess(locals.user, { projects: [id] });
+    if (refused) return refused;
 
     const project = await projectsDb.updateProject(id, updates);
 

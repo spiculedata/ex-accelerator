@@ -2,15 +2,18 @@
 // Returns all data needed for the home page in one round trip:
 // projects with sparklines/sentiment/anomalies, activity feed, summary stats
 
+import { visibleProjectIds } from '$lib/server/auth/accessGuard';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
   try {
+    // Home lists only the projects this person may see
+    const visible = locals.user ? await visibleProjectIds(locals.user) : new Set<number>();
     // Get all projects with workspace/investigation/data source counts
-    const projects = await postgresPool.query(`
+    const allProjects = await postgresPool.query(`
       SELECT
         p.id,
         p.name,
@@ -42,6 +45,8 @@ export const GET: RequestHandler = async () => {
       ) ds ON ds.project_id = p.id
       ORDER BY p.updated_at DESC
     `);
+
+    const projects = visible === null ? allProjects : allProjects.filter((p: any) => visible.has(Number(p.id)));
 
     // Get all investigations to find keywords for sparkline queries
     const investigations = await postgresPool.query(`
@@ -250,7 +255,9 @@ export const GET: RequestHandler = async () => {
     const alerts = enrichedProjects.filter((p) => p.anomaly !== null).length;
 
     // Activity feed: recent ingestion data across sources
-    const activity = await buildActivityFeed();
+    const allActivity = await buildActivityFeed();
+    // Items tied to a project are shown only for projects this person may see; installation-wide items have no project
+    const activity = visible === null ? allActivity : allActivity.filter((item: any) => item.project_id === null || visible.has(Number(item.project_id)));
 
     return json({
       success: true,

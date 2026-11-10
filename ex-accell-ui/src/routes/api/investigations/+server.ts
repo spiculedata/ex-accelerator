@@ -1,6 +1,7 @@
 // Investigations API Endpoint
 // CRUD operations for investigation configurations
 
+import { filterByWorkspaceAccess, refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { canModifyInvestigation } from '$lib/server/investigationAccess';
 import { investigationListQuery } from '$lib/server/investigationQuery';
 import { json } from '@sveltejs/kit';
@@ -39,7 +40,7 @@ async function ensureTable(): Promise<void> {
  * GET /api/investigations
  * List all investigations or get a single one by id
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
   try {
     await ensureTable();
 
@@ -57,6 +58,8 @@ export const GET: RequestHandler = async ({ url }) => {
         return json({ success: false, error: 'Investigation not found' }, { status: 404 });
       }
 
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [rows[0].workspace_id] });
+      if (refused) return refused;
       return json({ success: true, investigation: rows[0] });
     }
 
@@ -68,7 +71,9 @@ export const GET: RequestHandler = async ({ url }) => {
       projectId: Number.isInteger(projectNumber) ? projectNumber : undefined
     });
 
-    const investigations = await postgresPool.query(sql, params);
+    const all = await postgresPool.query(sql, params);
+    // Only investigations of workspaces this person may see
+    const investigations = locals.user ? await filterByWorkspaceAccess(locals.user, all, (row: any) => row.workspace_id) : [];
     return json({ success: true, investigations });
   } catch (error) {
     // The cause is logged; the browser gets a generic message, never database detail
@@ -108,6 +113,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!found.length) {
         return json({ success: false, error: 'Workspace not found' }, { status: 404 });
       }
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [data.workspace_id] });
+      if (refused) return refused;
       workspaceId = data.workspace_id;
     }
 
@@ -152,8 +159,11 @@ function safeJsonParse(text: string): unknown {
 async function refuseUnlessAllowed(id: unknown, user: { email: string; role?: string } | null | undefined): Promise<Response | null> {
   const numericId = typeof id === 'number' || typeof id === 'string' ? Number(id) : NaN;
   if (!Number.isInteger(numericId) || numericId < 1) return json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
-  const rows = await postgresPool.query('SELECT created_by FROM investigations WHERE id = $1', [numericId]);
+  const rows = await postgresPool.query('SELECT created_by, workspace_id FROM investigations WHERE id = $1', [numericId]);
   if (rows.length === 0) return null; // the handler reports not found
+  // The workspace's project must be one the person belongs to, as well as the investigation being theirs to change
+  const noAccess = await refuseIfNoAccess(user, { workspaces: [rows[0].workspace_id] });
+  if (noAccess) return noAccess;
   return canModifyInvestigation(user, rows[0].created_by) ? null : json({ success: false, error: 'Only the person who created this investigation, or an admin, can change it.' }, { status: 403 });
 }
 
