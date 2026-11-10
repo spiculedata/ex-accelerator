@@ -114,7 +114,8 @@ describe('/data-sharing when sharing is on', () => {
     serve({ enabled: true, packages: [generated] });
     render(Page);
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/Only administrators/);
+    expect(await screen.findByText(/Only administrators can generate, publish or import/)).toHaveAttribute('role', 'status');
+    expect(screen.queryByTestId('ipfs-disabled')).toBeNull();
     expect(screen.queryByRole('button', { name: /Publish to IPFS/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Generate Package/ })).toBeNull();
     expect(screen.queryByRole('heading', { name: /Import from IPFS/ })).toBeNull();

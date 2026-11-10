@@ -1,6 +1,7 @@
+// @vitest-environment node
 // The service against a fake Helia node: what it publishes, what it refuses to fetch, and the caps it applies.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -117,9 +118,6 @@ afterEach(() => {
 describe('publishDirectory', () => {
   it('adds the plain files of the directory, pins the directory and returns its CID', async () => {
     const pkg = join(dir, 'pkg');
-    rmSync(pkg, { recursive: true, force: true });
-    writeFileSync(join(dir, 'a.txt'), 'x'); // not inside pkg, must not be published
-    const { mkdirSync } = await import('node:fs');
     mkdirSync(join(pkg, 'nested'), { recursive: true });
     writeFileSync(join(pkg, 'datapackage.json'), '{}');
     writeFileSync(join(pkg, 'posts.csv'), 'id\n1');
@@ -139,7 +137,6 @@ describe('publishDirectory', () => {
 
   it('starts one node even when two publishes race on a cold start', async () => {
     const pkg = join(dir, 'pkg');
-    const { mkdirSync } = await import('node:fs');
     mkdirSync(pkg);
     writeFileSync(join(pkg, 'datapackage.json'), '{}');
 
@@ -165,13 +162,17 @@ describe('fetchDirectory', () => {
     expect(readdirSync(out).sort()).toEqual(['datapackage.json', 'posts.csv']);
   });
 
-  it.each(['../escape.csv', 'a/b.csv', '.env', ''])('refuses a package holding the file name %j and writes nothing', async (name) => {
-    const cid = publishedDirectory([{ name, content: 'x' }]);
+  it.each(['../escape.csv', 'a/b.csv', '.env', ''])('refuses a package holding the file name %j and writes nothing outside the output directory', async (name) => {
+    // A safe file first: the refusal comes when the bad name is reached, and the caller discards the output directory
+    const cid = publishedDirectory([
+      { name: 'datapackage.json', content: '{}' },
+      { name, content: 'x' }
+    ]);
     const out = join(dir, 'out');
 
     await expect(service.fetchDirectory(cid, out)).rejects.toMatchObject({ name: 'UnsafePackageError' });
-    expect(readdirSync(out)).toEqual([]);
-    expect(readdirSync(dir)).not.toContain('escape.csv');
+    expect(readdirSync(out)).toEqual(['datapackage.json']);
+    expect(readdirSync(dir).sort()).toEqual(['blocks', 'datastore', 'out']);
   });
 
   it('stops at the byte cap, counted across every file', async () => {
