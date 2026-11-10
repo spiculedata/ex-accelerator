@@ -253,6 +253,7 @@
 <PageHeader
   title="Analytics Correlation"
   subtitle="Sentiment, topics, languages and platforms side by side, with how daily sentiment moves together"
+  backHref="/text-analytics"
   accentColor="cyan"
 />
 

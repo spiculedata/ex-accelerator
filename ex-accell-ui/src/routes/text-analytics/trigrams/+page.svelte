@@ -165,14 +165,8 @@
   <PageHeader
     title="Trigram Analysis"
     subtitle="Discover three-word phrase patterns and linguistic trends in your content"
+    backHref="/text-analytics"
     accentColor="purple">
-    <svelte:fragment slot="icon">
-      <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-      </div>
-    </svelte:fragment>
     <svelte:fragment slot="actions">
       <div class="hidden lg:flex items-center space-x-6">
         <div class="text-center">

@@ -131,6 +131,7 @@
 <PageHeader
   title="Hashtag Analysis"
   subtitle="Discover trending hashtags and co-occurrence patterns"
+  backHref="/text-analytics"
   accentColor="purple"
 >
   <svelte:fragment slot="actions">

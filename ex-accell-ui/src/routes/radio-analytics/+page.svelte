@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { getSentimentColor } from '$lib/utils/colorUtils';
   import { onMount } from 'svelte';
   import { radioAnalyticsDb } from '$lib/services/radioAnalyticsDb';
@@ -320,24 +321,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Compact Header -->
-  <div class="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M12 12h.01"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white">Radio Analytics</h1>
-            <p class="text-sm text-purple-200">Analysis of radio broadcast transcripts</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader title="Radio Analytics" subtitle="Analysis of radio broadcast transcripts" backHref="/text-analytics" />
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
