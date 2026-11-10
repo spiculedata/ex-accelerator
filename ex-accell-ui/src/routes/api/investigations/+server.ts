@@ -1,6 +1,7 @@
 // Investigations API Endpoint
 // CRUD operations for investigation configurations
 
+import type { SessionUser } from '$lib/server/auth/session';
 import { filterByWorkspaceAccess, refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { canModifyInvestigation } from '$lib/server/investigationAccess';
 import { investigationListQuery } from '$lib/server/investigationQuery';
@@ -156,7 +157,7 @@ function safeJsonParse(text: string): unknown {
 }
 
 /** A 403 when the signed-in user may not change this investigation, or null when they may (or it does not exist yet to be refused). */
-async function refuseUnlessAllowed(id: unknown, user: { email: string; role?: string } | null | undefined): Promise<Response | null> {
+async function refuseUnlessAllowed(id: unknown, user: Pick<SessionUser, 'email' | 'role'> | null | undefined): Promise<Response | null> {
   const numericId = typeof id === 'number' || typeof id === 'string' ? Number(id) : NaN;
   if (!Number.isInteger(numericId) || numericId < 1) return json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
   const rows = await postgresPool.query('SELECT created_by, workspace_id FROM investigations WHERE id = $1', [numericId]);
