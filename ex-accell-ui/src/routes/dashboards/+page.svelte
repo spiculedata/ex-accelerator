@@ -665,7 +665,7 @@
                   <div class="font-medium text-gray-900">{source.name}</div>
                   <div class="text-sm text-gray-500">
                     {#if source.platform && source.platform !== source.name}
-                      <span class="text-xs text-gray-400 mr-1">{source.platform}</span> ·
+                      <span class="text-xs text-gray-500 mr-1">{source.platform}</span> ·
                     {/if}
                     {source.posts.toLocaleString()} posts ({source.percentage}%)
                   </div>
@@ -756,7 +756,7 @@
           </div>
         </div>
         {#if textAnalytics.topTopics.length === 0}
-          <div class="text-center py-8 text-gray-400">
+          <div class="text-center py-8 text-gray-500">
             <span class="text-3xl mb-2 block">💬</span>
             <p class="text-sm">No social post topics yet.</p>
             <p class="text-xs mt-1">Topics will appear after running topic analysis on social posts.</p>

@@ -61,7 +61,10 @@
   onMount(loadData);
 </script>
 
-<svelte:head><title>Brand Recognition - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>Brand Recognition - Social Explorer</title>
+  <meta name="description" content="Find brands and logos in images." />
+</svelte:head>
 
 <PageHeader title="Brand Recognition" subtitle="Detect logos and brand placements in visual content" accentColor="amber" />
 
@@ -123,7 +126,7 @@
       {#if brandStats.length > 0}
         <div id="brand-chart" class="w-full h-96"></div>
       {:else}
-        <div class="flex items-center justify-center h-48 text-gray-400">
+        <div class="flex items-center justify-center h-48 text-gray-500">
           <div class="text-center">
             <span class="text-4xl block mb-2">🏢</span>
             <p class="text-sm">No brand detections yet. Process images to detect brands and logos.</p>

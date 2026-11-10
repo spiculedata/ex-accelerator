@@ -264,7 +264,7 @@
         {#if moderationStats.categories.length > 0}
           <div id="moderation-category-chart" class="w-full h-80"></div>
         {:else}
-          <div class="flex items-center justify-center h-80 text-gray-400">
+          <div class="flex items-center justify-center h-80 text-gray-500">
             <p class="text-sm">No flag category data available</p>
           </div>
         {/if}
@@ -335,7 +335,7 @@
               </div>
               <p class="text-sm text-gray-600 truncate">{item.image_id || 'Unknown image'}</p>
               {#if item.source}
-                <p class="text-xs text-gray-400 mt-0.5">Source: {item.source}</p>
+                <p class="text-xs text-gray-500 mt-0.5">Source: {item.source}</p>
               {/if}
             </div>
 

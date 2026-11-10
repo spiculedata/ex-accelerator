@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-  <title>{notFound ? 'Page not found' : 'Error'} | Social Explorer</title>
+  <title>{notFound ? 'Page not found' : 'Error'} - Social Explorer</title>
 </svelte:head>
 
 <main class="min-h-screen bg-ink-50 flex items-center justify-center px-4">

@@ -511,7 +511,7 @@
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
       </div>
-      <p class="text-xs text-gray-400 mt-3">Data source and date range filters are in the bar above.</p>
+      <p class="text-xs text-gray-500 mt-3">Data source and date range filters are in the bar above.</p>
     </div>
 
     <!-- Charts Grid -->

@@ -37,7 +37,7 @@
   ];
 </script>
 
-<div class="flex gap-2">
+<div class="flex flex-wrap gap-2">
   {#each tiers as tier}
     <button
       type="button"
@@ -57,7 +57,7 @@
   {/each}
 </div>
 {#if !compact}
-  <p class="text-xs text-gray-400 mt-1.5">
+  <p class="text-xs text-gray-500 mt-1.5">
     {#if selectedTier === 'fast'}YOLOv8n object detection + Haar face detection + heuristic classification
     {:else if selectedTier === 'standard'}CLIP ViT-B/32 classification + YOLOv8s detection + CLIP NSFW moderation
     {:else}Full Gemma 4 multimodal vision analysis (requires GPU for acceptable speed)

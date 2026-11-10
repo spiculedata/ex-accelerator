@@ -196,12 +196,12 @@
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 {compact ? 'p-3' : 'p-4'}">
   {#if loading}
-    <div class="flex items-center gap-2 text-sm text-gray-400">
+    <div class="flex items-center gap-2 text-sm text-gray-500">
       <div class="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-blue-500"></div>
       Loading data sources...
     </div>
   {:else if !datesOnly && visibleDatasets.length === 0}
-    <p class="text-xs text-gray-400">No matching data sources{datasetTypes.length > 0 ? ` (filter: ${datasetTypes.join(', ')})` : ''}</p>
+    <p class="text-xs text-gray-500">No matching data sources{datasetTypes.length > 0 ? ` (filter: ${datasetTypes.join(', ')})` : ''}</p>
   {:else}
     <div class="flex flex-wrap items-center gap-3">
       {#if !datesOnly}
@@ -216,7 +216,7 @@
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
               {enabled
                 ? `${colors.bg} ${colors.text} ${colors.border} shadow-sm`
-                : 'bg-gray-100 text-gray-400 border-gray-200 opacity-60'}"
+                : 'bg-gray-100 text-gray-600 border-gray-200'}"
             on:click={() => toggleDataset(id)}
             title="{enabled ? 'Click to disable' : 'Click to enable'}: {dataset.name || dataset.dataset_name}"
           >
@@ -238,7 +238,7 @@
       {/if}
 
       <!-- Date range -->
-      <div class="flex items-center gap-1.5">
+      <div class="flex flex-wrap items-center gap-1.5">
         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Dates:</span>
         <input
           type="date"

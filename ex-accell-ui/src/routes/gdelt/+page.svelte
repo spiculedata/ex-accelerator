@@ -1100,7 +1100,8 @@
 </script>
 
 <svelte:head>
-	<title>GDELT World Events Dashboard</title>
+	<title>GDELT World Events - Social Explorer</title>
+	<meta name="description" content="A map of global news events from GDELT, with the people, places and themes behind them." />
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
@@ -1217,7 +1218,7 @@
 										<label class="block text-xs xl:text-sm font-medium text-gray-700 mb-2">From Date</label>
 										<div class="relative">
 											<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-												<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 												</svg>
 											</div>
@@ -1237,7 +1238,7 @@
 										<label class="block text-xs xl:text-sm font-medium text-gray-700 mb-2">To Date</label>
 										<div class="relative">
 											<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-												<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 												</svg>
 											</div>
@@ -1406,7 +1407,7 @@
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
-									<div class="flex justify-between text-xs text-gray-400 mt-6">
+									<div class="flex justify-between text-xs text-gray-500 mt-6">
 										<span>-10</span>
 										<span>0</span>
 										<span>+10</span>
@@ -1496,7 +1497,7 @@
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
-									<div class="flex justify-between text-xs text-gray-400 mt-6">
+									<div class="flex justify-between text-xs text-gray-500 mt-6">
 										<span>-50</span>
 										<span>0</span>
 										<span>+50</span>
@@ -1564,7 +1565,7 @@
 											bind:value={countrySearchTerm}
 											class="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 										/>
-										<svg class="absolute left-2.5 top-2.5 w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<svg class="absolute left-2.5 top-2.5 w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
 										</svg>
 									</div>
@@ -1649,7 +1650,7 @@
 								</svg>
 								Click types to filter map events
 							</div>
-							<p class="text-xs text-gray-400 mt-1">Based on GDELT CAMEO codes</p>
+							<p class="text-xs text-gray-500 mt-1">Based on GDELT CAMEO codes</p>
 						</div>
 					</div>
 				</div>
@@ -1888,7 +1889,7 @@
 									{/if}
 								{:else if mentions.length === 0}
 									<div class="text-center py-12">
-										<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 										</svg>
 										<h3 class="mt-4 text-lg font-medium text-gray-900">No mentions found</h3>
@@ -1972,7 +1973,7 @@
 													
 													{#if startPage > 1}
 														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
-														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+														{#if startPage > 2}<span class="text-gray-500">...</span>{/if}
 													{/if}
 													
 													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
@@ -1985,7 +1986,7 @@
 													{/each}
 													
 													{#if endPage < totalPages}
-														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														{#if endPage < totalPages - 1}<span class="text-gray-500">...</span>{/if}
 														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
 													{/if}
 													
@@ -2091,10 +2092,10 @@
 																{#if formattedDate}
 																	<span title="Raw: {mention.mentionTimeDate}">{formattedDate}</span>
 																{:else}
-																	<span class="text-gray-400" title="Raw: {mention.mentionTimeDate}">Invalid date</span>
+																	<span class="text-gray-500" title="Raw: {mention.mentionTimeDate}">Invalid date</span>
 																{/if}
 															{:else}
-																<span class="text-gray-400">N/A</span>
+																<span class="text-gray-500">N/A</span>
 															{/if}
 														</td>
 														<td class="px-4 py-3 text-sm text-gray-600">
@@ -2171,7 +2172,7 @@
 													
 													{#if startPage > 1}
 														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
-														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+														{#if startPage > 2}<span class="text-gray-500">...</span>{/if}
 													{/if}
 													
 													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
@@ -2184,7 +2185,7 @@
 													{/each}
 													
 													{#if endPage < totalPages}
-														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														{#if endPage < totalPages - 1}<span class="text-gray-500">...</span>{/if}
 														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
 													{/if}
 													

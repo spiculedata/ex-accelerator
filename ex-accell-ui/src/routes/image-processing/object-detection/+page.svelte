@@ -255,7 +255,7 @@
         {#if stats.topClasses.length > 0}
           <div id="classes-chart" class="w-full h-96"></div>
         {:else}
-          <div class="flex items-center justify-center h-96 text-gray-400 text-sm">
+          <div class="flex items-center justify-center h-96 text-gray-500 text-sm">
             No object class data available
           </div>
         {/if}
@@ -286,7 +286,7 @@
             </table>
           </div>
         {:else}
-          <div class="flex items-center justify-center h-96 text-gray-400 text-sm">
+          <div class="flex items-center justify-center h-96 text-gray-500 text-sm">
             No co-occurrence data available
           </div>
         {/if}
@@ -338,11 +338,11 @@
                       {#each objects.slice(0, 5) as obj}
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
                           {obj.class || obj.label || obj.name}
-                          <span class="ml-1 text-gray-400">{Math.round((obj.confidence || 0) * 100)}%</span>
+                          <span class="ml-1 text-gray-500">{Math.round((obj.confidence || 0) * 100)}%</span>
                         </span>
                       {/each}
                       {#if objects.length > 5}
-                        <span class="text-xs text-gray-400">+{objects.length - 5} more</span>
+                        <span class="text-xs text-gray-500">+{objects.length - 5} more</span>
                       {/if}
                     </div>
                   </td>
@@ -378,7 +378,7 @@
           </div>
         {/if}
       {:else}
-        <div class="flex flex-col items-center justify-center py-16 text-gray-400">
+        <div class="flex flex-col items-center justify-center py-16 text-gray-500">
           <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
           </svg>
@@ -400,7 +400,7 @@
           <h3 class="text-lg font-semibold text-gray-900">Object Detection Results</h3>
           <p class="text-xs text-gray-500 mt-1">{objects.length} object{objects.length !== 1 ? 's' : ''} detected</p>
         </div>
-        <button on:click={() => selectedImage = null} class="text-gray-400 hover:text-gray-600 p-1">
+        <button on:click={() => selectedImage = null} class="text-gray-500 hover:text-gray-600 p-1">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
@@ -462,7 +462,7 @@
       </div>
 
       <div class="p-4 border-t border-gray-200 flex justify-between items-center">
-        <span class="text-xs text-gray-400">Analyzed {selectedImage.analyzed_at ? new Date(selectedImage.analyzed_at).toLocaleString() : '—'}</span>
+        <span class="text-xs text-gray-500">Analyzed {selectedImage.analyzed_at ? new Date(selectedImage.analyzed_at).toLocaleString() : '—'}</span>
         <button on:click={() => selectedImage = null} class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700">Close</button>
       </div>
     </div>

@@ -111,4 +111,28 @@ describe('security headers', () => {
       config.secureCookies = false;
     }
   });
+
+  describe('caching of pages', () => {
+    const runWith = async (path: string, response: Response) => {
+      const resolve = vi.fn().mockResolvedValue(response);
+      const token = createSessionToken(admin, SECRET, 3600);
+      const event = {
+        url: new URL(`http://localhost${path}`),
+        request: new Request(`http://localhost${path}`),
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined) },
+        locals: {} as { user: SessionUser | null }
+      };
+      return handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
+    };
+
+    it('stops the browser keeping a signed-in page, so Back after sign out cannot show it', async () => {
+      const page = await runWith('/dashboards', new Response('<html></html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }));
+      expect(page.headers.get('cache-control')).toBe('no-store');
+    });
+
+    it('leaves the caching of scripts, styles and other assets alone', async () => {
+      const asset = await runWith('/_app/immutable/app.js', new Response('x', { headers: { 'content-type': 'text/javascript', 'cache-control': 'public, max-age=31536000, immutable' } }));
+      expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    });
+  });
 });

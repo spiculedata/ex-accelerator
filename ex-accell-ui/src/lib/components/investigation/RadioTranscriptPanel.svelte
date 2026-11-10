@@ -98,7 +98,7 @@
   </div>
 
   {#if segments.length === 0}
-    <div class="flex flex-col items-center justify-center flex-1 py-12 text-gray-400">
+    <div class="flex flex-col items-center justify-center flex-1 py-12 text-gray-500">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
       </svg>
@@ -126,7 +126,7 @@
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-800">{seg.radio_name}</span>
               {#if seg.state}
-                <span class="text-xs text-gray-400">{seg.state}</span>
+                <span class="text-xs text-gray-500">{seg.state}</span>
               {/if}
             </div>
             <div class="flex items-center gap-1.5">
@@ -146,7 +146,7 @@
             <span>{seg.segment_start}</span>
             <span>{formatDuration(seg.duration_seconds)}</span>
             {#if seg.confidence != null}
-              <span class="text-gray-400">conf: {(seg.confidence * 100).toFixed(0)}%</span>
+              <span class="text-gray-500">conf: {(seg.confidence * 100).toFixed(0)}%</span>
             {/if}
           </div>
 
@@ -162,7 +162,7 @@
           <!-- Actions -->
           <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
             <button
-              class="text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+              class="text-[10px] text-gray-500 hover:text-gray-600 transition-colors"
               on:click|stopPropagation={() => toggleExpand(String(seg.id))}
             >
               {expanded ? 'Collapse' : 'Expand'}

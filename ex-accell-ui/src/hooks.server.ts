@@ -21,6 +21,8 @@ const HSTS_VALUE = 'max-age=15552000; includeSubDomains';
 function withSecurityHeaders(response: Response, isSecure: boolean): Response {
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(BASELINE_SECURITY_HEADERS)) headers.set(name, value);
+  // A page that needed a sign-in must not be kept by the browser, or Back after signing out would show it again
+  if (headers.get('content-type')?.startsWith('text/html')) headers.set('Cache-Control', 'no-store');
   // Only send HSTS when the site is served over HTTPS (the same signal as the Secure cookie flag)
   if (isSecure) headers.set('Strict-Transport-Security', HSTS_VALUE);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });

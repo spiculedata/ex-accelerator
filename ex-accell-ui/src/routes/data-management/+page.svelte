@@ -542,7 +542,7 @@
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">{column}</span>
                           {/each}
                           {#if dataset.columns.length > 3}
-                            <span class="text-xs text-gray-400">+{dataset.columns.length - 3}</span>
+                            <span class="text-xs text-gray-500">+{dataset.columns.length - 3}</span>
                           {/if}
                         </div>
                       {/if}
@@ -613,7 +613,7 @@
                     <div class="text-sm">
                       <span class="text-gray-600">Input:</span>
                       <span class="font-medium text-gray-900 ml-1">{workflow.inputSource || workflow.input_source || '—'}</span>
-                      <span class="text-gray-400 mx-2">→</span>
+                      <span class="text-gray-500 mx-2">→</span>
                       <span class="text-gray-600">Output:</span>
                       <span class="font-medium text-gray-900 ml-1">{workflow.outputDataset || workflow.output_dataset || '—'}</span>
                     </div>
@@ -867,7 +867,7 @@
           </label>
           <textarea bind:value={crawlerConfig.urls} rows="3" placeholder="One per line or comma-separated"
             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-gray-500 mt-1">
             {crawlerConfig.platform === 'bluesky' ? 'e.g. user.bsky.social or "firehose" for full network' : crawlerConfig.platform === 'youtube' ? 'e.g. UCxxxxxxx or channel URLs' : 'e.g. @channelname'}
           </p>
         </div>
