@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
-  import { ErrorAlert } from '$lib/components/ui';
+  import { ErrorAlert, Modal } from '$lib/components/ui';
   import { formatNumber, formatDate } from '$lib/utils/formatUtils';
+  import { packageIdFor } from '$lib/utils/packageId';
 
   let loading = true;
   let errorMessage = '';
@@ -15,11 +16,16 @@
   let previewPackage: any = null;
   let previewData: any[] = [];
 
-  // IPFS state
+  // IPFS state. Sharing is opt-in (IPFS_ENABLED=true on the server); until the status is known nothing is offered.
+  let ipfsEnabled = false;
   let publishingFor: string | null = null;
+  let confirmPublishFor: any = null;
   let ipfsRegistry: Map<string, any> = new Map();
   let importCid = '';
   let importing = false;
+
+  // Generating, publishing and importing are admin-only on the server; the page only offers what the person may do
+  $: isAdmin = ($page.data.user as { role?: string } | null | undefined)?.role === 'admin';
 
   onMount(async () => {
     await loadData();
@@ -28,6 +34,15 @@
   async function loadData() {
     try {
       loading = true;
+
+      // Is peer-to-peer sharing turned on for this server?
+      try {
+        const statusResponse = await fetch('/api/data-sharing?action=status');
+        const statusResult = await statusResponse.json();
+        ipfsEnabled = statusResult.success && statusResult.data?.enabled === true;
+      } catch {
+        ipfsEnabled = false;
+      }
 
       // Load available datasets from catalog
       const dsResponse = await fetch('/api/datasets?status=available');
@@ -43,14 +58,14 @@
         packages = pkgResult.packages || [];
       }
 
-      // Load IPFS registry
+      // Load the registry of packages already published (they stay public even if sharing is turned off later)
       try {
         const regResponse = await fetch('/api/data-sharing?action=registry');
         const regResult = await regResponse.json();
         if (regResult.success) {
           ipfsRegistry = new Map((regResult.packages || []).map((p: any) => [p.package_id, p]));
         }
-      } catch { /* IPFS may not be enabled */ }
+      } catch { /* the registry is optional */ }
 
       loading = false;
     } catch (error) {
@@ -110,7 +125,13 @@
     navigator.clipboard.writeText(link);
   }
 
+  /** Publishing is irreversible, so the person confirms first. */
+  function askToPublish(pkg: any) {
+    confirmPublishFor = pkg;
+  }
+
   async function publishToIpfs(pkg: any) {
+    confirmPublishFor = null;
     publishingFor = pkg.id;
     errorMessage = '';
     successMessage = '';
@@ -134,8 +155,8 @@
     }
   }
 
-  function copyIpfsLink(cid: string) {
-    navigator.clipboard.writeText(`https://ipfs.io/ipfs/${cid}`);
+  function copyIpfsLink(ipfs: { cid: string; gateway_url?: string }) {
+    navigator.clipboard.writeText(ipfs.gateway_url || `https://ipfs.io/ipfs/${ipfs.cid}`);
     successMessage = 'IPFS gateway URL copied!';
     setTimeout(() => successMessage = '', 3000);
   }
@@ -202,6 +223,26 @@
     </div>
   {:else}
 
+  {#if !ipfsEnabled}
+    <div class="bg-ink-50 border border-ink-200 rounded-xl p-5 mb-8" role="status" data-testid="ipfs-disabled">
+      <h2 class="text-base font-semibold text-ink-900">Peer-to-peer sharing is turned off</h2>
+      <p class="text-sm text-ink-700 mt-2">
+        This server is not connected to the IPFS network, so packages cannot be published or imported. That is the default:
+        anything published to IPFS becomes public and cannot be taken back, so an administrator turns it on deliberately
+        by setting <code class="font-mono text-xs bg-white border border-ink-200 rounded px-1 py-0.5">IPFS_ENABLED=true</code>
+        and restarting the app.
+      </p>
+      <p class="text-sm text-ink-700 mt-2">
+        You can still generate Frictionless Data Packages here and share them with people who have an account on this server.
+        See the <a href="https://spiculedata.github.io/social-explorer/guide/data-sharing" class="text-primary-700 underline" target="_blank" rel="noopener">data sharing guide</a> for how it works and what to consider before turning it on.
+      </p>
+    </div>
+  {:else if !isAdmin}
+    <div class="bg-ink-50 border border-ink-200 rounded-xl p-4 mb-8 text-sm text-ink-700" role="status">
+      Only administrators can generate, publish or import packages. You can preview the packages below and copy their links.
+    </div>
+  {/if}
+
   <!-- Shared Packages -->
   <div class="mb-8">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Shared Data Packages</h2>
@@ -248,7 +289,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                       </svg>
                     </button>
-                    <button on:click={() => copyIpfsLink(ipfs.cid)} class="p-1 text-indigo-500 hover:text-indigo-700 rounded" title="Copy gateway URL">
+                    <button on:click={() => copyIpfsLink(ipfs)} class="p-1 text-indigo-500 hover:text-indigo-700 rounded" title="Copy gateway URL">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                       </svg>
@@ -262,10 +303,10 @@
               <button on:click={() => viewPackage(pkg)} class="text-xs text-purple-600 hover:text-purple-800 font-medium">Preview</button>
               <span class="text-gray-300">|</span>
               <button on:click={() => copyShareLink(pkg)} class="text-xs text-blue-600 hover:text-blue-800 font-medium">Copy Link</button>
-              {#if !ipfs}
+              {#if !ipfs && pkg.publishable && ipfsEnabled && isAdmin}
                 <span class="text-gray-300">|</span>
                 <button
-                  on:click={() => publishToIpfs(pkg)}
+                  on:click={() => askToPublish(pkg)}
                   disabled={publishingFor === pkg.id}
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
                 >
@@ -281,10 +322,11 @@
   </div>
 
   <!-- Import from IPFS -->
+  {#if ipfsEnabled && isAdmin}
   <div class="mb-8">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Import from IPFS</h2>
     <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
-      <p class="text-sm text-gray-600 mb-4">Paste an IPFS CID to import a Frictionless Data Package shared by another user or organization.</p>
+      <p class="text-sm text-gray-600 mb-4">Paste an IPFS CID to import a Frictionless Data Package shared by another user or organization. The package comes from the public network: only import CIDs from people you trust.</p>
       <div class="flex gap-3">
         <input
           type="text"
@@ -315,6 +357,7 @@
       <p class="text-xs text-gray-500 mt-2">The CID will be resolved from the IPFS network. This may take a moment for the first fetch.</p>
     </div>
   </div>
+  {/if}
 
   <!-- Available Datasets to Share -->
   <div>
@@ -345,8 +388,10 @@
               </td>
               <td class="px-4 py-3 text-right text-sm">{formatNumber(parseInt(dataset.record_count) || 0)}</td>
               <td class="px-4 py-3 text-right">
-                {#if packages.some(p => p.id === (dataset.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-'))}
+                {#if packages.some(p => p.id === packageIdFor(dataset.name, dataset.id))}
                   <span class="text-xs text-green-600 font-medium">Shared</span>
+                {:else if !isAdmin}
+                  <span class="text-xs text-ink-500">Admins only</span>
                 {:else}
                   <button
                     on:click={() => generatePackage(dataset)}
@@ -365,6 +410,33 @@
 
   {/if}
 </div>
+
+<!-- Publish confirmation: the data leaves this server for good -->
+<Modal
+  open={confirmPublishFor !== null}
+  title="Publish to the public IPFS network?"
+  description={confirmPublishFor ? `"${confirmPublishFor.title || confirmPublishFor.name}" (${formatNumber(confirmPublishFor.totalRows)} records) will be exported in full and published.` : ''}
+  onclose={() => (confirmPublishFor = null)}
+>
+  <div class="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-900 space-y-2">
+    <p class="font-semibold">This cannot be undone.</p>
+    <p>
+      Anyone with the content identifier (CID) can download the whole dataset from any IPFS node or gateway, with no
+      sign-in. Copies may be kept by other nodes indefinitely, so the data cannot be withdrawn later.
+    </p>
+    <p>Check first that the data holds no personal information you may not share and that its licence allows publication.</p>
+  </div>
+  <svelte:fragment slot="footer">
+    <div class="flex justify-end gap-2">
+      <button type="button" on:click={() => (confirmPublishFor = null)} class="px-4 py-2 text-sm text-ink-700 bg-ink-100 hover:bg-ink-200 rounded-lg" data-autofocus>
+        Cancel
+      </button>
+      <button type="button" on:click={() => publishToIpfs(confirmPublishFor)} class="px-4 py-2 text-sm font-medium text-white bg-danger-600 hover:bg-danger-700 rounded-lg">
+        Publish publicly
+      </button>
+    </div>
+  </svelte:fragment>
+</Modal>
 
 <!-- Preview Modal -->
 {#if showPreviewModal && previewPackage}
