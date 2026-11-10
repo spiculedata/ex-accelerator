@@ -49,7 +49,7 @@ on the IPFS network and cannot be withdrawn.
 | `IPFS_ENABLED` | `false` | Must be exactly `true` to turn peer-to-peer sharing on; any other value leaves it off |
 | `IPFS_BLOCKSTORE_PATH` | `/data/ipfs/blocks` | Where the node keeps published and fetched blocks |
 | `IPFS_DATASTORE_PATH` | `/data/ipfs/datastore` | The node's identity and routing data; keep it between restarts |
-| `IPFS_GATEWAY_URL` | `https://ipfs.io/ipfs` | Public gateway used to build shareable links (the server never fetches from it) |
+| `IPFS_GATEWAY_URL` | `https://ipfs.io/ipfs` | Public gateway used to build shareable links; the server never fetches from this address (the node itself does use other public gateways, see the guide) |
 | `IPFS_FETCH_TIMEOUT_MS` | `120000` | How long an import waits for the network before answering `504` |
 | `IPFS_MAX_FETCH_BYTES` | `268435456` | Largest package an import accepts (256 MB); bigger ones get `422` |
 | `PACKAGES_DIR` | `/data/packages` | Where generated and imported data packages are written |

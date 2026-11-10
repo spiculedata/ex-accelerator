@@ -37,12 +37,17 @@ needs an account on your server. That part never leaves your server.
 | Helia node | When sharing is on, the first publish or import starts a [Helia](https://helia.io/) IPFS node *inside the app process* (no separate daemon). It keeps blocks in `IPFS_BLOCKSTORE_PATH` and its peer identity and routing data in `IPFS_DATASTORE_PATH`. |
 | Publishing | Exports the full table to `<table>.csv` (up to `MAX_EXPORT_ROWS`, 500,000 by default), adds every file in the package directory to the node as one directory, **pins** it so the blockstore keeps it, and returns the directory's CID. |
 | Registry | The table `ipfs_published_packages` records every package this install published or imported: CID, gateway URL, title, row count, size, status (`published` or `imported`), who did it and when. The **Data Sharing** page reads it to show CIDs next to packages. |
-| Gateway | A public HTTP gateway (`IPFS_GATEWAY_URL`, `https://ipfs.io/ipfs` by default) is only used to build a shareable `https://.../ipfs/<cid>` link. The server never fetches from it. |
-| Importing | Fetches the directory for a CID from the network, checks it, creates a table `ipfs_<first 12 characters of the CID>`, loads the CSV with parameterised inserts, adds a row to the `datasets` catalogue and copies the files into `PACKAGES_DIR`. |
+| Gateway | A public HTTP gateway (`IPFS_GATEWAY_URL`, `https://ipfs.io/ipfs` by default) is only used to build a shareable `https://.../ipfs/<cid>` link. The server never fetches from *this* address; see the next paragraph for the gateways Helia itself uses. |
+| Importing | Fetches the directory for a CID from the network, checks it, creates a table named `ipfs_` plus the last 40 characters of the CID (lower-cased), loads the CSV with parameterised inserts, adds a row to the `datasets` catalogue and copies the files into `PACKAGES_DIR`. The same CID cannot be imported twice (`409`). |
 
-The node uses libp2p's defaults: it listens on random TCP, WebSocket and WebRTC-direct ports on every interface,
-dials the public bootstrap peers, and joins the public DHT so other peers can find the content it pins. It starts
-lazily and stops when the app process stops.
+The node runs with Helia's defaults, which do more than find peers. It listens on random TCP, WebSocket and
+WebRTC-direct ports on every interface (IPv4 and IPv6), dials the public bootstrap peers and joins the public DHT
+so other peers can find the content it pins. It also asks the router to open ports with **UPnP**, announces itself
+on the local network with **mDNS**, acts as a **circuit relay** for other peers' traffic, registers with
+`libp2p.direct` for a TLS certificate (**AutoTLS**), uses delegated routing over HTTPS (`delegated-ipfs.dev`) and
+fetches blocks over HTTPS from public trustless gateways (`trustless-gateway.link`, `4everland.io`) when peers
+are slow. None of this is configurable today ([issue #252](https://github.com/spiculedata/social-explorer/issues/252)).
+The node starts on the first publish or import and stops when the app process stops.
 
 ## Who may do what
 
@@ -70,15 +75,18 @@ Non-admins see the page with those controls hidden; the API answers `403` if the
 | `PACKAGES_DIR` | `/data/packages` | Where generated and imported packages are written. |
 | `MAX_EXPORT_ROWS` | `500000` | Most rows exported in one publish and loaded in one import. |
 
-With Docker Compose the paths are already set and mounted from `${DATA_DIR:-/data}/ipfs` and
-`${DATA_DIR:-/data}/packages`; put `IPFS_ENABLED=true` in `.env`.
+With Docker Compose the storage paths are fixed inside the container and mounted from `${DATA_DIR:-/data}/ipfs`
+and `${DATA_DIR:-/data}/packages`. The compose file forwards `IPFS_ENABLED`, `IPFS_GATEWAY_URL`,
+`IPFS_FETCH_TIMEOUT_MS`, `IPFS_MAX_FETCH_BYTES` and `MAX_EXPORT_ROWS` from `.env`; put `IPFS_ENABLED=true` there.
 
 ### Network and firewall
 
-The node picks random ports, so there is nothing fixed to open. Outbound connections to the bootstrap peers and
-the DHT (TCP and UDP) must be allowed, or publishing works locally but nobody can fetch from you. For other
-peers to connect *in*, your node must be reachable; behind NAT or the Compose network it relies on relays, which
-works but is slower. The Compose file does not publish an IPFS port; a fixed listen address and port are not configurable yet (see
+The node picks random ports, so there is nothing fixed to open. Outbound traffic must be allowed to the
+bootstrap peers and the DHT (TCP and UDP, any port) and over HTTPS to the delegated-routing and trustless-gateway
+hosts named above, or publishing works locally but nobody can fetch from you. For other peers to connect *in*,
+your node must be reachable; behind NAT or the Compose network it relies on relays (and on UPnP, if your router
+allows it), which works but is slower. The Compose file does not publish an IPFS port; a fixed listen address
+and port, and turning off UPnP, mDNS, the relay server or the HTTP gateways, are not configurable yet (see
 [issue #252](https://github.com/spiculedata/social-explorer/issues/252), which also tracks unpublishing and a
 clean node shutdown).
 
@@ -109,8 +117,9 @@ Keep your app running: until other nodes have cached it, your node is the only o
 1. On **Data Sharing**, under **Import from IPFS**, paste the CID and click **Fetch & Import**.
 2. The server fetches the directory (subject to the timeout and size cap), checks that it holds a
    `datapackage.json` with a CSV resource whose fields are plain identifiers, creates the table and loads it.
-3. The new table appears in the catalogue as an `imported` dataset from `ipfs`, and in the registry with status
-   `imported`.
+3. The new table appears in the catalogue as an `imported` dataset from `ipfs`. The registry table keeps a row
+   with status `imported` too, though the **Data Sharing** page and `?action=registry` list published packages
+   only. Importing the same CID again is refused (`409`).
 
 Only import CIDs from people you trust. A package is data, not code, and every name in it is checked before it
 reaches SQL or the file system, but the rows themselves are whatever the publisher put there.
@@ -118,13 +127,14 @@ reaches SQL or the file system, but the rows themselves are whatever the publish
 ## Limits
 
 - Preview rows: 100 by default, 1,000 at most.
-- Export and import: `MAX_EXPORT_ROWS` rows (500,000 by default).
+- Export and import: `MAX_EXPORT_ROWS` rows (500,000 by default). A publish that hits the cap says so in
+  `datapackage.json` (`social_explorer.truncated`); an import quietly stops reading the CSV at the cap.
+- A package may hold at most 100 files.
 - Fetch: `IPFS_FETCH_TIMEOUT_MS` and `IPFS_MAX_FETCH_BYTES`.
 - Only datasets in the catalogue can be packaged; application tables (users, projects, memberships, workflows,
   the registry itself) are refused even if a catalogue row points at them.
 - Package ids and file names must be plain names; a package whose files have paths in their names is refused.
-- The whole export is written through the app's database connection in batches of 10,000 rows, so a huge table
-  takes minutes and holds a connection for that long.
+- The export runs one query per 10,000 rows through the app's database pool, so a huge table takes minutes.
 
 ## Troubleshooting
 
@@ -140,9 +150,11 @@ publisher's app is still running and its node can accept connections, that outbo
 yours, and try again: the first lookup through the DHT can take a minute or two.
 
 **Import answers 422.** The package is not a data package this app can load: no `datapackage.json`, no CSV
-resource, field names that are not plain identifiers, a header that does not match the declared fields, a file
-name with a path in it, or a package over the size cap. Ask the publisher for a package generated by Social
-Explorer.
+resource, field names that are not plain identifiers, a header that does not match the declared fields, a value
+that does not fit its declared field type, a file name with a path in it, more than 100 files, or a package over
+the size cap. Ask the publisher for a package generated by Social Explorer.
+
+**Import answers 409.** This CID was already imported here; the table is still there.
 
 **Slow retrieval.** Content travels peer-to-peer; the first fetch of a large package can be slow, especially
 through relays. A public gateway that has already cached the content is often faster for people outside the
