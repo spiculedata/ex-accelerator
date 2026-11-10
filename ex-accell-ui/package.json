@@ -79,6 +79,7 @@
 		"http-proxy-middleware": "^3.0.5",
 		"leaflet": "^1.9.4",
 		"pg": "^8.16.3",
+		"undici": "^7.30.2",
 		"uuid": "^13.0.0"
 	},
 	"overrides": {

@@ -1,10 +1,16 @@
 // Fetching an address a visitor typed in must never reach the server's own network: loopback, private ranges, link-local
 // addresses (cloud metadata is 169.254.169.254) and the like. Each hop of a redirect is checked as well.
 import { lookup as dnsLookup } from 'node:dns/promises';
+import { lookup as nodeLookup } from 'node:dns';
 import { isIP } from 'node:net';
+import { Agent, fetch as undiciFetch } from 'undici';
+
+const PRIVATE_MESSAGE = 'That address points to a private or internal network, so it cannot be analysed.';
+// For a name, the same words as any other download failure, so the answer does not reveal what a name resolves to
+const GENERIC_MESSAGE = 'The image could not be downloaded. Check the address, and that the site allows downloads.';
 
 export class UnsafeUrlError extends Error {
-  constructor(message = 'That address points to a private or internal network, so it cannot be analysed.') {
+  constructor(message = PRIVATE_MESSAGE) {
     super(message);
     this.name = 'UnsafeUrlError';
   }
@@ -20,6 +26,8 @@ function ipv4Public(octets: number[]): boolean {
   if (a === 172 && b >= 16 && b <= 31) return false;
   if (a === 192 && b === 168) return false;
   if (a === 192 && b === 0 && (c === 0 || c === 2)) return false; // IETF protocol and documentation ranges
+  if (a === 192 && b === 88 && c === 99) return false; // 6to4 relay
+  if (a === 168 && b === 63 && c === 129 && octets[3] === 16) return false; // Azure's platform endpoint
   if (a === 198 && (b === 18 || b === 19)) return false; // benchmarking
   if (a === 198 && b === 51 && c === 100) return false;
   if (a === 203 && b === 0 && c === 113) return false;
@@ -85,30 +93,80 @@ const defaultLookup = (host: string) => dnsLookup(host, { all: true });
 async function assertPublic(url: URL, lookup: NonNullable<FetchDeps['lookup']>): Promise<void> {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new UnsafeUrlError('Only http:// and https:// addresses can be analysed.');
   if (url.username || url.password) throw new UnsafeUrlError('Addresses with a user name or password cannot be analysed.');
-  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
   if (host === 'localhost' || host.endsWith('.localhost')) throw new UnsafeUrlError();
   if (isIP(host)) {
     if (!isPublicIp(host)) throw new UnsafeUrlError();
     return;
   }
   const answers = await lookup(host);
-  if (answers.length === 0 || answers.some((answer) => !isPublicIp(answer.address))) throw new UnsafeUrlError();
+  if (answers.length === 0 || answers.some((answer) => !isPublicIp(answer.address))) throw new UnsafeUrlError(GENERIC_MESSAGE);
+}
+
+type LookupCallback = (error: Error | null, address?: unknown, family?: number) => void;
+
+/**
+ * The check made at connection time, on the addresses the connection will really use, so a name cannot answer
+ * differently after it was checked (DNS rebinding) and a URL read differently by two parsers cannot slip through.
+ */
+export function guardedLookup(hostname: string, options: { all?: boolean } & Record<string, unknown>, callback: LookupCallback, resolver: typeof nodeLookup = nodeLookup): void {
+  (resolver as any)(hostname, { ...options, all: true }, (error: Error | null, addresses: { address: string; family: number }[]) => {
+    if (error) return callback(error);
+    if (!addresses || addresses.length === 0 || addresses.some((a) => !isPublicIp(a.address))) return callback(new UnsafeUrlError(GENERIC_MESSAGE));
+    return options.all ? callback(null, addresses) : callback(null, addresses[0].address, addresses[0].family);
+  });
+}
+
+const guardedAgent = new Agent({ connect: { lookup: guardedLookup as any } });
+const guardedFetch = ((url: RequestInfo | URL, init?: RequestInit) => undiciFetch(url as any, { ...(init as any), dispatcher: guardedAgent })) as unknown as typeof fetch;
+
+export class TooLargeError extends Error {
+  constructor() {
+    super('Image too large (max 10MB). Use a smaller image or resize first.');
+    this.name = 'TooLargeError';
+  }
+}
+
+/** Reads a body but gives up as soon as it passes `maxBytes`, so a huge or endless response cannot fill memory. */
+export async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array(0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new TooLargeError();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 /**
  * fetch for an address a visitor supplied: every hop (the first address and each redirect) must resolve only to public
- * addresses. A name could in principle resolve differently between this check and the connection; the check closes the
- * direct and redirect routes, not that race.
+ * addresses, and the connection itself is checked again (guardedLookup).
  */
 export async function fetchPublic(input: string, init: RequestInit = {}, deps: FetchDeps = {}): Promise<Response> {
   const lookup = deps.lookup ?? defaultLookup;
-  const fetchImpl = deps.fetchImpl ?? fetch;
+  const fetchImpl = deps.fetchImpl ?? guardedFetch;
   let current = new URL(input);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertPublic(current, lookup);
-    const response = await fetchImpl(current.toString(), { ...init, redirect: 'manual' });
+    // Identity encoding: a small compressed body cannot inflate past the size cap
+    const response = await fetchImpl(current.toString(), { ...init, redirect: 'manual', headers: { ...(init.headers as Record<string, string>), 'Accept-Encoding': 'identity' } });
     const location = response.headers.get('location');
     if (response.status >= 300 && response.status < 400 && location) {
+      await response.body?.cancel(); // release the connection of a response nobody will read
       current = new URL(location, current);
       continue;
     }
