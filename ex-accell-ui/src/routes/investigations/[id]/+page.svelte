@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolveInvestigationRange } from '$lib/utils/investigationRange';
   import { formatDay } from '$lib/utils/dayFormat';
-  import { parseAnnotations, type Annotation } from '$lib/utils/annotations';
+  import { isPostNoted, noteFromPost, notesToMarkdown, parseAnnotations, type Annotation } from '$lib/utils/annotations';
   import { createSingleFlight } from '$lib/utils/singleFlight';
   import { beforeNavigate } from '$app/navigation';
   import { getSentimentColor } from '$lib/utils/colorUtils';
@@ -636,6 +636,14 @@
     void saveNotes();
   }
 
+  // Quotes a post into the notes with its citation; a post already cited there is not added twice
+  function addPostToNotes(post: SocialPost) {
+    if (isPostNoted(annotations, post)) return;
+    annotations = [...annotations, noteFromPost(post, crypto.randomUUID(), new Date().toISOString())];
+    showAnnotations = true;
+    void saveNotes();
+  }
+
   function removeAnnotation(id: string) {
     annotations = annotations.filter(a => a.id !== id);
     void saveNotes();
@@ -713,6 +721,10 @@
       exported_at: new Date().toISOString()
     };
     downloadFile(JSON.stringify(report, null, 2), 'application/json', 'json');
+  }
+
+  function handleExportNotes() {
+    downloadFile(notesToMarkdown(investigation?.name ?? 'Investigation', annotations), 'text/markdown', 'md');
   }
 
   function handleExportCsv() {
@@ -846,6 +858,7 @@
             on:keydown={(e) => { if (e.key === 'Enter') addAnnotation(); }}
           />
           <button on:click={addAnnotation} class="px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-medium rounded">Add</button>
+          <button on:click={handleExportNotes} disabled={annotations.length === 0} class="px-1.5 py-0.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 text-[9px] font-medium rounded" title="Download the notes as a Markdown file">Export notes</button>
         </div>
       </div>
     {/if}
@@ -1194,6 +1207,12 @@
                   {#if isExpanded}
                     <!-- Expanded view -->
                     <p class="text-sm text-slate-200 leading-relaxed mb-3 whitespace-pre-wrap">{post.text}</p>
+                    <button
+                      type="button"
+                      on:click|stopPropagation={() => addPostToNotes(post)}
+                      disabled={isPostNoted(annotations, post)}
+                      class="mb-3 px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white"
+                    >{isPostNoted(annotations, post) ? 'In your notes' : 'Add to notes'}</button>
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-700/30">
                       <div>
                         <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Engagement</span>
