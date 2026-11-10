@@ -14,10 +14,21 @@
   import { ErrorAlert } from '$lib/components/ui';
   import { platformOptions } from '$lib/utils/platformOptions';
   import { rangeReloader } from '$lib/utils/filterRange';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let currentFilterParams: Record<string, string> = {};
+
+  // The language whose posts were chosen; they open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
+  function openLanguagePosts(code: string, name: string) {
+    drilldown = {
+      title: `${name} posts`,
+      filters: { language: code, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) }
+    };
+  }
 
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
@@ -286,7 +297,9 @@
                   <span class="text-white font-bold text-xs">{lang.code.toUpperCase()}</span>
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900">{lang.name}</div>
+                  <div class="font-medium text-gray-900">
+                    <button type="button" class="hover:text-primary-700 hover:underline" on:click={() => openLanguagePosts(lang.code, lang.name)}>{lang.name}</button>
+                  </div>
                   <div class="text-sm text-gray-500">{lang.count.toLocaleString()} posts</div>
                 </div>
               </div>
@@ -384,3 +397,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

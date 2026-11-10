@@ -1,5 +1,5 @@
 // Posts behind a number: the evidence for a topic, hashtag, phrase or sentiment segment.
-// GET /api/posts?topic=&hashtag=&q=&phrase=&within_days=&sentiment=&platforms=a,b&date_start=&date_end=&limit=&cursor=
+// GET /api/posts?topic=&hashtag=&q=&phrase=&language=&within_days=&sentiment=&platforms=a,b&date_start=&date_end=&limit=&cursor=
 // Pages by keyset: each response carries `nextCursor` (null on the last page) to pass as `cursor`. Only the first page
 // (no cursor) counts the matches; later pages report `total: null`.
 
@@ -42,6 +42,7 @@ export const GET: RequestHandler = async ({ url }) => {
     hashtag: params.get('hashtag') ?? undefined,
     q: params.get('q') ?? undefined,
     phrase: params.get('phrase') ?? undefined,
+    language: params.get('language') ?? undefined,
     withinDays,
     sentiment: params.get('sentiment') ?? undefined,
     platforms: chosen && chosen.length > 0 ? chosen : scope?.socialPlatforms,

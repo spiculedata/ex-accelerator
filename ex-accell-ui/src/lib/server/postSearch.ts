@@ -10,6 +10,8 @@ export interface PostSearchFilters {
   topic?: string;
   hashtag?: string;
   q?: string;
+  /** A language code such as `es`: posts detected in that language (the codes on the language page). */
+  language?: string;
   /** Only posts from the last N days (1 to 366), by the database clock. */
   withinDays?: number;
   /** Two to six words matched as the phrase counts do: any punctuation between them, any case, links ignored. */
@@ -42,6 +44,7 @@ const HASHTAG = /^[\p{L}\p{M}\p{N}_]{1,100}$/u;
 const CURSOR = /^([1-9]\d{0,14})_([1-9]\d{0,9})$/;
 const MAX_POST_ID = 2_147_483_647;
 const MAX_WITHIN_DAYS = 366;
+const LANGUAGE_CODE = /^[A-Za-z0-9_-]{1,10}$/;
 const TOPIC_SLUG = /^[A-Za-z0-9_-]{1,100}$/;
 
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
@@ -87,6 +90,13 @@ export function buildPostSearch(filters: PostSearchFilters): PostSearch {
     const phrase = `(^| )${quote}*${words.join(between)}${quote}*( |$)`;
     conditions.push(
       `regexp_replace(regexp_replace(p.text, 'https?://\\S+', ' ', 'gi'), ${add(`[^${LETTER_RANGES}'’]+`)}, ' ', 'g') ~* ${add(phrase)}`
+    );
+  }
+
+  if (filters.language !== undefined) {
+    if (!LANGUAGE_CODE.test(filters.language)) return { ok: false, error: 'language must be a language code such as en' };
+    conditions.push(
+      `EXISTS (SELECT 1 FROM language_detection ld JOIN languages l ON l.id = ld.language_id WHERE ld.post_id = p.id AND l.code = ${add(filters.language)})`
     );
   }
 

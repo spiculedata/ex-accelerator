@@ -15,10 +15,21 @@
   import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import { rangeReloader } from '$lib/utils/filterRange';
   import { getSentimentColor } from '$lib/utils/colorUtils';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let currentFilterParams: Record<string, string> = {};
+
+  // The platform whose posts were chosen; they open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
+  function openPlatformPosts(platform: string) {
+    drilldown = {
+      title: `${platform} posts`,
+      filters: { ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }), platforms: [platform.toLowerCase()] }
+    };
+  }
 
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
@@ -534,7 +545,9 @@
                   <span class="text-lg">{getPlatformIcon(platform.platform)}</span>
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900">{platform.platform}</div>
+                  <div class="font-medium text-gray-900">
+                    <button type="button" class="hover:text-primary-700 hover:underline" on:click={() => openPlatformPosts(platform.platform)}>{platform.platform}</button>
+                  </div>
                   <div class="text-sm text-gray-500">{platform.posts.toLocaleString()} posts</div>
                 </div>
               </div>
@@ -621,3 +634,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />
