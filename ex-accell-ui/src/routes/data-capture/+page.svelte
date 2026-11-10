@@ -1394,7 +1394,7 @@
           <div>
             <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Data Capture & Collection</h1>
             <p class="text-slate-300 text-sm font-medium">Web Crawling • File Upload • Smart Data Integration</p>
-            <div class="flex flex-wrap items-center mt-2 gap-2">
+            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 🌐 Multi-Platform
               </span>
@@ -1442,7 +1442,7 @@
   <!-- Tab Navigation -->
   <div class="bg-white border-b border-gray-200">
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Data capture sections">
-      <div class="flex space-x-8 overflow-x-auto whitespace-nowrap">
+      <div class="flex space-x-8 overflow-x-auto whitespace-nowrap px-1 pt-1">
         <button 
           class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'schedule' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
           on:click={() => activeTab = 'schedule'}>

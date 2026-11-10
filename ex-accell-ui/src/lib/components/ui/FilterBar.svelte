@@ -216,7 +216,7 @@
             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
               {enabled
                 ? `${colors.bg} ${colors.text} ${colors.border} shadow-sm`
-                : 'bg-gray-100 text-gray-500 border-gray-200 opacity-60'}"
+                : 'bg-gray-100 text-gray-600 border-gray-200'}"
             on:click={() => toggleDataset(id)}
             title="{enabled ? 'Click to disable' : 'Click to enable'}: {dataset.name || dataset.dataset_name}"
           >

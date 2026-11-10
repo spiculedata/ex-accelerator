@@ -820,7 +820,7 @@
           <div>
             <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Android Research Analytics</h1>
             <p class="text-slate-300 text-sm font-medium">Deep Behavioral Analysis • Digital Phenotyping • Attention Research</p>
-            <div class="flex flex-wrap items-center mt-2 gap-2">
+            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 🧠 Cognitive Analysis
               </span>
@@ -949,7 +949,7 @@
       <!-- Analysis Navigation -->
       <div class="bg-white rounded-xl shadow-sm mb-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex space-x-8 overflow-x-auto whitespace-nowrap px-6" aria-label="Analysis type">
+          <nav class="-mb-px flex space-x-8 overflow-x-auto whitespace-nowrap px-6 pt-1" aria-label="Analysis type">
             <button 
               class="py-4 px-1 border-b-2 font-medium text-sm {activeAnalysis === 'temporal-patterns' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
               on:click={() => switchAnalysis('temporal-patterns')}>

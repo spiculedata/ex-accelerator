@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { watchForExpiredSession } from './sessionExpiry';
+import { get } from 'svelte/store';
+import { sessionExpired, watchForExpiredSession } from './sessionExpiry';
 
 const respond = (status: number) => new Response('{}', { status });
 
@@ -37,5 +38,25 @@ describe('watchForExpiredSession', () => {
     expect(target.fetch).not.toBe(original);
     stop();
     expect(target.fetch).toBe(original);
+  });
+
+  describe('the sessionExpired flag', () => {
+    const run = async (...statuses: Array<[string, number]>) => {
+      sessionExpired.set(false);
+      const queue = [...statuses];
+      const target = { fetch: vi.fn(async () => respond(queue.shift()![1])) } as { fetch: typeof fetch };
+      watchForExpiredSession(target, () => sessionExpired.set(true), 'http://localhost', () => sessionExpired.set(false));
+      for (const [path] of statuses) await target.fetch(path);
+    };
+
+    it('clears once the app API answers normally again, for example after signing in elsewhere', async () => {
+      await run(['/api/projects', 401], ['/api/projects', 200]);
+      expect(get(sessionExpired)).toBe(false);
+    });
+
+    it('is not cleared by the public health check, which answers without a session', async () => {
+      await run(['/api/projects', 401], ['/api/health', 200]);
+      expect(get(sessionExpired)).toBe(true);
+    });
   });
 });

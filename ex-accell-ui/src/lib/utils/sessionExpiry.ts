@@ -18,13 +18,23 @@ function appApiPath(input: RequestInfo | URL, origin: string): string | null {
   }
 }
 
-/** Calls `onExpired` when a request to the app's own API answers 401 (a failed sign-in does not count). Returns a function that undoes the watch. */
-export function watchForExpiredSession(target: { fetch: typeof fetch }, onExpired: () => void, origin = 'http://localhost'): () => void {
+// Answered without a session, so they say nothing about whether the visitor is signed in
+const PUBLIC_PATHS = new Set(['/api/health']);
+
+/**
+ * Calls `onExpired` when a request to the app's own API answers 401 (a failed sign-in does not count) and `onRecovered`
+ * when one answers successfully again. Returns a function that undoes the watch. Only `window.fetch` is watched, not the
+ * `fetch` SvelteKit hands to `load` functions; no route loads data that way today.
+ */
+export function watchForExpiredSession(target: { fetch: typeof fetch }, onExpired: () => void, origin = 'http://localhost', onRecovered: () => void = () => {}): () => void {
   const original = target.fetch;
   target.fetch = async (input, init) => {
     const response = await original(input, init);
     const path = appApiPath(input, origin);
-    if (response.status === 401 && path && !path.startsWith(SIGN_IN_PREFIX)) onExpired();
+    if (path && !path.startsWith(SIGN_IN_PREFIX) && !PUBLIC_PATHS.has(path)) {
+      if (response.status === 401) onExpired();
+      else if (response.ok) onRecovered();
+    }
     return response;
   };
   return () => {

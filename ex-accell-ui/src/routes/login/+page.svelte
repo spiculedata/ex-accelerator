@@ -1,6 +1,7 @@
 <script lang="ts">
   import BrandMark from '$lib/components/ui/BrandMark.svelte';
   import { goto, invalidateAll } from '$app/navigation';
+  import { sessionExpired } from '$lib/utils/sessionExpiry';
 
   export let data: { next: string };
 
@@ -27,6 +28,7 @@
         return;
       }
 
+      sessionExpired.set(false);
       await invalidateAll();
       await goto(data.next, { replaceState: true });
     } catch {

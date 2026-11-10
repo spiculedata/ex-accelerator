@@ -651,7 +651,7 @@
               <button
                 on:click={() => toggleDropdown(item.name)}
                 class="w-full flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.requiresProject && !$currentProject 
-                  ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed' 
+                  ? 'text-gray-500 opacity-60 hover:text-gray-500 cursor-not-allowed' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
               >
                 <span>
@@ -679,7 +679,7 @@
                         (dropdownItem.requiresProject && !$currentProject) ||
                         (dropdownItem?.requiresWorkspace && !currentWorkspace) ||
                         (dropdownItem?.requiresDataType && !hasRequiredData(dropdownItem))
-                        ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed'
+                        ? 'text-gray-500 opacity-60 hover:text-gray-500 cursor-not-allowed'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                       title={getDataAvailabilityTooltip(dropdownItem)}
                     >
@@ -712,7 +712,7 @@
               class="flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current
                 ? 'bg-blue-100 text-blue-700'
                 : (item.requiresProject && !$currentProject) || (item?.requiresDataType && !hasRequiredData(item))
-                  ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed'
+                  ? 'text-gray-500 opacity-60 hover:text-gray-500 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
               title={getDataAvailabilityTooltip(item)}
               aria-current={item.current ? 'page' : undefined}
