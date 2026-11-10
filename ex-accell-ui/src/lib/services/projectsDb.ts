@@ -186,8 +186,9 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Workspace>('SELECT * FROM workspace_overview WHERE id = $1', [id]);
       return rows[0] || null;
     } catch (error) {
+      // A failed query is not "no such workspace": let the caller answer 500, not 404
       console.error('Error fetching workspace:', error);
-      return null;
+      throw error;
     }
   }
 

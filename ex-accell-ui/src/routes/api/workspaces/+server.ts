@@ -16,6 +16,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     if (workspaceId) {
       const workspace = await projectsDb.getWorkspaceById(parseInt(workspaceId));
+      if (!workspace) return json({ success: false, error: 'Workspace not found' }, { status: 404 });
       const dataSources = await projectsDb.getWorkspaceDataSources(parseInt(workspaceId));
       return json({ success: true, workspace: { ...workspace, dataSources } });
     }

@@ -6,6 +6,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { workspaceIdFromRoute } from '$lib/utils/workspaceRoute';
   import { currentProject, setCurrentProject, loadCurrentProject, clearCurrentProject } from '$lib/stores/projectStore';
 
   interface DropdownItem {
@@ -49,12 +51,13 @@
     // Load current workspace from localStorage
     if (typeof window !== 'undefined') {
       const savedWorkspaceId = localStorage.getItem('currentWorkspace');
-      if (savedWorkspaceId) {
+      // A page that names its own workspace decides it; the remembered one is only for pages that do not
+      if (savedWorkspaceId && !routeWorkspaceId) {
         // Load workspace details and dataset summary
         fetch(`/api/workspaces?id=${savedWorkspaceId}`)
           .then(response => response.json())
           .then(result => {
-            if (result.success && result.workspace) {
+            if (result.success && result.workspace?.id !== undefined && !routeWorkspaceId) {
               currentWorkspace = result.workspace;
               loadWorkspaceDatasets(savedWorkspaceId);
             }
@@ -166,6 +169,48 @@
 
     // Navigate to the workspace detail page
     goto(`/workspaces/${workspace.id}`);
+  }
+
+  // The header names the workspace of the page you are on, however you got there (a link, a new workspace, the switcher).
+  // One request per workspace at a time; the answer is used only if the page is still about that workspace.
+  let loadingWorkspaceId: string | null = null;
+  let missingWorkspaceId: string | null = null;
+  $: routeWorkspaceId = workspaceIdFromRoute($page.route.id, $page.params, $page.url.searchParams);
+  $: if (routeWorkspaceId !== missingWorkspaceId) missingWorkspaceId = null; // asked again if the visitor comes back to it
+  $: if (
+    browser &&
+    routeWorkspaceId &&
+    String(currentWorkspace?.id) !== routeWorkspaceId &&
+    routeWorkspaceId !== loadingWorkspaceId &&
+    routeWorkspaceId !== missingWorkspaceId
+  ) followWorkspace(routeWorkspaceId);
+
+  async function followWorkspace(workspaceId: string) {
+    loadingWorkspaceId = workspaceId;
+    try {
+      const result = await (await fetch(`/api/workspaces?id=${workspaceId}`)).json();
+      if (routeWorkspaceId !== workspaceId) return; // the visitor has moved on to another page
+      if (result.success && result.workspace?.id !== undefined) {
+        currentWorkspace = result.workspace;
+        rememberWorkspace(workspaceId);
+        loadWorkspaceDatasets(workspaceId);
+      } else {
+        missingWorkspaceId = workspaceId;
+      }
+    } catch (error) {
+      console.error('Error loading workspace:', error);
+      if (routeWorkspaceId === workspaceId) missingWorkspaceId = workspaceId;
+    } finally {
+      if (loadingWorkspaceId === workspaceId) loadingWorkspaceId = null;
+    }
+  }
+
+  function rememberWorkspace(workspaceId: string) {
+    try {
+      localStorage.setItem('currentWorkspace', workspaceId);
+    } catch {
+      // Storage can be blocked; the header still follows the page
+    }
   }
 
   // Reload workspaces when project changes
