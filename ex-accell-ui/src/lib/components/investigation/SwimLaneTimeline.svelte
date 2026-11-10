@@ -200,7 +200,8 @@
 		// ---- LANE 2: Radio ----
 		const radioY = laneHeight + laneGap;
 		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 0;
-		const hasRadio = radioMaxSegments > 0;
+		// Segments can exist without a sentiment label, so count them as well as the labelled ones
+		const hasRadio = radioMaxSegments > 0 || (d3.max(parsedData, (d) => d.radio_segments) ?? 0) > 0;
 		const yRadio = d3.scaleLinear().domain([0, radioMaxSegments]).nice().range([laneHeight, 0]);
 
 		const radioGroup = g.append('g').attr('transform', `translate(0,${radioY})`);
@@ -268,7 +269,8 @@
 
 		// ---- LANE 3: Social ----
 		const socialY = 2 * (laneHeight + laneGap);
-		const socialMaxPosts = d3.max(parsedData, (d) => d.social_positive + d.social_negative + d.social_neutral) ?? 1;
+		const socialMaxPosts = d3.max(parsedData, (d) => d.social_positive + d.social_negative + d.social_neutral) ?? 0;
+		const hasSocial = socialMaxPosts > 0;
 		const ySocial = d3.scaleLinear().domain([0, socialMaxPosts]).nice().range([laneHeight, 0]);
 
 		const socialGroup = g.append('g').attr('transform', `translate(0,${socialY})`);
@@ -315,12 +317,24 @@
 
 		socialGroup
 			.selectAll('.social-area')
-			.data(socialStacked)
+			.data(hasSocial ? socialStacked : [])
 			.join('path')
 			.attr('class', 'social-area')
 			.attr('fill', (d) => socialColorMap[d.key] ?? '#999')
 			.attr('opacity', 0.75)
 			.attr('d', socialArea);
+
+		if (!hasSocial) {
+			socialGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', '#94a3b8')
+				.text('No social posts for these keywords');
+		}
 
 		// ---- SHARED X AXIS ----
 		g

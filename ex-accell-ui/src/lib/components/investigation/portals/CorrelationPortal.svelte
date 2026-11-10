@@ -10,6 +10,9 @@
 
   export let timelineData: any[] = [];
   export let gdeltEvents: any[] = [];
+  /** Events before any cross-filter, and whether they are still loading, so the empty message is only said when it is true. */
+  export let gdeltTotal: number = gdeltEvents.length;
+  export let gdeltLoading = false;
   export let height: number = 260;
   export let crossFilter: CrossFilter | null = null;
 
@@ -209,9 +212,13 @@
   </div>
 
   <div bind:this={container} class="flex-1 min-h-0 p-2">
-    {#if gdeltEvents.length === 0}
+    {#if gdeltEvents.length === 0 && !gdeltLoading}
       <p class="flex h-full items-center justify-center px-4 text-center text-xs text-slate-400">
-        Correlation compares GDELT events with social posts. This investigation has no GDELT events for its keywords, so there is nothing to compare.
+        {#if gdeltTotal === 0}
+          Correlation compares GDELT events with social posts. This investigation has no GDELT events for its keywords, so there is nothing to compare.
+        {:else}
+          No GDELT events in the current selection. Clear the filter to compare again.
+        {/if}
       </p>
     {/if}
     {#if activeView === 'lag'}

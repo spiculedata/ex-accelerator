@@ -1324,6 +1324,8 @@
                   <CorrelationPortal
                     timelineData={filteredTimelineData}
                     gdeltEvents={crossFilteredGdelt}
+                    gdeltTotal={gdeltEvents.length}
+                    {gdeltLoading}
                     height={portalHeight(item)}
                     crossFilter={activeCrossFilter}
                     on:crossfilter={handleCrossFilter}

@@ -72,6 +72,7 @@
   onMount(async () => {
     mounted = true;
     loadedWorkspace = workspaceId;
+    loadedProject = projectId;
     await loadWorkspaceName(workspaceId);
     await loadInvestigations();
     if (workspaceId) {

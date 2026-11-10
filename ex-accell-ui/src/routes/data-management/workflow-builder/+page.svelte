@@ -51,8 +51,14 @@
   let savedWorkflowId: string | null = $state(null);
   let saveState: { kind: 'idle' | 'saving' | 'saved' | 'error'; message: string } = $state({ kind: 'idle', message: '' });
   // Results and problems appear in the toolbar status, not in a blocking browser alert
+  // A toast above any open dialog, so a failed publish or run is seen where the visitor is looking
+  let notice: { kind: 'saved' | 'error'; message: string } | null = $state(null);
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const NOTICE_MS = 8000;
   const notify = (kind: 'saved' | 'error', message: string) => {
-    saveState = { kind, message };
+    notice = { kind, message };
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = null), NOTICE_MS);
   };
 
   // Publish workflow state
@@ -413,6 +419,16 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
+  <!-- Always present so a message added later is announced; sits above the dialogs -->
+  <div role="status" aria-live="polite" class="pointer-events-none fixed inset-x-0 top-4 z-[70] flex justify-center px-4">
+    {#if notice}
+      <div class="pointer-events-auto flex max-w-xl items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg {notice.kind === 'error' ? 'border-danger-300 bg-danger-50 text-danger-900' : 'border-success-300 bg-success-50 text-success-900'}">
+        <span>{notice.message}</span>
+        <button type="button" class="shrink-0 font-medium underline" onclick={() => (notice = null)}>Dismiss</button>
+      </div>
+    {/if}
+  </div>
+
   <!-- Page Header -->
   <div class="bg-white shadow-sm border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
