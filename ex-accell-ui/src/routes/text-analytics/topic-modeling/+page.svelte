@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
@@ -180,7 +181,7 @@
   }
 
   // Okabe-Ito order, colour-blind safe; categories beyond the eighth reuse colours and are told apart by the legend and tooltip
-  const NETWORK_COLOURS = ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'];
+  const NETWORK_COLOURS = [CHART.catBlue, CHART.catOrange, CHART.catGreen, CHART.catPink, CHART.catSky, CHART.catVermilion, CHART.catYellow, CHART.ink900];
   const LABEL_LIMIT = 14;
   // A category has the same colour in the network, the treemap and the legend
   // The order is the sorted names of every category, not just those left after a filter, so a category keeps its
@@ -248,8 +249,8 @@
         top: 10,
         bottom: 40,
         itemStyle: { borderColor: '#fff', borderWidth: 1.5 },
-        label: { show: false, position: 'right', formatter: '{b}', fontSize: 11, color: '#0f1926' },
-        lineStyle: { color: '#98a2ae', curveness: 0.1, opacity: 0.7 },
+        label: { show: false, position: 'right', formatter: '{b}', fontSize: 11, color: CHART.ink900 },
+        lineStyle: { color: CHART.ink400, curveness: 0.1, opacity: 0.7 },
         emphasis: { focus: 'adjacency', label: { show: true } },
         force: { repulsion: 260, gravity: 0.08, edgeLength: [60, 160], layoutAnimation: false }
       }]
@@ -517,7 +518,6 @@
   <PageHeader
     title="Topic Modeling"
     subtitle="Discover themes and relationships in your social media data with advanced topic analysis"
-    accentColor="indigo"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">

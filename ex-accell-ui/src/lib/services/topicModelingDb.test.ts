@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { topicModelingDb } from './topicModelingDb';
 
+import { CHART } from '$lib/utils/chartColors';
 // Helper to create a mock fetch that routes by endpoint (the 'type' query param)
 function mockFetch(routes: Record<string, any>) {
   vi.stubGlobal(
@@ -108,7 +109,7 @@ describe('getTopics', () => {
 
     const topics = await topicModelingDb.getTopics();
     expect(topics[0].category).toBe('General');
-    expect(topics[0].categoryColor).toBe('#6b7280');
+    expect(topics[0].categoryColor).toBe(CHART.ink500);
   });
 
   it('passes workspaceId to both queries', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
@@ -104,7 +105,7 @@
       series: [{
         type: 'bar',
         data: top20.map((h: any) => parseInt(h.count)).reverse(),
-        itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', fontSize: 10, color: '#666' }
       }]
     });
@@ -132,7 +133,6 @@
   title="Hashtag Analysis"
   subtitle="Discover trending hashtags and co-occurrence patterns"
   backHref="/text-analytics"
-  accentColor="purple"
 >
   <svelte:fragment slot="actions">
     <button

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CATEGORICAL, CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
@@ -109,7 +110,7 @@
       series: [{
         type: 'bar',
         data: top15.map((c: any) => parseInt(c.count || c.frequency)).reverse(),
-        itemStyle: { color: '#3b82f6', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: CHART.catBlue, borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', fontSize: 10, color: '#666' }
       }]
     });
@@ -131,7 +132,6 @@
 <PageHeader
   title="Object Detection"
   subtitle="YOLOv8 powered object identification"
-  accentColor="blue"
 />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -418,7 +418,7 @@
           />
           <!-- Bounding box overlays -->
           {#each objects as obj, i}
-            {@const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']}
+            {@const colors = CATEGORICAL}
             {@const color = colors[i % colors.length]}
             {@const bbox = obj.bbox || []}
             {#if bbox.length === 4}
@@ -447,7 +447,7 @@
         <!-- Object list -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
           {#each objects as obj, i}
-            {@const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']}
+            {@const colors = CATEGORICAL}
             <div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
               <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {colors[i % colors.length]}"></div>
               <span class="text-sm font-medium text-gray-900">{obj.class}</span>

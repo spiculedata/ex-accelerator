@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import LagAnalysisChart from '../LagAnalysisChart.svelte';
@@ -95,23 +96,23 @@
       const agreementGrad = svg.append('defs').append('linearGradient')
         .attr('id', 'agree-grad').attr('gradientUnits', 'userSpaceOnUse')
         .attr('y1', yScale(1) + margin.top).attr('y2', yScale(0) + margin.top);
-      agreementGrad.append('stop').attr('offset', '0%').attr('stop-color', '#22c55e');
-      agreementGrad.append('stop').attr('offset', '50%').attr('stop-color', '#eab308');
-      agreementGrad.append('stop').attr('offset', '100%').attr('stop-color', '#ef4444');
+      agreementGrad.append('stop').attr('offset', '0%').attr('stop-color', CHART.catGreen);
+      agreementGrad.append('stop').attr('offset', '50%').attr('stop-color', CHART.catOrange);
+      agreementGrad.append('stop').attr('offset', '100%').attr('stop-color', CHART.danger500);
 
       const area = d3.area<any>()
         .x(d => xScale(d.parsedDate)).y0(h).y1(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
       g.append('path').datum(correlationData).attr('fill', 'url(#agree-grad)').attr('fill-opacity', highlightDays ? 0.08 : 0.25).attr('d', area);
 
       const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
-      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', '#22c55e').attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
+      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', CHART.catGreen).attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
 
       g.selectAll('.dot').data(correlationData).join('circle')
         .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d.agreement))
         .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
-        .attr('fill', d => d.agreement > 0.7 ? '#22c55e' : d.agreement > 0.4 ? '#eab308' : '#ef4444')
+        .attr('fill', d => d.agreement > 0.7 ? CHART.catGreen : d.agreement > 0.4 ? CHART.catOrange : CHART.danger500)
         .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
-        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
+        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary400 : CHART.ink900)
         .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
         .style('cursor', 'pointer')
         .on('click', (_event: any, d: any) => {
@@ -120,25 +121,25 @@
 
       // Threshold lines
       g.append('line').attr('x1', 0).attr('x2', w).attr('y1', yScale(0.7)).attr('y2', yScale(0.7))
-        .attr('stroke', '#22c55e').attr('stroke-dasharray', '2,4').attr('opacity', 0.3);
+        .attr('stroke', CHART.catGreen).attr('stroke-dasharray', '2,4').attr('opacity', 0.3);
       g.append('text').attr('x', w).attr('y', yScale(0.7) - 3).attr('text-anchor', 'end')
-        .attr('fill', '#22c55e').attr('font-size', '7px').attr('opacity', 0.5).text('consensus');
+        .attr('fill', CHART.catGreen).attr('font-size', '7px').attr('opacity', 0.5).text('consensus');
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w).tickFormat(d3.format('.1f')))
         .call(g2 => g2.select('.domain').remove())
-        .call(g2 => g2.selectAll('.tick line').attr('stroke', '#1e293b'))
-        .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
+        .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink800))
+        .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'));
 
     } else if (activeView === 'overlay') {
       const yScale = d3.scaleLinear().domain([-1, 1]).range([h, 0]);
 
       g.append('line').attr('x1', 0).attr('x2', w).attr('y1', yScale(0)).attr('y2', yScale(0))
-        .attr('stroke', '#334155').attr('stroke-dasharray', '3,3');
+        .attr('stroke', CHART.ink700).attr('stroke-dasharray', '3,3');
 
       const sources = [
-        { key: 'gdelt', color: '#f59e0b', label: 'GDELT' },
-        { key: 'radio', color: '#a78bfa', label: 'Radio' },
-        { key: 'social', color: '#38bdf8', label: 'Social' },
+        { key: 'gdelt', color: CHART.catOrange, label: 'GDELT' },
+        { key: 'radio', color: CHART.catPink, label: 'Radio' },
+        { key: 'social', color: CHART.catSky, label: 'Social' },
       ];
 
       for (const src of sources) {
@@ -155,7 +156,7 @@
           .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 2.5)
           .attr('fill', src.color)
           .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
-          .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : '#0f172a')
+          .attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary400 : CHART.ink900)
           .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
           .style('cursor', 'pointer')
           .on('click', (_event: any, d: any) => {
@@ -168,21 +169,21 @@
       for (const src of [...sources].reverse()) {
         lx -= src.label.length * 6 + 18;
         g.append('circle').attr('cx', lx).attr('cy', 6).attr('r', 3).attr('fill', src.color);
-        g.append('text').attr('x', lx + 6).attr('y', 9).attr('fill', '#94a3b8').attr('font-size', '8px').text(src.label);
+        g.append('text').attr('x', lx + 6).attr('y', 9).attr('fill', CHART.ink400).attr('font-size', '8px').text(src.label);
       }
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w).tickFormat(d3.format('.1f')))
         .call(g2 => g2.select('.domain').remove())
-        .call(g2 => g2.selectAll('.tick line').attr('stroke', '#1e293b'))
-        .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
+        .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink800))
+        .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'));
     }
 
     // Shared X axis
     g.append('g').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(d3.timeDay.every(1)).tickFormat(d => d3.timeFormat('%b %d')(d as Date)))
-      .call(g2 => g2.select('.domain').attr('stroke', '#334155'))
-      .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'))
-      .call(g2 => g2.selectAll('.tick line').attr('stroke', '#334155'));
+      .call(g2 => g2.select('.domain').attr('stroke', CHART.ink700))
+      .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'))
+      .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink700));
 
     // Cross-filter indicator line for single-day highlights
     if (highlightDays && highlightDays.size === 1) {
@@ -190,7 +191,7 @@
       if (cfDate) {
         const cx = xScale(cfDate);
         g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', h)
-          .attr('stroke', '#818cf8').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
+          .attr('stroke', CHART.primary400).attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
       }
     }
   }

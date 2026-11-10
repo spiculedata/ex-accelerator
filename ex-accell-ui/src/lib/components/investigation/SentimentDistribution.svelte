@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
 
@@ -66,11 +67,11 @@
       .append('path')
       .attr('fill', (d) => {
         if (crossFilter?.dimension === 'sentiment') {
-          return d.data.label.toLowerCase() === crossFilter.value ? d.data.color : '#334155';
+          return d.data.label.toLowerCase() === crossFilter.value ? d.data.color : CHART.ink700;
         }
         return d.data.color;
       })
-      .attr('stroke', (d) => crossFilter?.dimension === 'sentiment' && d.data.label.toLowerCase() === crossFilter?.value ? '#818cf8' : 'white')
+      .attr('stroke', (d) => crossFilter?.dimension === 'sentiment' && d.data.label.toLowerCase() === crossFilter?.value ? CHART.primary400 : 'white')
       .attr('stroke-width', (d) => crossFilter?.dimension === 'sentiment' && d.data.label.toLowerCase() === crossFilter?.value ? 3 : 2)
       .attr('opacity', (d) => {
         if (crossFilter?.dimension === 'sentiment') {

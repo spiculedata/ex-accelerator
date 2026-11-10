@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { engagementAnalysisDb } from './engagementAnalysisDb';
 
+import { CHART } from '$lib/utils/chartColors';
 // Helper to create a mock fetch that routes by endpoint (the 'type' query param)
 function mockFetch(routes: Record<string, any>) {
   vi.stubGlobal(
@@ -89,7 +90,7 @@ describe('getPlatformEngagement', () => {
 
     const [platform] = await engagementAnalysisDb.getPlatformEngagement();
 
-    expect(platform.color).toBe('#6b7280');
+    expect(platform.color).toBe(CHART.ink500);
   });
 });
 

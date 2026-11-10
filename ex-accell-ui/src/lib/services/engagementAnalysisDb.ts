@@ -3,6 +3,7 @@
 
 import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
+import { CHART } from '$lib/utils/chartColors';
 import type {
   EngagementMetrics,
   PostEngagement,
@@ -97,14 +98,15 @@ interface HashtagPerformance {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const PLATFORM_COLORS: Record<string, string> = {
-  instagram: '#ff6b9d',
-  tiktok: '#667eea',
-  twitter: '#26d0ce',
-  linkedin: '#6366f1',
-  facebook: '#8b5cf6',
-  youtube: '#f72585',
-  telegram: '#3b82f6',
-  bluesky: '#0ea5e9'
+  // Eight platforms, eight different series colours, so a chart never shows two platforms alike
+  instagram: CHART.catPink,
+  tiktok: CHART.ink900,
+  twitter: CHART.catSky,
+  linkedin: CHART.catBlue,
+  facebook: CHART.catOrange,
+  youtube: CHART.catVermilion,
+  telegram: CHART.catGreen,
+  bluesky: CHART.primary500
 };
 
 /** The API returns numeric columns as strings. */
@@ -162,7 +164,7 @@ class EngagementAnalysisDatabase extends BaseDatabaseService {
       avgComments: Math.round(toNumber(row.avg_comments)),
       avgShares: Math.round(toNumber(row.avg_shares)),
       totalReach: toNumber(row.total_reach),
-      color: PLATFORM_COLORS[String(row.platform)] || '#6b7280'
+      color: PLATFORM_COLORS[String(row.platform)] || CHART.ink500
     }));
   }
 

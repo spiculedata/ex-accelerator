@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   /**
    * Workflow Canvas Component
    *
@@ -175,7 +176,7 @@
   <!-- Grid Background -->
   <div
     class="absolute inset-0 opacity-40"
-    style="background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px); background-size: 20px 20px;"
+    style="background-image: radial-gradient(circle, {CHART.ink300} 1px, transparent 1px); background-size: 20px 20px;"
     aria-hidden="true">
   </div>
 
@@ -190,7 +191,7 @@
         <g>
           <path
             d="M {fromPos.x + 6} {fromPos.y + 6} C {midX} {fromPos.y + 6} {midX} {toPos.y + 6} {toPos.x + 6} {toPos.y + 6}"
-            stroke="#06d6a0"
+            stroke={CHART.catGreen}
             stroke-width="2"
             fill="none"
             class="connection-line"
@@ -201,7 +202,7 @@
             cy={(fromPos.y + toPos.y) / 2 + 6}
             r="8"
             fill="white"
-            stroke="#ef4444"
+            stroke={CHART.danger500}
             stroke-width="2"
             class="cursor-pointer pointer-events-auto"
             onclick={() => deleteConnection(connection.id)}
@@ -223,7 +224,7 @@
       {@const midX = startPos.x + (mousePosition.x - startPos.x) / 2}
       <path
         d="M {startPos.x + 6} {startPos.y + 6} C {midX} {startPos.y + 6} {midX} {mousePosition.y} {mousePosition.x} {mousePosition.y}"
-        stroke="#26d0ce"
+        stroke={CHART.primary500}
         stroke-width="2"
         stroke-dasharray="5,5"
         fill="none"

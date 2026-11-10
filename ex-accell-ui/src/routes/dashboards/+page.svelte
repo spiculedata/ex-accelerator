@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { currentProject } from '$lib/stores/projectStore';
@@ -307,8 +308,8 @@
           itemStyle: {
             // Brand categorical series for active sources, grey for inactive ones
             color: s.status === 'active' ?
-              ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442'][index % 7] :
-              '#98a2ae'
+              [CHART.catBlue, CHART.catOrange, CHART.catGreen, CHART.catPink, CHART.catSky, CHART.catVermilion, CHART.catYellow][index % 7] :
+              CHART.ink400
           }
         })),
         emphasis: {
@@ -466,7 +467,7 @@
         data: textAnalytics.topTopics.map((t: any) => ({
           value: t.posts,
           itemStyle: {
-            color: t.trend === 'up' ? '#0072b2' : t.trend === 'down' ? '#d55e00' : '#98a2ae'
+            color: t.trend === 'up' ? CHART.catBlue : t.trend === 'down' ? CHART.catVermilion : CHART.ink400
           }
         })),
         emphasis: {

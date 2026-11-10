@@ -206,7 +206,6 @@
 <PageHeader
   title="GDELT Analytics"
   subtitle="Explore global news events from the GDELT Project"
-  accentColor="amber"
   backHref="/gdelt"
 >
   <div slot="icon">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -185,9 +186,9 @@
         { type: 'value', name: 'Events', position: 'right' }
       ],
       series: [
-        { name: 'Tone', type: 'line', data: toneValues, smooth: true, lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' } },
-        { name: 'Goldstein', type: 'line', data: goldsteinValues, smooth: true, lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' } },
-        { name: 'Events', type: 'bar', data: eventCounts, yAxisIndex: 1, itemStyle: { color: '#e5e7eb' }, barWidth: '60%' }
+        { name: 'Tone', type: 'line', data: toneValues, smooth: true, lineStyle: { color: CHART.catBlue }, itemStyle: { color: CHART.catBlue } },
+        { name: 'Goldstein', type: 'line', data: goldsteinValues, smooth: true, lineStyle: { color: CHART.danger500 }, itemStyle: { color: CHART.danger500 } },
+        { name: 'Events', type: 'bar', data: eventCounts, yAxisIndex: 1, itemStyle: { color: CHART.ink200 }, barWidth: '60%' }
       ]
     });
   }
@@ -228,7 +229,6 @@
 <PageHeader
   title="GDELT Intelligence"
   subtitle="Explore global events, conflicts, and media narratives"
-  accentColor="red"
   showProject={false}
 >
   <svelte:fragment slot="actions">

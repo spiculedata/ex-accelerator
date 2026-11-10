@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
 
@@ -148,29 +149,29 @@
 		const colorScale = d3
 			.scaleLinear<string>()
 			.domain([0, pairs.length - 1])
-			.range(['#8b5cf6', '#06d6a0']);
+			.range([CHART.catPink, CHART.catGreen]);
 
 		g.append('g')
 			.attr('transform', `translate(0,${innerHeight})`)
 			.call(d3.axisBottom(xScale).ticks(6).tickFormat(d3.format('.2f')))
 			.selectAll('text')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.attr('font-size', '10px');
 
 		g.append('g')
 			.call(d3.axisLeft(yScale).ticks(6).tickFormat(d3.format('.2f')))
 			.selectAll('text')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.attr('font-size', '10px');
 
-		g.selectAll('.domain').attr('stroke', '#475569');
-		g.selectAll('.tick line').attr('stroke', '#334155');
+		g.selectAll('.domain').attr('stroke', CHART.ink600);
+		g.selectAll('.tick line').attr('stroke', CHART.ink700);
 
 		g.append('text')
 			.attr('x', innerWidth / 2)
 			.attr('y', innerHeight + 38)
 			.attr('text-anchor', 'middle')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.attr('font-size', '11px')
 			.text(sourceLabels[sourceA] ?? sourceA);
 
@@ -179,7 +180,7 @@
 			.attr('x', -innerHeight / 2)
 			.attr('y', -42)
 			.attr('text-anchor', 'middle')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.attr('font-size', '11px')
 			.text(sourceLabels[sourceB] ?? sourceB);
 
@@ -202,7 +203,7 @@
 					.attr('y1', yScale(slope * x1 + intercept))
 					.attr('x2', xScale(x2))
 					.attr('y2', yScale(slope * x2 + intercept))
-					.attr('stroke', '#fbbf24')
+					.attr('stroke', CHART.catOrange)
 					.attr('stroke-width', 2)
 					.attr('stroke-dasharray', '6,3')
 					.attr('opacity', 0.7);
@@ -216,8 +217,8 @@
 			.attr('cx', (d: any) => xScale(d.a))
 			.attr('cy', (d: any) => yScale(d.b))
 			.attr('r', (d: any) => highlightDays?.has(d.date) ? 8 : 6)
-			.attr('fill', (d: any, i: number) => highlightDays?.has(d.date) ? '#818cf8' : colorScale(i))
-			.attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+			.attr('fill', (d: any, i: number) => highlightDays?.has(d.date) ? CHART.primary400 : colorScale(i))
+			.attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary100 : CHART.ink900)
 			.attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2.5 : 1.5)
 			.attr('opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.25) : 0.85)
 			.style('cursor', 'pointer')
@@ -237,12 +238,12 @@
 
 		const hasValidCorr = !isNaN(correlation);
 		const corrColor = !hasValidCorr
-			? '#64748b'
+			? CHART.ink500
 			: Math.abs(correlation) > 0.5
-				? '#22c55e'
+				? CHART.catGreen
 				: Math.abs(correlation) > 0.3
-					? '#eab308'
-					: '#94a3b8';
+					? CHART.catOrange
+					: CHART.ink400;
 
 		g.append('text')
 			.attr('x', innerWidth - 8)
@@ -264,7 +265,7 @@
 			.attr('x', innerWidth - 8)
 			.attr('y', 22)
 			.attr('text-anchor', 'end')
-			.attr('fill', '#cbd5e1')
+			.attr('fill', CHART.ink300)
 			.attr('font-size', '11px')
 			.text(
 				`${sourceLabels[sourceA] ?? sourceA} → ${sourceLabels[sourceB] ?? sourceB} (lag: ${lagLabel})`

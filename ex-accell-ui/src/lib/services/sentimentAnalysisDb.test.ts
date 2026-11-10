@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sentimentAnalysisDb } from './sentimentAnalysisDb';
 
+import { CHART } from '$lib/utils/chartColors';
 // Helper to create a mock fetch that routes by endpoint (the 'type' query param)
 function mockFetch(routes: Record<string, any>) {
   vi.stubGlobal(
@@ -157,13 +158,13 @@ describe('getEmotionStats', () => {
     expect(emotions).toHaveLength(3);
     expect(emotions[0].emotion).toBe('Joy');
     expect(emotions[0].count).toBe(50);
-    expect(emotions[0].color).toBe('#fbbf24');
+    expect(emotions[0].color).toBe(CHART.catOrange);
 
     expect(emotions[1].emotion).toBe('Anger');
-    expect(emotions[1].color).toBe('#ef4444');
+    expect(emotions[1].color).toBe(CHART.danger500);
 
     expect(emotions[2].emotion).toBe('Trust');
-    expect(emotions[2].color).toBe('#3b82f6');
+    expect(emotions[2].color).toBe(CHART.catBlue);
   });
 
   it('uses emotion1 field if emotion field is absent', async () => {
@@ -173,7 +174,7 @@ describe('getEmotionStats', () => {
     const emotions = await sentimentAnalysisDb.getEmotionStats();
     expect(emotions[0].emotion).toBe('Fear');
     expect(emotions[0].count).toBe(15);
-    expect(emotions[0].color).toBe('#8b5cf6');
+    expect(emotions[0].color).toBe(CHART.catPink);
   });
 });
 
