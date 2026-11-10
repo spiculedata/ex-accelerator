@@ -12,9 +12,9 @@
   // Agreement is blue when the sources agree and orange when they do not (the brand sentiment scale, not red/green)
   const agreeHigh = getSentimentColor('positive');
   const agreementLegend = [
-    { label: 'Agree', color: agreeHigh },
-    { label: 'Mixed', color: getSentimentColor('neutral') },
-    { label: 'Disagree', color: getSentimentColor('negative') }
+    { label: 'Agree', color: agreeHigh, title: 'Agreement above 0.7' },
+    { label: 'Mixed', color: getSentimentColor('neutral'), title: 'Agreement between 0.4 and 0.7' },
+    { label: 'Disagree', color: getSentimentColor('negative'), title: 'Agreement of 0.4 or below' }
   ];
 
   const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();

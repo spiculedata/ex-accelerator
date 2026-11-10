@@ -149,7 +149,8 @@
 		const colorScale = d3
 			.scaleLinear<string>()
 			.domain([0, pairs.length - 1])
-			.range([CHART.primary100, CHART.primary500]);
+			// Early to late in grey, so a cross-filtered point (primary400) stands apart from the rest
+			.range([CHART.ink500, CHART.ink200]);
 
 		g.append('g')
 			.attr('transform', `translate(0,${innerHeight})`)

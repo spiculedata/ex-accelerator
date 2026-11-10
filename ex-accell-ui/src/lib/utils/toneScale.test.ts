@@ -56,25 +56,34 @@ describe('getAgreementColor', () => {
     expect(getAgreementColor(0.5)).toBe(getSentimentColor('neutral'));
     expect(getAgreementColor(0.2)).toBe(getSentimentColor('negative'));
   });
+
+  it('changes band just above 0.7 and 0.4, matching the consensus line in the portal', () => {
+    expect(getAgreementColor(0.71)).toBe(getSentimentColor('positive'));
+    expect(getAgreementColor(0.7)).toBe(getSentimentColor('neutral'));
+    expect(getAgreementColor(0.41)).toBe(getSentimentColor('neutral'));
+    expect(getAgreementColor(0.4)).toBe(getSentimentColor('negative'));
+  });
 });
 
-// The portals and pages that once held their own traffic-light scale now take it from colorUtils.
-const TONE_SCALE_FILES = [
-  'src/lib/components/investigation/portals/ActorsPortal.svelte',
-  'src/lib/components/investigation/portals/GeographyPortal.svelte',
-  'src/lib/components/investigation/portals/CorrelationPortal.svelte',
-  'src/routes/gdelt/+page.svelte',
-  'src/lib/services/overviewDb.ts',
-  'src/lib/services/radioAnalyticsDb.ts'
+// The portals and services that once held their own traffic-light scale now call the shared one, and the green of
+// that scale is gone from the file. (overviewDb still colours the YouTube platform with danger500; that is a
+// platform colour, not a tone, and is handled with the other hue-only categories.)
+const TONE_SCALE_FILES: [string, string][] = [
+  ['src/lib/components/investigation/portals/ActorsPortal.svelte', 'getToneColor('],
+  ['src/lib/components/investigation/portals/GeographyPortal.svelte', 'getToneColor('],
+  ['src/lib/components/investigation/portals/CorrelationPortal.svelte', 'getAgreementColor('],
+  ['src/lib/services/overviewDb.ts', 'getSentimentColor('],
+  ['src/lib/services/radioAnalyticsDb.ts', 'getSentimentColor(']
 ];
 
-const GOOD_BAD_LINE = /tone|goldstein|sentiment|positive|negative|agreement/i;
-const GREEN_OR_RED = /CHART\.(catGreen|danger\d{3})/;
-
 describe('tone and agreement scales', () => {
-  it.each(TONE_SCALE_FILES)('%s does not colour good and bad green and red', (path) => {
-    // Other lines may still use these hues for a category or a state; a line about tone or sentiment may not
-    const offending = readFileSync(path, 'utf8').split('\n').filter((line) => GOOD_BAD_LINE.test(line) && GREEN_OR_RED.test(line));
-    expect(offending).toEqual([]);
+  it.each(TONE_SCALE_FILES)('%s takes its scale from colorUtils', (path, call) => {
+    const source = readFileSync(path, 'utf8');
+    expect(source).toContain(call);
+    expect(source).not.toMatch(/CHART\.catGreen/);
+  });
+
+  it.each(['ActorsPortal', 'GeographyPortal', 'CorrelationPortal'])('%s no longer pairs green with red', (name) => {
+    expect(readFileSync(`src/lib/components/investigation/portals/${name}.svelte`, 'utf8')).not.toMatch(/CHART\.danger\d{3}/);
   });
 });
