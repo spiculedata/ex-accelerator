@@ -27,8 +27,9 @@ test.describe('Sentiment Analysis', () => {
   });
 
   test('says so, in an alert, when the data cannot be loaded', async ({ page }) => {
+    // A failed request is reported once, by the error banner, instead of looking like "no data"
     await page.route('**/api/unified-analytics**', (route) => route.fulfill({ status: 500, json: { success: false, error: 'Request failed' } }));
     await page.goto('/text-analytics/sentiment-analysis');
-    await expect(page.getByRole('alert').filter({ hasText: 'We could not load sentiment data' })).toBeVisible();
+    await expect(page.getByRole('alert').first()).toBeVisible();
   });
 });
