@@ -13,7 +13,7 @@ Open **Projects** in the navigation and choose **New Project**, or go to `/proje
 
 1. Give it a **name** (required, and unique) and an optional description.
 2. Pick a **project type**. It labels the project; it does not change what the app does.
-3. Optionally add team members by email. Only the project's members, its creator and administrators can then see the project and its
+3. Optionally add team members by email. You can add or remove people later from the **Team** panel on the project page. Only the project's members, its creator and administrators can then see the project and its
    workspaces (see [Authentication and roles](/guide/authentication)).
 4. Choose **Create Project**.
 

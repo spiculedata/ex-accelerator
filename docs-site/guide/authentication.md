@@ -7,7 +7,7 @@ session cookie that is signed with `SESSION_SECRET`.
 ## Who can see which project
 
 Projects record their members (the person who creates one becomes its owner, and team members are added from the new
-project form). A signed-in user can open only the projects they are a member of, and the workspaces, investigations
+project form or later from the **Team** panel on the project page). A signed-in user can open only the projects they are a member of, and the workspaces, investigations
 and analytics that belong to them; administrators see everything.
 
 - Lists (projects, Home, investigations) show only what you may see.
@@ -20,7 +20,11 @@ and analytics that belong to them; administrators see everything.
   `/api/unified-analytics`, `/api/datasets`), GDELT, image processing, crawling jobs and workflows are
   installation-wide, not project-scoped. Anyone signed in can read them; only the project, workspace and
   investigation views above are limited by membership.
-- Membership is remembered for 30 seconds, so adding or removing a member takes effect within that time.
+- **Team** panel: every member sees who is in the project. The creator and admins can add people by email and remove
+  them; ordinary members cannot, and the creator can never be removed. Only the creator or an admin can delete a
+  project. A project from before accounts can be managed by admins only.
+- Membership is remembered for 30 seconds, but a change made on the instance you are using applies at once. On another
+  instance an added or removed member takes effect within that time.
 - If membership cannot be checked (the database is unreachable) the request gets `503`, not a refusal.
 
 ## Ending sessions early
@@ -97,7 +101,7 @@ this one stays signed in.
 
 ## Current limitations
 
-- Roles are global. Project membership limits who can see a project, but there is no per-project role (everyone in a project has the same rights as their global role), and members are chosen when the project is created.
+- Roles are global. Project membership limits who can see a project, but there is no per-project role: everyone in a project has the rights of their global role (only the creator and admins manage the team or delete the project).
 - The sign-in throttle lives in memory, per server process. Behind several replicas each keeps its own count.
 - There is no password reset by email and no single sign-on; an admin resets passwords.
 - Rate limiting of the rest of `/api/*` and a Content-Security-Policy are not in place yet.

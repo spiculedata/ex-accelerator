@@ -1,7 +1,9 @@
 // Projects API Endpoint
 // CRUD operations for projects and workspaces
 
+import { canManageProject, parseResourceId } from '$lib/server/auth/access';
 import { refuseIfNoAccess, visibleProjectIds } from '$lib/server/auth/accessGuard';
+import { loadProjectAccessInfo } from '$lib/server/auth/accessRepo';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { projectsDb } from '$lib/services/projectsDb';
@@ -25,9 +27,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     const projects = visible === null ? all : all.filter((project) => visible.has(Number(project.id)));
     return json({ success: true, projects });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('GET /api/projects error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    console.error('GET /api/projects error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, data: null, error: 'Could not load the projects. Try again.' }, { status: 500 });
   }
 };
 
@@ -53,9 +54,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('POST /api/projects error:', msg);
 
-    // Return 400 for validation errors (like duplicate names), 500 for server errors
-    const statusCode = msg.includes('already exists') ? 400 : 500;
-    return json({ success: false, error: msg }, { status: statusCode });
+    // A duplicate name is the person's to fix, so it is said plainly; anything else stays in the log
+    if (msg.includes('already exists')) return json({ success: false, error: msg }, { status: 400 });
+    return json({ success: false, data: null, error: 'Could not create the project. Try again.' }, { status: 500 });
   }
 };
 
@@ -82,25 +83,30 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
     return json({ success: true, project });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('PUT /api/projects error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    console.error('PUT /api/projects error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, data: null, error: 'Could not update the project. Try again.' }, { status: 500 });
   }
 };
 
 /**
  * DELETE /api/projects
- * Delete a project
+ * Delete a project. Members can see a project but only its creator or an admin can delete it.
  */
-export const DELETE: RequestHandler = async ({ url }) => {
-  try {
-    const projectId = url.searchParams.get('id');
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+  const projectId = parseResourceId(url.searchParams.get('id'));
+  if (typeof projectId !== 'number') {
+    return json({ success: false, error: projectId === null ? 'Project ID required' : 'Project ID must be a whole number' }, { status: 400 });
+  }
+  if (!locals.user) return json({ success: false, error: 'Authentication required' }, { status: 401 });
 
-    if (!projectId) {
-      return json({ success: false, error: 'Project ID required' }, { status: 400 });
+  try {
+    const info = await loadProjectAccessInfo(projectId);
+    if (!info) return json({ success: false, error: 'Project not found' }, { status: 404 });
+    if (!canManageProject(locals.user, info)) {
+      return json({ success: false, error: 'Only the person who created this project, or an admin, can delete it.' }, { status: 403 });
     }
 
-    const success = await projectsDb.deleteProject(parseInt(projectId));
+    const success = await projectsDb.deleteProject(projectId);
 
     if (!success) {
       return json({ success: false, error: 'Failed to delete project' }, { status: 500 });
@@ -108,8 +114,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 
     return json({ success: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('DELETE /api/projects error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    console.error('DELETE /api/projects error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, data: null, error: 'Could not delete the project. Try again.' }, { status: 500 });
   }
 };
