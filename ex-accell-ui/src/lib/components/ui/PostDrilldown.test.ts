@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 
 const fetchPosts = vi.hoisted(() => vi.fn());
 vi.mock('$lib/services/postsApi', () => ({ fetchPosts }));
@@ -53,8 +54,10 @@ describe('PostDrilldown', () => {
     await rerender(props({ title: 'Negative posts', filters: { sentiment: 'Negative' } }));
 
     expect(await screen.findByText('post 9')).toBeTruthy();
+    expect(fetchPosts).toHaveBeenCalledTimes(2); // the open and the newer choice really were two requests
     slow.resolve(page([1, 2], 2)); // the older request finishes last
-    await new Promise((r) => setTimeout(r, 20));
+    await slow.promise;
+    await tick();
 
     expect(screen.queryByText('post 1')).toBeNull();
     expect(screen.getByText('post 9')).toBeTruthy();
@@ -85,15 +88,80 @@ describe('PostDrilldown', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('closes on Escape and from the close button', async () => {
+  it('closes on Escape pressed on the focused control, before any other handler on the page sees it', async () => {
+    fetchPosts.mockResolvedValue(page([1], 1));
+    const onclose = vi.fn();
+    const pageHandler = vi.fn();
+    document.addEventListener('keydown', pageHandler);
+    render(PostDrilldown, props({ onclose }));
+    await screen.findByText('post 1');
+    await tick();
+
+    // A real Escape press is dispatched on the focused element (the close button), not on the window
+    await fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+
+    expect(onclose).toHaveBeenCalledTimes(1);
+    expect(pageHandler).not.toHaveBeenCalled();
+    document.removeEventListener('keydown', pageHandler);
+  });
+
+  it('closes from the close button', async () => {
     fetchPosts.mockResolvedValue(page([1], 1));
     const onclose = vi.fn();
     render(PostDrilldown, props({ onclose }));
     await screen.findByText('post 1');
-
-    await fireEvent.keyDown(window, { key: 'Escape' });
-    expect(onclose).toHaveBeenCalledTimes(1);
     await fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onclose).toHaveBeenCalledTimes(2);
+    expect(onclose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not leave "Show more" stuck on Loading when the choice changes while a page is loading', async () => {
+    const first = Array.from({ length: 25 }, (_, i) => i + 1);
+    const slowMore = deferred<ReturnType<typeof page>>();
+    fetchPosts.mockResolvedValueOnce(page(first, 40)).mockReturnValueOnce(slowMore.promise).mockResolvedValueOnce(page(Array.from({ length: 25 }, (_, i) => i + 101), 40));
+    const { rerender } = render(PostDrilldown, props());
+    await fireEvent.click(await screen.findByRole('button', { name: 'Show 15 more' }));
+    expect(screen.getByRole('button', { name: 'Loading…' })).toBeTruthy();
+
+    await rerender(props({ title: 'Negative posts', filters: { sentiment: 'Negative' } }));
+    expect(await screen.findByText('post 101')).toBeTruthy();
+    slowMore.resolve(page([26], 40));
+    await slowMore.promise;
+    await tick();
+
+    expect((await screen.findByRole('button', { name: 'Show 15 more' })).hasAttribute('disabled')).toBe(false);
+  });
+});
+
+describe('PostDrilldown focus', () => {
+  it('moves focus into the panel when it opens and back to what opened it when it closes', async () => {
+    fetchPosts.mockResolvedValue(page([1], 1));
+    const opener = document.createElement('button');
+    opener.textContent = 'open';
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { rerender } = render(PostDrilldown, props({ open: false }));
+    await rerender(props({ open: true }));
+    await screen.findByText('post 1');
+    await tick();
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toBe('Close');
+
+    await rerender(props({ open: false }));
+    await tick();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it('keeps Tab inside the open panel', async () => {
+    fetchPosts.mockResolvedValue(page(Array.from({ length: 25 }, (_, i) => i + 1), 30));
+    render(PostDrilldown, props());
+    const more = await screen.findByRole('button', { name: 'Show 5 more' });
+    more.focus(); // the last focusable control in the panel
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    more.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true); // Tab from the last control wraps instead of leaving the panel
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toBe('Close');
   });
 });

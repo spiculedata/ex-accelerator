@@ -39,6 +39,8 @@
   async function load() {
     const current = ++requestId;
     loading = true;
+    // A "show more" still in flight belongs to the old choice and will be ignored, so it must not keep the button disabled
+    loadingMore = false;
     errorMessage = '';
     unavailable = false;
     posts = [];

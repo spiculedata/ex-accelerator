@@ -583,8 +583,8 @@
         <div id="sentiment-chart" class="w-full h-80"></div>
         <!-- The chart's slices are mouse-only; these buttons open the same posts from the keyboard -->
         {#if detailedSentiments.length > 0}
-          <ul class="mt-3 flex flex-wrap gap-2" aria-label="Open the posts behind each sentiment">
-            {#each detailedSentiments as item}
+          <ul role="list" class="mt-3 flex flex-wrap gap-2" aria-label="Open the posts behind each sentiment">
+            {#each detailedSentiments.filter((entry) => entry.label) as item}
               <li>
                 <button type="button" on:click={() => openSentimentDrilldown(item.label)} class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600">
                   View {item.label} posts <span class="text-gray-500">({item.count.toLocaleString()})</span>
