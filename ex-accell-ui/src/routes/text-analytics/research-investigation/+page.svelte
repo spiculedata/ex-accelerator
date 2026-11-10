@@ -482,8 +482,8 @@
               </svg>
             </div>
             <div>
-              <h4 class="font-medium text-gray-900">Notebooks you can keep and share</h4>
-              <p class="text-sm text-gray-600">Notebooks are saved as files you can download and send to colleagues</p>
+              <h4 class="font-medium text-gray-900">Work in JupyterLab</h4>
+              <p class="text-sm text-gray-600">Open the templates in JupyterLab and work with your data in code</p>
             </div>
           </div>
         </div>

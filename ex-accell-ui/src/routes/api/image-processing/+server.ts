@@ -262,9 +262,9 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({
         success: true,
         tiers: {
-          fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristic', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
-          standard: { label: 'Standard Analysis', description: 'YOLOv8s + CLIP ViT-B/32 + CLIP NSFW', speed: '2-5s per image', models: ['YOLOv8s', 'CLIP ViT-B/32', 'CLIP NSFW'] },
-          accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + Gemma Vision', speed: '30-60s+ per image', models: ['YOLOv8m', 'RetinaFace', 'Gemma 3 Vision'] }
+          fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristics (no OCR)', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
+          standard: { label: 'Standard Analysis', description: 'YOLOv8s + Haar cascade + CLIP ViT-B/32 + PaddleOCR', speed: '2-5s per image', models: ['YOLOv8s', 'Haar Cascade', 'CLIP ViT-B/32', 'PaddleOCR'] },
+          accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + CLIP ViT-B/32 + PaddleOCR', speed: 'Slowest', models: ['YOLOv8m', 'RetinaFace', 'CLIP ViT-B/32', 'PaddleOCR'] }
         }
       });
     }

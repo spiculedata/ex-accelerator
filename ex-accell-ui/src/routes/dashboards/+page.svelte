@@ -64,7 +64,6 @@
   let dashboardStats = {
     totalPosts: 0,
     totalSources: 0,
-    activeCrawlers: 0,
     lastUpdated: '',
     processingRate: 0,
     dataQuality: 0
@@ -127,7 +126,6 @@
       dashboardStats = {
         totalPosts: stats.total_posts,
         totalSources: stats.total_sources,
-        activeCrawlers: stats.active_crawlers,
         lastUpdated: stats.last_updated,
         processingRate: stats.processing_rate,
         dataQuality: stats.data_quality
@@ -617,7 +615,7 @@
         <div class="text-sm text-gray-600" title="Percentage of posts with sentiment classification">Enrichment Rate</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-xs text-gray-500 mb-1">Last Updated</div>
+        <div class="text-xs text-gray-500 mb-1">Refreshed</div>
         <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated)}</div>
       </div>
     </div>
@@ -741,7 +739,7 @@
       <!-- Top Topics with Trends -->
       <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-lg font-semibold text-gray-900">Trending Topics <span class="text-sm font-normal text-gray-500">(change since the previous period)</span></h2>
+          <h2 class="text-lg font-semibold text-gray-900">Trending Topics</h2>
           <div class="flex items-center space-x-2">
             <select bind:value={topicsLimit} class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600">
               <option value={5}>Top 5</option>

@@ -109,7 +109,6 @@ export interface DashboardStats {
   processing_rate: number;
   data_quality: number;
   total_sources: number;
-  active_crawlers: number;
   last_updated: string;
 }
 

@@ -444,17 +444,18 @@
     <div class="mb-6">
       <MethodNote>
         <p>
-          Each post is labelled by a simple word-list method, not a language model. Its words are matched against lists of positive and negative words;
-          more positive than negative words gives <em>Positive</em>, and more than twice as many gives <em>Very Positive</em>, and likewise for negative.
-          A post with no matching words, or an equal number of each, is <em>Neutral</em>. Radio transcripts are scored with TextBlob polarity instead.
+          Posts processed by the built-in enrichment are labelled by a simple word-list method, not a language model. The distinct words of a post
+          (split on spaces, so "great!" does not match "great") are checked against lists of positive and negative words. More positive than negative words
+          gives <em>Positive</em>, and more than twice as many gives <em>Very Positive</em>, and likewise for negative. A post with no matching words, or an
+          equal number of each, is <em>Neutral</em>.
         </p>
         <p>
-          <strong>Confidence is not a probability.</strong> It is a score from how many sentiment words were found (0.5 when there are none), so a post with several
-          matching words scores higher than one with a single word. Use it to rank posts, not to say how likely a label is to be right.
+          <strong>Confidence is not a probability.</strong> It is a score from how many distinct sentiment words were found (0.5 when there are none or they
+          tie), so a post with several matching words scores higher than one with a single word. Use it to rank posts, not to say how likely a label is to be right.
         </p>
         <p>
           The method does not understand sarcasm, negation ("not good") or context, and its word lists are English, so posts in other languages are mostly Neutral.
-          Treat the figures as a rough guide and read the posts behind them.
+          <strong>The demo dataset is different:</strong> its labels and confidence are generated at random to illustrate the pages, not produced by this method.
         </p>
       </MethodNote>
     </div>

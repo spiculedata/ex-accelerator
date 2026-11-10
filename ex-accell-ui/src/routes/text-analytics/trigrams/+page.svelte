@@ -199,8 +199,9 @@
     <MethodNote title="What trigrams and trends mean">
       <p>A trigram is a phrase of three words that appears in your posts. Only phrases that start and end with a meaningful word are counted, so "state of emergency" is kept and "this is the" is not.</p>
       <p>
-        <strong>Trend</strong> compares the first half of the period with the second half. <em>Up</em> means the phrase appears at least one and a half times as often in the
-        later half, <em>Down</em> means at least one and a half times as often in the earlier half, and <em>Stable</em> means neither. Phrases seen only a few times can
+        <strong>Trend</strong> compares the first half of the period with the second half. <em>Up</em> means the phrase appears more than one and a half times as often in the
+        later half, <em>Down</em> means more than one and a half times as often in the earlier half, and <em>Stable</em> means neither. If there are more posts than can be
+        scanned (20,000), the period starts at the oldest post that was scanned. Phrases seen only a few times can
         change trend with one more post, so read the counts too.
       </p>
       <p>Min Frequency hides phrases seen fewer times than the number you set. It starts at 2; raise it to focus on the most repeated phrases.</p>

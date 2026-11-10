@@ -31,7 +31,7 @@
       id: 'accurate',
       label: 'Deep Analysis',
       icon: '\uD83D\uDD2C',
-      desc: 'Gemma Vision',
+      desc: 'YOLOv8m + RetinaFace',
       speed: '30s+',
       bgActive: 'bg-purple-50',
       borderActive: 'border-purple-300',

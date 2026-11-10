@@ -139,7 +139,7 @@
     <h1 class="text-lg font-semibold text-slate-900">Social Explorer</h1>
     {#if !loading}
       <span class="text-sm text-slate-500">
-        {summary.total_projects} project{summary.total_projects !== 1 ? 's' : ''} · {formatCount(summary.total_events)} events
+        {summary.total_projects} project{summary.total_projects !== 1 ? 's' : ''} · {formatCount(summary.total_events)} recent events
       </span>
     {/if}
   </div>
@@ -147,7 +147,7 @@
   <div class="flex items-center gap-3">
     {#if !loading}
       <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-        Total events: {formatCount(summary.total_events)}
+        Recent events: {formatCount(summary.total_events)}
       </span>
       <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium {summary.alerts > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
         Alerts: {summary.alerts}
@@ -221,7 +221,6 @@
             </div>
             <p class="text-slate-600 font-medium mb-1">No projects yet</p>
             <p class="text-sm text-slate-500">Create a project to get started</p>
-            <a href="/projects/new" class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">New project</a>
           </div>
         {:else}
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
