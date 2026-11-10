@@ -270,7 +270,7 @@ npm run build  # Database initializes on build
 
 ## License
 
-This project is part of the Ex-Accelerator platform.
+This project is part of the Social Explorer platform.
 
 ---
 

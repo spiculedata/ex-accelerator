@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { engagementAnalysisDb } from './engagementAnalysisDb';
 
+import { CHART } from '$lib/utils/chartColors';
 // Helper to create a mock fetch that routes by endpoint (the 'type' query param)
 function mockFetch(routes: Record<string, any>) {
   vi.stubGlobal(
@@ -24,245 +25,174 @@ beforeEach(() => {
 // ─── getEngagementStats ────────────────────────────────────────────────────
 
 describe('getEngagementStats', () => {
-  it('returns default stats when no data', async () => {
-    mockFetch({ 'cross-platform-sentiment': [] });
-    const stats = await engagementAnalysisDb.getEngagementStats();
-
-    expect(stats.totalEngagements).toBe(0);
-    expect(stats.averageRate).toBe(0);
-    expect(stats.totalReach).toBe(0);
-    expect(stats.totalPosts).toBe(0);
-    expect(stats.avgLikes).toBe(0);
-    expect(stats.avgComments).toBe(0);
-    expect(stats.avgShares).toBe(0);
-  });
-
-  it('returns default stats when API returns null', async () => {
-    mockFetch({ 'cross-platform-sentiment': null });
-    const stats = await engagementAnalysisDb.getEngagementStats();
-    expect(stats.totalEngagements).toBe(0);
-  });
-
-  it('calculates stats from cross-platform data', async () => {
-    const data = [
-      { post_count: 100, avg_confidence: 0.9, total_engagements: 500, total_reach: 2000, avg_likes: 20, avg_comments: 5, avg_shares: 3 },
-      { post_count: 200, avg_confidence: 0.8, total_engagements: 1000, total_reach: 4000, avg_likes: 30, avg_comments: 10, avg_shares: 7 }
-    ];
-    mockFetch({ 'cross-platform-sentiment': data });
+  it('returns zeroed stats when there is no data', async () => {
+    mockFetch({ 'engagement-stats': [] });
 
     const stats = await engagementAnalysisDb.getEngagementStats();
 
-    expect(stats.totalPosts).toBe(300);
-    expect(stats.totalEngagements).toBe(1500);
-    expect(stats.totalReach).toBe(6000);
-    expect(stats.averageRate).toBe(0.85); // (0.9+0.8)/2 rounded
-    expect(stats.avgLikes).toBe(25); // (20+30)/2
-    expect(stats.avgComments).toBe(8); // Math.round((5+10)/2)
-    expect(stats.bestPerformingPost).toBe(200);
+    expect(stats).toMatchObject({ totalEngagements: 0, averageRate: 0, totalReach: 0, totalPosts: 0 });
   });
 
-  it('passes workspaceId to the API', async () => {
-    mockFetch({ 'cross-platform-sentiment': [] });
-    await engagementAnalysisDb.getEngagementStats('ws-1');
+  it('maps the aggregate row, converting numeric strings from the database', async () => {
+    mockFetch({
+      'engagement-stats': [{
+        total_posts: '1500', total_engagements: '594154', average_rate: '7.6293133', total_reach: '7810585',
+        total_impressions: '10962494', best_post_engagements: '4210', avg_likes: '280.4', avg_comments: '60.2', avg_shares: '39.9'
+      }]
+    });
 
-    const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('workspace_id')).toBe('ws-1');
+    const stats = await engagementAnalysisDb.getEngagementStats();
+
+    expect(stats).toEqual({
+      totalPosts: 1500, totalEngagements: 594154, averageRate: 7.63, totalReach: 7810585,
+      totalImpressions: 10962494, bestPerformingPost: 4210, avgLikes: 280, avgComments: 60, avgShares: 40
+    });
+  });
+
+  it('passes the workspace through to the API', async () => {
+    mockFetch({ 'engagement-stats': [] });
+
+    await engagementAnalysisDb.getEngagementStats('7');
+
+    const url = String((fetch as any).mock.calls[0][0]);
+    expect(url).toContain('workspace_id=7');
   });
 });
 
 // ─── getPlatformEngagement ─────────────────────────────────────────────────
 
 describe('getPlatformEngagement', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'platform-performance': [] });
-    const platforms = await engagementAnalysisDb.getPlatformEngagement();
-    expect(platforms).toEqual([]);
+  it('returns an empty list when there is no data', async () => {
+    mockFetch({ 'engagement-platforms': [] });
+
+    expect(await engagementAnalysisDb.getPlatformEngagement()).toEqual([]);
   });
 
-  it('transforms platform data with colors', async () => {
-    const data = [
-      { platform: 'instagram', total_posts: 500, positive_ratio: 0.75, avg_likes: 50, avg_comments: 10, avg_shares: 5, total_reach: 8000 },
-      { platform: 'twitter', total_posts: 300, positive_ratio: 0.6, avg_likes: 20, avg_comments: 5, avg_shares: 3 }
-    ];
-    mockFetch({ 'platform-performance': data });
+  it('maps platforms with a capitalised name, real engagement rate and a colour', async () => {
+    mockFetch({
+      'engagement-platforms': [{
+        platform: 'youtube', posts: '295', total_engagements: '283979', engagement_rate: '7.7532881',
+        total_reach: '3594530', avg_likes: '500.2', avg_comments: '90.7', avg_shares: '60.1'
+      }]
+    });
 
-    const platforms = await engagementAnalysisDb.getPlatformEngagement();
+    const [platform] = await engagementAnalysisDb.getPlatformEngagement();
 
-    expect(platforms).toHaveLength(2);
-    expect(platforms[0].platform).toBe('Instagram');
-    expect(platforms[0].engagementRate).toBe(0.75);
-    expect(platforms[0].posts).toBe(500);
-    expect(platforms[0].avgLikes).toBe(50);
-    expect(platforms[0].color).toBe('#ff6b9d');
-
-    expect(platforms[1].platform).toBe('Twitter');
-    expect(platforms[1].color).toBe('#26d0ce');
+    expect(platform).toMatchObject({
+      platform: 'Youtube', posts: 295, totalEngagements: 283979, engagementRate: 7.75,
+      totalReach: 3594530, avgLikes: 500, avgComments: 91, avgShares: 60
+    });
+    expect(platform.color).toMatch(/^#/);
   });
 
-  it('uses gray for unknown platforms', async () => {
-    const data = [{ platform: 'mastodon', total_posts: 10, positive_ratio: 0.5 }];
-    mockFetch({ 'platform-performance': data });
+  it('gives unknown platforms a neutral colour', async () => {
+    mockFetch({ 'engagement-platforms': [{ platform: 'myspace', posts: '1', total_engagements: '1', engagement_rate: '1', total_reach: '1', avg_likes: '0', avg_comments: '0', avg_shares: '0' }] });
 
-    const platforms = await engagementAnalysisDb.getPlatformEngagement();
-    expect(platforms[0].color).toBe('#6b7280');
+    const [platform] = await engagementAnalysisDb.getPlatformEngagement();
+
+    expect(platform.color).toBe(CHART.ink500);
   });
 });
 
 // ─── getContentTypePerformance ─────────────────────────────────────────────
 
 describe('getContentTypePerformance', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'cross-platform-sentiment': [] });
-    const content = await engagementAnalysisDb.getContentTypePerformance();
-    expect(content).toEqual([]);
+  it('returns real content types from the data, not a fixed list', async () => {
+    mockFetch({
+      'engagement-content-types': [
+        { content_type: 'Video', posts: '354', engagement_rate: '7.82', reach: '3625571', avg_likes: '568.5', avg_comments: '90', avg_shares: '55', positive_share: '0.7' },
+        { content_type: 'Link', posts: '200', engagement_rate: '6.1', reach: '900000', avg_likes: '100', avg_comments: '10', avg_shares: '5', positive_share: '0.2' }
+      ]
+    });
+
+    const types = await engagementAnalysisDb.getContentTypePerformance();
+
+    expect(types.map((t) => t.type)).toEqual(['Video', 'Link']);
+    expect(types[0]).toMatchObject({ posts: 354, engagementRate: 7.82, reach: 3625571, avgLikes: 569 });
   });
 
-  it('generates 5 content types from data', async () => {
-    const data = [
-      { post_count: 100, avg_confidence: 0.7, total_reach: 500, avg_likes: 10, avg_comments: 3, avg_shares: 2 }
-    ];
-    mockFetch({ 'cross-platform-sentiment': data });
+  it('derives the sentiment label from the share of positive posts', async () => {
+    mockFetch({
+      'engagement-content-types': [
+        { content_type: 'A', posts: '1', engagement_rate: '1', reach: '1', avg_likes: '0', avg_comments: '0', avg_shares: '0', positive_share: '0.8' },
+        { content_type: 'B', posts: '1', engagement_rate: '1', reach: '1', avg_likes: '0', avg_comments: '0', avg_shares: '0', positive_share: '0.4' },
+        { content_type: 'C', posts: '1', engagement_rate: '1', reach: '1', avg_likes: '0', avg_comments: '0', avg_shares: '0', positive_share: '0.1' }
+      ]
+    });
 
-    const content = await engagementAnalysisDb.getContentTypePerformance();
+    const types = await engagementAnalysisDb.getContentTypePerformance();
 
-    expect(content).toHaveLength(5);
-    expect(content[0].type).toBe('Text Post');
-    expect(content[1].type).toBe('Image');
-    expect(content[2].type).toBe('Video');
-    expect(content[3].type).toBe('Story');
-    expect(content[4].type).toBe('Reel');
-  });
-
-  it('assigns sentiment based on confidence threshold', async () => {
-    const data = [
-      { post_count: 10, avg_confidence: 0.8 },  // positive (>=0.65)
-      { post_count: 10, avg_confidence: 0.5 },  // mixed (>=0.35)
-      { post_count: 10, avg_confidence: 0.2 }   // neutral (<0.35)
-    ];
-    mockFetch({ 'cross-platform-sentiment': data });
-
-    const content = await engagementAnalysisDb.getContentTypePerformance();
-
-    expect(content[0].sentiment).toBe('positive');
-    expect(content[1].sentiment).toBe('mixed');
-    expect(content[2].sentiment).toBe('neutral');
+    expect(types.map((t) => t.sentiment)).toEqual(['positive', 'mixed', 'negative']);
   });
 });
 
 // ─── getEngagementTrends ───────────────────────────────────────────────────
 
 describe('getEngagementTrends', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'sentiment-trends': [] });
-    const trends = await engagementAnalysisDb.getEngagementTrends();
-    expect(trends).toEqual([]);
+  it('returns an empty list when there is no data', async () => {
+    mockFetch({ 'engagement-trends': [] });
+
+    expect(await engagementAnalysisDb.getEngagementTrends('7d')).toEqual([]);
   });
 
-  it('transforms trend data with calculated fields', async () => {
-    const data = [
-      { date: '2024-01-01', positive: 30, negative: 10, neutral: 60, likes: 100, comments: 20, shares: 15, saves: 5, views: 500, reach: 1000 }
-    ];
-    mockFetch({ 'sentiment-trends': data });
+  it('maps daily totals and passes the time range', async () => {
+    mockFetch({
+      'engagement-trends': [{ date: '2026-10-07', likes: '5148', comments: '1104', shares: '736', saves: '366', views: '143648', reach: '104918', engagement_rate: '7.4' }]
+    });
 
-    const trends = await engagementAnalysisDb.getEngagementTrends();
+    const [day] = await engagementAnalysisDb.getEngagementTrends('30d');
 
-    expect(trends).toHaveLength(1);
-    expect(trends[0].date).toBe('2024-01-01');
-    expect(trends[0].likes).toBe(100);
-    expect(trends[0].comments).toBe(20);
-    expect(trends[0].shares).toBe(15);
-    expect(trends[0].reach).toBe(1000);
-  });
-
-  it('calculates engagement rate from sentiment when not provided', async () => {
-    const data = [
-      { date: '2024-01-01', positive: 30, negative: 10, neutral: 60 }
-    ];
-    mockFetch({ 'sentiment-trends': data });
-
-    const trends = await engagementAnalysisDb.getEngagementTrends();
-
-    // engagementRate = positive / totalSentiment = 30/100 = 0.3
-    expect(trends[0].engagementRate).toBe(0.3);
-    expect(trends[0].reach).toBe(100); // falls back to totalSentiment
-  });
-
-  it('passes timeRange param to the API', async () => {
-    mockFetch({ 'sentiment-trends': [] });
-    await engagementAnalysisDb.getEngagementTrends('30d');
-
-    const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('timeRange')).toBe('30d');
+    expect(day).toEqual({ date: '2026-10-07', likes: 5148, comments: 1104, shares: 736, saves: 366, views: 143648, reach: 104918, engagementRate: 7.4 });
+    expect(String((fetch as any).mock.calls[0][0])).toContain('timeRange=30d');
   });
 });
 
 // ─── getTopPerformingPosts ─────────────────────────────────────────────────
 
 describe('getTopPerformingPosts', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'sample-posts': [] });
-    const posts = await engagementAnalysisDb.getTopPerformingPosts();
-    expect(posts).toEqual([]);
+  it('returns an empty list when there is no data', async () => {
+    mockFetch({ 'engagement-top-posts': [] });
+
+    expect(await engagementAnalysisDb.getTopPerformingPosts()).toEqual([]);
   });
 
-  it('transforms posts and assigns content types cyclically', async () => {
-    const data = [
-      { id: '1', text: 'Great post', platform: 'twitter', confidence: 0.9, timestamp: '2024-01-01T00:00:00Z' },
-      { id: '2', text: 'Another one', platform: 'instagram', confidence: 0.7, timestamp: '2024-01-02T00:00:00Z' }
-    ];
-    mockFetch({ 'sample-posts': data });
+  it('maps posts with their real engagement and ranks them in the order returned', async () => {
+    mockFetch({
+      'engagement-top-posts': [
+        { id: 271, text: 'First', author: 'demo_user_0001', platform: 'youtube', content_type: 'Video', likes: '900', comments: '100', shares: '50', saves: '10', engagement_rate: '12.5', reach: '8000', views: '9000', timestamp: '2026-10-01T10:00:00.000Z' },
+        { id: 12, text: 'Second', author: 'demo_user_0002', platform: 'bluesky', content_type: 'Text Only', likes: '40', comments: '4', shares: '2', saves: '1', engagement_rate: '3.1', reach: '900', views: '1000', timestamp: '2026-10-02T10:00:00.000Z' }
+      ]
+    });
 
-    const posts = await engagementAnalysisDb.getTopPerformingPosts();
+    const posts = await engagementAnalysisDb.getTopPerformingPosts({}, 2);
 
-    expect(posts).toHaveLength(2);
-    // Sorted by engagement rate descending: post 1 (0.9) before post 2 (0.7)
-    expect(posts[0].id).toBe('1');
-    expect(posts[0].contentType).toBe('Text Post'); // index 0 % 5
-    expect(posts[0].engagement.rate).toBe(0.9);
-    expect(posts[0].performance_rank).toBe(1);
-
-    expect(posts[1].id).toBe('2');
-    expect(posts[1].engagement.rate).toBe(0.7);
-  });
-
-  it('passes limit parameter', async () => {
-    mockFetch({ 'sample-posts': [] });
-    await engagementAnalysisDb.getTopPerformingPosts({}, 25);
-
-    const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('limit')).toBe('25');
+    expect(posts.map((p) => p.id)).toEqual([271, 12]);
+    expect(posts[0]).toMatchObject({
+      contentType: 'Video', platform: 'youtube', reach: 8000, views: 9000, performance_rank: 1,
+      engagement: { likes: 900, comments: 100, shares: 50, saves: 10, rate: 12.5 }
+    });
+    expect(posts[1].performance_rank).toBe(2);
+    expect(String((fetch as any).mock.calls[0][0])).toContain('limit=2');
   });
 });
 
 // ─── getEngagementTiming ───────────────────────────────────────────────────
 
 describe('getEngagementTiming', () => {
-  it('returns empty array when no data', async () => {
-    mockFetch({ 'hourly-patterns': [] });
-    const timing = await engagementAnalysisDb.getEngagementTiming();
-    expect(timing).toEqual([]);
+  it('returns an empty list when there is no data', async () => {
+    mockFetch({ 'engagement-timing': [] });
+
+    expect(await engagementAnalysisDb.getEngagementTiming()).toEqual([]);
   });
 
-  it('transforms hourly patterns with day names', async () => {
-    const data = [
-      { hour_of_day: 0, positive: 10, negative: 5, neutral: 15 },
-      { hour_of_day: 3, positive: 20, negative: 10, neutral: 30 }
-    ];
-    mockFetch({ 'hourly-patterns': data });
+  it('maps the real day of week and hour', async () => {
+    mockFetch({
+      'engagement-timing': [{ hour_of_day: 9, day_of_week: 2, avg_engagement_rate: '7.5', total_posts: '12', total_engagements: '3400' }]
+    });
 
-    const timing = await engagementAnalysisDb.getEngagementTiming();
+    const [slot] = await engagementAnalysisDb.getEngagementTiming();
 
-    expect(timing).toHaveLength(2);
-    expect(timing[0].hour_of_day).toBe(0);
-    expect(timing[0].day_of_week).toBe(0); // 0 % 7
-    expect(timing[0].day_name).toBe('Sunday');
-    expect(timing[0].total_posts).toBe(30); // 10+5+15
-
-    expect(timing[1].day_of_week).toBe(3); // 3 % 7
-    expect(timing[1].day_name).toBe('Wednesday');
+    expect(slot).toEqual({ hour_of_day: 9, day_of_week: 2, day_name: 'Tuesday', avg_engagement_rate: 7.5, total_posts: 12, total_engagements: 3400 });
   });
 });
 
@@ -315,18 +245,11 @@ describe('getHashtagPerformance', () => {
 
 describe('exportEngagementData', () => {
   it('combines results from all queries', async () => {
-    const crossPlatform = [{ post_count: 100, avg_confidence: 0.8 }];
-    const platformPerf = [{ platform: 'twitter', total_posts: 100, positive_ratio: 0.6 }];
-    const trends = [{ date: '2024-01-01', positive: 10, negative: 5, neutral: 15 }];
-    const samplePosts = [{ id: '1', text: 'Test', platform: 'twitter', confidence: 0.9, timestamp: '2024-01-01T00:00:00Z' }];
-    const hourly = [{ hour_of_day: 0, positive: 10, negative: 5, neutral: 15 }];
-
     mockFetch({
-      'cross-platform-sentiment': crossPlatform,
-      'platform-performance': platformPerf,
-      'sentiment-trends': trends,
-      'sample-posts': samplePosts,
-      'hourly-patterns': hourly,
+      'engagement-stats': [{ total_posts: '100', total_engagements: '5000', average_rate: '5', total_reach: '9000', total_impressions: '12000', best_post_engagements: '300', avg_likes: '30', avg_comments: '5', avg_shares: '2' }],
+      'engagement-platforms': [{ platform: 'youtube', posts: '100', total_engagements: '5000', engagement_rate: '5', total_reach: '9000', avg_likes: '30', avg_comments: '5', avg_shares: '2' }],
+      'engagement-trends': [{ date: '2024-01-01', likes: '1', comments: '1', shares: '1', saves: '1', views: '1', reach: '1', engagement_rate: '1' }],
+      'engagement-top-posts': [{ id: 1, text: 'Test', author: 'a', platform: 'youtube', content_type: 'Video', likes: '1', comments: '1', shares: '1', saves: '1', engagement_rate: '1', reach: '1', views: '1', timestamp: '2024-01-01T00:00:00Z' }],
       'hashtag-analysis': { hashtags: [] }
     });
 

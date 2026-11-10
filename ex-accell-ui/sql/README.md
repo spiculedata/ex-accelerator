@@ -1,27 +1,14 @@
 # SQL Directory
 
-This directory contains all SQL-related files for the ex-accelerator UI project.
+> **The core schema now lives in `../db/migrations/`** and is applied automatically on first
+> sign-in (see the data model docs). The files here are reference material from earlier
+> DuckDB-based work; several are DuckDB-dialect and do not apply to PostgreSQL unchanged.
 
-## Structure
+This directory contains all SQL-related files for the Social Explorer UI project.
 
-- **`schemas/`** - Database schema definitions
-  - `unified_social_analytics_schema.sql` - Main unified database schema
-  - Individual module schemas for analytics components
-  - Platform-specific schemas (Android, etc.)
-  
-- **`migrations/`** - Database migration scripts (for future use)
-  - Schema updates and data transformations
-  - Version control for database changes
+## Contents
 
-## Key Schema Files
-
-- **`unified_social_analytics_schema.sql`** - Complete unified database structure with all analytics modules
-- **`dashboard_schema.sql`** - Dashboard-specific views and tables
-- **`sentiment_analysis_schema.sql`** - Sentiment analysis tables and indexes
-- **`topic_modeling_schema.sql`** - Topic modeling and NLP analysis structures
-- **`engagement_analysis_schema.sql`** - Social media engagement metrics
-- **`language_detection_schema.sql`** - Language detection and analysis tables
-
-## Usage
-
-These schema files are used by the DuckDB service to initialize and maintain the analytics database. The unified schema combines all analytics modules for cross-table analysis capabilities.
+Reference schema definitions from earlier DuckDB-based work, one file per analytics module
+(`unified_social_analytics_schema.sql`, `sentiment_analysis_schema.sql`, and so on). Several use
+DuckDB-only syntax and some overlap each other, so they are not applied automatically. Treat them as
+design notes; add real schema changes as numbered files in `../db/migrations/`.

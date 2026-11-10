@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { currentProject } from '$lib/stores/projectStore';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { dashboardDb } from '$lib/services/dashboardDb';
   import { ErrorAlert } from '$lib/components/ui';
-  import { getStatusColor, getStatusIcon, getTrendIcon, getHealthColor } from '$lib/utils/colorUtils';
+  import { getSentimentColor, getStatusColor, getStatusIcon, getTrendIcon, getHealthColor } from '$lib/utils/colorUtils';
   import { formatTimestamp, formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
@@ -64,7 +66,6 @@
   let dashboardStats = {
     totalPosts: 0,
     totalSources: 0,
-    activeCrawlers: 0,
     lastUpdated: '',
     processingRate: 0,
     dataQuality: 0
@@ -127,7 +128,6 @@
       dashboardStats = {
         totalPosts: stats.total_posts,
         totalSources: stats.total_sources,
-        activeCrawlers: stats.active_crawlers,
         lastUpdated: stats.last_updated,
         processingRate: stats.processing_rate,
         dataQuality: stats.data_quality
@@ -234,6 +234,11 @@
 
   function updateSentimentChart() {
     if (!sentimentChart) return;
+    const sentimentCounts: Record<string, number> = {
+      Positive: textAnalytics.sentimentBreakdown.positive.count,
+      Negative: textAnalytics.sentimentBreakdown.negative.count,
+      Neutral: textAnalytics.sentimentBreakdown.neutral.count
+    };
 
     const option = {
       title: {
@@ -245,13 +250,16 @@
         trigger: 'item',
         formatter: '{b}: {c} ({d}%)'
       },
+      // Colour is never the only cue: each slice is named in the legend with its count
+      legend: { bottom: 0, textStyle: { fontSize: 11 }, formatter: (name: string) => `${name}: ${sentimentCounts[name] ?? 0}` },
       series: [{
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: ['40%', '65%'],
+        center: ['50%', '45%'],
         data: [
-          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: '#06d6a0' } },
-          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: '#f72585' } },
-          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: '#8b5cf6' } }
+          { name: 'Positive', value: textAnalytics.sentimentBreakdown.positive.count, itemStyle: { color: getSentimentColor('positive') } },
+          { name: 'Negative', value: textAnalytics.sentimentBreakdown.negative.count, itemStyle: { color: getSentimentColor('negative') } },
+          { name: 'Neutral', value: textAnalytics.sentimentBreakdown.neutral.count, itemStyle: { color: getSentimentColor('neutral') } }
         ],
         label: { show: false },
         emphasis: {
@@ -287,11 +295,10 @@
       },
       yAxis: {
         type: 'value',
-        name: 'Posts (K)',
+        name: 'Posts',
         axisLabel: {
-          formatter: function(value: any) {
-            return (value / 1000).toFixed(0) + 'K';
-          }
+          // 1.5K, 2K, 800: whole thousands made every tick under 1,500 read "1K" or "0K"
+          formatter: (value: number) => formatNumber(value)
         }
       },
       series: [{
@@ -299,9 +306,10 @@
         data: dataSources.map((s, index) => ({
           value: s.posts,
           itemStyle: {
-            color: s.status === 'active' ? 
-              ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc', '#d946ef', '#e879f9', '#f0abfc'][index % 7] : 
-              '#f59e0b'
+            // Brand categorical series for active sources, grey for inactive ones
+            color: s.status === 'active' ?
+              [CHART.catBlue, CHART.catOrange, CHART.catGreen, CHART.catPink, CHART.catSky, CHART.catVermilion, CHART.catYellow][index % 7] :
+              CHART.ink400
           }
         })),
         emphasis: {
@@ -354,15 +362,15 @@
           name: 'Positive',
           type: 'line',
           data: crawlingActivity.map(a => a.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(6, 214, 160, 0.3)' },
-                { offset: 1, color: 'rgba(6, 214, 160, 0.02)' }
+                { offset: 0, color: 'rgba(86, 180, 233, 0.3)' },
+                { offset: 1, color: 'rgba(86, 180, 233, 0.02)' }
               ]
             }
           },
@@ -372,15 +380,15 @@
           name: 'Negative',
           type: 'line',
           data: crawlingActivity.map(a => a.negative),
-          itemStyle: { color: '#f72585' },
+          itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(247, 37, 133, 0.3)' },
-                { offset: 1, color: 'rgba(247, 37, 133, 0.02)' }
+                { offset: 0, color: 'rgba(230, 159, 0, 0.3)' },
+                { offset: 1, color: 'rgba(230, 159, 0, 0.02)' }
               ]
             }
           },
@@ -390,15 +398,15 @@
           name: 'Neutral',
           type: 'line',
           data: crawlingActivity.map(a => a.neutral),
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: getSentimentColor('neutral') },
           lineStyle: { width: 2 },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(139, 92, 246, 0.3)' },
-                { offset: 1, color: 'rgba(139, 92, 246, 0.02)' }
+                { offset: 0, color: 'rgba(152, 162, 174, 0.3)' },
+                { offset: 1, color: 'rgba(152, 162, 174, 0.02)' }
               ]
             }
           },
@@ -417,7 +425,7 @@
 
     const option = {
       title: {
-        text: 'Top Topics',
+        text: 'Top Topics (by posts)',
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 'bold' }
       },
@@ -459,7 +467,7 @@
         data: textAnalytics.topTopics.map((t: any) => ({
           value: t.posts,
           itemStyle: {
-            color: t.trend === 'up' ? '#06d6a0' : t.trend === 'down' ? '#f72585' : '#8b5cf6'
+            color: t.trend === 'up' ? CHART.catBlue : t.trend === 'down' ? CHART.catVermilion : CHART.ink400
           }
         })),
         emphasis: {
@@ -510,63 +518,26 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-10 h-10 bg-gradient-to-br from-violet-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Interactive Dashboards</h1>
-            <p class="text-slate-300 text-sm font-medium">
-              {workspaceId ? 'Workspace-scoped analytics and insights' : 'Comprehensive analytics and insights across all your social media data sources'}
-            </p>
-            <div class="flex items-center mt-2 space-x-3">
-              {#if $currentProject}
-                <div class="flex items-center">
-                  <span class="text-sm text-slate-400">Project:</span>
-                  <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                    {$currentProject.name}
-                  </span>
-                </div>
-              {/if}
-              {#if workspaceId && workspace}
-                <div class="flex items-center">
-                  <span class="text-sm text-slate-400">Workspace:</span>
-                  <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 backdrop-blur-sm">
-                    {workspace.name}
-                  </span>
-                </div>
-              {/if}
-            </div>
-          </div>
-        </div>
-        
-        <div class="flex items-center space-x-4">
-          <div class="flex items-center space-x-3 bg-white/10 rounded-xl px-4 py-3 border border-white/20 backdrop-blur-sm">
-            <span class="text-sm text-slate-300 font-medium">Auto-refresh:</span>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" bind:checked={autoRefresh} class="sr-only peer">
-              <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-md peer-checked:bg-gradient-to-r peer-checked:from-violet-500 peer-checked:to-blue-600"></div>
-            </label>
-          </div>
-          <select bind:value={timeRange} class="px-4 py-3 bg-white/10 border border-white/20 backdrop-blur-sm rounded-xl text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:border-violet-400/50">
-            <option value="1h" class="bg-slate-800 text-white">Last Hour</option>
-            <option value="24h" class="bg-slate-800 text-white">Last 24 Hours</option>
-            <option value="7d" class="bg-slate-800 text-white">Last 7 Days</option>
-            <option value="30d" class="bg-slate-800 text-white">Last 30 Days</option>
-          </select>
-        </div>
+  <PageHeader
+    title="Interactive Dashboards"
+    subtitle={workspaceId ? 'Workspace-scoped analytics and insights' : 'Comprehensive analytics and insights across all your social media data sources'}
+    backHref="/">
+    <svelte:fragment slot="actions">
+      <div class="flex items-center space-x-3 bg-white/10 rounded-xl px-4 py-3 border border-white/20 backdrop-blur-sm">
+        <span class="text-sm text-slate-300 font-medium">Auto-refresh:</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" bind:checked={autoRefresh} class="sr-only peer" aria-label="Auto-refresh">
+          <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-md peer-checked:bg-gradient-to-r peer-checked:from-violet-500 peer-checked:to-blue-600"></div>
+        </label>
       </div>
-    </div>
-  </div>
+      <select bind:value={timeRange} aria-label="Time range" class="px-4 py-3 bg-white/10 border border-white/20 backdrop-blur-sm rounded-xl text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-violet-400/50 focus:border-violet-400/50">
+        <option value="1h" class="bg-slate-800 text-white">Last Hour</option>
+        <option value="24h" class="bg-slate-800 text-white">Last 24 Hours</option>
+        <option value="7d" class="bg-slate-800 text-white">Last 7 Days</option>
+        <option value="30d" class="bg-slate-800 text-white">Last 30 Days</option>
+      </select>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -590,7 +561,7 @@
     </div>
 
     <!-- Key Metrics Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts</div>
@@ -598,10 +569,6 @@
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalSources}</div>
         <div class="text-sm text-gray-600">Data Sources</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.activeCrawlers}</div>
-        <div class="text-sm text-gray-600">Active Crawlers</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.processingRate.toLocaleString()}</div>
@@ -612,8 +579,8 @@
         <div class="text-sm text-gray-600" title="Percentage of posts with sentiment classification">Enrichment Rate</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-xs text-gray-500 mb-1">Last Updated</div>
-        <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated).split(',')[1]}</div>
+        <div class="text-xs text-gray-500 mb-1">Refreshed</div>
+        <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated)}</div>
       </div>
     </div>
 
@@ -656,7 +623,7 @@
                   <div class="font-medium text-gray-900">{source.name}</div>
                   <div class="text-sm text-gray-500">
                     {#if source.platform && source.platform !== source.name}
-                      <span class="text-xs text-gray-400 mr-1">{source.platform}</span> ·
+                      <span class="text-xs text-gray-500 mr-1">{source.platform}</span> ·
                     {/if}
                     {source.posts.toLocaleString()} posts ({source.percentage}%)
                   </div>
@@ -747,7 +714,7 @@
           </div>
         </div>
         {#if textAnalytics.topTopics.length === 0}
-          <div class="text-center py-8 text-gray-400">
+          <div class="text-center py-8 text-gray-500">
             <span class="text-3xl mb-2 block">💬</span>
             <p class="text-sm">No social post topics yet.</p>
             <p class="text-xs mt-1">Topics will appear after running topic analysis on social posts.</p>

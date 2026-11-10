@@ -82,7 +82,7 @@
           <!-- Icon -->
           <div
             class="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center
-              {comp.available ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}"
+              {comp.available ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={comp.icon} />
@@ -116,7 +116,7 @@
         {:else}
           <div class="mt-2 flex justify-end">
             <button
-              class="text-xs font-medium px-3 py-1.5 rounded-md bg-gray-200 text-gray-400 cursor-not-allowed"
+              class="text-xs font-medium px-3 py-1.5 rounded-md bg-gray-200 text-gray-500 cursor-not-allowed"
               disabled
             >
               Add

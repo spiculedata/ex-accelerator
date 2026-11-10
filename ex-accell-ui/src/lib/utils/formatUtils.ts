@@ -45,19 +45,19 @@ export function formatDate(date: string | Date | undefined | null): string {
 /**
  * Format a timestamp for consistent display
  */
-export function formatTimestamp(date: string | Date | undefined | null): string {
-  if (!date) return '—';
-  try {
-    return new Date(date).toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return '—';
-  }
+export function formatTimestamp(date: string | number | Date | undefined | null): string {
+  if (date === undefined || date === null || date === '') return '—';
+  // The posts view stores times as epoch milliseconds (13 digits today), which arrive as a number or a numeric string; shorter digit strings are not treated as times
+  const value = typeof date === 'string' && /^\d{12,}$/.test(date.trim()) ? Number(date) : date;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 /**

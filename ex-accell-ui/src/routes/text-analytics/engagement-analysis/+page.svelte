@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
@@ -9,10 +10,26 @@
   import { onMount } from 'svelte';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { ErrorAlert } from '$lib/components/ui';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
+  import { rangeReloader } from '$lib/utils/filterRange';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let currentFilterParams: Record<string, string> = {};
+
+  // The platform whose posts were chosen; they open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
+  function openPlatformPosts(platform: string) {
+    drilldown = {
+      title: `${platform} posts`,
+      filters: { ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }), platforms: [platform.toLowerCase()] }
+    };
+  }
 
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
@@ -21,7 +38,10 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+    // A new date range changes every figure on the page; the reloader makes sure the newest range wins
+    rangeSync.sync();
   }
+  const rangeSync = rangeReloader(loadEngagementAnalysisData, () => loading);
   
   // Loading state
   let loading = true;
@@ -29,7 +49,9 @@
 
   onMount(async () => {
     // Load engagement analysis data from database
+    rangeSync.markLoaded();
     await loadEngagementAnalysisData();
+    await rangeSync.sync();
   });
 
   // Engagement analysis data - loaded from database
@@ -88,12 +110,12 @@
     };
 
     platformEngagement = [
-      { platform: 'Instagram', engagementRate: 6.8, totalEngagements: 156789, posts: 2341, avgLikes: 245, avgComments: 67, avgShares: 23, color: '#ff6b9d' },
-      { platform: 'TikTok', engagementRate: 5.9, totalEngagements: 134567, posts: 1876, avgLikes: 387, avgComments: 89, avgShares: 45, color: '#667eea' },
-      { platform: 'Twitter', engagementRate: 3.7, totalEngagements: 98765, posts: 4523, avgLikes: 89, avgComments: 23, avgShares: 156, color: '#26d0ce' },
-      { platform: 'LinkedIn', engagementRate: 3.1, totalEngagements: 56789, posts: 1234, avgLikes: 167, avgComments: 34, avgShares: 78, color: '#6366f1' },
-      { platform: 'Facebook', engagementRate: 2.8, totalEngagements: 34567, posts: 2987, avgLikes: 45, avgComments: 12, avgShares: 89, color: '#8b5cf6' },
-      { platform: 'YouTube', engagementRate: 4.5, totalEngagements: 23456, posts: 234, avgLikes: 456, avgComments: 123, avgShares: 67, color: '#f72585' }
+      { platform: 'Instagram', engagementRate: 6.8, totalEngagements: 156789, posts: 2341, avgLikes: 245, avgComments: 67, avgShares: 23, color: CHART.catPink },
+      { platform: 'TikTok', engagementRate: 5.9, totalEngagements: 134567, posts: 1876, avgLikes: 387, avgComments: 89, avgShares: 45, color: CHART.ink900 },
+      { platform: 'Twitter', engagementRate: 3.7, totalEngagements: 98765, posts: 4523, avgLikes: 89, avgComments: 23, avgShares: 156, color: CHART.catSky },
+      { platform: 'LinkedIn', engagementRate: 3.1, totalEngagements: 56789, posts: 1234, avgLikes: 167, avgComments: 34, avgShares: 78, color: CHART.catBlue },
+      { platform: 'Facebook', engagementRate: 2.8, totalEngagements: 34567, posts: 2987, avgLikes: 45, avgComments: 12, avgShares: 89, color: CHART.catOrange },
+      { platform: 'YouTube', engagementRate: 4.5, totalEngagements: 23456, posts: 234, avgLikes: 456, avgComments: 123, avgShares: 67, color: CHART.catVermilion }
     ];
 
     contentTypes = [
@@ -176,21 +198,25 @@
     return new Date(timestamp).toLocaleString();
   }
 
+  let exportState: ExportState = IDLE_EXPORT;
+
+  // Exports the top posts as listed
   function exportEngagementData() {
-    const csvData = topPosts.map(post => 
-      `"${post.text}",${post.platform},${post.contentType},${post.engagement.likes},${post.engagement.comments},${post.engagement.shares},${post.engagement.rate},${post.reach},${post.timestamp}`
-    ).join('\n');
-    
-    const header = 'Text,Platform,Content Type,Likes,Comments,Shares,Engagement Rate,Reach,Timestamp\n';
-    const csv = header + csvData;
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'engagement_analysis_report.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    return runExport(async () => {
+      const rows = topPosts.map((post) => ({
+        text: post.text,
+        platform: post.platform,
+        contentType: post.contentType,
+        likes: post.engagement?.likes,
+        comments: post.engagement?.comments,
+        shares: post.engagement?.shares,
+        rate: post.engagement?.rate,
+        reach: post.reach,
+        timestamp: post.timestamp
+      }));
+      downloadCsv('engagement_analysis_report.csv', toCsv(rows, ['text', 'platform', 'contentType', 'likes', 'comments', 'shares', 'rate', 'reach', 'timestamp']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
   }
 
   // Initialize charts after data is loaded
@@ -300,8 +326,7 @@
           name: c.type,
           value: c.engagementRate,
           itemStyle: {
-            color: c.sentiment === 'positive' ? '#06d6a0' : 
-                   c.sentiment === 'mixed' ? '#ffd23f' : '#8b5cf6'
+            color: getSentimentColor(c.sentiment === 'mixed' ? 'neutral' : c.sentiment)
           }
         })),
         emphasis: {
@@ -352,21 +377,21 @@
           name: 'Likes',
           type: 'line',
           data: engagementTrends.map(t => t.likes),
-          itemStyle: { color: '#6366f1' },
+          itemStyle: { color: CHART.primary600 },
           lineStyle: { width: 3 }
         },
         {
           name: 'Comments',
           type: 'line',
           data: engagementTrends.map(t => t.comments),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: CHART.catGreen },
           lineStyle: { width: 3 }
         },
         {
           name: 'Shares',
           type: 'line',
           data: engagementTrends.map(t => t.shares),
-          itemStyle: { color: '#ff6b9d' },
+          itemStyle: { color: CHART.catPink },
           lineStyle: { width: 3 }
         }
       ]
@@ -383,7 +408,7 @@
   }
 
   // Watch for filter changes and reload data
-  $: if (!loading && (selectedPlatform || selectedContentType || minEngagementRate || timeRange)) {
+  $: if (!loading && (selectedPlatform || selectedContentType || minEngagementRate)) {
     loadFilteredData();
   }
 </script>
@@ -396,16 +421,8 @@
 <div class="min-h-screen bg-gray-50">
   <PageHeader
     title="Engagement Analysis"
-    subtitle="Track likes, shares, comments, and engagement rates across all your social media content"
-    accentColor="cyan"
+    subtitle="Likes, shares, comments and engagement rates across your content"
     backHref="/text-analytics">
-    <svelte:fragment slot="icon">
-      <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-        </svg>
-      </div>
-    </svelte:fragment>
     <svelte:fragment slot="actions">
       <button
         on:click={exportEngagementData}
@@ -414,8 +431,8 @@
       </button>
       <button
         on:click={() => goto('/text-analytics/research-investigation')}
-        class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
-        Research Investigation
+        class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
+        Research Notebooks
       </button>
     </svelte:fragment>
   </PageHeader>
@@ -424,6 +441,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->
@@ -493,16 +511,6 @@
             step="0.5"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500">
-            <option value="1d">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
-        </div>
       </div>
     </div>
 
@@ -537,7 +545,9 @@
                   <span class="text-lg">{getPlatformIcon(platform.platform)}</span>
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900">{platform.platform}</div>
+                  <div class="font-medium text-gray-900">
+                    <button type="button" class="hover:text-primary-700 hover:underline" on:click={() => openPlatformPosts(platform.platform)}>{platform.platform}</button>
+                  </div>
                   <div class="text-sm text-gray-500">{platform.posts.toLocaleString()} posts</div>
                 </div>
               </div>
@@ -624,3 +634,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

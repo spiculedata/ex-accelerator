@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { tierDescription, type TierTool } from '$lib/utils/tierDescriptions';
   export let selectedTier = 'fast';
   export let compact = false;
   export let disabled = false;
+  /** Which tool this is for, so the description names only what that tool uses. */
+  export let tool: TierTool = 'general';
 
   const tiers = [
     {
@@ -28,7 +31,7 @@
       id: 'accurate',
       label: 'Deep Analysis',
       icon: '\uD83D\uDD2C',
-      desc: 'Gemma Vision',
+      desc: 'YOLOv8m + RetinaFace',
       speed: '30s+',
       bgActive: 'bg-purple-50',
       borderActive: 'border-purple-300',
@@ -37,7 +40,7 @@
   ];
 </script>
 
-<div class="flex gap-2">
+<div class="flex flex-wrap gap-2">
   {#each tiers as tier}
     <button
       type="button"
@@ -57,10 +60,7 @@
   {/each}
 </div>
 {#if !compact}
-  <p class="text-xs text-gray-400 mt-1.5">
-    {#if selectedTier === 'fast'}YOLOv8n object detection + Haar face detection + heuristic classification
-    {:else if selectedTier === 'standard'}CLIP ViT-B/32 classification + YOLOv8s detection + CLIP NSFW moderation
-    {:else}Full Gemma 4 multimodal vision analysis (requires GPU for acceptable speed)
-    {/if}
+  <p class="text-xs text-gray-500 mt-1.5">
+    {tierDescription(tool, selectedTier)}
   </p>
 {/if}

@@ -3,6 +3,9 @@
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
+  import { extractCommand } from '$lib/utils/commandHint';
+  import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
 
   // Load current project and check if exists
   onMount(async () => {
@@ -15,7 +18,7 @@
   });
 
   let errorMessage = '';
-  let jupyterUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8888` : 'http://localhost:8888';
+  let connection: JupyterConnection | null = null;
   let isJupyterRunning = false;
   let notebookFile = '';
   let notebookTemplate = 'sentiment_analysis';
@@ -67,7 +70,7 @@
     {
       id: 'ollama_gdelt_integration',
       name: 'Ollama + GDELT Intelligence',
-      description: 'LLM-powered geopolitical analysis using Gemma via Ollama and 23M+ GDELT events',
+      description: 'LLM-powered geopolitical analysis using Gemma via Ollama and the GDELT events you have loaded',
       file: 'ollama_gdelt_integration.ipynb'
     },
     {
@@ -86,9 +89,17 @@
 
   let selectedTemplate = notebookTemplates[0];
 
-  function startJupyter() {
-    // Open JupyterLab in a new tab
-    window.open(jupyterUrl, '_blank');
+  async function startJupyter() {
+    // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
+    const tab = window.open('', '_blank');
+    errorMessage = '';
+    connection = await connectJupyter((message) => (errorMessage = message));
+    if (!connection) {
+      tab?.close();
+      return;
+    }
+    if (tab) tab.opener = null;
+    if (tab) tab.location.href = jupyterLink(connection, '/lab');
   }
 
   let showEmbeddedNotebook = false;
@@ -101,14 +112,19 @@
   }
 
   function openInJupyterLab() {
-    const url = `${jupyterUrl}/lab/tree/notebooks/${notebookFile}`;
-    window.open(url, '_blank');
+    if (!connection) return;
+    window.open(jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`), '_blank');
   }
 
   async function checkJupyterStatus() {
+    if (!connection) {
+      isJupyterRunning = false;
+      return;
+    }
     try {
-      const response = await fetch(`${jupyterUrl}/api`, { method: 'GET' });
+      const response = await fetch(jupyterLink(connection, '/api'), { method: 'GET' });
       isJupyterRunning = response.ok;
+      if (response.status === 401 || response.status === 403) connection = null;
     } catch (error) {
       isJupyterRunning = false;
     }
@@ -209,7 +225,7 @@
 </script>
 
 <svelte:head>
-  <title>Research Investigation - Text Analytics - Social Explorer</title>
+  <title>Research Notebooks - Text Analytics - Social Explorer</title>
   <meta name="description" content="Interactive Jupyter notebooks for text analytics research and experimentation" />
 </svelte:head>
 
@@ -235,7 +251,7 @@
             </svg>
           </div>
           <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Research Investigation</h1>
+            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Research Notebooks</h1>
             <p class="text-slate-300 text-sm font-medium">Interactive Jupyter notebooks for advanced text analytics research and experimentation</p>
             {#if $currentProject}
               <div class="flex items-center mt-2">
@@ -260,7 +276,16 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+    {#if errorMessage}
+      <ErrorAlert message={errorMessage} />
+      {@const command = extractCommand(errorMessage)}
+      {#if command}
+        <div class="mt-2 max-w-xl"><CopyCommand {command} /></div>
+        <p class="mt-2 text-sm text-ink-600">
+          Setup steps are in the <a class="text-primary-700 underline" href="https://spiculedata.github.io/social-explorer/tutorials/jupyter" target="_blank" rel="noopener">Jupyter guide</a>.
+        </p>
+      {/if}
+    {/if}
 
     <!-- Quick Start Section -->
     <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
@@ -296,8 +321,8 @@
                     <strong>⚠️ Setup Required:</strong> Run <code class="bg-amber-100 px-1 rounded">poetry run openllm serve deepseek:r1-llama3.1-8b --port 3000</code> first
                   </div>
                 {:else if template.id.includes('ollama')}
-                  <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">
-                    <strong>✅ Setup Required:</strong> Install <a href="https://ollama.ai/" target="_blank" class="underline">Ollama</a> then run <code class="bg-green-100 px-1 rounded">ollama pull llama3.3:8b</code>
+                  <div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                    <strong>⚠️ Setup Required:</strong> Install <a href="https://ollama.ai/" target="_blank" class="underline">Ollama</a> then run <code class="bg-amber-100 px-1 rounded">ollama pull llama3.3:8b</code>
                   </div>
                 {/if}
               </div>
@@ -328,7 +353,7 @@
               {:else}
                 <div class="bg-green-50 rounded-xl p-4 text-sm">
                   <p class="font-medium text-green-900 mb-2">✓ JupyterLab is running</p>
-                  <p class="text-green-700">Server available at <a href="{jupyterUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">{jupyterUrl}</a></p>
+                  <p class="text-green-700">Server available at <a href="{jupyterLink(connection, '/lab')}" target="_blank" class="text-blue-600 hover:underline font-medium">{connection?.baseUrl}</a></p>
                 </div>
               {/if}
             </div>
@@ -348,9 +373,13 @@
                 
                 <button 
                   on:click={createNotebook}
-                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
+                  disabled={!isJupyterRunning}
+                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors">
                   Open in Embedded Viewer
                 </button>
+                {#if !isJupyterRunning}
+                  <p class="text-xs text-ink-600">Start JupyterLab in Step 1 first. You can still download the template.</p>
+                {/if}
                 
                 {#if isJupyterRunning}
                   <button 
@@ -397,14 +426,14 @@
         <div class="border border-gray-200 rounded-xl overflow-hidden" style="height: 600px;">
           {#if isJupyterRunning}
             <iframe 
-              src="{jupyterUrl}/lab/tree/notebooks/{notebookFile}" 
+              src="{jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`)}" 
               class="w-full h-full"
               title="Jupyter Notebook">
             </iframe>
           {:else}
             <div class="flex items-center justify-center h-full bg-gray-50">
               <div class="text-center">
-                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-16 h-16 text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                 </svg>
                 <h3 class="text-lg font-medium text-gray-900 mb-2">JupyterLab Not Running</h3>
@@ -453,8 +482,8 @@
               </svg>
             </div>
             <div>
-              <h4 class="font-medium text-gray-900">Real-time Collaboration</h4>
-              <p class="text-sm text-gray-600">Share notebooks and collaborate with team members</p>
+              <h4 class="font-medium text-gray-900">Work in JupyterLab</h4>
+              <p class="text-sm text-gray-600">Open the templates in JupyterLab and work with your data in code</p>
             </div>
           </div>
         </div>
@@ -536,7 +565,7 @@
         <div class="h-6 w-6 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center mr-2">
           <span class="text-white font-bold text-sm">SE</span>
         </div>
-        <span class="text-sm text-gray-600">Social Explorer - Research Investigation</span>
+        <span class="text-sm text-gray-600">Social Explorer - Research Notebooks</span>
       </div>
       
       <!-- Links -->

@@ -6,10 +6,15 @@
   import type { JobState } from '$lib/services/jobStateStore';
   import { getStatusColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { describeJobStateFailure, type JobStateProblem } from '$lib/utils/jobStateProblem';
+  import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
   
   let activeTab = 'schedule';
   let errorMessage = '';
   
+  // Why job history could not be shown, in terms a person can act on
+  let jobProblem: JobStateProblem | null = null;
+
   // Load job states from state store
   async function loadJobStates(forceRefresh = false) {
     loadingJobStates = true;
@@ -49,13 +54,14 @@
         if (runningJobs.length > 0 && !isGlobalPollingActive) {
           startGlobalJobMonitoring();
         }
+        jobProblem = null;
       } else {
         console.error('Failed to load job states:', response.status, response.statusText);
-        errorMessage = 'Failed to load job states. Please try again.';
+        jobProblem = describeJobStateFailure(response.status, await response.json().catch(() => null));
       }
     } catch (error) {
       console.error('Failed to load job states:', error);
-      errorMessage = 'Failed to load job states. Please try again.';
+      jobProblem = describeJobStateFailure(0, null);
     } finally {
       loadingJobStates = false;
     }
@@ -426,7 +432,7 @@
     return `Daily (${timeSlots.length} time slots)`;
   }
 
-  // Combine crawler jobs, WavePulse schedules, and Princeton SMART extracts
+  // Combine crawler jobs and WavePulse schedules
   $: allJobs = [
     ...crawlJobs,
     ...wavePulseConfig.radioStreams.map((stream, index) => ({
@@ -437,8 +443,9 @@
       progress: wavePulseStatus === 'starting' ? wavePulseProgress : undefined,
       startTime: wavePulseResults?.startTime || null,
       schedule: formatWavePulseSchedule(stream.timeSlots),
-      itemsCollected: wavePulseStatus === 'running' ? Math.floor(Math.random() * 500) : 0, // Mock data
-      totalEstimated: wavePulseStatus === 'running' ? Math.floor(Math.random() * 1000) + 500 : 0,
+      // The WavePulse service does not report collection counts yet, so none are shown
+      itemsCollected: 0,
+      totalEstimated: 0,
       streamUrl: stream.url,
       logs: wavePulseStatus === 'running' ? [
         `[${new Date().toISOString()}] INFO: Started WavePulse for ${stream.radioName}`,
@@ -447,47 +454,7 @@
         wavePulseConfig.enableClassification ? `[${new Date().toISOString()}] INFO: Content classification enabled` : null,
         wavePulseConfig.enableDiarization ? `[${new Date().toISOString()}] INFO: Speaker diarization active` : null
       ].filter(Boolean) : []
-    })),
-    // Add Princeton SMART extract job (always show at least a sample)
-    {
-      id: 'princeton-smart-extract',
-      name: princetonSmartConfig.datasetId 
-        ? `Princeton SMART: ${princetonSmartConfig.datasetId}`
-        : 'Princeton SMART: twitter-election-2024 (Sample)',
-      type: 'princeton-smart',
-      status: princetonSmartConfig.datasetId 
-        ? (princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'running' : princetonSmartStatus === 'completed' ? 'completed' : princetonSmartStatus === 'error' ? 'failed' : 'scheduled')
-        : 'scheduled',
-      progress: princetonSmartStatus === 'fetching' ? princetonSmartProgress : undefined,
-      startTime: princetonSmartResults?.startTime || null,
-      nextRun: princetonSmartConfig.datasetId ? null : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 hours from now for demo
-      schedule: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.dateRange.start && princetonSmartConfig.dateRange.end 
-            ? `${princetonSmartConfig.dateRange.start} to ${princetonSmartConfig.dateRange.end}` 
-            : 'Date range not configured')
-        : '2024-01-01 to 2024-12-31',
-      itemsCollected: princetonSmartResults?.recordCount || (princetonSmartConfig.datasetId ? 0 : 12547), // Sample data for demo
-      totalEstimated: princetonSmartConfig.maxRecords || 50000,
-      query: princetonSmartConfig.datasetId 
-        ? (princetonSmartConfig.query || 'No query specified')
-        : '#election2024 OR #vote2024',
-      apiEndpoint: princetonSmartConfig.apiEndpoint,
-      logs: princetonSmartConfig.datasetId && princetonSmartStatus !== 'idle' ? [
-        `[${new Date().toISOString()}] INFO: Princeton SMART extract initiated`,
-        `[${new Date().toISOString()}] INFO: Dataset: ${princetonSmartConfig.datasetId}`,
-        `[${new Date().toISOString()}] INFO: Query: ${princetonSmartConfig.query || 'No query specified'}`,
-        princetonSmartConfig.filters.language !== 'all' ? `[${new Date().toISOString()}] INFO: Language filter: ${princetonSmartConfig.filters.language}` : null,
-        princetonSmartConfig.filters.location ? `[${new Date().toISOString()}] INFO: Location filter: ${princetonSmartConfig.filters.location}` : null,
-        princetonSmartResults ? `[${new Date().toISOString()}] INFO: Extracted ${princetonSmartResults.recordCount} records` : null
-      ].filter(Boolean) : [
-        `[2025-01-29T14:30:00.000Z] INFO: Sample Princeton SMART configuration`,
-        `[2025-01-29T14:30:00.000Z] INFO: Dataset: twitter-election-2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Query: #election2024 OR #vote2024`,
-        `[2025-01-29T14:30:00.000Z] INFO: Language filter: en`,
-        `[2025-01-29T14:30:00.000Z] INFO: Location filter: United States`,
-        `[2025-01-29T14:30:00.000Z] INFO: Configure dataset to activate extraction`
-      ]
-    }
+    }))
   ];
 
   // Sorting state
@@ -603,9 +570,6 @@
     includeAnalytics: false
   };
   
-  let princetonSmartStatus = 'idle'; // idle, connecting, fetching, completed, error
-  let princetonSmartProgress = 0;
-  let princetonSmartResults: any = null;
 
   // WavePulse configuration state
   let wavePulseConfig = {
@@ -699,47 +663,6 @@
       includeMetadata: true,
       includeAnalytics: false
     };
-    princetonSmartStatus = 'idle';
-    princetonSmartProgress = 0;
-    princetonSmartResults = null;
-  }
-
-  async function handlePrincetonSmartImport() {
-    if (!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId) {
-      return;
-    }
-
-    princetonSmartStatus = 'connecting';
-    princetonSmartProgress = 0;
-
-    try {
-      // Simulate API connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      princetonSmartStatus = 'fetching';
-      
-      // Simulate data fetching with progress
-      for (let i = 0; i <= 100; i += 10) {
-        princetonSmartProgress = i;
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      
-      // Mock successful import
-      princetonSmartResults = {
-        recordCount: Math.floor(Math.random() * princetonSmartConfig.maxRecords) + 100,
-        datasetId: princetonSmartConfig.datasetId,
-        query: princetonSmartConfig.query,
-        dateRange: princetonSmartConfig.dateRange,
-        format: princetonSmartConfig.outputFormat
-      };
-      
-      princetonSmartStatus = 'completed';
-      
-    } catch (error) {
-      console.error('Princeton SMART import error:', error);
-      errorMessage = 'Failed to import Princeton SMART data. Please check your configuration and try again.';
-      princetonSmartStatus = 'error';
-    }
   }
 
   // WavePulse functions
@@ -1461,7 +1384,7 @@
     <div class="absolute inset-0 bg-gradient-to-br from-emerald-900/10 to-slate-900/10 opacity-40"></div>
     
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center">
           <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1471,7 +1394,7 @@
           <div>
             <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Data Capture & Collection</h1>
             <p class="text-slate-300 text-sm font-medium">Web Crawling • File Upload • Smart Data Integration</p>
-            <div class="flex items-center mt-2 space-x-4">
+            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 🌐 Multi-Platform
               </span>
@@ -1485,7 +1408,7 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center gap-3">
           <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
             <div class="text-white text-sm font-medium">
               {crawlJobs.filter(job => job.status === 'running').length} jobs running
@@ -1518,8 +1441,8 @@
 
   <!-- Tab Navigation -->
   <div class="bg-white border-b border-gray-200">
-    <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex space-x-8">
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Data capture sections">
+      <div class="flex space-x-8 overflow-x-auto whitespace-nowrap px-1 pt-1">
         <button 
           class="py-4 px-1 border-b-2 font-medium text-sm {activeTab === 'schedule' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
           on:click={() => activeTab = 'schedule'}>
@@ -1556,6 +1479,14 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {#if jobProblem}
+      <div role="alert" class="mb-4 rounded-xl border border-ink-200 bg-white px-6 py-5">
+        <p class="font-medium text-ink-900">{jobProblem.title}</p>
+        <p class="mt-1 text-sm text-ink-600">{jobProblem.detail}</p>
+        {#if jobProblem.command}<div class="mt-3 max-w-md"><CopyCommand command={jobProblem.command} /></div>{/if}
+        <button type="button" on:click={() => loadJobStates(true)} class="mt-3 rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700">Try again</button>
+      </div>
+    {/if}
     {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
 
     <!-- Web Crawler Tab -->
@@ -1607,7 +1538,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Job Name *</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1629,7 +1560,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Crawl ID</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1647,7 +1578,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Log Level</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1671,7 +1602,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Concurrency</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1689,7 +1620,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Timeout (seconds)</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1707,7 +1638,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">User Agent</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1724,7 +1655,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">Output Format</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1752,7 +1683,7 @@
                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                     <label for="skip-media-global" class="ml-2 text-sm text-gray-700">Skip media download</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1777,7 +1708,7 @@
                 <div class="flex items-center mb-2">
                   <label class="block text-sm font-medium text-gray-700">Platform</label>
                   <div class="group relative ml-2">
-                    <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1879,7 +1810,7 @@
                   <div class="flex items-center mb-2">
                     <label class="block text-sm font-medium text-gray-700">URL File URL</label>
                     <div class="group relative ml-2">
-                      <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1907,7 +1838,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">TDLib Database URLs *</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1952,7 +1883,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">TDLib Verbosity (0-10)</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1976,7 +1907,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">YouTube API Key</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -1994,7 +1925,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Min Channel Videos</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2030,7 +1961,7 @@
                     <div class="flex items-center mb-2">
                       <label class="block text-sm font-medium text-gray-700">Min Post Date</label>
                       <div class="group relative ml-2">
-                        <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2047,7 +1978,7 @@
                     <div class="flex items-center mb-2">
                       <label class="block text-sm font-medium text-gray-700">Time Ago</label>
                       <div class="group relative ml-2">
-                        <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2065,7 +1996,7 @@
                     <div class="flex items-center mb-2">
                       <label class="block text-sm font-medium text-gray-700">Date Between</label>
                       <div class="group relative ml-2">
-                        <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2103,7 +2034,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Max Posts</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2121,7 +2052,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Max Comments</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2139,7 +2070,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Max Depth</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2157,7 +2088,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Max Pages</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2175,7 +2106,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Min Users</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2193,7 +2124,7 @@
                       <div class="flex items-center mb-2">
                         <label class="block text-sm font-medium text-gray-700">Sample Size</label>
                         <div class="group relative ml-2">
-                          <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
                           <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2219,7 +2150,7 @@
                 <div class="flex items-center mb-2">
                   <label class="block text-sm font-medium text-gray-700">Sampling Method</label>
                   <div class="group relative ml-2">
-                    <svg class="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-gray-500 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
@@ -2473,7 +2404,7 @@
           
           <!-- Upload Area -->
           <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-6">
-            <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-12 h-12 text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
             </svg>
             <p class="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</p>
@@ -2500,7 +2431,7 @@
                 {#each Array.from(uploadFiles) as file}
                   <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div class="flex items-center">
-                      <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-5 h-5 text-gray-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                       </svg>
                       <div>
@@ -2763,48 +2694,9 @@
             </div>
           </div>
 
-          <!-- Status and Progress -->
-          {#if princetonSmartStatus === 'connecting'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center">
-                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-                <span class="text-sm font-medium text-blue-800">Connecting to Princeton SMART API...</span>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'fetching'}
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700">Fetching data from SMART...</span>
-                <span class="text-sm text-gray-500">{princetonSmartProgress}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {princetonSmartProgress}%"></div>
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'completed'}
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                  <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="text-sm font-medium text-blue-800">Data imported successfully!</span>
-                </div>
-                {#if princetonSmartResults}
-                  <span class="text-sm text-blue-600">{princetonSmartResults.recordCount} records imported</span>
-                {/if}
-              </div>
-            </div>
-          {:else if princetonSmartStatus === 'error'}
-            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <div class="flex items-center">
-                <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-sm font-medium text-red-800">Error connecting to Princeton SMART API</span>
-              </div>
-            </div>
-          {/if}
+          <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+            Importing from Princeton SMART is not available yet. This form previews the planned configuration.
+          </div>
 
           <!-- Actions -->
           <div class="flex justify-between items-center">
@@ -2819,11 +2711,12 @@
                 class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 Reset Form
               </button>
-              <button 
-                on:click={handlePrincetonSmartImport}
-                disabled={!princetonSmartConfig.apiKey || !princetonSmartConfig.datasetId || princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching'}
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors">
-                {princetonSmartStatus === 'connecting' || princetonSmartStatus === 'fetching' ? 'Importing...' : 'Import Data'}
+              <button
+                type="button"
+                disabled
+                title="Importing from Princeton SMART is not available yet"
+                class="px-6 py-2 bg-gray-400 text-white rounded-md text-sm font-medium cursor-not-allowed">
+                Import Data
               </button>
             </div>
           </div>
@@ -2835,7 +2728,7 @@
     {#if activeTab === 'schedule'}
       <div class="space-y-6">
         <!-- Statistics -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
             <div class="text-2xl font-bold text-emerald-600 mb-1">{allJobs.filter(job => job.status === 'running').length}</div>
             <div class="text-sm text-gray-600">Running</div>
@@ -2853,12 +2746,8 @@
             <div class="text-sm text-gray-600">Failed</div>
           </div>
           <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-            <div class="text-2xl font-bold text-amber-600 mb-1">{allJobs.filter(job => job.type === 'wavepulse').length}</div>
+            <div class="text-2xl font-bold text-signal-700 mb-1">{allJobs.filter(job => job.type === 'wavepulse').length}</div>
             <div class="text-sm text-gray-600">Radio Streams</div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-            <div class="text-2xl font-bold text-purple-600 mb-1">{allJobs.filter(job => job.type === 'princeton-smart').length}</div>
-            <div class="text-sm text-gray-600">SMART Extracts</div>
           </div>
         </div>
 
@@ -2943,7 +2832,7 @@
           <div class="divide-y divide-gray-200">
             {#if loadingJobStates}
               <div class="p-6 text-center text-gray-500">
-                <svg class="mx-auto h-8 w-8 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="mx-auto h-8 w-8 animate-spin text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -2951,7 +2840,7 @@
               </div>
             {:else if allJobs.length === 0}
               <div class="p-6 text-center text-gray-500">
-                <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="mx-auto h-8 w-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                 </svg>
                 <p class="mt-2">No jobs scheduled yet</p>
@@ -2990,12 +2879,8 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                           <div class="flex items-center">
                             {#if job.type === 'wavepulse'}
-                              <svg class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg class="w-5 h-5 text-signal-700 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828a2 2 0 01-1.414-.586l5-5A2 2 0 009 12.172V5L8 4z"></path>
-                              </svg>
-                            {:else if job.type === 'princeton-smart'}
-                              <svg class="w-5 h-5 text-purple-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                               </svg>
                             {:else}
                               <svg class="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3007,8 +2892,6 @@
                               <div class="text-xs text-gray-500">
                                 {#if job.type === 'wavepulse'}
                                   Radio Stream
-                                {:else if job.type === 'princeton-smart'}
-                                  SMART Extract
                                 {:else}
                                   Crawler Job
                                 {/if}
@@ -3080,21 +2963,6 @@
                               {/if}
                               <button
                                 on:click={() => activeTab = 'wavepulse'}
-                                class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
-                                Configure
-                              </button>
-                            </div>
-                          {:else if job.type === 'princeton-smart'}
-                            <div class="flex items-center justify-end space-x-2">
-                              {#if job.status === 'scheduled' || job.status === 'idle' || job.status === 'error'}
-                                <button
-                                  on:click={handlePrincetonSmartImport}
-                                  class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md">
-                                  Run Extract
-                                </button>
-                              {/if}
-                              <button
-                                on:click={() => activeTab = 'princeton-smart'}
                                 class="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded-md hover:bg-gray-50">
                                 Configure
                               </button>
@@ -3278,7 +3146,7 @@
               <!-- Transcription Settings -->
               <div class="bg-white border border-gray-200 rounded-xl p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-5 h-5 text-signal-700 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4"></path>
                   </svg>
                   Transcription Settings
@@ -3566,7 +3434,7 @@
           </div>
           
           <div class="bg-white rounded-xl shadow-sm p-6 text-center border border-yellow-200">
-            <div class="text-3xl font-bold text-yellow-600 mb-2">{analyticsData.pendingJobs}</div>
+            <div class="text-3xl font-bold text-signal-700 mb-2">{analyticsData.pendingJobs}</div>
             <div class="text-sm font-medium text-gray-600">Pending</div>
           </div>
           
@@ -3748,7 +3616,7 @@
 
           <div class="bg-white rounded-xl shadow-sm border border-gray-200">
             <div class="p-4 border-b border-gray-200">
-              <h4 class="text-md font-semibold text-yellow-600">Pending Jobs ({analyticsData.jobsByStatus.pending.length})</h4>
+              <h4 class="text-md font-semibold text-signal-700">Pending Jobs ({analyticsData.jobsByStatus.pending.length})</h4>
             </div>
             <div class="p-4 max-h-64 overflow-y-auto">
               {#each analyticsData.jobsByStatus.pending as job}
@@ -3782,7 +3650,7 @@
         </div>
         <button 
           on:click={closeLogViewer}
-          class="text-gray-400 hover:text-gray-600 transition-colors">
+          class="text-gray-500 hover:text-gray-600 transition-colors">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>

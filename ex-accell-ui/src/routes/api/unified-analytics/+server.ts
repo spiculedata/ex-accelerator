@@ -4,7 +4,15 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
-import { queryErrorResponse } from '$lib/server/queryErrors';
+import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
+import { languageQueries } from '$lib/server/languageQueries';
+import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
+import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
+import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
+import { dateBoundToEpochMs, validateDateParams } from '$lib/server/dateBounds';
+import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
+import { exportRangeConditions } from '$lib/server/exportRange';
+import { parseDateWindow, windowConditions } from '$lib/server/dateWindow';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
 /**
@@ -52,9 +60,46 @@ async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
  * GET /api/unified-analytics
  * Test connection and basic queries for unified analytics
  */
+interface TrigramPostRow {
+  id: number | string;
+  text: string | null;
+  platform: string;
+  created_at: string | Date;
+  sentiment_category: string | null;
+  engagement_rate: string | number | null;
+}
+
+interface HashtagPostSource {
+  from: string;
+  idColumn: string;
+  contentColumn: string;
+  platformColumn: string;
+}
+
+/** Where hashtags are read from: the ETL silver.posts table when present, else the core posts table. */
+async function hashtagPostSource(): Promise<HashtagPostSource> {
+  const [row] = await executeQuery("SELECT to_regclass('silver.posts') IS NOT NULL AS present");
+  if (row?.present === true) {
+    return { from: 'FROM silver.posts', idColumn: 'post_id', contentColumn: 'content', platformColumn: 'media_type' };
+  }
+  return {
+    from: 'FROM posts p JOIN data_sources ds ON ds.id = p.data_source_id',
+    idColumn: 'p.id',
+    contentColumn: 'p.content',
+    platformColumn: 'ds.platform'
+  };
+}
+
+/** The most rows one export holds, so a very large dataset cannot build an unbounded response. */
+const EXPORT_MAX_ROWS = 10_000;
+
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const type = url.searchParams.get('type');
+
+    // A bad or reversed date range is the caller's mistake, whatever the endpoint: answer 400, not a database error
+    const dateProblem = validateDateParams(url.searchParams);
+    if (dateProblem) return json({ success: false, error: dateProblem }, { status: 400 });
 
     // Resolve workspace scope for dataset-scoped analytics
     const scope = await resolveWorkspaceScope(url);
@@ -157,17 +202,20 @@ export const GET: RequestHandler = async ({ url }) => {
           }
         }
 
-        // Date range filter
+        // Date range filter: the timestamp column is epoch milliseconds, so bounds are converted
         const dateStart = url.searchParams.get('date_start');
         const dateEnd = url.searchParams.get('date_end');
-        if (dateStart) {
-          conditions.push(`timestamp >= $${paramIndex}`);
-          params.push(dateStart);
-          paramIndex++;
-        }
-        if (dateEnd) {
-          conditions.push(`timestamp <= $${paramIndex}`);
-          params.push(dateEnd);
+        for (const [name, value, bound, op] of [
+          ['date_start', dateStart, 'start', '>='],
+          ['date_end', dateEnd, 'end', '<=']
+        ] as const) {
+          if (!value) continue;
+          const epochMs = dateBoundToEpochMs(value, bound);
+          if (epochMs === null) {
+            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp with a time zone` }, { status: 400 });
+          }
+          conditions.push(`timestamp ${op} $${paramIndex}`);
+          params.push(epochMs);
           paramIndex++;
         }
 
@@ -197,10 +245,25 @@ export const GET: RequestHandler = async ({ url }) => {
         const timeRange = url.searchParams.get('timeRange') || '30d';
         const days = timeRange === '90d' ? 90 : timeRange === '30d' ? 30 : timeRange === '14d' ? 14 : 7;
 
+        // The window is the date bar when it is set, otherwise the last N days
+        const dateBounds: Array<[string, number]> = [];
+        for (const [name, bound, op] of [['date_start', 'start', '>='], ['date_end', 'end', '<=']] as const) {
+          const value = url.searchParams.get(name);
+          if (!value) continue;
+          const epochMs = dateBoundToEpochMs(value, bound);
+          if (epochMs === null) {
+            return json({ success: false, data: null, error: `${name} must be a date (YYYY-MM-DD) or an ISO timestamp with a time zone` }, { status: 400 });
+          }
+          dateBounds.push([op, epochMs]);
+        }
+
         // Build platform filter
         const conditions: string[] = [];
-        const params: any[] = [days];
-        let paramIndex = 2;
+        const params: any[] = dateBounds.length > 0 ? dateBounds.map(([, ms]) => ms) : [days];
+        let paramIndex = params.length + 1;
+        const windowClause = dateBounds.length > 0
+          ? dateBounds.map(([op], i) => `timestamp ${op} $${i + 1}`).join(' AND ')
+          : "DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC') >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date - $1::integer";
 
         const explicitPlatforms = url.searchParams.get('platforms');
         if (explicitPlatforms !== null) {
@@ -224,16 +287,16 @@ export const GET: RequestHandler = async ({ url }) => {
         // Query live data from posts_with_sentiment instead of stale pre-aggregated table
         const data = await executeQuery(`
           SELECT
-            DATE(to_timestamp(timestamp/1000)) as date,
+            DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC') as date,
             COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) as positive,
             COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) as negative,
             COUNT(*) FILTER (WHERE sentiment_category = 'Neutral') as neutral,
             COUNT(*) as total_posts
           FROM posts_with_sentiment
           WHERE timestamp IS NOT NULL
-            AND DATE(to_timestamp(timestamp/1000)) >= CURRENT_DATE - $1::integer
+            AND ${windowClause}
             ${whereClause}
-          GROUP BY DATE(to_timestamp(timestamp/1000))
+          GROUP BY DATE(to_timestamp(timestamp/1000) AT TIME ZONE 'UTC')
           ORDER BY date
         `, params);
 
@@ -249,7 +312,8 @@ export const GET: RequestHandler = async ({ url }) => {
         const sentiment = url.searchParams.get('sentiment') || 'all';
         const platform = url.searchParams.get('platform') || 'all';
         const limit = parseInt(url.searchParams.get('limit') || '50');
-        const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 50;
+        // The sentiment page pages through up to 500 posts; nothing larger is useful in one response
+        const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 50;
 
         const conditions: string[] = ['1=1'];
         const params: any[] = [];
@@ -458,6 +522,8 @@ export const GET: RequestHandler = async ({ url }) => {
     }
     
     if (type === 'export-data') {
+      const range = exportRangeConditions(url.searchParams, 1);
+      if (!range.ok) return json({ success: false, error: range.error }, { status: 400 });
       try {
         if (scope && !scope.hasSocialMedia) return json({ success: true, data: [] });
         const sentiment = url.searchParams.get('sentiment') || 'all';
@@ -485,6 +551,13 @@ export const GET: RequestHandler = async ({ url }) => {
           paramIndex++;
         }
 
+        // The date bar and the confidence slider apply too; the placeholders are renumbered after the filters above
+        const dated = exportRangeConditions(url.searchParams, paramIndex);
+        if (dated.ok) {
+          conditions.push(...dated.conditions);
+          params.push(...dated.params);
+        }
+
         const data = await executeQuery(`
           SELECT
             id,
@@ -497,6 +570,7 @@ export const GET: RequestHandler = async ({ url }) => {
           FROM posts_with_sentiment
           WHERE ${conditions.join(' AND ')}
           ORDER BY timestamp DESC
+          LIMIT ${EXPORT_MAX_ROWS}
         `, params);
         
         return json({ success: true, data: data || [] });
@@ -538,18 +612,20 @@ export const GET: RequestHandler = async ({ url }) => {
         let whereClause = '';
         if (topicId) {
           params.push(topicId);
-          whereClause = `WHERE topic_id = $1`;
+          whereClause = `WHERE t.topic_id = $1`;
         }
 
+        // Keyed by the readable topics.topic_id so it matches topics-overview
         const data = await executeQuery(`
           SELECT
-            topic_id,
-            keyword,
-            weight,
-            rank_position
-          FROM topic_keywords
+            t.topic_id AS topic_id,
+            tk.keyword,
+            tk.weight,
+            tk.rank_position
+          FROM topic_keywords tk
+          JOIN topics t ON t.id = tk.topic_id
           ${whereClause}
-          ORDER BY topic_id, rank_position
+          ORDER BY t.topic_id, tk.rank_position
         `, params);
 
         return json({ success: true, data: data || [] });
@@ -591,14 +667,16 @@ export const GET: RequestHandler = async ({ url }) => {
 
         const data = await executeQuery(`
           SELECT
-            topic1_id,
-            topic2_id,
-            similarity_score,
-            relationship_type,
-            strength
-          FROM topic_relationships
-          WHERE similarity_score >= $1
-          ORDER BY similarity_score DESC
+            t1.topic_id AS topic1_id,
+            t2.topic_id AS topic2_id,
+            tr.similarity_score,
+            tr.relationship_type,
+            tr.strength
+          FROM topic_relationships tr
+          JOIN topics t1 ON t1.id = tr.topic1_id
+          JOIN topics t2 ON t2.id = tr.topic2_id
+          WHERE tr.similarity_score >= $1
+          ORDER BY tr.similarity_score DESC
         `, [safeThreshold]);
 
         return json({ success: true, data: data || [] });
@@ -632,21 +710,50 @@ export const GET: RequestHandler = async ({ url }) => {
     
     // ─── Language Detection Endpoints ─────────────────────────────────────
     if (type === 'language-stats') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
       try {
-        const data = await executeQuery(`
-          SELECT
-            l.code as language_code,
-            l.name as language,
-            COUNT(ld.id) as post_count,
-            AVG(ld.confidence) as confidence
-          FROM language_detection ld
-          JOIN languages l ON ld.language_code = l.code
-          GROUP BY l.code, l.name
-          ORDER BY post_count DESC
-        `);
+        const dated = windowConditions('p.created_at', parsed.window, 1);
+        const data = await executeQuery(languageQueries.stats(dated.conditions), dated.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language stats', error, []);
+      }
+    }
+
+    if (type === 'language-posts') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      try {
+        const params: any[] = [];
+        const conditions: string[] = [];
+        const platform = url.searchParams.get('platform');
+        const language = url.searchParams.get('language');
+        const minConfidence = parseFloat(url.searchParams.get('minConfidence') || '');
+        if (platform && platform !== 'all') { params.push(platform); conditions.push(`ds.platform = $${params.length}`); }
+        if (language && language !== 'all') { params.push(language); conditions.push(`l.code = $${params.length}`); }
+        if (Number.isFinite(minConfidence)) { params.push(minConfidence); conditions.push(`ld.confidence_score >= $${params.length}`); }
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
+        conditions.push(...dated.conditions);
+        params.push(Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 200));
+
+        const data = await executeQuery(languageQueries.posts(conditions, `$${params.length}`), params);
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Language posts', error, []);
+      }
+    }
+
+    if (type === 'language-mixing') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      try {
+        const dated = windowConditions('p.created_at', parsed.window, 1);
+        const data = await executeQuery(languageQueries.mixing(dated.conditions), dated.params);
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Language mixing', error, []);
       }
     }
 
@@ -674,19 +781,21 @@ export const GET: RequestHandler = async ({ url }) => {
         let whereClause = '';
         if (langCode !== 'all') {
           params.push(langCode);
-          whereClause = `WHERE ld.language_code = $1`;
+          whereClause = `WHERE l.code = $1`;
         }
         const data = await executeQuery(`
           SELECT
-            ld.document_id,
-            ld.document_source,
-            ld.language_code,
-            ld.confidence,
-            l.name as language_name
+            ld.post_id AS document_id,
+            ds.platform AS document_source,
+            l.code AS language_code,
+            ld.confidence_score AS confidence,
+            l.name AS language_name
           FROM language_detection ld
-          JOIN languages l ON ld.language_code = l.code
+          JOIN languages l ON ld.language_id = l.id
+          LEFT JOIN posts p ON p.id = ld.post_id
+          LEFT JOIN data_sources ds ON ds.id = p.data_source_id
           ${whereClause}
-          ORDER BY ld.confidence DESC
+          ORDER BY ld.confidence_score DESC
           LIMIT 100
         `, params);
         return json({ success: true, data });
@@ -1238,37 +1347,126 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
+    if (type?.startsWith('engagement-')) {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      try {
+        const wsId = url.searchParams.get('workspace_id');
+        let platforms: string[] = [];
+        if (wsId && scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
+        const filter = platforms.length > 0;
+        const params: any[] = filter ? [platforms] : [];
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
+        const dateConditions = dated.conditions;
+        const limitParam = `$${params.length + 1}`;
+        const days = ENGAGEMENT_TRENDS_DAYS[url.searchParams.get('timeRange') || '7d'] ?? 7;
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10') || 10, 1), 100);
+
+        const queries: Record<string, { sql: string; extra?: any[] }> = {
+          'engagement-stats': { sql: engagementQueries.stats(filter, dateConditions) },
+          'engagement-platforms': { sql: engagementQueries.platforms(filter, dateConditions) },
+          'engagement-content-types': { sql: engagementQueries.contentTypes(filter, dateConditions) },
+          'engagement-trends': { sql: engagementQueries.trends(filter, days, dateConditions) },
+          'engagement-top-posts': { sql: engagementQueries.topPosts(filter, limitParam, dateConditions), extra: [limit] },
+          'engagement-timing': { sql: engagementQueries.timing(filter, dateConditions) }
+        };
+        const query = queries[type];
+        if (!query) return json({ success: false, error: `Unknown engagement query: ${type}` }, { status: 400 });
+
+        const data = await executeQuery(query.sql, [...params, ...(query.extra ?? [])]);
+        return json({ success: true, data });
+      } catch (error) {
+        return queryErrorResponse('Engagement analysis', error, []);
+      }
+    }
+
+    if (type === 'trigrams') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      try {
+        const intParam = (name: string, fallback: number, min: number, max: number): number => {
+          const parsed = parseInt(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+        };
+        const sentimentParam = (name: string, fallback: number): number => {
+          const parsed = parseFloat(url.searchParams.get(name) || '');
+          return Number.isFinite(parsed) ? Math.min(Math.max(parsed, -1), 1) : fallback;
+        };
+
+        const days = TRIGRAM_TIME_RANGE_DAYS[url.searchParams.get('timeRange') || ''] ?? TRIGRAM_DEFAULT_DAYS;
+        const platform = url.searchParams.get('platform');
+        const filterByPlatform = !!platform && platform !== 'all';
+        const workspacePlatforms = scope?.hasSocialMedia && scope.socialPlatforms.length > 0 ? scope.socialPlatforms : [];
+
+        const params: any[] = [];
+        if (workspacePlatforms.length > 0) params.push(workspacePlatforms);
+        if (filterByPlatform) params.push(platform);
+        const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
+        params.push(...dated.params);
+
+        const rows: TrigramPostRow[] = await executeQuery(
+          trigramPostsQuery({ workspacePlatforms: workspacePlatforms.length > 0, platform: filterByPlatform }, days, dated.conditions),
+          params
+        );
+        const posts = rows.map((row) => ({
+          id: row.id,
+          text: String(row.text ?? ''),
+          platform: String(row.platform),
+          createdAt: new Date(row.created_at),
+          sentiment: row.sentiment_category ?? null,
+          engagementRate: Number(row.engagement_rate) || 0
+        }));
+
+        // When the scan hit its cap, the oldest posts were dropped: measure trends from the oldest one kept
+        const now = new Date();
+        const truncated = rows.length >= TRIGRAM_MAX_POSTS;
+        const oldestKept = posts.reduce((oldest, p) => Math.min(oldest, p.createdAt.getTime()), now.getTime());
+        const trendPeriod = trendWindow(parsed.window, days, now, oldestKept, truncated);
+
+        const data = computeTrigrams(posts, {
+          now: trendPeriod.end,
+          windowStart: trendPeriod.start,
+          minFrequency: intParam('minFrequency', 1, 1, 1000),
+          maxResults: intParam('maxResults', 100, 1, 500),
+          search: url.searchParams.get('search') || undefined,
+          sentimentRange: [sentimentParam('minSentiment', -1), sentimentParam('maxSentiment', 1)]
+        });
+        return json({ success: true, data, meta: { truncated, scannedPosts: rows.length } });
+      } catch (error) {
+        return queryErrorResponse('Trigram analysis', error, []);
+      }
+    }
+
     if (type === 'hashtag-analysis') {
       try {
-        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 500);
         const wsId = url.searchParams.get('workspace_id');
+
+        // ETL installs keep posts in silver.posts; otherwise use the core posts table
+        const source = await hashtagPostSource();
 
         // Only apply platform filter if workspace is specified
         let platformFilter = '';
-        const params: any[] = [];
-        let paramIndex = 1;
-
+        const filterParams: any[] = [];
         if (wsId) {
           const scope = await resolveWorkspaceScope(url);
           if (scope.hasSocialMedia && scope.socialPlatforms.length > 0) {
-            platformFilter = `AND media_type = ANY($${paramIndex})`;
-            params.push(scope.socialPlatforms);
-            paramIndex++;
+            platformFilter = `AND ${source.platformColumn} = ANY($1)`;
+            filterParams.push(scope.socialPlatforms);
           }
         }
+        const limitParam = `$${filterParams.length + 1}`;
 
-        params.push(limit);
-
-        // Extract hashtags from posts using regex
         const data = await executeQuery(`
           WITH hashtag_extract AS (
             SELECT
-              unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag,
-              post_id,
-              media_type
-            FROM silver.posts
-            WHERE content IS NOT NULL
-              AND content LIKE '%#%'
+              unnest(regexp_matches(${source.contentColumn}, '#([A-Za-z0-9_]+)', 'g')) as hashtag,
+              ${source.idColumn} as post_id,
+              ${source.platformColumn} as media_type
+            ${source.from}
+            WHERE ${source.contentColumn} IS NOT NULL
+              AND ${source.contentColumn} LIKE '%#%'
               ${platformFilter}
           )
           SELECT
@@ -1280,17 +1478,17 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
           GROUP BY lower(hashtag)
           HAVING COUNT(*) >= 2
           ORDER BY count DESC
-          LIMIT $${paramIndex}
-        `, params);
+          LIMIT ${limitParam}
+        `, [...filterParams, limit]);
 
         // Also get hashtag co-occurrence (top pairs)
         const cooccurrence = await executeQuery(`
           WITH hashtag_extract AS (
             SELECT
-              post_id,
-              unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag
-            FROM silver.posts
-            WHERE content IS NOT NULL AND content LIKE '%#%'
+              ${source.idColumn} as post_id,
+              unnest(regexp_matches(${source.contentColumn}, '#([A-Za-z0-9_]+)', 'g')) as hashtag
+            ${source.from}
+            WHERE ${source.contentColumn} IS NOT NULL AND ${source.contentColumn} LIKE '%#%'
             ${platformFilter}
           ),
           pairs AS (
@@ -1304,7 +1502,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
           HAVING COUNT(*) >= 2
           ORDER BY co_count DESC
           LIMIT 20
-        `, platformFilter ? params.slice(0, -1) : []);
+        `, filterParams);
 
         return json({
           success: true,
@@ -1315,9 +1513,10 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
             totalPosts: data.reduce((sum: number, h: any) => sum + parseInt(h.post_count || 0), 0)
           }
         });
-      } catch (error: any) {
-        console.error('Hashtag analysis failed:', error);
-        return json({ success: true, data: { hashtags: [], cooccurrence: [], totalHashtags: 0, totalPosts: 0 } });
+      } catch (error) {
+        return queryErrorResponse('Hashtag analysis', error, {
+          hashtags: [], cooccurrence: [], totalHashtags: 0, totalPosts: 0
+        });
       }
     }
 
@@ -1346,22 +1545,27 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
-    if (type === 'datasets') {
-      // Return mock datasets for now since we don't have real data tables yet
-      return json({
-        success: true,
-        datasets: [
-          {
-            id: 'sample_social',
-            name: 'Sample Social Media Data',
-            description: 'Sample dataset for testing workflows',
-            table: 'posts',
-            type: 'sample'
-          }
-        ]
-      });
+    if (type === 'workflow-datasets') {
+      try {
+        // The counts are independent, so run them together; a module whose table does not exist yet has no data
+        const entries = await Promise.all(
+          Object.entries(WORKFLOW_DATASET_COUNT_QUERIES).map(async ([key, sql]) => {
+            try {
+              const [row] = await executeQuery(sql);
+              return [key, Number(row?.count) || 0] as const;
+            } catch (error) {
+              if (!isMissingRelationError(error)) throw error;
+              return [key, 0] as const;
+            }
+          })
+        );
+        const counts = Object.fromEntries(entries) as unknown as WorkflowDatasetCounts;
+        return json({ success: true, data: buildWorkflowDatasets(counts) });
+      } catch (error) {
+        return queryErrorResponse('Workflow datasets', error, []);
+      }
     }
-    
+
     // ========== Radio Analytics Handlers ==========
 
     if (type === 'radio-overview') {
@@ -1532,11 +1736,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       const keywordsArray = keywords.split(',').map((k: string) => '%' + k.trim() + '%');
 
       try {
-        const data = await executeQuery(`
-          WITH date_series AS (
-            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS d
-          ),
-          gdelt AS (
+        // A source whose table does not exist yet contributes empty columns instead of failing the whole timeline
+        const [present] = await executeQuery("SELECT to_regclass('gdelt_events') IS NOT NULL AS gdelt, to_regclass('radio_transcripts') IS NOT NULL AS radio");
+        const gdeltCte = present?.gdelt === true ? `gdelt AS (
             SELECT TO_DATE(sqldate::text, 'YYYYMMDD') AS d,
               COUNT(*) AS event_count, AVG(goldsteinscale) AS avg_goldstein, AVG(avgtone) AS avg_tone
             FROM gdelt_events
@@ -1545,8 +1747,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
               AND (actor1name ILIKE ANY($3::text[]) OR actor2name ILIKE ANY($3::text[])
                    OR actiongeo_fullname ILIKE ANY($3::text[]))
             GROUP BY 1
-          ),
-          radio AS (
+          ),` : `gdelt AS (SELECT NULL::date AS d, 0::bigint AS event_count, NULL::float8 AS avg_goldstein, NULL::float8 AS avg_tone WHERE false),`;
+        const radioCte = present?.radio === true ? `radio AS (
             SELECT DATE(segment_start) AS d, COUNT(*) AS segment_count,
               COUNT(*) FILTER (WHERE sentiment = 'positive') AS positive,
               COUNT(*) FILTER (WHERE sentiment = 'negative') AS negative,
@@ -1555,8 +1757,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
             WHERE segment_start >= $1::timestamp AND segment_start <= ($2::date + 1)::timestamp
               AND transcript ILIKE ANY($3::text[])
             GROUP BY 1
-          ),
-          social AS (
+          ),` : `radio AS (SELECT NULL::date AS d, 0::bigint AS segment_count, 0::bigint AS positive, 0::bigint AS negative, 0::bigint AS neutral WHERE false),`;
+        const socialCte = `social AS (
             SELECT DATE(to_timestamp(timestamp/1000)) AS d, COUNT(*) AS post_count,
               COUNT(*) FILTER (WHERE sentiment_category IN ('Positive','Very Positive')) AS positive,
               COUNT(*) FILTER (WHERE sentiment_category IN ('Negative','Very Negative')) AS negative,
@@ -1566,7 +1768,15 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
               AND to_timestamp(timestamp/1000) <= ($2::date + 1)::timestamp
               AND text ILIKE ANY($3::text[])
             GROUP BY 1
-          )
+          )`;
+
+        const data = await executeQuery(`
+          WITH date_series AS (
+            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS d
+          ),
+          ${gdeltCte}
+          ${radioCte}
+          ${socialCte}
           SELECT ds.d as date,
             COALESCE(g.event_count, 0) as gdelt_events, g.avg_goldstein, g.avg_tone,
             COALESCE(r.segment_count, 0) as radio_segments, COALESCE(r.positive, 0) as radio_positive,
@@ -1664,7 +1874,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
 
       try {
         const data = await executeQuery(`
-          SELECT id, text, timestamp, platform,
+          SELECT id, text, timestamp, platform, author,
             sentiment_category, confidence_score, emotions,
             engagement_likes, engagement_shares, engagement_comments
           FROM posts_with_sentiment
@@ -1846,7 +2056,6 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       message: `Query type '${type}' not implemented yet`,
       endpoints: {
         test: '/api/unified-analytics?type=test',
-        datasets: '/api/unified-analytics?type=datasets',
         'cross-platform-sentiment': '/api/unified-analytics?type=cross-platform-sentiment',
         'sentiment-trends': '/api/unified-analytics?type=sentiment-trends',
         'radio-overview': '/api/unified-analytics?type=radio-overview',

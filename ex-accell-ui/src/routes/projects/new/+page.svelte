@@ -1,14 +1,18 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { setCurrentProject } from '$lib/stores/projectStore';
+  import { createFailureMessage, isEmail, nameProblem } from '$lib/utils/projectForm';
   
   let projectName = '';
   let projectDescription = '';
   let projectType = 'social-media';
-  let dataSources: any[] = [];
   let teamMembers: any[] = [];
   let newMemberEmail = '';
   let isCreating = false;
+  // Problems are shown next to the field they belong to, not in a browser alert
+  let nameError: string | null = null;
+  let memberError: string | null = null;
+  let formError: string | null = null;
 
   const projectTypes = [
     { value: 'social-media', label: 'Social Media Analysis', description: 'Analyze sentiment, trends, and engagement from social platforms' },
@@ -17,31 +21,16 @@
     { value: 'content-analysis', label: 'Content Analysis', description: 'Analyze documents, articles, and multimedia content' }
   ];
 
-  const availableDataSources = [
-    { id: 'twitter', name: 'Twitter/X', type: 'social' },
-    { id: 'reddit', name: 'Reddit', type: 'social' },
-    { id: 'telegram', name: 'Telegram', type: 'social' },
-    { id: 'youtube', name: 'YouTube', type: 'social' },
-    { id: 'instagram', name: 'Instagram', type: 'social' },
-    { id: 'linkedin', name: 'LinkedIn', type: 'social' },
-    { id: 'csv-upload', name: 'CSV Upload', type: 'upload' },
-    { id: 'json-upload', name: 'JSON Upload', type: 'upload' },
-    { id: 'text-files', name: 'Text Files', type: 'upload' }
-  ];
-
-  function toggleDataSource(sourceId: string) {
-    if (dataSources.includes(sourceId)) {
-      dataSources = dataSources.filter(id => id !== sourceId);
-    } else {
-      dataSources = [...dataSources, sourceId];
-    }
-  }
-
   function addTeamMember() {
-    if (newMemberEmail.trim() && !teamMembers.includes(newMemberEmail.trim())) {
-      teamMembers = [...teamMembers, newMemberEmail.trim()];
-      newMemberEmail = '';
+    const email = newMemberEmail.trim();
+    if (!email) return;
+    if (!isEmail(email)) {
+      memberError = 'Enter a full email address, such as name@company.com';
+      return;
     }
+    memberError = null;
+    if (!teamMembers.includes(email)) teamMembers = [...teamMembers, email];
+    newMemberEmail = '';
   }
 
   function removeTeamMember(email: string) {
@@ -49,7 +38,12 @@
   }
 
   async function createProject() {
-    if (!projectName.trim()) return;
+    nameError = nameProblem(projectName);
+    formError = null;
+    if (nameError) {
+      document.getElementById('project-name')?.focus();
+      return;
+    }
 
     isCreating = true;
 
@@ -62,8 +56,6 @@
           name: projectName,
           description: projectDescription,
           project_type: projectType,
-          created_by: 'current_user@example.com', // TODO: Get from auth
-          data_sources: dataSources,
           team_members: teamMembers
         })
       });
@@ -71,22 +63,29 @@
       const result = await response.json();
 
       if (result.success && result.project) {
-        // Redirect to the new project (it will load from database)
+        // Make it the open project, so the header and the next pages are about the project just created
+        try {
+          await setCurrentProject(String(result.project.id));
+        } catch (error) {
+          console.error('Could not open the new project:', error); // it was created; go to it regardless
+        }
         goto(`/projects/${result.project.id}`);
       } else {
-        alert('Failed to create project: ' + (result.error || 'Unknown error'));
+        const failure = createFailureMessage(result.error);
+        if (failure.field === 'name') {
+          nameError = failure.message;
+          document.getElementById('project-name')?.focus();
+        }
+        else formError = failure.message;
         isCreating = false;
       }
     } catch (error) {
       console.error('Error creating project:', error);
-      alert('Failed to create project');
+      formError = createFailureMessage(undefined).message;
       isCreating = false;
     }
   }
 
-  function validateForm() {
-    return projectName.trim().length > 0 && dataSources.length > 0;
-  }
 </script>
 
 <svelte:head>
@@ -100,7 +99,7 @@
     <div class="flex items-center">
       <button 
         on:click={() => window.history.back()}
-        class="mr-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-xl transition-colors">
+        class="mr-4 p-2 text-white hover:bg-white/20 rounded-xl transition-colors">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
         </svg>
@@ -117,7 +116,7 @@
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="p-8">
-      <form on:submit|preventDefault={createProject} class="space-y-8">
+      <form on:submit|preventDefault={createProject} class="space-y-8" novalidate>
         
         <!-- Basic Information -->
         <div>
@@ -130,10 +129,16 @@
               <input 
                 id="project-name"
                 bind:value={projectName}
+                on:input={() => (nameError = null)}
                 type="text" 
-                required
+                aria-required="true"
+                aria-invalid={nameError ? 'true' : undefined}
+                aria-describedby={nameError ? 'project-name-error' : undefined}
                 placeholder="e.g., Brand Sentiment Analysis Q1 2025"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {nameError ? 'border-danger-500' : 'border-gray-300'}">
+              {#if nameError}
+                <p id="project-name-error" role="alert" class="mt-1 text-sm text-danger-700">{nameError}</p>
+              {/if}
             </div>
             
             <div>
@@ -179,38 +184,12 @@
           </div>
         </div>
 
-        <!-- Data Sources -->
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900 mb-6">Data Sources *</h2>
-          <p class="text-sm text-gray-600 mb-4">Select the data sources you plan to use in this project</p>
-          
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each availableDataSources as source}
-              <label class="relative cursor-pointer">
-                <input 
-                  type="checkbox"
-                  on:change={() => toggleDataSource(source.id)}
-                  class="sr-only">
-                <div class="border-2 rounded-xl p-4 transition-all {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
-                  <div class="flex items-center">
-                    <div class="w-5 h-5 border-2 rounded mr-3 flex items-center justify-center {dataSources.includes(source.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
-                      {#if dataSources.includes(source.id)}
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                      {/if}
-                    </div>
-                    <div>
-                      <h3 class="font-medium text-gray-900">{source.name}</h3>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {source.type === 'social' ? 'bg-blue-100 text-blue-800' : 'bg-blue-100 text-blue-800'} mt-1">
-                        {source.type === 'social' ? 'Social Media' : 'File Upload'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </label>
-            {/each}
-          </div>
+        <!-- Where data comes from: datasets are linked per workspace, not chosen here -->
+        <div class="rounded-xl border border-ink-200 bg-ink-50 px-5 py-4">
+          <h2 class="text-base font-semibold text-ink-900">Where the data comes from</h2>
+          <p class="mt-1 text-sm text-ink-600">
+            You link datasets to a workspace after the project is created, so there is nothing to choose here.
+          </p>
         </div>
 
         <!-- Team Members -->
@@ -221,9 +200,14 @@
           <div class="flex space-x-2 mb-4">
             <input 
               bind:value={newMemberEmail}
+              on:input={() => (memberError = null)}
+              on:keydown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTeamMember(); } }}
               type="email" 
+              aria-label="Team member email"
+              aria-invalid={memberError ? 'true' : undefined}
+              aria-describedby={memberError ? 'member-error' : undefined}
               placeholder="colleague@company.com"
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 {memberError ? 'border-danger-500' : 'border-gray-300'}">
             <button 
               type="button"
               on:click={addTeamMember}
@@ -232,6 +216,9 @@
               Add
             </button>
           </div>
+          {#if memberError}
+            <p id="member-error" role="alert" class="-mt-2 mb-4 text-sm text-danger-700">{memberError}</p>
+          {/if}
 
           {#if teamMembers.length > 0}
             <div class="space-y-2">
@@ -250,6 +237,10 @@
           {/if}
         </div>
 
+        {#if formError}
+          <p role="alert" class="rounded-md border border-danger-300 bg-danger-50 px-4 py-3 text-sm text-danger-900">{formError}</p>
+        {/if}
+
         <!-- Actions -->
         <div class="flex justify-between items-center pt-6 border-t border-gray-200">
           <button 
@@ -261,7 +252,7 @@
           
           <button 
             type="submit"
-            disabled={!validateForm() || isCreating}
+            disabled={isCreating}
             class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors flex items-center">
             {#if isCreating}
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

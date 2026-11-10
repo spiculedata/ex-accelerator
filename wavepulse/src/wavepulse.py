@@ -1,5 +1,5 @@
 # NOTE: Derived from NYU-DICE-Lab/WavePulse (Apache-2.0, Copyright 2024 New York University).
-# Modified by ex-accelerator contributors (see git history for changes). See NOTICE and README.md.
+# Modified by Social Explorer contributors (see git history for changes). See NOTICE and README.md.
 """
 Controller for audio_processor and fact_checker modules.
  Trigger audio_processor at set timmings for different radio stations.

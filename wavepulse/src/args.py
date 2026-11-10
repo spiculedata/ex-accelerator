@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # NOTE: Derived from NYU-DICE-Lab/WavePulse (Apache-2.0, Copyright 2024 New York University).
-# Modified by ex-accelerator contributors (see git history for changes). See NOTICE and README.md.
+# Modified by Social Explorer contributors (see git history for changes). See NOTICE and README.md.
 #
 # New York University
 

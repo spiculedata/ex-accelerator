@@ -33,3 +33,24 @@ export function highlightKeywords(text: string, keywords: readonly string[]): st
     )
     .join('');
 }
+
+export interface HighlightSegment {
+  text: string;
+  match: boolean;
+}
+
+/**
+ * Splits text into plain and matching segments for rendering with ordinary Svelte markup (no {@html}).
+ * Terms are matched literally and case-insensitively.
+ */
+export function splitHighlight(text: string, keywords: readonly string[]): HighlightSegment[] {
+  if (!text) return [];
+  const terms = keywords.map((keyword) => keyword.trim()).filter((keyword) => keyword.length > 0).map(escapeRegExp);
+  if (terms.length === 0) return [{ text, match: false }];
+
+  const matcher = new RegExp(`(${terms.join('|')})`, 'gi');
+  return text
+    .split(matcher)
+    .map((part, index) => ({ text: part, match: index % 2 === 1 }))
+    .filter((segment) => segment.text.length > 0);
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -6,6 +7,7 @@
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { getCountryNameWithFallback } from '$lib/countryMapping';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 
   // Helper: resolve country code to full name
   function countryName(code: string): string {
@@ -33,6 +35,8 @@
   let conflicts: any[] = [];
   let topCountries: any[] = [];
   let summary: any = null;
+  // GDELT has not been loaded: explain it instead of showing three blank cards
+  let unavailable = false;
   let countryLoading = false;
 
   // Simple markdown to HTML for LLM output (bold, italic, lists)
@@ -104,6 +108,7 @@
       ]);
 
       const summaryData = await summaryRes.json();
+      unavailable = !!summaryData.meta?.unavailable || (summaryData.success && !summaryData.data?.length);
       const conflictsData = await conflictsRes.json();
       const countriesData = await countriesRes.json();
 
@@ -181,9 +186,9 @@
         { type: 'value', name: 'Events', position: 'right' }
       ],
       series: [
-        { name: 'Tone', type: 'line', data: toneValues, smooth: true, lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' } },
-        { name: 'Goldstein', type: 'line', data: goldsteinValues, smooth: true, lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' } },
-        { name: 'Events', type: 'bar', data: eventCounts, yAxisIndex: 1, itemStyle: { color: '#e5e7eb' }, barWidth: '60%' }
+        { name: 'Tone', type: 'line', data: toneValues, smooth: true, lineStyle: { color: CHART.catBlue }, itemStyle: { color: CHART.catBlue } },
+        { name: 'Goldstein', type: 'line', data: goldsteinValues, smooth: true, lineStyle: { color: CHART.danger500 }, itemStyle: { color: CHART.danger500 } },
+        { name: 'Events', type: 'bar', data: eventCounts, yAxisIndex: 1, itemStyle: { color: CHART.ink200 }, barWidth: '60%' }
       ]
     });
   }
@@ -202,14 +207,14 @@
   function getGoldsteinColor(value: number): string {
     if (value >= 5) return 'text-green-600';
     if (value >= 0) return 'text-blue-600';
-    if (value >= -5) return 'text-amber-600';
+    if (value >= -5) return 'text-signal-700';
     return 'text-red-600';
   }
 
   function getToneColor(value: number): string {
     if (value >= 2) return 'text-green-600';
     if (value >= 0) return 'text-blue-600';
-    if (value >= -2) return 'text-amber-600';
+    if (value >= -2) return 'text-signal-700';
     return 'text-red-600';
   }
 
@@ -218,12 +223,12 @@
 
 <svelte:head>
   <title>GDELT Intelligence - Social Explorer</title>
+  <meta name="description" content="Explore global events, conflicts and media narratives from GDELT." />
 </svelte:head>
 
 <PageHeader
   title="GDELT Intelligence"
   subtitle="Explore global events, conflicts, and media narratives"
-  accentColor="red"
   showProject={false}
 >
   <svelte:fragment slot="actions">
@@ -251,14 +256,14 @@
             placeholder="Search countries, actors, locations... (e.g. Iran, UNITED STATES, Ukraine)"
             class="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
           />
-          <svg class="absolute left-3 top-3 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="absolute left-3 top-3 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
         </div>
       </div>
-      <div class="flex gap-2 items-center">
+      <div class="flex flex-wrap gap-2 items-center">
         <input type="date" bind:value={dateStart} class="text-sm border border-gray-200 rounded-lg px-3 py-2" />
-        <span class="text-gray-400 text-sm">to</span>
+        <span class="text-gray-500 text-sm">to</span>
         <input type="date" bind:value={dateEnd} class="text-sm border border-gray-200 rounded-lg px-3 py-2" />
         <button on:click={handleSearch} class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">
           Search
@@ -270,6 +275,12 @@
   {#if loading}
     <div class="flex items-center justify-center py-16">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+    </div>
+  {:else if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <DataUnavailable
+        title="No GDELT events are loaded"
+        description="The intelligence dashboard summarises GDELT news events by country and conflict. It fills in once GDELT data has been loaded into the database." />
     </div>
   {:else}
 
@@ -550,7 +561,7 @@
         <div>
           <h3 class="text-sm font-semibold text-gray-700 mb-2" title="Top events ranked by number of source articles — more articles indicates higher media significance">
             Key Events
-            <span class="text-xs font-normal text-gray-400 ml-1 cursor-help" title="Sorted by number of source news articles covering the event. Higher article count = more media attention.">ⓘ</span>
+            <span class="text-xs font-normal text-gray-500 ml-1 cursor-help" title="Sorted by number of source news articles covering the event. Higher article count = more media attention.">ⓘ</span>
           </h3>
           <div class="space-y-2 max-h-48 overflow-y-auto">
             {#each (countryDetail.keyEvents || []).slice(0, 5) as event}

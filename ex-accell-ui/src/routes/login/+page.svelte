@@ -1,5 +1,7 @@
 <script lang="ts">
+  import BrandMark from '$lib/components/ui/BrandMark.svelte';
   import { goto, invalidateAll } from '$app/navigation';
+  import { sessionExpired } from '$lib/utils/sessionExpiry';
 
   export let data: { next: string };
 
@@ -26,6 +28,7 @@
         return;
       }
 
+      sessionExpired.set(false);
       await invalidateAll();
       await goto(data.next, { replaceState: true });
     } catch {
@@ -37,16 +40,15 @@
 </script>
 
 <svelte:head>
-  <title>Sign in | Social Explorer</title>
+  <title>Sign in - Social Explorer</title>
+  <meta name="description" content="Sign in to Social Explorer to analyse social media, news and image data." />
 </svelte:head>
 
 <div class="min-h-screen bg-slate-50 flex items-center justify-center px-4">
   <div class="w-full max-w-sm">
     <div class="flex items-center justify-center mb-8">
-      <div class="h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center">
-        <span class="text-white font-bold text-xl">SE</span>
-      </div>
-      <h1 class="ml-3 text-2xl font-bold text-gray-900">Social Explorer</h1>
+      <BrandMark size={40} class="text-primary-700" />
+      <h1 class="ml-3 text-3xl font-semibold tracking-tight text-ink-900">Social Explorer</h1>
     </div>
 
     <form on:submit={signIn} class="bg-white shadow-lg rounded-xl border border-gray-200 p-6 space-y-5" aria-labelledby="signin-heading">

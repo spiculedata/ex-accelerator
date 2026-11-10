@@ -1,0 +1,65 @@
+import { canAccessProject, type ProjectAccessInfo, type RequestResources } from './access';
+import { loadProjectAccessInfo, projectIdOfWorkspace } from './accessRepo';
+import type { SessionUser } from './session';
+
+// Membership changes rarely and is checked on many requests, so answers are kept briefly. A person added to a project
+// gets in, and one removed is shut out, within this long.
+const CACHE_TTL_MS = 30_000;
+
+interface Cached<T> {
+  value: T;
+  at: number;
+}
+
+// Raised whenever membership is forgotten, so a lookup that began before the change cannot store its stale answer after it
+let generation = 0;
+
+const projectCache = new Map<number, Cached<ProjectAccessInfo>>();
+const workspaceCache = new Map<number, Cached<number>>();
+
+// A "does not exist" answer is not remembered: a project created a moment after someone asked about its id must not be
+// open to everyone for the rest of the window
+async function cached<K, V>(cache: Map<K, Cached<V>>, key: K, load: (key: K) => Promise<V | null>): Promise<V | null> {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+  const startedAt = generation;
+  const value = await load(key);
+  if (value !== null && startedAt === generation) cache.set(key, { value, at: Date.now() });
+  return value;
+}
+
+export type AccessResult = { allowed: true } | { allowed: false; what: 'project' | 'workspace' };
+
+/**
+ * Whether the user may see every project and workspace the request names. A resource that does not exist is allowed
+ * here so the route can answer 404 itself. Database failures are raised, never guessed at.
+ */
+export async function checkAccess(user: Pick<SessionUser, 'email' | 'role'>, resources: RequestResources): Promise<AccessResult> {
+  if (user.role === 'admin') return { allowed: true };
+
+  for (const projectId of resources.projects) {
+    const info = await cached(projectCache, projectId, loadProjectAccessInfo);
+    if (info && !canAccessProject(user, info)) return { allowed: false, what: 'project' };
+  }
+  for (const workspaceId of resources.workspaces) {
+    const projectId = await cached(workspaceCache, workspaceId, projectIdOfWorkspace);
+    if (projectId === null) continue;
+    const info = await cached(projectCache, projectId, loadProjectAccessInfo);
+    if (info && !canAccessProject(user, info)) return { allowed: false, what: 'workspace' };
+  }
+  return { allowed: true };
+}
+
+/** Forgets remembered membership, for example after someone is added to or removed from a project. */
+export function forgetProjectAccess(projectId?: number): void {
+  generation++;
+  if (projectId === undefined) projectCache.clear();
+  else projectCache.delete(projectId);
+}
+
+/** For tests: forget everything that was remembered. */
+export function resetAccessCacheForTests(): void {
+  generation++;
+  projectCache.clear();
+  workspaceCache.clear();
+}

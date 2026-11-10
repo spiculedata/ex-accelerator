@@ -1,10 +1,12 @@
 <svelte:head>
-  <title>Social Explorer</title>
+  <title>Home - Social Explorer</title>
   <meta name="description" content="Social Explorer - project overview and activity feed" />
 </svelte:head>
 
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, onDestroy } from 'svelte';
+  import { insightText, needsFirstRun, sourceNames } from '$lib/utils/homeProject';
   import { goto } from '$app/navigation';
 
   // ---------- types ----------
@@ -49,7 +51,6 @@
   interface Summary {
     total_projects: number;
     total_events: number;
-    active_crawlers: number;
     alerts: number;
   }
 
@@ -58,7 +59,7 @@
   let error = '';
   let projects: Project[] = [];
   let activity: Activity[] = [];
-  let summary: Summary = { total_projects: 0, total_events: 0, active_crawlers: 0, alerts: 0 };
+  let summary: Summary = { total_projects: 0, total_events: 0, alerts: 0 };
   let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
   // ---------- helpers ----------
@@ -72,16 +73,8 @@
   function freshness(dateStr: string): { label: string; color: string } {
     const hours = (Date.now() - new Date(dateStr).getTime()) / 3600000;
     if (hours < 24) return { label: 'just now', color: 'text-emerald-600' };
-    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-amber-600' };
+    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-signal-700' };
     return { label: `${Math.floor(hours / 168)}w ago`, color: 'text-slate-400' };
-  }
-
-  function insightText(project: Project): string {
-    if (project.anomaly?.type === 'volume_spike') return 'Volume spike detected';
-    if (project.anomaly?.type === 'sentiment_shift') return 'Sentiment shift detected';
-    if (project.sentiment_trend === 'positive') return 'Sentiment trending positive';
-    if (project.sentiment_trend === 'negative') return 'Sentiment trending negative';
-    return 'Steady, no significant changes';
   }
 
   function formatCount(n: number): string {
@@ -103,7 +96,7 @@
       case 'data_ingestion':
         return { symbol: '●', bg: 'text-emerald-500' };
       case 'sentiment_shift':
-        return { symbol: '▲', bg: 'text-amber-500' };
+        return { symbol: '▲', bg: 'text-signal-700' };
       case 'system_health':
         return { symbol: '●', bg: 'text-red-500' };
       default:
@@ -147,7 +140,7 @@
     <h1 class="text-lg font-semibold text-slate-900">Social Explorer</h1>
     {#if !loading}
       <span class="text-sm text-slate-500">
-        {summary.total_projects} project{summary.total_projects !== 1 ? 's' : ''} · {formatCount(summary.total_events)} events · {summary.active_crawlers} active crawler{summary.active_crawlers !== 1 ? 's' : ''}
+        {summary.total_projects} project{summary.total_projects !== 1 ? 's' : ''} · {formatCount(summary.total_events)} recent events
       </span>
     {/if}
   </div>
@@ -155,10 +148,7 @@
   <div class="flex items-center gap-3">
     {#if !loading}
       <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-        Events today: {formatCount(summary.total_events)}
-      </span>
-      <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-        Active crawlers: {summary.active_crawlers}
+        Recent events: {formatCount(summary.total_events)}
       </span>
       <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium {summary.alerts > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
         Alerts: {summary.alerts}
@@ -209,6 +199,20 @@
 
       <!-- ===== PROJECT CARDS ===== -->
       <section class="lg:w-[65%] lg:overflow-y-auto lg:pr-2">
+        {#if needsFirstRun(projects)}
+          <!-- First run: say what this is and what to do, until a project has a workspace -->
+          <div class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-slate-900">Start here</h2>
+            <p class="mt-1 text-sm text-slate-600">
+              Social Explorer analyses social media posts, news events and images: sentiment, topics, languages and engagement, with investigations you can annotate and export.
+            </p>
+            <ol class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <li class="rounded-lg bg-slate-50 p-3"><span class="font-semibold text-slate-900">1. Create a project</span><br /><a class="text-indigo-700 underline" href="/projects/new">New project</a></li>
+              <li class="rounded-lg bg-slate-50 p-3"><span class="font-semibold text-slate-900">2. Link data in a workspace</span><br /><span class="text-slate-600">Open the project, add a workspace and choose its datasets.</span></li>
+              <li class="rounded-lg bg-slate-50 p-3"><span class="font-semibold text-slate-900">3. Open an analysis</span><br /><a class="text-indigo-700 underline" href="/text-analytics/sentiment-analysis">Sentiment Analysis</a></li>
+            </ol>
+          </div>
+        {/if}
         {#if projects.length === 0}
           <div class="flex flex-col items-center justify-center py-20 text-center">
             <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-4">
@@ -217,7 +221,7 @@
               </svg>
             </div>
             <p class="text-slate-600 font-medium mb-1">No projects yet</p>
-            <p class="text-sm text-slate-400">Create an investigation to get started</p>
+            <p class="text-sm text-slate-500">Create a project to get started</p>
           </div>
         {:else}
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -231,13 +235,12 @@
                 <!-- Top row: name + source dots -->
                 <div class="flex items-center justify-between gap-2 mb-1.5">
                   <h3 class="text-sm font-semibold text-slate-900 truncate">{project.name}</h3>
-                  <div class="flex items-center gap-1.5 shrink-0">
-                    <!-- GDELT dot (amber) -->
-                    <span class="w-2.5 h-2.5 rounded-full {project.sources.gdelt ? 'bg-amber-400' : 'border border-slate-300'}" title="GDELT"></span>
-                    <!-- Radio dot (violet) -->
-                    <span class="w-2.5 h-2.5 rounded-full {project.sources.radio ? 'bg-violet-500' : 'border border-slate-300'}" title="Radio"></span>
-                    <!-- Social dot (sky) -->
-                    <span class="w-2.5 h-2.5 rounded-full {project.sources.social ? 'bg-sky-500' : 'border border-slate-300'}" title="Social"></span>
+                  <div class="flex items-center gap-1 shrink-0">
+                    {#each sourceNames(project.sources) as name}
+                      <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{name}</span>
+                    {:else}
+                      <span class="text-[10px] text-slate-500">No data linked</span>
+                    {/each}
                   </div>
                 </div>
 
@@ -258,14 +261,12 @@
                       <polyline
                         points={sparklinePath(project.sparkline, 100, 24)}
                         fill="none"
-                        stroke="#6366f1"
+                        stroke={CHART.primary600}
                         stroke-width="1.5"
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       />
                     </svg>
-                  {:else}
-                    <div class="w-[100px] h-6 bg-slate-100 rounded"></div>
                   {/if}
                   <span class="text-xs text-slate-600 font-medium">{formatCount(project.event_count)} events</span>
                 </div>
@@ -307,7 +308,7 @@
           <div class="overflow-y-auto max-h-[calc(100vh-200px)] divide-y divide-slate-100">
             {#if activity.length === 0}
               <div class="p-5 text-center">
-                <p class="text-sm text-slate-400">No recent activity</p>
+                <p class="text-sm text-slate-500">No recent activity</p>
               </div>
             {:else}
               {#each activity as item}
@@ -323,11 +324,6 @@
                 </div>
               {/each}
             {/if}
-          </div>
-          <div class="px-5 py-3 border-t border-slate-100">
-            <button type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
-              View all activity
-            </button>
           </div>
         </div>
       </aside>

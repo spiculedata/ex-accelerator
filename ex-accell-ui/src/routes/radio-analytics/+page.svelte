@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { onMount } from 'svelte';
   import { radioAnalyticsDb } from '$lib/services/radioAnalyticsDb';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
@@ -117,12 +120,7 @@
   });
 
   function getSentimentBadgeClasses(sentiment: string): string {
-    switch (sentiment?.toLowerCase()) {
-      case 'positive': return 'bg-emerald-100 text-emerald-800';
-      case 'negative': return 'bg-rose-100 text-rose-800';
-      case 'neutral': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    return getSentimentColor(sentiment, 'tailwind');
   }
 
   function getPoliticalBadgeClasses(isPolitical: boolean): string {
@@ -142,9 +140,9 @@
     if (!sentimentChart) return;
 
     const colorMap: Record<string, string> = {
-      positive: '#06d6a0',
-      negative: '#f72585',
-      neutral: '#8b5cf6'
+      positive: getSentimentColor('positive'),
+      negative: getSentimentColor('negative'),
+      neutral: getSentimentColor('neutral')
     };
 
     sentimentChart.setOption({
@@ -163,7 +161,7 @@
         data: sentimentBreakdown.map(item => ({
           name: item.label || item.sentiment_category,
           value: item.count || item.post_count,
-          itemStyle: { color: item.color || colorMap[(item.label || item.sentiment_category || '').toLowerCase()] || '#8b5cf6' }
+          itemStyle: { color: item.color || colorMap[(item.label || item.sentiment_category || '').toLowerCase()] || CHART.catPink }
         })),
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
@@ -180,9 +178,9 @@
     if (!politicalChart) return;
 
     const colorMap: Record<string, string> = {
-      political_news: '#ef4444',
-      political_ad: '#f97316',
-      apolitical: '#6b7280'
+      political_news: CHART.danger500,
+      political_ad: CHART.catVermilion,
+      apolitical: CHART.ink500
     };
 
     politicalChart.setOption({
@@ -201,7 +199,7 @@
         data: politicalBreakdown.map(item => ({
           name: item.category,
           value: item.count,
-          itemStyle: { color: colorMap[item.category?.toLowerCase()] || '#6b7280' }
+          itemStyle: { color: colorMap[item.category?.toLowerCase()] || CHART.ink500 }
         })),
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
@@ -246,7 +244,8 @@
           name: 'Positive',
           type: 'line',
           data: sentimentTrends.map(t => t.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') }, // same palette as every sentiment chart
+
           lineStyle: { width: 2 },
           smooth: true
         },
@@ -254,7 +253,7 @@
           name: 'Negative',
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
-          itemStyle: { color: '#f72585' },
+          itemStyle: { color: getSentimentColor('negative') },
           lineStyle: { width: 2 },
           smooth: true
         },
@@ -262,8 +261,8 @@
           name: 'Neutral',
           type: 'line',
           data: sentimentTrends.map(t => t.neutral),
-          itemStyle: { color: '#8b5cf6' },
-          lineStyle: { width: 2 },
+          itemStyle: { color: getSentimentColor('neutral') },
+          lineStyle: { width: 2, type: 'dashed' },
           smooth: true
         }
       ]
@@ -280,7 +279,7 @@
 
     topicsChart.setOption({
       title: {
-        text: 'Top Topics',
+        text: 'Top Topics (by segments)',
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 'bold' }
       },
@@ -304,8 +303,8 @@
               type: 'linear',
               x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
-                { offset: 0, color: '#7c3aed' },
-                { offset: 1, color: '#a78bfa' }
+                { offset: 0, color: CHART.catPink },
+                { offset: 1, color: CHART.catVermilion }
               ]
             }
           }
@@ -323,24 +322,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Compact Header -->
-  <div class="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M12 12h.01"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white">Radio Analytics</h1>
-            <p class="text-sm text-purple-200">Analysis of radio broadcast transcripts</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader title="Radio Analytics" subtitle="Analysis of radio broadcast transcripts" backHref="/text-analytics" />
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -387,7 +369,7 @@
           <div class="text-xs text-gray-600">Active Stations</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
-          <div class="text-2xl font-bold text-amber-600 mb-1">{typeof overviewStats.avgDuration === 'number' ? overviewStats.avgDuration.toFixed(0) : overviewStats.avgDuration}s</div>
+          <div class="text-2xl font-bold text-signal-700 mb-1">{typeof overviewStats.avgDuration === 'number' ? overviewStats.avgDuration.toFixed(0) : overviewStats.avgDuration}s</div>
           <div class="text-xs text-gray-600">Avg Duration</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
@@ -395,7 +377,7 @@
           <div class="text-xs text-gray-600">Political Content</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
-          <div class="text-2xl font-bold text-orange-600 mb-1">{typeof overviewStats.adPercent === 'number' ? overviewStats.adPercent.toFixed(1) : overviewStats.adPercent}%</div>
+          <div class="text-2xl font-bold text-signal-700 mb-1">{typeof overviewStats.adPercent === 'number' ? overviewStats.adPercent.toFixed(1) : overviewStats.adPercent}%</div>
           <div class="text-xs text-gray-600">Ad Content</div>
         </div>
       </div>
@@ -472,7 +454,7 @@
         <!-- Search and Filters -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
           <div class="relative flex-1 w-full">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
             </svg>
             <input
@@ -514,7 +496,7 @@
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-gray-900">{transcript.radioName || 'Unknown Station'}</span>
                     {#if transcript.timestamp}
-                      <span class="text-xs text-gray-400">{new Date(transcript.timestamp).toLocaleString()}</span>
+                      <span class="text-xs text-gray-500">{new Date(transcript.timestamp).toLocaleString()}</span>
                     {/if}
                   </div>
                   <div class="flex items-center gap-2">

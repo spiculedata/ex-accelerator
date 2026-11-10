@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   /**
    * Workflow Canvas Component
    *
@@ -102,11 +103,17 @@
       if (portType === 'output') {
         workflowBuilder.startConnection(step.id);
 
+        // Start the preview line at the port that was clicked; until the mouse moves it would sit at the canvas corner
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          workflowBuilder.updateMousePosition(event.clientX - rect.left + canvasElement.scrollLeft, event.clientY - rect.top + canvasElement.scrollTop);
+        }
+
         // Track mouse movement for temporary connection line
         const handleMouseMove = (e: MouseEvent) => {
           if (!canvasElement) return;
           const rect = canvasElement.getBoundingClientRect();
-          workflowBuilder.updateMousePosition(e.clientX - rect.left, e.clientY - rect.top);
+          workflowBuilder.updateMousePosition(e.clientX - rect.left + canvasElement.scrollLeft, e.clientY - rect.top + canvasElement.scrollTop);
         };
 
         const handleMouseUp = () => {
@@ -169,7 +176,7 @@
   <!-- Grid Background -->
   <div
     class="absolute inset-0 opacity-40"
-    style="background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px); background-size: 20px 20px;"
+    style="background-image: radial-gradient(circle, {CHART.ink300} 1px, transparent 1px); background-size: 20px 20px;"
     aria-hidden="true">
   </div>
 
@@ -184,7 +191,7 @@
         <g>
           <path
             d="M {fromPos.x + 6} {fromPos.y + 6} C {midX} {fromPos.y + 6} {midX} {toPos.y + 6} {toPos.x + 6} {toPos.y + 6}"
-            stroke="#06d6a0"
+            stroke={CHART.catGreen}
             stroke-width="2"
             fill="none"
             class="connection-line"
@@ -195,7 +202,7 @@
             cy={(fromPos.y + toPos.y) / 2 + 6}
             r="8"
             fill="white"
-            stroke="#ef4444"
+            stroke={CHART.danger500}
             stroke-width="2"
             class="cursor-pointer pointer-events-auto"
             onclick={() => deleteConnection(connection.id)}
@@ -217,7 +224,7 @@
       {@const midX = startPos.x + (mousePosition.x - startPos.x) / 2}
       <path
         d="M {startPos.x + 6} {startPos.y + 6} C {midX} {startPos.y + 6} {midX} {mousePosition.y} {mousePosition.x} {mousePosition.y}"
-        stroke="#26d0ce"
+        stroke={CHART.primary500}
         stroke-width="2"
         stroke-dasharray="5,5"
         fill="none"
@@ -247,7 +254,7 @@
             e.stopPropagation();
             deleteStep(step.id);
           }}
-          class="text-gray-400 hover:text-red-600 transition-colors"
+          class="text-gray-500 hover:text-red-600 transition-colors"
           aria-label="Delete step">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -262,7 +269,7 @@
         <div class="flex flex-col space-y-1">
           {#each step.inputs as input, index}
             <div
-              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group"
+              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group before:absolute before:-inset-x-2.5 before:-inset-y-0.5 before:content-['']"
               onclick={(e) => handlePortClick(e, step, 'input', index)}
               role="button"
               tabindex="0"
@@ -277,7 +284,7 @@
         <div class="flex flex-col space-y-1">
           {#each step.outputs as output, index}
             <div
-              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group"
+              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group before:absolute before:-inset-x-2.5 before:-inset-y-0.5 before:content-['']"
               onclick={(e) => handlePortClick(e, step, 'output', index)}
               role="button"
               tabindex="0"
@@ -294,7 +301,7 @@
       <!-- Status Indicator -->
       <div class="mt-2 text-center">
         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {getStatusColor(step.status)}">
-          {step.status}
+          {step.status === 'needs-setup' ? 'needs setup' : step.status}
         </span>
       </div>
     </div>

@@ -5,6 +5,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
 export const GET: RequestHandler = async ({ url }) => {
   const projectId = url.searchParams.get('id');
@@ -57,7 +58,7 @@ export const GET: RequestHandler = async ({ url }) => {
           ARRAY_AGG(DISTINCT source_type) AS source_types,
           SUM(record_count) AS total_records,
           MAX(last_sync) AS last_sync
-        FROM workspace_data_sources
+        FROM (${WORKSPACE_SOURCES_SQL}) s
         WHERE status = 'active'
         GROUP BY workspace_id
       ) ds ON ds.workspace_id = w.id

@@ -15,9 +15,9 @@
 
   import { goto } from '$app/navigation';
   import { workflowBuilder, type Dataset } from '$lib/stores/workflowBuilderStore';
+  import { setupProblems } from '$lib/utils/workflowSteps';
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount, onDestroy } from 'svelte';
-  import { unifiedDb } from '$lib/services/duckdb';
 
   // ===================================================================
   // Type Definitions
@@ -47,6 +47,20 @@
   // Python workflow generation
   let pythonWorkflow: PythonDaprWorkflow | null = $state(null);
 
+  // Saving drafts: the id of the saved draft, so later saves update it instead of creating copies
+  let savedWorkflowId: string | null = $state(null);
+  let saveState: { kind: 'idle' | 'saving' | 'saved' | 'error'; message: string } = $state({ kind: 'idle', message: '' });
+  // Results and problems appear in the toolbar status, not in a blocking browser alert
+  // A toast above any open dialog, so a failed publish or run is seen where the visitor is looking
+  let notice: { kind: 'saved' | 'error'; message: string } | null = $state(null);
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const NOTICE_MS = 8000;
+  const notify = (kind: 'saved' | 'error', message: string) => {
+    notice = { kind, message };
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = null), NOTICE_MS);
+  };
+
   // Publish workflow state
   let loadingPublish = $state(false);
   let publishMetadata = $state({
@@ -70,6 +84,10 @@
 
   // Subscribe to workflow state
   let workflow = $derived($workflowBuilder.workflow);
+
+  // Steps that are not ready yet; they block Generate, Publish and Run until finished
+  const problems = $derived(setupProblems(workflow.steps));
+  const blockedReason = $derived(workflow.steps.length === 0 ? 'Add a step first' : problems.length > 0 ? `Finish setting up: ${problems.join('; ')}` : '');
   let showCodeExport = $derived($workflowBuilder.showCodeExport);
   let showPublishDialog = $derived($workflowBuilder.showPublishDialog);
   let showExecuteDialog = $derived($workflowBuilder.showExecuteDialog);
@@ -94,6 +112,10 @@
 
     // Load available datasets
     await loadAvailableDatasets();
+
+    // /data-management/workflow-builder?workflow=<id> reopens a saved workflow
+    const requestedId = new URLSearchParams(window.location.search).get('workflow');
+    if (requestedId) await openSavedWorkflow(requestedId);
   });
 
   onDestroy(() => {
@@ -109,144 +131,17 @@
 
     try {
       loadingDatasets = true;
-      await unifiedDb.connect();
-
-      if (!mounted) return;
-
-      const datasets: Dataset[] = [];
-
-      // Check for posts data (main social media data)
-      try {
-        const postsCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM posts
-          WHERE created_at >= '2024-01-01'
-        `);
-        if (mounted && postsCount[0]?.count > 0) {
-          datasets.push({
-            id: 'social_posts',
-            name: 'Social Media Posts',
-            description: `${postsCount[0].count.toLocaleString()} posts from social platforms`,
-            table: 'posts',
-            type: 'social_media'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for sentiment analysis data
-      try {
-        const sentimentCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM sentiment_classifications
-        `);
-        if (mounted && sentimentCount[0]?.count > 0) {
-          datasets.push({
-            id: 'sentiment_data',
-            name: 'Sentiment Analysis Results',
-            description: `${sentimentCount[0].count.toLocaleString()} sentiment classifications`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for topic modeling data
-      try {
-        const topicsCount = await unifiedDb.query(`
-          SELECT COUNT(DISTINCT topic_id) as count
-          FROM topics
-        `);
-        if (mounted && topicsCount[0]?.count > 0) {
-          datasets.push({
-            id: 'topic_data',
-            name: 'Topic Modeling Results',
-            description: `${topicsCount[0].count} discovered topics`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for language detection data
-      try {
-        const languageCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM language_detection
-        `);
-        if (mounted && languageCount[0]?.count > 0) {
-          datasets.push({
-            id: 'language_data',
-            name: 'Language Detection Results',
-            description: `${languageCount[0].count.toLocaleString()} language classifications`,
-            table: 'unified_post_analysis',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for engagement analysis data
-      try {
-        const engagementCount = await unifiedDb.query(`
-          SELECT COUNT(*) as count
-          FROM post_engagement
-        `);
-        if (mounted && engagementCount[0]?.count > 0) {
-          datasets.push({
-            id: 'engagement_data',
-            name: 'Engagement Analysis Results',
-            description: `${engagementCount[0].count.toLocaleString()} engagement records`,
-            table: 'post_engagement',
-            type: 'analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Check for Android analytics data
-      try {
-        const androidCount = await unifiedDb.query(`
-          SELECT COUNT(DISTINCT device_id) as count
-          FROM android_devices
-        `);
-        if (mounted && androidCount[0]?.count > 0) {
-          datasets.push({
-            id: 'android_data',
-            name: 'Android Analytics Data',
-            description: `${androidCount[0].count} devices tracked`,
-            table: 'android_app_usage',
-            type: 'mobile_analytics'
-          });
-        }
-      } catch (e) {
-        if (!mounted) return;
-      }
-
-      // Add unified analysis view (combines all analytics)
-      if (mounted && datasets.length > 0) {
-        datasets.unshift({
-          id: 'unified_analysis',
-          name: 'Unified Post Analysis',
-          description: 'Combined view of all analytics (sentiment, topics, language, engagement)',
-          table: 'unified_post_analysis',
-          type: 'unified'
-        });
-      }
+      const response = await fetch('/api/unified-analytics?type=workflow-datasets');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.success) throw new Error(body.error || `Request failed (${response.status})`);
 
       if (mounted) {
-        availableDatasets = datasets;
+        availableDatasets = body.data;
       }
     } catch (error) {
       if (mounted) {
         console.error('Error loading datasets:', error);
+        availableDatasets = [];
       }
     } finally {
       if (mounted) {
@@ -259,14 +154,48 @@
   // Workflow Actions
   // ===================================================================
 
-  function saveWorkflow() {
-    console.log('Saving workflow:', workflow);
-    alert('Workflow saved successfully!');
+  async function openSavedWorkflow(id: string) {
+    try {
+      const response = await fetch(`/api/workflows/${encodeURIComponent(id)}`);
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.workflow?.definition) throw new Error(result?.message ?? `HTTP ${response.status}`);
+      workflowBuilder.loadWorkflow(result.workflow.definition);
+      // Only drafts are updated in place; saving a published workflow makes a new draft
+      savedWorkflowId = result.workflow.status === 'draft' ? result.workflow.id : null;
+      saveState = { kind: 'idle', message: '' };
+    } catch (error) {
+      console.error('Could not open the saved workflow:', error);
+      saveState = { kind: 'error', message: 'We could not open that workflow. It may have been deleted.' };
+    }
+  }
+
+  async function saveWorkflow() {
+    saveState = { kind: 'saving', message: 'Saving…' };
+    try {
+      const response = await fetch('/api/workflows/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: savedWorkflowId ?? undefined,
+          workflowDefinition: workflow,
+          name: workflow.name,
+          description: workflow.description
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error ?? `HTTP ${response.status}`);
+      savedWorkflowId = result.workflow.id;
+      const steps = workflow.steps.length;
+      saveState = { kind: 'saved', message: `Saved as a draft (${steps} step${steps === 1 ? '' : 's'})` };
+    } catch (error) {
+      console.error('Error saving workflow:', error);
+      saveState = { kind: 'error', message: 'We could not save this workflow. Try again.' };
+    }
   }
 
   function runWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before running');
+      notify('error', 'Add steps to the workflow before running it.');
       return;
     }
     workflowBuilder.toggleExecuteDialog(true);
@@ -274,7 +203,7 @@
 
   async function publishWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before publishing');
+      notify('error', 'Add steps to the workflow before publishing it.');
       return;
     }
 
@@ -296,6 +225,8 @@
         },
         body: JSON.stringify({
           workflowDefinition: workflow,
+          // The draft this was saved as is removed once it is published
+          draftId: savedWorkflowId ?? undefined,
           metadata: {
             ...publishMetadata,
             tags: publishMetadata.tags.split(',').map(t => t.trim()).filter(Boolean)
@@ -310,14 +241,15 @@
       const result = await response.json();
 
       if (result.success) {
-        alert(`Workflow "${publishMetadata.name}" published successfully!`);
+        notify('saved', `Workflow "${publishMetadata.name}" published.`);
+        savedWorkflowId = null; // the draft was turned into the published workflow, so a later save starts a new draft
         workflowBuilder.togglePublishDialog(false);
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error publishing workflow:', error);
-      alert('Error publishing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be published. Try again.');
     } finally {
       loadingPublish = false;
     }
@@ -332,8 +264,7 @@
         name: workflow.name || `Temp Workflow ${Date.now()}`,
         description: workflow.description || 'Temporary workflow for execution',
         version: '1.0.0',
-        tags: [],
-        createdBy: 'current-user'
+        tags: []
       };
 
       const publishResponse = await fetch('/api/workflows', {
@@ -377,13 +308,13 @@
 
       if (result.success) {
         workflowBuilder.toggleExecuteDialog(false);
-        alert('Workflow execution started successfully!');
+        notify('saved', 'Workflow execution started.');
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error executing workflow:', error);
-      alert('Error executing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be started. Try again.');
     } finally {
       loadingExecute = false;
     }
@@ -395,7 +326,7 @@
 
   async function generateDaprCode() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before generating code');
+      notify('error', 'Add steps to the workflow before generating code.');
       return;
     }
 
@@ -430,7 +361,7 @@
       }
     } catch (error) {
       console.error('Error generating Python workflow code:', error);
-      alert('Error generating Python workflow code: ' + (error as Error).message);
+      notify('error', 'The code could not be generated. Check that every step is set up, then try again.');
     }
   }
 
@@ -480,7 +411,7 @@
       // Success feedback handled by modal
     }).catch(err => {
       console.error('Failed to copy to clipboard:', err);
-      alert('Failed to copy to clipboard');
+      notify('error', 'Copying failed. Select the code and copy it by hand.');
     });
   }
 </script>
@@ -491,10 +422,20 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
+  <!-- Always present so a message added later is announced; sits above the dialogs -->
+  <div role="status" aria-live="polite" class="pointer-events-none fixed inset-x-0 top-4 z-[70] flex justify-center px-4">
+    {#if notice}
+      <div class="pointer-events-auto flex max-w-xl items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg {notice.kind === 'error' ? 'border-danger-300 bg-danger-50 text-danger-900' : 'border-success-300 bg-success-50 text-success-900'}">
+        <span>{notice.message}</span>
+        <button type="button" class="shrink-0 font-medium underline" onclick={() => (notice = null)}>Dismiss</button>
+      </div>
+    {/if}
+  </div>
+
   <!-- Page Header -->
   <div class="bg-white shadow-sm border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-4">
           <button
             onclick={() => goto('/data-management')}
@@ -510,15 +451,18 @@
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <span role="status" class="text-sm {saveState.kind === 'error' ? 'text-danger-700' : 'text-ink-600'}">{saveState.message}</span>
           <button
             onclick={saveWorkflow}
-            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-sm font-medium transition-colors">
-            Save Workflow
+            disabled={saveState.kind === 'saving'}
+            class="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-60 text-white rounded-xl text-sm font-medium transition-colors">
+            Save draft
           </button>
           <button
             onclick={generateDaprCode}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
@@ -527,7 +471,8 @@
           </button>
           <button
             onclick={publishWorkflow}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -536,7 +481,8 @@
           </button>
           <button
             onclick={runWorkflow}
-            disabled={workflow.steps.length === 0}
+            disabled={blockedReason !== ''}
+            title={blockedReason}
             class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center space-x-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-7-9h6M12 5V3"></path>
@@ -562,11 +508,13 @@
               bind:value={workflow.name}
               onchange={(e: Event) => workflowBuilder.setWorkflowInfo((e.target as HTMLInputElement).value, workflow.description)}
               class="text-lg font-semibold text-gray-900 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2"
+              aria-label="Workflow name"
               placeholder="Workflow name">
             <input
               bind:value={workflow.description}
               onchange={(e: Event) => workflowBuilder.setWorkflowInfo(workflow.name, (e.target as HTMLInputElement).value)}
               class="block text-sm text-gray-600 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 mt-1"
+              aria-label="Workflow description"
               placeholder="Workflow description">
           </div>
           <div class="text-sm text-gray-500">

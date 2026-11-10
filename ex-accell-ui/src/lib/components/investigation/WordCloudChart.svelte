@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, createEventDispatcher, tick } from 'svelte';
 	import * as d3 from 'd3';
 
@@ -20,7 +21,7 @@
 	let containerWidth = 800;
 
 	export let height: number = 250;
-	const colors = ['#06d6a0', '#f72585', '#8b5cf6', '#3b82f6', '#f59e0b'];
+	const colors = [CHART.catGreen, CHART.catPink, CHART.catBlue, CHART.catOrange, CHART.catSky];
 	const FONT_FAMILY = 'Inter, system-ui, sans-serif';
 	const WORD_PADDING = 4;
 	const ROTATED_SHARE = 0.4;
@@ -90,7 +91,7 @@
 				.attr('font-size', (d) => d.size + 'px')
 				.attr('font-family', FONT_FAMILY)
 				.attr('font-weight', (d) => (d.size > 36 ? '700' : '500'))
-				.attr('fill', (d) => highlightedKeywords.size > 0 && highlightedKeywords.has(d.text) ? '#818cf8' : colorScale(d.text))
+				.attr('fill', (d) => highlightedKeywords.size > 0 && highlightedKeywords.has(d.text) ? CHART.primary400 : colorScale(d.text))
 				.attr('opacity', (d) => highlightedKeywords.size > 0 ? (highlightedKeywords.has(d.text) ? 1 : 0.25) : 0.9)
 				.attr('stroke', 'none')
 				.style('cursor', 'pointer')

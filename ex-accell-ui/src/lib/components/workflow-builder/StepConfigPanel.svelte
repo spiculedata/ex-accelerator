@@ -59,7 +59,7 @@
         <h3 class="text-lg font-semibold text-gray-900">Configure Step</h3>
         <button
           onclick={closePanel}
-          class="text-gray-400 hover:text-gray-600 transition-colors"
+          class="text-gray-500 hover:text-gray-600 transition-colors"
           aria-label="Close configuration panel">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -121,7 +121,7 @@
               {#if availableDatasets.length === 0}
                 <div class="mt-2 p-3 bg-yellow-50 rounded-lg">
                   <div class="flex items-center space-x-2">
-                    <span class="text-yellow-600">⚠️</span>
+                    <span class="text-signal-700">⚠️</span>
                     <div>
                       <p class="text-sm font-medium text-yellow-800">No datasets available</p>
                       <p class="text-xs text-yellow-700">Run data collection or import datasets to get started</p>

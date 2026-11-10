@@ -1,13 +1,17 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
+  import ResponsibleUse from '$lib/components/ui/ResponsibleUse.svelte';
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let activeTab: 'dashboard' | 'review' = 'dashboard';
 
   let moderationStats: {
@@ -33,6 +37,8 @@
       ]);
 
       const statsData = await statsRes.json();
+
+      unavailable = !!statsData.meta?.unavailable;
       const resultsData = await resultsRes.json();
 
       if (statsData.success && statsData.data) {
@@ -87,7 +93,7 @@
       donutChart = initChart(donutContainer);
       if (donutChart) {
         donutChart.setOption({
-          title: { text: 'Content Status', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: '#374151' } },
+          title: { text: 'Content Status', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: CHART.ink700 } },
           tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
           legend: { bottom: 10, left: 'center', textStyle: { fontSize: 11 } },
           series: [{
@@ -98,9 +104,9 @@
             itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
             label: { show: true, fontSize: 11, formatter: '{b}\n{d}%' },
             data: [
-              { value: moderationStats.summary.safe, name: 'Safe', itemStyle: { color: '#22c55e' } },
-              { value: moderationStats.summary.flagged, name: 'Flagged', itemStyle: { color: '#ef4444' } },
-              { value: moderationStats.summary.pending, name: 'Pending', itemStyle: { color: '#f59e0b' } }
+              { value: moderationStats.summary.safe, name: 'Safe', itemStyle: { color: CHART.catGreen } },
+              { value: moderationStats.summary.flagged, name: 'Flagged', itemStyle: { color: CHART.danger500 } },
+              { value: moderationStats.summary.pending, name: 'Pending', itemStyle: { color: CHART.catOrange } }
             ]
           }]
         });
@@ -115,7 +121,7 @@
         if (categoryChart) {
           const cats = moderationStats.categories.sort((a, b) => b.count - a.count);
           categoryChart.setOption({
-            title: { text: 'Flags by Category', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: '#374151' } },
+            title: { text: 'Flags by Category', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: CHART.ink700 } },
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
             grid: { left: 10, right: 40, top: 50, bottom: 20, containLabel: true },
             xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
@@ -129,7 +135,7 @@
             series: [{
               type: 'bar',
               data: cats.map((c) => c.count).reverse(),
-              itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] },
+              itemStyle: { color: CHART.danger500, borderRadius: [0, 4, 4, 0] },
               label: { show: true, position: 'right', fontSize: 10, color: '#666' }
             }]
           });
@@ -149,7 +155,6 @@
 <PageHeader
   title="Content Moderation"
   subtitle="Automated content safety screening"
-  accentColor="red"
 />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -158,6 +163,16 @@
       <ErrorAlert message={errorMessage} />
     </div>
   {/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
+
+  <!-- Shown on every tab -->
+  <div class="max-w-7xl mx-auto"><ResponsibleUse tool="content moderation" /></div>
 
   <!-- Tab Switcher -->
   <div class="flex space-x-1 bg-gray-100 rounded-xl p-1 mb-8 max-w-xs">
@@ -231,12 +246,12 @@
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-medium text-gray-500">Pending Review</span>
           <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-signal-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         </div>
-        <p class="text-3xl font-bold text-amber-600">{formatNumber(moderationStats.summary.pending)}</p>
+        <p class="text-3xl font-bold text-signal-700">{formatNumber(moderationStats.summary.pending)}</p>
       </div>
     </div>
 
@@ -249,7 +264,7 @@
         {#if moderationStats.categories.length > 0}
           <div id="moderation-category-chart" class="w-full h-80"></div>
         {:else}
-          <div class="flex items-center justify-center h-80 text-gray-400">
+          <div class="flex items-center justify-center h-80 text-gray-500">
             <p class="text-sm">No flag category data available</p>
           </div>
         {/if}
@@ -262,7 +277,7 @@
     <!-- Warning Banner -->
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
       <div class="flex items-start">
-        <svg class="w-5 h-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-signal-700 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <div>
@@ -320,7 +335,7 @@
               </div>
               <p class="text-sm text-gray-600 truncate">{item.image_id || 'Unknown image'}</p>
               {#if item.source}
-                <p class="text-xs text-gray-400 mt-0.5">Source: {item.source}</p>
+                <p class="text-xs text-gray-500 mt-0.5">Source: {item.source}</p>
               {/if}
             </div>
 

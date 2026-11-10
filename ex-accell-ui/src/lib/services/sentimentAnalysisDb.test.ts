@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { sentimentAnalysisDb } from './sentimentAnalysisDb';
 
+import { CHART } from '$lib/utils/chartColors';
 // Helper to create a mock fetch that routes by endpoint (the 'type' query param)
 function mockFetch(routes: Record<string, any>) {
   vi.stubGlobal(
@@ -102,11 +103,11 @@ describe('getDetailedSentiments', () => {
     const positive = categories.find((c) => c.label === 'Positive');
     expect(positive).toBeDefined();
     expect(positive!.count).toBe(80);
-    expect(positive!.color).toBe('#84cc16');
+    expect(positive!.color).toBe('#56b4e9');
     expect(positive!.percentage).toBe(80);
 
     const negative = categories.find((c) => c.label === 'Negative');
-    expect(negative!.color).toBe('#f97316');
+    expect(negative!.color).toBe('#e69f00');
   });
 
   it('assigns correct colors for all known categories', async () => {
@@ -122,11 +123,11 @@ describe('getDetailedSentiments', () => {
     const categories = await sentimentAnalysisDb.getDetailedSentiments();
 
     const colorMap: Record<string, string> = {
-      'Very Positive': '#22c55e',
-      Positive: '#84cc16',
-      Neutral: '#6b7280',
-      Negative: '#f97316',
-      'Very Negative': '#ef4444'
+      'Very Positive': '#0072b2',
+      Positive: '#56b4e9',
+      Neutral: '#98a2ae',
+      Negative: '#e69f00',
+      'Very Negative': '#d55e00'
     };
 
     categories.forEach((cat) => {
@@ -157,13 +158,13 @@ describe('getEmotionStats', () => {
     expect(emotions).toHaveLength(3);
     expect(emotions[0].emotion).toBe('Joy');
     expect(emotions[0].count).toBe(50);
-    expect(emotions[0].color).toBe('#fbbf24');
+    expect(emotions[0].color).toBe(CHART.catOrange);
 
     expect(emotions[1].emotion).toBe('Anger');
-    expect(emotions[1].color).toBe('#ef4444');
+    expect(emotions[1].color).toBe(CHART.danger500);
 
     expect(emotions[2].emotion).toBe('Trust');
-    expect(emotions[2].color).toBe('#3b82f6');
+    expect(emotions[2].color).toBe(CHART.catBlue);
   });
 
   it('uses emotion1 field if emotion field is absent', async () => {
@@ -173,7 +174,7 @@ describe('getEmotionStats', () => {
     const emotions = await sentimentAnalysisDb.getEmotionStats();
     expect(emotions[0].emotion).toBe('Fear');
     expect(emotions[0].count).toBe(15);
-    expect(emotions[0].color).toBe('#8b5cf6');
+    expect(emotions[0].color).toBe(CHART.catPink);
   });
 });
 
@@ -186,20 +187,16 @@ describe('getSentimentTrends', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns data in chronological order (reversed from API)', async () => {
-    const data = [
-      { date: '2024-01-03', positive: 10, negative: 5, neutral: 20 },
-      { date: '2024-01-02', positive: 8, negative: 3, neutral: 15 },
-      { date: '2024-01-01', positive: 12, negative: 7, neutral: 18 }
-    ];
-    mockFetch({ 'sentiment-trends': data });
+  it.each([
+    ['oldest first, as the API returns it', ['2024-01-01', '2024-01-02', '2024-01-03']],
+    ['newest first', ['2024-01-03', '2024-01-02', '2024-01-01']],
+    ['shuffled', ['2024-01-02', '2024-01-03', '2024-01-01']]
+  ])('always returns days oldest to newest, whatever the order it receives (%s)', async (_label, dates) => {
+    mockFetch({ 'sentiment-trends': dates.map((date) => ({ date, positive: 1, negative: 1, neutral: 1 })) });
 
     const trends = await sentimentAnalysisDb.getSentimentTrends();
 
-    // API data is newest-first; service reverses to chronological
-    expect(trends[0].date).toBe('2024-01-01');
-    expect(trends[1].date).toBe('2024-01-02');
-    expect(trends[2].date).toBe('2024-01-03');
+    expect(trends.map((t) => t.date)).toEqual(['2024-01-01', '2024-01-02', '2024-01-03']);
   });
 
   it('calculates total from positive+negative+neutral', async () => {
@@ -219,13 +216,13 @@ describe('getSentimentTrends', () => {
     expect(parsed.searchParams.get('timeRange')).toBe('30d');
   });
 
-  it('uses default timeRange of 7d', async () => {
+  it('uses default timeRange of 30d', async () => {
     mockFetch({ 'sentiment-trends': [] });
     await sentimentAnalysisDb.getSentimentTrends();
 
     const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     const parsed = new URL(callUrl, 'http://localhost');
-    expect(parsed.searchParams.get('timeRange')).toBe('7d');
+    expect(parsed.searchParams.get('timeRange')).toBe('30d');
   });
 });
 
@@ -269,25 +266,30 @@ describe('getSamplePosts', () => {
     expect(result[0].author).toBe('user123');
   });
 
-  it('handles missing timestamp by using current date', async () => {
+  it('reads epoch-millisecond timestamps, as the posts view stores them, instead of replacing them with now', async () => {
+    mockFetch({ 'sample-posts': [{ id: '9', text: 'x', sentiment: 'neutral', confidence: 0.5, platform: 'fb', timestamp: '1762530618733' }] });
+    const result = await sentimentAnalysisDb.getSamplePosts();
+    expect(result[0].timestamp).toBe('2025-11-07T15:50:18.733Z');
+  });
+
+  it('leaves a missing timestamp empty rather than inventing one', async () => {
     const posts = [
       { id: '2', text: 'No timestamp', sentiment: 'neutral', confidence: 0.5, platform: 'reddit' }
     ];
     mockFetch({ 'sample-posts': posts });
 
     const result = await sentimentAnalysisDb.getSamplePosts();
-    // Should be a valid ISO string (current date fallback)
-    expect(new Date(result[0].timestamp).getTime()).not.toBeNaN();
+    expect(result[0].timestamp).toBe('');
   });
 
-  it('handles invalid timestamp by using current date', async () => {
+  it('leaves an unreadable timestamp empty rather than showing today', async () => {
     const posts = [
       { id: '3', text: 'Bad ts', sentiment: 'neutral', confidence: 0.5, platform: 'fb', timestamp: 'not-a-date' }
     ];
     mockFetch({ 'sample-posts': posts });
 
     const result = await sentimentAnalysisDb.getSamplePosts();
-    expect(new Date(result[0].timestamp).getTime()).not.toBeNaN();
+    expect(result[0].timestamp).toBe('');
   });
 
   it('defaults engagement to zeros when missing', async () => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import ParallelCoordinates from '../ParallelCoordinates.svelte';
@@ -90,11 +91,11 @@
       // Attention index area
       const area = d3.area<any>()
         .x(d => xScale(d.parsedDate)).y0(h).y1(d => yScale(d.index)).curve(d3.curveMonotoneX);
-      g.append('path').datum(attentionData).attr('fill', '#6366f1').attr('fill-opacity', highlightDays ? 0.05 : 0.15).attr('d', area);
+      g.append('path').datum(attentionData).attr('fill', CHART.primary600).attr('fill-opacity', highlightDays ? 0.05 : 0.15).attr('d', area);
 
       // Attention line
       const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d.index)).curve(d3.curveMonotoneX);
-      g.append('path').datum(attentionData).attr('fill', 'none').attr('stroke', '#818cf8').attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
+      g.append('path').datum(attentionData).attr('fill', 'none').attr('stroke', CHART.primary400).attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
 
       // Source contribution bars (thin stacked bars at each data point)
       const barW = Math.max(2, w / attentionData.length * 0.4);
@@ -103,9 +104,9 @@
         const total = d.gdelt + d.radio + d.social || 1;
         let cy = h;
         const segments = [
-          { val: d.gdelt, color: '#f59e0b' },
-          { val: d.radio, color: '#a78bfa' },
-          { val: d.social, color: '#38bdf8' },
+          { val: d.gdelt, color: CHART.catOrange },
+          { val: d.radio, color: CHART.catPink },
+          { val: d.social, color: CHART.catSky },
         ];
         for (const seg of segments) {
           const segH = (seg.val / total) * (h - yScale(d.index));
@@ -120,9 +121,9 @@
       g.selectAll('.dot').data(attentionData).join('circle')
         .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d.index))
         .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
-        .attr('fill', '#818cf8')
+        .attr('fill', CHART.primary400)
         .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
-        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+        .attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary100 : CHART.ink900)
         .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
         .style('cursor', 'pointer')
         .on('click', (_event: any, d: any) => {
@@ -131,11 +132,11 @@
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w))
         .call(g2 => g2.select('.domain').remove())
-        .call(g2 => g2.selectAll('.tick line').attr('stroke', '#1e293b'))
-        .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
+        .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink800))
+        .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'));
 
       // "Attention Index" label
-      g.append('text').attr('x', 4).attr('y', 8).attr('fill', '#64748b').attr('font-size', '8px').text('Attention Index (0–100)');
+      g.append('text').attr('x', 4).attr('y', 8).attr('fill', CHART.ink500).attr('font-size', '8px').text('Attention Index (0–100)');
 
     } else if (activeView === 'stacked') {
       const yMax = d3.max(attentionData, d => d.rawGdelt + d.rawRadio + d.rawSocial) ?? 1;
@@ -143,7 +144,7 @@
 
       const stack = d3.stack<any>().keys(['rawRadio', 'rawSocial', 'rawGdelt']).order(d3.stackOrderNone).offset(d3.stackOffsetNone);
       const stacked = stack(attentionData);
-      const colors: Record<string, string> = { rawGdelt: '#f59e0b', rawRadio: '#a78bfa', rawSocial: '#38bdf8' };
+      const colors: Record<string, string> = { rawGdelt: CHART.catOrange, rawRadio: CHART.catPink, rawSocial: CHART.catSky };
       const labels: Record<string, string> = { rawGdelt: 'GDELT', rawRadio: 'Radio', rawSocial: 'Social' };
 
       const area = d3.area<any>()
@@ -160,9 +161,9 @@
           .attr('cx', (d: any) => xScale(d.data.parsedDate))
           .attr('cy', (d: any) => yScale(d[1]))
           .attr('r', (d: any) => highlightDays?.has(d.data.date) ? 5 : 3)
-          .attr('fill', '#818cf8')
+          .attr('fill', CHART.primary400)
           .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.data.date) ? 1 : 0.15) : 1)
-          .attr('stroke', (d: any) => highlightDays?.has(d.data.date) ? '#e0e7ff' : '#0f172a')
+          .attr('stroke', (d: any) => highlightDays?.has(d.data.date) ? CHART.primary100 : CHART.ink900)
           .attr('stroke-width', (d: any) => highlightDays?.has(d.data.date) ? 2 : 1)
           .style('cursor', 'pointer')
           .on('click', (_event: any, d: any) => {
@@ -176,21 +177,21 @@
         const lbl = labels[key];
         lx -= lbl.length * 6 + 18;
         g.append('circle').attr('cx', lx).attr('cy', 6).attr('r', 3).attr('fill', colors[key]);
-        g.append('text').attr('x', lx + 6).attr('y', 9).attr('fill', '#94a3b8').attr('font-size', '8px').text(lbl);
+        g.append('text').attr('x', lx + 6).attr('y', 9).attr('fill', CHART.ink400).attr('font-size', '8px').text(lbl);
       }
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w).tickFormat(d => d3.format('.2s')(d as number)))
         .call(g2 => g2.select('.domain').remove())
-        .call(g2 => g2.selectAll('.tick line').attr('stroke', '#1e293b'))
-        .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
+        .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink800))
+        .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'));
     }
 
     // Shared X axis
     g.append('g').attr('transform', `translate(0,${h})`)
       .call(d3.axisBottom(xScale).ticks(d3.timeDay.every(1)).tickFormat(d => d3.timeFormat('%b %d')(d as Date)))
-      .call(g2 => g2.select('.domain').attr('stroke', '#334155'))
-      .call(g2 => g2.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'))
-      .call(g2 => g2.selectAll('.tick line').attr('stroke', '#334155'));
+      .call(g2 => g2.select('.domain').attr('stroke', CHART.ink700))
+      .call(g2 => g2.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'))
+      .call(g2 => g2.selectAll('.tick line').attr('stroke', CHART.ink700));
 
     // Cross-filter indicator line for single-day highlights
     if (highlightDays && highlightDays.size === 1) {
@@ -198,7 +199,7 @@
       if (cfDate) {
         const cx = xScale(cfDate);
         g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', h)
-          .attr('stroke', '#818cf8').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
+          .attr('stroke', CHART.primary400).attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3').attr('opacity', 0.7);
       }
     }
   }

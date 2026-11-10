@@ -1,7 +1,11 @@
 // Image Processing API — object detection, face detection, OCR, classification, moderation
+import { fetchPublic, readCapped, TooLargeError, UnsafeUrlError } from '$lib/server/safeFetch';
+import { imageUrlProblem } from '$lib/server/imageUrl';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { queryErrorResponse } from '$lib/server/queryErrors';
+import { emptyImageData } from '$lib/server/imageProcessingEmpty';
 
 /**
  * GET /api/image-processing — query image analysis results and stats
@@ -259,23 +263,27 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({
         success: true,
         tiers: {
-          fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristic', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
-          standard: { label: 'Standard Analysis', description: 'YOLOv8s + CLIP ViT-B/32 + CLIP NSFW', speed: '2-5s per image', models: ['YOLOv8s', 'CLIP ViT-B/32', 'CLIP NSFW'] },
-          accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + Gemma Vision', speed: '30-60s+ per image', models: ['YOLOv8m', 'RetinaFace', 'Gemma 3 Vision'] }
+          fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristics (no OCR)', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
+          standard: { label: 'Standard Analysis', description: 'YOLOv8s + Haar cascade + CLIP ViT-B/32 + PaddleOCR', speed: '2-5s per image', models: ['YOLOv8s', 'Haar Cascade', 'CLIP ViT-B/32', 'PaddleOCR'] },
+          accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + CLIP ViT-B/32 + PaddleOCR', speed: 'Slowest', models: ['YOLOv8m', 'RetinaFace', 'CLIP ViT-B/32', 'PaddleOCR'] }
         }
       });
     }
 
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
-    console.error('Image processing API error:', err);
-    return json({ success: false, error: err.message }, { status: 500 });
+    // A missing table means image analysis has not been set up: answer with an empty result flagged
+    // unavailable. Anything else is a generic 500; the detail is logged, never sent to the browser.
+    return queryErrorResponse('Image processing', err, emptyImageData(action));
   }
 };
 
 /**
  * POST /api/image-processing — analyze single image or trigger batch
  */
+const DOWNLOAD_TIMEOUT_MS = 30_000;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json();
   const { action } = body;
@@ -284,30 +292,29 @@ export const POST: RequestHandler = async ({ request }) => {
     // ── Analyze single image via Ollama Gemma 3 multimodal ─────────────
     if (action === 'analyze') {
       const imageUrl = body.image_url;
-      if (!imageUrl) return json({ success: false, error: 'image_url required' }, { status: 400 });
+      const urlProblem = imageUrlProblem(imageUrl);
+      if (urlProblem) return json({ success: false, error: urlProblem }, { status: 400 });
 
       const ollamaHost = process.env.OLLAMA_HOST || 'http://ollama:11434';
 
       // Step 1: Download the image and convert to base64
       let imageBase64: string;
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
-        const imgResponse = await fetch(imageUrl, {
-          signal: controller.signal,
-          redirect: 'follow',
+        // One deadline covers the connection, any redirects and the whole body, so a slow drip cannot hold the request open
+        const signal = AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS);
+        // Only public addresses: the server must not be made to read its own network on a visitor's behalf
+        const imgResponse = await fetchPublic(imageUrl, {
+          signal,
           headers: { 'User-Agent': 'SocialExplorer/1.0' }
         });
-        clearTimeout(timeout);
         if (!imgResponse.ok) {
-          return json({ success: false, error: `Failed to download image: HTTP ${imgResponse.status}` }, { status: 400 });
+          await imgResponse.body?.cancel();
+          return json({ success: false, error: `That address did not return an image (it answered HTTP ${imgResponse.status}).` }, { status: 400 });
         }
-        const imgBuffer = await imgResponse.arrayBuffer();
+        // The size is enforced while reading, not after: a missing or false Content-Length cannot be trusted
+        const imgBuffer = await readCapped(imgResponse, MAX_IMAGE_BYTES);
         if (imgBuffer.byteLength === 0) {
-          return json({ success: false, error: 'Downloaded image is empty' }, { status: 400 });
-        }
-        if (imgBuffer.byteLength > 10 * 1024 * 1024) {
-          return json({ success: false, error: 'Image too large (max 10MB). Use a smaller image or resize first.' }, { status: 400 });
+          return json({ success: false, error: 'That address returned an empty file, not an image.' }, { status: 400 });
         }
         imageBase64 = Buffer.from(imgBuffer).toString('base64');
         const sizeMB = (imgBuffer.byteLength / 1024 / 1024).toFixed(2);
@@ -317,8 +324,10 @@ export const POST: RequestHandler = async ({ request }) => {
           console.warn(`Large image (${sizeMB}MB) — vision processing may take several minutes on CPU`);
         }
       } catch (dlErr: any) {
+        if (dlErr instanceof UnsafeUrlError || dlErr instanceof TooLargeError) return json({ success: false, error: dlErr.message }, { status: 400 });
         console.error('Image download error:', dlErr);
-        return json({ success: false, error: `Image download failed: ${dlErr.message}` }, { status: 400 });
+        // The cause is logged above; the browser gets a sentence it can act on
+        return json({ success: false, error: 'The image could not be downloaded. Check the address, and that the site allows downloads.' }, { status: 400 });
       }
 
       // Step 2: Send to Ollama with base64 image
@@ -477,6 +486,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
   } catch (err: any) {
     console.error('Image processing POST error:', err);
-    return json({ success: false, error: err.message }, { status: 500 });
+    return json({ success: false, error: 'Image analysis failed. Check that the image service is running and try again.' }, { status: 500 });
   }
 };

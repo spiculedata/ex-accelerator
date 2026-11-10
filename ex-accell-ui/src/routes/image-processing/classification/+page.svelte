@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -11,6 +13,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let classStats: any = { topTags: [], categories: [], treemap: [] };
   let results: any[] = [];
   let imageUrl = '';
@@ -28,6 +31,7 @@
         fetch('/api/image-processing?action=classification-results&limit=20'),
       ]);
       const [statsData, resultsData] = await Promise.all([statsRes.json(), resultsRes.json()]);
+      unavailable = !!statsData.meta?.unavailable;
       if (statsData.success) classStats = statsData.data;
       if (resultsData.success) results = resultsData.data || [];
     } catch (err: any) { errorMessage = err.message; }
@@ -64,7 +68,7 @@
         grid: { left: 10, right: 40, top: 40, bottom: 20, containLabel: true },
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: top15.map((t: any) => t.tag).reverse(), axisLabel: { fontSize: 10, width: 120, overflow: 'truncate' } },
-        series: [{ type: 'bar', data: top15.map((t: any) => parseInt(t.count)).reverse(), itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
+        series: [{ type: 'bar', data: top15.map((t: any) => parseInt(t.count)).reverse(), itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
       });
     }
 
@@ -83,18 +87,28 @@
   onMount(loadData);
 </script>
 
-<svelte:head><title>Image Classification - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>Image Classification - Social Explorer</title>
+  <meta name="description" content="Tag and categorise images with zero-shot classification." />
+</svelte:head>
 
-<PageHeader title="Image Classification" subtitle="CLIP zero-shot classification with custom taxonomy" accentColor="purple" />
+<PageHeader title="Image Classification" subtitle="CLIP zero-shot classification with custom taxonomy" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <!-- Classify Panel -->
   <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
     <h2 class="text-lg font-semibold text-gray-900 mb-3">Classify Image</h2>
     <div class="mb-3">
-      <ModelTierSelector bind:selectedTier disabled={analyzing} />
+      <ModelTierSelector tool="classification" bind:selectedTier disabled={analyzing} />
     </div>
     <div class="flex gap-3 mb-4">
       <input type="text" bind:value={imageUrl} placeholder="Paste image URL..." disabled={analyzing}
@@ -152,13 +166,13 @@
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <div id="tag-chart" class="w-full h-96"></div>
         {#if classStats.topTags?.length === 0}
-          <div class="flex items-center justify-center h-96 text-gray-400"><p class="text-sm">No classification data yet</p></div>
+          <div class="flex items-center justify-center h-96 text-gray-500"><p class="text-sm">No classification data yet</p></div>
         {/if}
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <div id="category-chart" class="w-full h-96"></div>
         {#if classStats.categories?.length === 0}
-          <div class="flex items-center justify-center h-96 text-gray-400"><p class="text-sm">No category data yet</p></div>
+          <div class="flex items-center justify-center h-96 text-gray-500"><p class="text-sm">No category data yet</p></div>
         {/if}
       </div>
     </div>
@@ -169,7 +183,7 @@
         <h2 class="text-lg font-semibold text-gray-900">Classification Results</h2>
       </div>
       {#if results.length === 0}
-        <div class="p-12 text-center text-gray-400">
+        <div class="p-12 text-center text-gray-500">
           <span class="text-4xl block mb-2">🏷️</span>
           <p class="text-sm">No classified images yet. Use the classify panel above or run batch processing.</p>
         </div>

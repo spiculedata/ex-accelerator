@@ -1,12 +1,15 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import { moduleBadge } from '$lib/utils/imageModules';
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let stats: any = {};
 
   const modules = [
@@ -58,11 +61,11 @@
     {
       name: 'Brand Recognition',
       href: '/image-processing/brand-recognition',
-      description: 'Detect logos and brand placements in visual content',
+      description: 'Preview: find logos and brand placements in images. Results are limited while this is built out.',
       icon: '🏢',
       color: 'amber',
       statKey: null,
-      statLabel: 'Stretch Goal'
+      statLabel: 'Preview'
     }
   ];
 
@@ -79,6 +82,7 @@
     try {
       const res = await fetch('/api/image-processing?action=stats');
       const data = await res.json();
+      unavailable = !!data.meta?.unavailable;
       if (data.success) stats = data.data || {};
     } catch (err: any) { errorMessage = err.message; }
     finally { loading = false; }
@@ -89,16 +93,23 @@
 
 <svelte:head>
   <title>Image Processing Suite - Social Explorer</title>
+  <meta name="description" content="Classify images, read text, detect faces and objects, recognise brands and moderate content." />
 </svelte:head>
 
 <PageHeader
   title="Image Processing Suite"
   subtitle="Computer Vision, Content Analysis, and Visual Intelligence"
-  accentColor="indigo"
 />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   {#if loading}
     <div class="flex items-center justify-center py-16">
@@ -114,7 +125,7 @@
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Objects Detected</p>
         <p class="text-2xl font-bold text-blue-600">{formatNumber(stats.totalObjects || 0)}</p>
-        <p class="text-xs text-gray-400 mt-1">{stats.objectClasses || 0} unique classes</p>
+        <p class="text-xs text-gray-500 mt-1">{stats.objectClasses || 0} unique classes</p>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Content Safety</p>
@@ -125,7 +136,7 @@
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Text Extractions</p>
-        <p class="text-2xl font-bold text-amber-600">{formatNumber(stats.ocrExtractions || 0)}</p>
+        <p class="text-2xl font-bold text-signal-700">{formatNumber(stats.ocrExtractions || 0)}</p>
       </div>
     </div>
 
@@ -141,13 +152,7 @@
           <div class="flex items-start justify-between mb-3">
             <span class="text-3xl">{mod.icon}</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {colors.badge}">
-              {#if mod.statKey && stats[mod.statKey] > 0}
-                {formatNumber(stats[mod.statKey])}
-              {:else if !mod.statKey}
-                {mod.statLabel}
-              {:else}
-                Ready
-              {/if}
+              {moduleBadge(mod.statKey, stats, unavailable)}
             </span>
           </div>
           <h3 class="text-lg font-semibold text-gray-900 mb-1">{mod.name}</h3>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART, DIVERGING } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import { onMount, afterUpdate, tick } from 'svelte';
   import { androidResearchDb } from '$lib/services/androidResearchDb';
@@ -199,6 +200,14 @@
     return transitions[from]?.[to] || Math.random() * 0.3;
   }
 
+  /** Names the content type that actually has the highest engagement score, if there is any data. */
+  function topEngagementFinding(): string {
+    const scored = researchData.contentEngagement.filter((entry) => typeof entry.engagementScore === 'number');
+    if (scored.length === 0) return 'No content engagement data available';
+    const top = scored.reduce((best, entry) => (entry.engagementScore > best.engagementScore ? entry : best));
+    return `${top.content} shows highest engagement (${top.engagementScore}/100)`;
+  }
+
   function getAppMeanDuration(app: string): number {
     const durations: Record<string, number> = {
       'YouTube': 280, 'Instagram': 180, 'WhatsApp': 90, 'Chrome': 200,
@@ -217,7 +226,7 @@
         if (temporalChartInstance) {
           temporalChartInstance.dispose();
         }
-        temporalChartInstance = echarts.init(temporalChart);
+        temporalChartInstance = echarts.init(temporalChart, 'social-explorer');
         temporalChartInstance.setOption(getTemporalChartOption());
       } else {
         console.log('Temporal chart container not ready or not on temporal tab');
@@ -226,7 +235,7 @@
       // App Network Chart
       if (appNetworkChart && appNetworkChart.offsetWidth > 0) {
         console.log('Initializing app network chart');
-        appNetworkChartInstance = echarts.init(appNetworkChart);
+        appNetworkChartInstance = echarts.init(appNetworkChart, 'social-explorer');
         appNetworkChartInstance.setOption(getAppNetworkOption());
       } else {
         console.log('App network chart container not ready');
@@ -235,7 +244,7 @@
       // Attention Span Distribution Chart
       if (attentionChart && attentionChart.offsetWidth > 0) {
         console.log('Initializing attention chart');
-        attentionChartInstance = echarts.init(attentionChart);
+        attentionChartInstance = echarts.init(attentionChart, 'social-explorer');
         attentionChartInstance.setOption(getAttentionChartOption());
       } else {
         console.log('Attention chart container not ready');
@@ -244,7 +253,7 @@
       // Content Engagement Chart
       if (engagementChart && engagementChart.offsetWidth > 0) {
         console.log('Initializing engagement chart');
-        engagementChartInstance = echarts.init(engagementChart);
+        engagementChartInstance = echarts.init(engagementChart, 'social-explorer');
         engagementChartInstance.setOption(getEngagementChartOption());
       } else {
         console.log('Engagement chart container not ready');
@@ -253,7 +262,7 @@
       // App Transition Flow Chart
       if (transitionChart && transitionChart.offsetWidth > 0) {
         console.log('Initializing transition chart');
-        transitionChartInstance = echarts.init(transitionChart);
+        transitionChartInstance = echarts.init(transitionChart, 'social-explorer');
         getTransitionFlowOption().then(option => {
           transitionChartInstance.setOption(option);
         });
@@ -267,7 +276,7 @@
         if (heatmapChartInstance) {
           heatmapChartInstance.dispose();
         }
-        heatmapChartInstance = echarts.init(heatmapChart);
+        heatmapChartInstance = echarts.init(heatmapChart, 'social-explorer');
         heatmapChartInstance.setOption(getHeatmapOption());
       } else {
         console.log('Heatmap chart container not ready or not on temporal tab');
@@ -399,11 +408,11 @@
           lineStyle: { width: 5 }
         },
         categories: [
-          { name: 'Social', itemStyle: { color: '#ff6b6b' } },
-          { name: 'Productivity', itemStyle: { color: '#4ecdc4' } },
-          { name: 'Entertainment', itemStyle: { color: '#45b7d1' } },
-          { name: 'Communication', itemStyle: { color: '#f9ca24' } },
-          { name: 'Utility', itemStyle: { color: '#6c5ce7' } }
+          { name: 'Social', itemStyle: { color: CHART.danger500 } },
+          { name: 'Productivity', itemStyle: { color: CHART.primary500 } },
+          { name: 'Entertainment', itemStyle: { color: CHART.catSky } },
+          { name: 'Communication', itemStyle: { color: CHART.catOrange } },
+          { name: 'Utility', itemStyle: { color: CHART.primary600 } }
         ],
         data: nodes,
         links: links
@@ -462,7 +471,7 @@
         itemStyle: {
           color: function(params: any) {
             const ratio = params.data.value[1] / params.data.value[0];
-            return ratio > 1.2 ? '#52c41a' : ratio < 0.8 ? '#ff4d4f' : '#1890ff';
+            return ratio > 1.2 ? CHART.catGreen : ratio < 0.8 ? CHART.danger500 : CHART.catBlue;
           },
           opacity: 0.8
         },
@@ -511,21 +520,21 @@
           name: 'Engagement Score',
           type: 'bar',
           data: researchData.contentEngagement.map(d => d.engagementScore),
-          itemStyle: { color: '#5470c6' }
+          itemStyle: { color: CHART.catBlue }
         },
         {
           name: 'Avg Duration',
           type: 'line',
           yAxisIndex: 1,
           data: researchData.contentEngagement.map(d => d.avgDuration / 60),
-          itemStyle: { color: '#91cc75' },
+          itemStyle: { color: CHART.catGreen },
           lineStyle: { width: 3 }
         },
         {
           name: 'Return Rate',
           type: 'line',
           data: researchData.contentEngagement.map(d => d.returnRate * 100),
-          itemStyle: { color: '#fac858' },
+          itemStyle: { color: CHART.catOrange },
           lineStyle: { width: 3 }
         }
       ]
@@ -648,7 +657,7 @@
         left: 'center',
         bottom: '5%',
         inRange: {
-          color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+          color: [...DIVERGING]
         }
       },
       series: [{
@@ -721,9 +730,9 @@
       },
       {
         title: "Content Engagement Depth",
-        finding: `Video content shows highest engagement (${researchData.contentEngagement[1]?.engagementScore || 92}/100)`,
-        significance: "Visual media captures sustained attention most effectively",
-        implication: "Video-based interfaces may improve user retention"
+        finding: topEngagementFinding(),
+        significance: "Shows which kinds of content capture sustained attention",
+        implication: "Prioritise the highest-engagement content types in interface design"
       }
     ];
 
@@ -779,7 +788,7 @@
 </script>
 
 <svelte:head>
-  <title>Android Research Analytics - Deep Behavioral Analysis</title>
+  <title>Android Research Analytics - Social Explorer</title>
   <meta name="description" content="Advanced research dashboard for Android mobile behavior analysis using Princeton SMART data" />
 </svelte:head>
 
@@ -788,12 +797,12 @@
 
     {#if isDemo && !loading}
       <div class="mb-6 bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-center">
-        <svg class="w-5 h-5 text-amber-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-signal-700 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
-          <span class="font-semibold text-amber-800">Demo Data</span>
-          <span class="text-amber-700 text-sm ml-2">No real Android device tables are available. The data shown below is derived from social analytics or generated for demonstration purposes.</span>
+          <span class="font-semibold text-amber-800">Example data, not findings</span>
+          <span class="text-amber-700 text-sm ml-2">No Android research data is connected to this installation. Every figure below is generated as an example of what this page shows and does not describe real participants.</span>
         </div>
       </div>
     {/if}
@@ -802,8 +811,8 @@
     <div class="absolute inset-0 bg-gradient-to-br from-purple-900/20 to-pink-900/20 opacity-60"></div>
     
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex min-w-0 items-center">
           <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -812,7 +821,7 @@
           <div>
             <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Android Research Analytics</h1>
             <p class="text-slate-300 text-sm font-medium">Deep Behavioral Analysis • Digital Phenotyping • Attention Research</p>
-            <div class="flex items-center mt-2 space-x-4">
+            <div class="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
                 🧠 Cognitive Analysis
               </span>
@@ -846,7 +855,9 @@
           </button>
           <button 
             on:click={exportResearchReport}
-            class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors shadow-sm">
+            disabled={isDemo}
+            title={isDemo ? 'Export is available once Android research data is connected' : 'Export the research report'}
+            class="disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors shadow-sm">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
@@ -855,7 +866,7 @@
         </div>
         
         <!-- Filters -->
-        <div class="flex items-center gap-6">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-gray-700 whitespace-nowrap">User:</label>
             <div class="relative">
@@ -863,7 +874,7 @@
                 <option value="7324">User 7324</option>
                 <option value="all">All Users</option>
               </select>
-              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </div>
@@ -877,7 +888,7 @@
                 <option value="7d">7 Days</option>
                 <option value="30d">30 Days</option>
               </select>
-              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </div>
@@ -897,7 +908,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
         <div class="flex items-center">
-          <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-signal-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           <div>
@@ -930,7 +941,7 @@
           <div class="text-xs text-gray-500 mt-1">{digitalPhenotype.multitaskingIndex} Multitasking</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-          <div class="text-3xl font-bold text-amber-600 mb-1">{Math.round(behavioralMetrics.digitalWellbeingScore)}</div>
+          <div class="text-3xl font-bold text-signal-700 mb-1">{Math.round(behavioralMetrics.digitalWellbeingScore)}</div>
           <div class="text-sm text-gray-600">Wellbeing Score</div>
           <div class="text-xs text-gray-500 mt-1">0-100 scale</div>
         </div>
@@ -939,7 +950,7 @@
       <!-- Analysis Navigation -->
       <div class="bg-white rounded-xl shadow-sm mb-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex space-x-8 px-6">
+          <nav class="-mb-px flex space-x-8 overflow-x-auto whitespace-nowrap px-6 pt-1" aria-label="Analysis type">
             <button 
               class="py-4 px-1 border-b-2 font-medium text-sm {activeAnalysis === 'temporal-patterns' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
               on:click={() => switchAnalysis('temporal-patterns')}>
@@ -1082,10 +1093,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  :global(.project-switcher) {
-    position: relative;
-    z-index: 50;
-  }
-</style>

@@ -102,3 +102,49 @@ describe('decideAccess: admin-only bypass attempts', () => {
     expect(req('/api/unified-analytics', 'GET', member).action).toBe('allow');
   });
 });
+
+describe('sign out everywhere', () => {
+  const logoutAll = (user: SessionUser | null) => decideAccess({ pathname: '/api/auth/logout-all', search: '', method: 'POST', user });
+
+  it('is for signed-in users only: an anonymous caller gets 401', () => {
+    expect(logoutAll(null)).toEqual({ action: 'unauthorized' });
+  });
+
+  it('works for every role, including a read-only viewer, since it only ends the caller\'s own sessions', () => {
+    for (const role of ['admin', 'user', 'viewer'] as const) {
+      expect(logoutAll({ id: '1', email: 'a@b.co', name: 'A', role })).toEqual({ action: 'allow' });
+    }
+  });
+});
+
+describe('workflow executions', () => {
+  it.each([
+    ['/api/workflow-executions/ex_1', 'DELETE'],
+    ['/api/workflow-executions/ex_1/manage', 'POST'],
+    ['/api/workflow-executions/%65x_1/manage', 'POST']
+  ])('only an admin may change %s (%s)', (path, method) => {
+    expect(req(path, method, member).action).toBe('forbidden');
+    expect(req(path, method, admin).action).toBe('allow');
+  });
+
+  it('lets any signed-in role read executions and their status', () => {
+    for (const user of [admin, member, viewer]) {
+      expect(req('/api/workflow-executions', 'GET', user).action).toBe('allow');
+      expect(req('/api/workflow-executions/ex_1/manage', 'GET', user, '?action=status').action).toBe('allow');
+    }
+  });
+});
+
+describe('account management', () => {
+  it('lets any signed-in role change their own password', () => {
+    for (const user of [admin, member, viewer]) expect(req('/api/auth/password', 'POST', user).action).toBe('allow');
+  });
+
+  it.each(['/api/users', '/api/users/5b1c7e3a-0000-4000-8000-000000000001', '/api/%75sers', '/api//users', '/settings/users', '/settings/%75sers'])('keeps %s for admins only, even for reads', (path) => {
+    for (const method of ['GET', 'POST', 'PATCH']) {
+      expect(req(path, method, member).action).toBe('forbidden');
+      expect(req(path, method, viewer).action).toBe('forbidden');
+      expect(req(path, method, admin).action).toBe('allow');
+    }
+  });
+});

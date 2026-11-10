@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { CATEGORICAL, CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
+  import { correlationMatrix } from '$lib/utils/correlation';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
@@ -105,18 +108,13 @@
       categories[cat] = (categories[cat] || 0) + (parseInt(d.post_count) || 0);
     });
 
-    const colorMap: Record<string, string> = {
-      'Very Positive': '#06d6a0', 'Positive': '#22c55e',
-      'Neutral': '#8b5cf6', 'Very Negative': '#f72585', 'Negative': '#ef4444',
-    };
-
     sentimentChart.setOption({
       title: { text: 'Sentiment Distribution', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       series: [{
         type: 'pie', radius: ['35%', '65%'],
         data: Object.entries(categories).map(([name, value]) => ({
-          name, value, itemStyle: { color: colorMap[name] || '#6b7280' }
+          name, value, itemStyle: { color: getSentimentColor(name) }
         })),
         label: { show: true, fontSize: 11 },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' } }
@@ -138,7 +136,7 @@
       yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
       series: [{
         type: 'bar', data: counts,
-        itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
+        itemStyle: { color: CHART.catBlue, borderRadius: [4, 4, 0, 0] },
         label: { show: true, position: 'top', fontSize: 10 }
       }]
     });
@@ -162,7 +160,7 @@
       series: [{
         type: 'bar',
         data: top10.map((t: any) => parseInt(t.size) || 0).reverse(),
-        itemStyle: { color: '#a855f7', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', fontSize: 10, color: '#666' }
       }]
     });
@@ -171,7 +169,7 @@
   function updateLanguageChart() {
     if (!languageChart || languageData.length === 0) return;
 
-    const colors = ['#3b82f6', '#06d6a0', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
+    const colors = [...CATEGORICAL, CHART.primary600, CHART.ink500];
     languageChart.setOption({
       title: { text: 'Language Distribution', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -203,73 +201,60 @@
       xAxis: { type: 'category', data: hours, axisLabel: { fontSize: 9 } },
       yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
       series: [
-        { name: 'Positive', type: 'line', data: positive, itemStyle: { color: '#06d6a0' }, smooth: true, areaStyle: { color: 'rgba(6,214,160,0.15)' } },
-        { name: 'Negative', type: 'line', data: negative, itemStyle: { color: '#f72585' }, smooth: true, areaStyle: { color: 'rgba(247,37,133,0.15)' } },
-        { name: 'Neutral', type: 'line', data: neutral, itemStyle: { color: '#8b5cf6' }, smooth: true, areaStyle: { color: 'rgba(139,92,246,0.15)' } },
+        { name: 'Positive', type: 'line', data: positive, itemStyle: { color: getSentimentColor('positive') }, lineStyle: { color: getSentimentColor('positive') }, smooth: true, areaStyle: { color: getSentimentColor('positive'), opacity: 0.15 } },
+        { name: 'Negative', type: 'line', data: negative, itemStyle: { color: getSentimentColor('negative') }, lineStyle: { color: getSentimentColor('negative') }, smooth: true, areaStyle: { color: getSentimentColor('negative'), opacity: 0.15 } },
+        { name: 'Neutral', type: 'line', data: neutral, itemStyle: { color: getSentimentColor('neutral') }, lineStyle: { color: getSentimentColor('neutral'), type: 'dashed' }, smooth: true, areaStyle: { color: getSentimentColor('neutral'), opacity: 0.1 } },
       ]
     });
   }
 
+  // Daily post counts by sentiment over the last 30 days; the matrix says which of them move together
+  $: dailyCounts = {
+    Positive: trendData.map((d: any) => Number(d.positive) || 0),
+    Neutral: trendData.map((d: any) => Number(d.neutral) || 0),
+    Negative: trendData.map((d: any) => Number(d.negative) || 0)
+  };
+  $: matrix = correlationMatrix(dailyCounts);
+  $: hasMatrix = matrix.values.some((row, i) => row.some((value, j) => i !== j && value !== null));
+
   function updateCorrelationMatrix() {
-    if (!correlationChart) return;
-
-    // Build correlation from real metrics
-    const metrics = ['Sentiment', 'Topics', 'Languages', 'Posts', 'Engagement'];
-
-    // Calculate real correlations from data overlaps
-    const totalPosts = sentimentData.reduce((s: number, d: any) => s + (parseInt(d.post_count) || 0), 0);
-    const topicCoverage = topicsData.reduce((s: number, t: any) => s + (parseInt(t.size) || 0), 0) / Math.max(totalPosts, 1);
-    const langDiversity = languageData.length / 10; // Normalized
-    const sentimentSpread = sentimentData.length / 5; // How many categories have data
-
-    const data: [number, number, number][] = [];
-    const matrix = [
-      [1.0, topicCoverage * 0.6, 0.3, sentimentSpread * 0.8, 0.5],
-      [topicCoverage * 0.6, 1.0, 0.4, 0.7, topicCoverage],
-      [0.3, 0.4, 1.0, langDiversity, 0.2],
-      [sentimentSpread * 0.8, 0.7, langDiversity, 1.0, 0.6],
-      [0.5, topicCoverage, 0.2, 0.6, 1.0],
-    ];
-
-    for (let i = 0; i < metrics.length; i++) {
-      for (let j = 0; j < metrics.length; j++) {
-        data.push([i, j, Math.round(Math.min(matrix[i][j], 1) * 100) / 100]);
-      }
-    }
+    if (!correlationChart || !hasMatrix) return;
+    const { labels, values } = matrix;
+    const data = values.flatMap((row, y) => row.map((value, x) => [x, y, value === null ? '-' : Math.round(value * 100) / 100]));
 
     correlationChart.setOption({
-      title: { text: 'Metric Correlations', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
-      tooltip: { formatter: (p: any) => `${metrics[p.data[0]]} vs ${metrics[p.data[1]]}: ${p.data[2]}` },
-      grid: { left: 80, right: 40, top: 40, bottom: 40 },
-      xAxis: { type: 'category', data: metrics, axisLabel: { fontSize: 10, rotate: 30 }, splitArea: { show: true } },
-      yAxis: { type: 'category', data: metrics, axisLabel: { fontSize: 10 }, splitArea: { show: true } },
-      visualMap: { min: 0, max: 1, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f0f9ff', '#3b82f6', '#1e40af'] } },
-      series: [{
-        type: 'heatmap', data,
-        label: { show: true, fontSize: 10 },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } }
-      }]
+      tooltip: { formatter: (p: any) => `${labels[p.data[1]]} and ${labels[p.data[0]]}: ${p.data[2] === '-' ? 'not enough variation to compare' : p.data[2]}` },
+      grid: { left: 80, right: 90, top: 10, bottom: 50 },
+      xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
+      yAxis: { type: 'category', data: labels, inverse: true, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
+      // Diverging scale from -1 to 1, in hues that are not the sentiment colours; the legend sits beside the grid
+      visualMap: { min: -1, max: 1, calculable: false, orient: 'vertical', right: 10, top: 'middle', itemHeight: 140, text: ['+1', '-1'], inRange: { color: [CHART.catPink, CHART.white, CHART.catGreen] } },
+      series: [{ type: 'heatmap', data, label: { show: true, fontSize: 12 }, emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.3)' } } }]
     });
   }
 
-  onMount(async () => {
-    await loadData();
-    await initCharts();
+  // Load once on mount, then again only when the selected workspace changes. (Gating on `loading`
+  // instead re-triggers the load every time it finishes, which loops forever.)
+  let loadedWorkspace: string | null | undefined;
+  let mounted = false;
+  onMount(() => {
+    mounted = true;
   });
-
-  $: if (!loading && workspaceId !== undefined && browser) {
+  $: if (mounted && browser && workspaceId !== loadedWorkspace) {
+    loadedWorkspace = workspaceId;
     loadData().then(() => initCharts());
   }
 </script>
 
 <svelte:head>
   <title>Analytics Correlation - Social Explorer</title>
+  <meta name="description" content="Sentiment, topics, languages and platforms side by side, and how daily sentiment moves together." />
 </svelte:head>
 
 <PageHeader
   title="Analytics Correlation"
-  subtitle="Cross-dimensional analysis across sentiment, topics, languages, and platforms"
-  accentColor="cyan"
+  subtitle="Sentiment, topics, languages and platforms side by side, with how daily sentiment moves together"
+  backHref="/text-analytics"
 />
 
 <WorkspaceBanner />
@@ -300,11 +285,11 @@
         <div class="text-xs text-gray-500">Languages</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 text-center">
-        <div class="text-xl font-bold text-amber-600">{platformData.length}</div>
+        <div class="text-xl font-bold text-signal-700">{platformData.length}</div>
         <div class="text-xs text-gray-500">Platforms</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 text-center">
-        <div class="text-xl font-bold text-cyan-600">{sentimentData.filter(d => d.sentiment_category !== 'Unknown').length}</div>
+        <div class="text-xl font-bold text-cyan-600">{new Set(sentimentData.map(d => d.sentiment_category).filter(c => c && c !== 'Unknown')).size}</div>
         <div class="text-xs text-gray-500">Sentiment Categories</div>
       </div>
     </div>
@@ -336,9 +321,18 @@
         <div id="corr-hourly" class="w-full h-80"></div>
       </div>
 
-      <!-- Correlation Matrix -->
+      <!-- Correlation matrix -->
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <div id="corr-matrix" class="w-full h-80"></div>
+        <h2 class="text-sm font-bold text-ink-900">Do sentiments rise and fall together?</h2>
+        <p class="mt-1 text-xs text-ink-600">
+          Correlation of the daily post counts by sentiment, on days with posts in the last 30 days. +1 means two sentiments rise and fall on the same days,
+          -1 means one rises as the other falls, and 0 means no pattern. When overall volume drives the numbers all three move together; values near 0 mean no clear pattern.
+        </p>
+        {#if hasMatrix}
+          <div id="corr-matrix" class="w-full h-64"></div>
+        {:else}
+          <p class="py-16 text-center text-sm text-ink-500">Not enough variation to compare sentiments yet. At least three days with different counts are needed.</p>
+        {/if}
       </div>
     </div>
   {/if}

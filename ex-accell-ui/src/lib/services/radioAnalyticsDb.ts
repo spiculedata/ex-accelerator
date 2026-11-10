@@ -2,6 +2,7 @@
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
 import { BaseDatabaseService } from './baseDatabaseService';
+import { CHART } from '$lib/utils/chartColors';
 import type {
   RadioOverviewStats,
   StationStats,
@@ -77,10 +78,10 @@ class RadioAnalyticsDatabase extends BaseDatabaseService {
     }
 
     const sentimentColors: Record<string, string> = {
-      positive: '#22c55e',
-      negative: '#ef4444',
-      neutral: '#6b7280',
-      mixed: '#f59e0b'
+      positive: CHART.catGreen,
+      negative: CHART.danger500,
+      neutral: CHART.ink500,
+      mixed: CHART.catOrange
     };
 
     const total = data.reduce((sum: number, row: any) => sum + (row.post_count || 0), 0);
@@ -90,7 +91,7 @@ class RadioAnalyticsDatabase extends BaseDatabaseService {
       (row) => ({
         label: row.sentiment_category || 'unknown',
         count: row.post_count || 0,
-        color: sentimentColors[row.sentiment_category?.toLowerCase()] || '#6b7280',
+        color: sentimentColors[row.sentiment_category?.toLowerCase()] || CHART.ink500,
         percentage: total > 0 ? Math.round(((row.post_count || 0) / total * 100) * 100) / 100 : 0
       }),
       []

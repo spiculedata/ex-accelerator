@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
@@ -7,10 +10,15 @@
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let currentFilterParams: Record<string, string> = {};
+  // The hashtag whose posts are open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
 
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
@@ -30,6 +38,16 @@
   let totalPosts = 0;
   let searchQuery = '';
   let hashtagChart: any = null;
+
+  let exportState: ExportState = IDLE_EXPORT;
+  // Exports the hashtags as listed, including the search box filter
+  function exportHashtags() {
+    return runExport(async () => {
+      const rows = filteredHashtags.map((h) => ({ hashtag: `#${h.hashtag}`, mentions: Number(h.count), posts: Number(h.post_count) }));
+      downloadCsv('hashtag_analysis.csv', toCsv(rows, ['hashtag', 'mentions', 'posts']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
+  }
 
   $: filteredHashtags = hashtags.filter(h => {
     if (!searchQuery) return true;
@@ -87,25 +105,47 @@
       series: [{
         type: 'bar',
         data: top20.map((h: any) => parseInt(h.count)).reverse(),
-        itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', fontSize: 10, color: '#666' }
       }]
     });
   }
 
-  onMount(() => { loadData(); });
-  $: if (workspaceId !== undefined && !loading) loadData();
+  // Load once on mount, then again only when the selected workspace changes. (Gating on `loading`
+  // instead re-triggers the load every time it finishes, which loops forever.)
+  let loadedWorkspace: string | null | undefined;
+  let mounted = false;
+  onMount(() => {
+    mounted = true;
+  });
+  $: if (mounted && workspaceId !== loadedWorkspace) {
+    loadedWorkspace = workspaceId;
+    loadData();
+  }
 </script>
 
 <svelte:head>
   <title>Hashtag Analysis - Social Explorer</title>
+  <meta name="description" content="The hashtags used in your posts, how often, and how they trend." />
 </svelte:head>
 
 <PageHeader
   title="Hashtag Analysis"
   subtitle="Discover trending hashtags and co-occurrence patterns"
-  accentColor="purple"
-/>
+  backHref="/text-analytics"
+>
+  <svelte:fragment slot="actions">
+    <button
+      type="button"
+      on:click={exportHashtags}
+      disabled={exportState.kind === 'working' || loading}
+      class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 disabled:opacity-60">
+      {exportState.kind === 'working' ? 'Exporting…' : 'Export CSV'}
+    </button>
+  </svelte:fragment>
+</PageHeader>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4"><ExportStatus state={exportState} /></div>
 
 <WorkspaceBanner />
 
@@ -151,7 +191,7 @@
         {#if hashtags.length > 0}
           <div id="hashtag-chart" class="w-full h-96"></div>
         {:else}
-          <div class="flex items-center justify-center h-96 text-gray-400">
+          <div class="flex items-center justify-center h-96 text-gray-500">
             <div class="text-center">
               <span class="text-4xl block mb-2">#</span>
               <p class="text-sm">No hashtags found in posts</p>
@@ -167,7 +207,7 @@
           <p class="text-xs text-gray-500 mt-1">Hashtags that frequently appear together</p>
         </div>
         {#if cooccurrence.length === 0}
-          <div class="p-8 text-center text-gray-400 text-sm">No co-occurrence data</div>
+          <div class="p-8 text-center text-gray-500 text-sm">No co-occurrence data</div>
         {:else}
           <div class="max-h-96 overflow-y-auto">
             <table class="w-full text-sm">
@@ -208,7 +248,7 @@
         />
       </div>
       {#if filteredHashtags.length === 0}
-        <div class="p-8 text-center text-gray-400 text-sm">No hashtags match your search</div>
+        <div class="p-8 text-center text-gray-500 text-sm">No hashtags match your search</div>
       {:else}
         <div class="max-h-[500px] overflow-y-auto">
           <table class="w-full text-sm">
@@ -225,7 +265,7 @@
               {#each filteredHashtags as h}
                 {@const maxCount = Math.max(...filteredHashtags.slice(0, 1).map(x => parseInt(x.count)), 1)}
                 <tr class="hover:bg-purple-50/50">
-                  <td class="px-4 py-2.5 text-purple-700 font-semibold">#{h.hashtag}</td>
+                  <td class="px-4 py-2.5 font-semibold"><button type="button" class="text-primary-700 hover:underline" on:click={() => (drilldown = { title: `#${h.hashtag}`, filters: { hashtag: h.hashtag, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } })}>#{h.hashtag}</button></td>
                   <td class="px-4 py-2.5 text-right text-gray-900">{formatNumber(parseInt(h.count))}</td>
                   <td class="px-4 py-2.5 text-right text-gray-600">{formatNumber(parseInt(h.post_count))}</td>
                   <td class="px-4 py-2.5">
@@ -249,3 +289,5 @@
     </div>
   {/if}
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

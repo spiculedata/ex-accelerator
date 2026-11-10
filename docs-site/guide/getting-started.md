@@ -2,6 +2,11 @@
 
 This page gets the web app running locally for development or evaluation.
 
+::: tip Just want to look around?
+`npm run demo` starts everything with sample data in one command. See
+[Try it with demo data](./demo-data#the-fastest-way).
+:::
+
 ::: tip What you need
 - **Node 22**
 - **Docker** (for PostgreSQL with the `pg_duckdb` extension)
@@ -11,8 +16,8 @@ This page gets the web app running locally for development or evaluation.
 ## 1. Get the code and install
 
 ```bash
-git clone https://github.com/spiculedata/ex-accelerator.git
-cd ex-accelerator/ex-accell-ui
+git clone https://github.com/spiculedata/social-explorer.git
+cd social-explorer/ex-accell-ui
 npm ci
 cp .env.example .env
 ```
@@ -76,7 +81,7 @@ Production mode marks the session cookie `Secure`. Chrome and Firefox accept tha
 `docker-compose.yml` at the repository root also defines Redis, Dapr sidecars, the crawler, ETL,
 Jupyter, the WavePulse radio service and an Ollama container for local models. It requires
 `SESSION_SECRET` to be set. A step-by-step guide for the full stack is still being written; follow
-[issue #60](https://github.com/spiculedata/ex-accelerator/issues/60) for progress.
+[issue #60](https://github.com/spiculedata/social-explorer/issues/60) for progress.
 
 ## Next steps
 

@@ -1,7 +1,14 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
+  // Tailwind-only styling for the dual-handle range sliders (thumb and track pseudo-elements)
+  const rangeSliderClass =
+    'absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-violet-500 [&::-webkit-slider-thumb]:to-purple-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-linear-to-br [&::-moz-range-thumb]:from-violet-500 [&::-moz-range-thumb]:to-purple-500 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-webkit-slider-track]:h-1.5 [&::-webkit-slider-track]:bg-gray-300 [&::-webkit-slider-track]:rounded-sm [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-gray-300 [&::-moz-range-track]:rounded-sm';
+
+	import 'leaflet/dist/leaflet.css';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { getCountryNameWithFallback, getAllCountries } from '$lib/countryMapping';
+	import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 	
 	let mapContainer: HTMLDivElement;
 	let map: any;
@@ -9,6 +16,8 @@
 	let events: any[] = [];
 	let loading = true;
 	let error = '';
+	// GDELT has not been loaded into this database: say so, rather than show an error or an empty map
+	let gdeltUnavailable = false;
 	let markers: any = {};
 	let activeEventTypes = new Set(['all']);
 	let isToggling = false;
@@ -251,73 +260,73 @@
 		'verbal_cooperation': { 
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'],
 			label: 'Verbal Cooperation',
-			color: '#22c55e',
+			color: CHART.catGreen,
 			description: 'Make statement, comment, consult, engage in diplomatic cooperation'
 		},
 		'material_cooperation': {
 			codes: ['20', '21', '22', '23', '24', '25', '26', '27'],
 			label: 'Material Cooperation', 
-			color: '#84cc16',
+			color: CHART.catSky,
 			description: 'Appeal, express intent to cooperate, provide aid'
 		},
 		'verbal_conflict': {
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'].map(c => '1' + c),
 			label: 'Verbal Conflict',
-			color: '#f59e0b', 
+			color: CHART.catOrange, 
 			description: 'Demand, disapprove, reject, threaten, protest'
 		},
 		'material_conflict': {
 			codes: ['18', '19', '20'],
 			label: 'Material Conflict',
-			color: '#ef4444',
+			color: CHART.danger500,
 			description: 'Exhibit force, reduce relations, coerce'
 		},
 		'diplomacy': {
 			codes: ['30', '31', '32', '33', '34', '35', '36', '37'], 
 			label: 'Diplomacy',
-			color: '#3b82f6',
+			color: CHART.catBlue,
 			description: 'Express intent to cooperate, consult, support'
 		},
 		'support': {
 			codes: ['40', '41', '42', '43', '44', '45', '46'],
 			label: 'Support & Agreements',
-			color: '#06b6d4',
+			color: CHART.primary500,
 			description: 'Cooperate, agree, provide support'
 		},
 		'information': {
 			codes: ['50', '51', '52', '53', '54', '55', '56', '57'],
 			label: 'Information & Media',
-			color: '#8b5cf6',
+			color: CHART.catPink,
 			description: 'Engage in symbolic acts, media statements'
 		},
 		'economic': {
 			codes: ['60', '61', '62', '63', '64', '65', '66', '67'],
 			label: 'Economic Actions',
-			color: '#059669',
+			color: CHART.success600,
 			description: 'Economic cooperation, trade, sanctions'
 		},
 		'political': {
 			codes: ['70', '71', '72', '73', '74', '75', '76'],
 			label: 'Political Actions', 
-			color: '#dc2626',
+			color: CHART.ink600,
 			description: 'Provide diplomatic cooperation, host meetings'
 		},
 		'military': {
 			codes: ['80', '81', '82', '83', '84', '85', '86', '87'],
 			label: 'Military Actions',
-			color: '#b91c1c',
+			color: CHART.danger700,
 			description: 'Military cooperation, exercises, operations'
 		},
 		'protests': {
 			codes: ['14', '141', '142', '143', '144', '145'],
 			label: 'Protests & Demonstrations',
-			color: '#ea580c',
+			color: CHART.catVermilion,
 			description: 'Protests, demonstrations, strikes'
 		},
 		'violence': {
 			codes: ['17', '18', '19', '190', '193', '194', '195'],
 			label: 'Violence & Conflict',
-			color: '#991b1b',
+			color: CHART.ink900,
 			description: 'Violence, fighting, armed conflict'
 		}
 	};
@@ -333,7 +342,7 @@
 
 	function getEventTypeColor(eventCode: string): string {
 		const type = getEventType(eventCode);
-		return eventTypes[type]?.color || '#6b7280';
+		return eventTypes[type]?.color || CHART.ink500;
 	}
 
 	async function toggleEventType(eventType: string) {
@@ -735,7 +744,7 @@
 		}
 		
 		const data = await response.json();
-		console.log('API response:', { eventsCount: data.events?.length, hasError: !!data.error });
+		gdeltUnavailable = !!data.unavailable;
 		
 		if (data.error) {
 			throw new Error(data.error);
@@ -1084,52 +1093,16 @@
 	
 	function getEventColor(goldstein: number): string {
 		if (!goldstein) return '#999';
-		if (goldstein > 5) return '#22c55e'; // Green for very positive
-		if (goldstein > 0) return '#84cc16'; // Light green for positive
-		if (goldstein > -5) return '#f59e0b'; // Orange for slightly negative
-		return '#ef4444'; // Red for very negative
+		if (goldstein > 5) return CHART.catGreen; // Green for very positive
+		if (goldstein > 0) return CHART.primary500; // Light green for positive
+		if (goldstein > -5) return CHART.catOrange; // Orange for slightly negative
+		return CHART.danger500; // Red for very negative
 	}
 </script>
 
 <svelte:head>
-	<title>GDELT World Events Dashboard</title>
-	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-	<style>
-		.range-slider {
-			-webkit-appearance: none;
-			appearance: none;
-		}
-		.range-slider::-webkit-slider-thumb {
-			-webkit-appearance: none;
-			appearance: none;
-			height: 16px;
-			width: 16px;
-			border-radius: 50%;
-			background: linear-gradient(135deg, #8b5cf6, #a855f7);
-			border: 2px solid white;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-			cursor: pointer;
-		}
-		.range-slider::-moz-range-thumb {
-			height: 16px;
-			width: 16px;
-			border-radius: 50%;
-			background: linear-gradient(135deg, #8b5cf6, #a855f7);
-			border: 2px solid white;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-			cursor: pointer;
-		}
-		.range-slider::-webkit-slider-track {
-			height: 6px;
-			background: #d1d5db;
-			border-radius: 3px;
-		}
-		.range-slider::-moz-range-track {
-			height: 6px;
-			background: #d1d5db;
-			border-radius: 3px;
-		}
-	</style>
+	<title>GDELT World Events - Social Explorer</title>
+	<meta name="description" content="A map of global news events from GDELT, with the people, places and themes behind them." />
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
@@ -1168,6 +1141,10 @@
 					<p class="text-sm text-gray-500 mt-2">Fetching global event data from database</p>
 				</div>
 			</div>
+		{:else if gdeltUnavailable}
+			<DataUnavailable
+				title="No GDELT events are loaded"
+				description="The world map shows news events from the GDELT Project. It fills in once GDELT data has been loaded into the database." />
 		{:else if error}
 			<div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-400">
 				<div class="flex items-center">
@@ -1179,7 +1156,7 @@
 					<div class="ml-3">
 						<h3 class="text-sm font-medium text-red-800">Error Loading Data</h3>
 						<p class="text-sm text-red-700 mt-1">{error}</p>
-						<p class="text-xs text-red-600 mt-2">Check the browser console for more details.</p>
+						<p class="text-xs text-red-600 mt-2">Check that the database is running, then reload the page.</p>
 						<button 
 							on:click={() => error = ''}
 							class="text-xs text-red-600 hover:text-red-800 mt-2 underline"
@@ -1197,7 +1174,7 @@
 						
 						<!-- Loading Overlay for Filter Panel -->
 						{#if isUpdatingFilter}
-							<div class="absolute inset-0 bg-white bg-opacity-90 rounded-xl flex items-center justify-center z-40">
+							<div class="absolute inset-0 bg-white/90 rounded-xl flex items-center justify-center z-40">
 								<div class="text-center">
 									<div class="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600 mx-auto mb-3"></div>
 									<div class="text-sm font-medium text-gray-700">Updating filters...</div>
@@ -1242,7 +1219,7 @@
 										<label class="block text-xs xl:text-sm font-medium text-gray-700 mb-2">From Date</label>
 										<div class="relative">
 											<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-												<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 												</svg>
 											</div>
@@ -1262,7 +1239,7 @@
 										<label class="block text-xs xl:text-sm font-medium text-gray-700 mb-2">To Date</label>
 										<div class="relative">
 											<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-												<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 												</svg>
 											</div>
@@ -1415,7 +1392,7 @@
 										step="0.1"
 										bind:value={goldsteinRange[0]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1425,13 +1402,13 @@
 										step="0.1"
 										bind:value={goldsteinRange[1]}
 										on:input={handleGoldsteinChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 3; pointer-events: auto;"
 									/>
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
-									<div class="flex justify-between text-xs text-gray-400 mt-6">
+									<div class="flex justify-between text-xs text-gray-500 mt-6">
 										<span>-10</span>
 										<span>0</span>
 										<span>+10</span>
@@ -1505,7 +1482,7 @@
 										step="0.5"
 										bind:value={toneRange[0]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 2; pointer-events: auto;"
 									/>
 									<input
@@ -1515,13 +1492,13 @@
 										step="0.5"
 										bind:value={toneRange[1]}
 										on:input={handleToneChange}
-										class="absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer range-slider"
+										class={rangeSliderClass}
 										style="z-index: 3; pointer-events: auto;"
 									/>
 									<div class="absolute top-1 w-full h-2 bg-gray-200 rounded-xl" style="z-index: 1;"></div>
 									
 									<!-- Scale Labels -->
-									<div class="flex justify-between text-xs text-gray-400 mt-6">
+									<div class="flex justify-between text-xs text-gray-500 mt-6">
 										<span>-50</span>
 										<span>0</span>
 										<span>+50</span>
@@ -1589,7 +1566,7 @@
 											bind:value={countrySearchTerm}
 											class="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 										/>
-										<svg class="absolute left-2.5 top-2.5 w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<svg class="absolute left-2.5 top-2.5 w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
 										</svg>
 									</div>
@@ -1674,7 +1651,7 @@
 								</svg>
 								Click types to filter map events
 							</div>
-							<p class="text-xs text-gray-400 mt-1">Based on GDELT CAMEO codes</p>
+							<p class="text-xs text-gray-500 mt-1">Based on GDELT CAMEO codes</p>
 						</div>
 					</div>
 				</div>
@@ -1709,7 +1686,7 @@
 									<div class="animate-spin rounded-full h-3 w-3 border border-amber-200 border-t-amber-600"></div>
 								</div>
 							{/if}
-							<div class="text-xl xl:text-2xl font-bold text-amber-600">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
+							<div class="text-xl xl:text-2xl font-bold text-signal-700">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
 							<div class="text-xs text-gray-600">Event Types</div>
 						</div>
 						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">
@@ -1780,7 +1757,7 @@
 							
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}
-								<div class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+								<div class="absolute inset-0 bg-white/75 flex items-center justify-center z-50">
 									<div class="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
 										<div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
 										<div class="text-lg font-semibold text-gray-900 mb-2">Refreshing Data</div>
@@ -1913,7 +1890,7 @@
 									{/if}
 								{:else if mentions.length === 0}
 									<div class="text-center py-12">
-										<svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 										</svg>
 										<h3 class="mt-4 text-lg font-medium text-gray-900">No mentions found</h3>
@@ -1997,7 +1974,7 @@
 													
 													{#if startPage > 1}
 														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
-														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+														{#if startPage > 2}<span class="text-gray-500">...</span>{/if}
 													{/if}
 													
 													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
@@ -2010,7 +1987,7 @@
 													{/each}
 													
 													{#if endPage < totalPages}
-														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														{#if endPage < totalPages - 1}<span class="text-gray-500">...</span>{/if}
 														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
 													{/if}
 													
@@ -2116,10 +2093,10 @@
 																{#if formattedDate}
 																	<span title="Raw: {mention.mentionTimeDate}">{formattedDate}</span>
 																{:else}
-																	<span class="text-gray-400" title="Raw: {mention.mentionTimeDate}">Invalid date</span>
+																	<span class="text-gray-500" title="Raw: {mention.mentionTimeDate}">Invalid date</span>
 																{/if}
 															{:else}
-																<span class="text-gray-400">N/A</span>
+																<span class="text-gray-500">N/A</span>
 															{/if}
 														</td>
 														<td class="px-4 py-3 text-sm text-gray-600">
@@ -2196,7 +2173,7 @@
 													
 													{#if startPage > 1}
 														<button on:click={() => goToPage(1)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">1</button>
-														{#if startPage > 2}<span class="text-gray-400">...</span>{/if}
+														{#if startPage > 2}<span class="text-gray-500">...</span>{/if}
 													{/if}
 													
 													{#each Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i) as page}
@@ -2209,7 +2186,7 @@
 													{/each}
 													
 													{#if endPage < totalPages}
-														{#if endPage < totalPages - 1}<span class="text-gray-400">...</span>{/if}
+														{#if endPage < totalPages - 1}<span class="text-gray-500">...</span>{/if}
 														<button on:click={() => goToPage(totalPages)} class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">{totalPages}</button>
 													{/if}
 													

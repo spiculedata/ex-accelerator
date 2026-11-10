@@ -299,7 +299,7 @@
 </script>
 
 <svelte:head>
-  <title>Android Analytics Dashboard - Princeton SMART Data</title>
+  <title>Android Analytics - Social Explorer</title>
   <meta name="description" content="Analyze Android mobile device user interactions and app usage patterns" />
 </svelte:head>
 
@@ -342,7 +342,9 @@
           </button>
           <button 
             on:click={exportData}
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+            disabled
+            title="Export is available once Android data is connected"
+            class="disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
             Export Analysis
           </button>
         </div>
@@ -354,12 +356,12 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
       <div class="flex items-center">
-        <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-signal-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
-          <p class="text-sm font-medium text-amber-800">Demo Mode</p>
-          <p class="text-xs text-amber-700">Android analytics data is not connected yet. Showing sample visualizations of the interface capabilities.</p>
+          <p class="text-sm font-medium text-amber-800">No Android data is connected</p>
+          <p class="text-xs text-amber-700">These charts stay empty until Android research data is loaded into this installation.</p>
         </div>
       </div>
     </div>
@@ -390,7 +392,7 @@
           <div class="text-xs text-gray-500 mt-1">Different apps used</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-          <div class="text-3xl font-bold text-amber-600 mb-1">{sessionDuration}</div>
+          <div class="text-3xl font-bold text-signal-700 mb-1">{sessionDuration}</div>
           <div class="text-sm text-gray-600">Total Duration (min)</div>
           <div class="text-xs text-gray-500 mt-1">Active usage time</div>
         </div>
@@ -537,7 +539,6 @@
               <p><strong>Collection Method:</strong> Passive smartphone usage monitoring with automated screenshots every 3-5 seconds</p>
               <p><strong>Data Types:</strong> App accessibility events, app segment timing, screenshot OCR text extraction, and URL visits</p>
               <p><strong>Privacy:</strong> All data collection is participant-controlled and consent-based for research purposes</p>
-              <p><strong>User ID:</strong> 7324 • <strong>Session:</strong> 5db4bc90-8fcf-4d20-b6d7-4474def9786f • <strong>Date:</strong> April 14, 2025</p>
             </div>
           </div>
         </div>

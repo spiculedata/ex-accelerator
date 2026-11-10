@@ -1,0 +1,15 @@
+import DefaultTheme from 'vitepress/theme';
+import type { Theme } from 'vitepress';
+import Landing from './Landing.vue';
+import ColorRamp from './ColorRamp.vue';
+import './brand.css';
+
+// `layout: landing` in a page's front matter renders this component inside the default theme
+// (navigation, search and footer stay). Every other page uses the default theme untouched.
+export default {
+  extends: DefaultTheme,
+  enhanceApp({ app }) {
+    app.component('landing', Landing);
+    app.component('ColorRamp', ColorRamp);
+  }
+} satisfies Theme;

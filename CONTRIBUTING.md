@@ -1,4 +1,4 @@
-# Contributing to ex-accelerator
+# Contributing to Social Explorer
 
 Thanks for helping out! This guide covers setup, conventions and the pull request process.
 By participating you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -50,6 +50,18 @@ npm run build
 npm run test:e2e       # Playwright; first run: npx playwright install chromium
 ```
 
+## Dependency overrides
+
+`ex-accell-ui/package.json` pins two nested dependencies through npm `overrides`, because the
+packages that pull them in have not released fixes:
+
+- `image-size`: reached via `helia` → `react-native` → `metro`, which never runs in this app.
+- `qs`: reached via `express` under `@dapr/dapr`, whose HTTP server the app does not use.
+
+Re-check both after upgrading `helia` or `@dapr/dapr`, and drop an override once the parent
+requires a fixed version. CI runs `npm audit --omit=dev --audit-level=high` weekly and when
+dependencies change.
+
 ## Conventions
 
 - **Tests first.** Write a failing test, make it pass, then refactor. New behaviour needs tests;
@@ -75,7 +87,7 @@ npm run test:e2e       # Playwright; first run: npx playwright install chromium
 
 ## Licensing
 
-ex-accelerator is licensed under the [Apache License 2.0](LICENSE). By submitting a contribution
+Social Explorer is licensed under the [Apache License 2.0](LICENSE). By submitting a contribution
 you agree it is licensed under the same terms (section 5 of the license). Files under `wavepulse/`
 derive from third-party work; keep their copyright headers and modification notices intact.
 

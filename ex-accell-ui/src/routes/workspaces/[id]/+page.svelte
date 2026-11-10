@@ -12,6 +12,7 @@
 
   // ---------- types ----------
   interface DataSource {
+    kind: 'capture' | 'dataset';
     id: number;
     source_type: string;
     source_name: string;
@@ -210,8 +211,12 @@
             <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Data Sources</h2>
             <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{dataSources.length}</span>
           </div>
-          <button type="button" class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-            + Add Data Source
+          <button
+            type="button"
+            class="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            onclick={() => goto(`/data-management?workspace=${workspaceId}&link=1`)}
+          >
+            Link dataset
           </button>
         </div>
 
@@ -227,7 +232,7 @@
           </div>
         {:else}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {#each dataSources as ds}
+            {#each dataSources as ds (`${ds.kind}-${ds.id}`)}
               <div class="bg-white rounded-xl shadow-sm p-5 border border-transparent">
                 <!-- Name + type -->
                 <div class="flex items-center justify-between mb-3">
@@ -269,7 +274,11 @@
             </div>
             <p class="text-slate-600 font-medium mb-1">No investigations yet</p>
             <p class="text-sm text-slate-400 mb-4">Create an investigation to start analyzing this workspace's data</p>
-            <button type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <button
+              type="button"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              onclick={() => goto(`/investigations?workspace=${workspaceId}`)}
+            >
               Create Investigation
             </button>
           </div>

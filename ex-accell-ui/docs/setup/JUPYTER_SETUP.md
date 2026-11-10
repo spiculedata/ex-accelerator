@@ -73,7 +73,7 @@ poetry install
 poetry run python bootstrap_notebooks.py
 
 # Start only Jupyter Lab
-poetry run jupyter lab --port=8888 --no-browser --allow-root
+npm run jupyter:start
 
 # Start only SvelteKit
 npm run dev
@@ -122,7 +122,7 @@ pkill -f "jupyter lab"
 lsof -i :8888
 
 # Start manually to see errors
-poetry run jupyter lab --port=8888 --no-browser --allow-root
+npm run jupyter:start
 ```
 
 #### Embedding Not Working

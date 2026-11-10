@@ -1,38 +1,59 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import type { PostFilters } from '$lib/services/postsApi';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
-  import { trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
+  import { summarizeTrigrams, trigramsDb, type TrigramData, type TrigramFilters, type TrigramStats } from '$lib/services/trigramsDb';
   import { getTrendColor } from '$lib/utils/colorUtils';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
+  import { platformOptions } from '$lib/utils/platformOptions';
+  import FilterBar from '$lib/components/ui/FilterBar.svelte';
+  import MethodNote from '$lib/components/ui/MethodNote.svelte';
+  import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
+  import { trigramDrilldownFilters } from '$lib/utils/trigramDrilldown';
+
+  // The phrase the visitor chose; its posts open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
 
   $: workspaceId = $page.url.searchParams.get('workspace');
   
   let errorMessage = '';
+  let truncated = false;
 
   // Trigrams analysis data
   let loading = true;
   let trigramsData: TrigramData[] = [];
+  // Only platforms that appear in the data are offered
+  $: platformChoices = platformOptions(trigramsData.flatMap((t) => t.platforms ?? []));
   let trigramStats: TrigramStats = {
     totalTrigrams: 0,
     uniqueTrigrams: 0,
     averageFrequency: 0,
-    topCategories: [],
     sentimentDistribution: { positive: 0, neutral: 0, negative: 0 },
     trendDistribution: { up: 0, stable: 0, down: 0 }
   };
   let selectedPlatform = 'all';
-  let selectedTimeRange = '7d';
-  let minFrequency = 5;
+  // Phrases are counted over the last 7 days unless the date bar sets a range
+  const DEFAULT_TIME_RANGE = '7d';
+  const DEFAULT_DAYS = 7;
+  let hasRange = false;
+  // Two mentions is already a repeated phrase; a higher default hid most of them
+  let minFrequency = 2;
   let showChart = 'frequency';
   let searchQuery = '';
   
   // Filtering
   let filteredTrigrams: TrigramData[] = [];
   
+  // A date change made while a load runs is picked up afterwards, and the newest range wins
+  const rangeSync = rangeReloader(loadTrigramsData, () => loading);
+
   onMount(async () => {
+    rangeSync.markLoaded();
     await loadTrigramsData();
+    await rangeSync.sync();
   });
 
   async function loadTrigramsData() {
@@ -41,25 +62,24 @@
       
       const filters: TrigramFilters = {
         platform: selectedPlatform,
-        timeRange: selectedTimeRange,
+        timeRange: DEFAULT_TIME_RANGE,
         minFrequency,
         maxResults: 100,
         searchQuery
       };
       
-      // Load trigrams data and stats from database
-      const [data, stats] = await Promise.all([
-        trigramsDb.getTrigramsData(filters, workspaceId || undefined),
-        trigramsDb.getTrigramStats(filters, workspaceId || undefined)
-      ]);
-      
+      errorMessage = '';
+      const { data, truncated: wasTruncated } = await trigramsDb.getTrigramsResult(filters, workspaceId || undefined);
+      truncated = wasTruncated;
+
       trigramsData = data;
-      trigramStats = stats;
+      trigramStats = summarizeTrigrams(data);
       filteredTrigrams = data;
-      
-      console.log('Trigrams data loaded successfully from database');
     } catch (error) {
       console.error('Error loading trigrams data:', error);
+      trigramsData = [];
+      filteredTrigrams = [];
+      trigramStats = summarizeTrigrams([]);
       errorMessage = 'Failed to load trigrams data. Please try again.';
     } finally {
       loading = false;
@@ -78,10 +98,17 @@
     });
   }
 
+  // Highlights computed from the phrases currently shown
+  $: risingTrigrams = filteredTrigrams.filter((t) => t.trend === 'up').slice(0, 5);
+  $: mostPositive = filteredTrigrams.reduce<TrigramData | null>((best, t) => (t.sentiment > (best?.sentiment ?? 0) ? t : best), null);
+  $: mostCritical = filteredTrigrams.reduce<TrigramData | null>((worst, t) => (t.sentiment < (worst?.sentiment ?? 0) ? t : worst), null);
+  const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+
   function getSentimentColor(sentiment: number) {
-    if (sentiment > 0.3) return 'text-green-600';
-    if (sentiment < -0.3) return 'text-red-600';
-    return 'text-yellow-600';
+    // The brand sentiment scale runs blue to orange, so it stays readable for colour-blind people; both are dark enough for text
+    if (sentiment > 0.3) return 'text-primary-700';
+    if (sentiment < -0.3) return 'text-signal-800';
+    return 'text-ink-600';
   }
 
   function getSentimentLabel(sentiment: number) {
@@ -104,7 +131,7 @@
     try {
       const filters: TrigramFilters = {
         platform: selectedPlatform,
-        timeRange: selectedTimeRange,
+        timeRange: DEFAULT_TIME_RANGE,
         minFrequency,
         searchQuery
       };
@@ -141,14 +168,7 @@
   <PageHeader
     title="Trigram Analysis"
     subtitle="Discover three-word phrase patterns and linguistic trends in your content"
-    accentColor="purple">
-    <svelte:fragment slot="icon">
-      <div class="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-      </div>
-    </svelte:fragment>
+    backHref="/text-analytics">
     <svelte:fragment slot="actions">
       <div class="hidden lg:flex items-center space-x-6">
         <div class="text-center">
@@ -163,6 +183,27 @@
     </svelte:fragment>
   </PageHeader>
 
+  <!-- Dates: the same bar as the other analysis pages; with no dates set the last 7 days are analysed -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <FilterBar datesOnly compact on:change={() => { hasRange = Object.keys(currentRangeQuery()).length > 0; rangeSync.sync(); }} />
+    {#if !hasRange}
+      <p class="mt-2 text-xs text-ink-600">Showing the last 7 days. Pick dates above to analyse a different period.</p>
+    {/if}
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <MethodNote title="What trigrams and trends mean">
+      <p>A trigram is a phrase of three words that appears in your posts. Only phrases that start and end with a meaningful word are counted, so "state of emergency" is kept and "this is the" is not.</p>
+      <p>
+        <strong>Trend</strong> compares the first half of the period with the second half. <em>Up</em> means the phrase appears more than one and a half times as often in the
+        later half, <em>Down</em> means more than one and a half times as often in the earlier half, and <em>Stable</em> means neither. If there are more posts than can be
+        scanned (20,000), the period starts at the oldest post that was scanned. Phrases seen only a few times can
+        change trend with one more post, so read the counts too.
+      </p>
+      <p>Min Frequency hides phrases seen fewer times than the number you set. It starts at 2; raise it to focus on the most repeated phrases.</p>
+    </MethodNote>
+  </div>
+
   <!-- Controls Section -->
   <div class="bg-white border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -173,20 +214,9 @@
             <label class="text-sm font-medium text-gray-700">Platform:</label>
             <select bind:value={selectedPlatform} class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
               <option value="all">All Platforms</option>
-              <option value="twitter">Twitter</option>
-              <option value="facebook">Facebook</option>
-              <option value="instagram">Instagram</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
-          </div>
-          
-          <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium text-gray-700">Time Range:</label>
-            <select bind:value={selectedTimeRange} class="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
-              <option value="1d">Last Day</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
+              {#each platformChoices as choice}
+                <option value={choice.value}>{choice.label}</option>
+              {/each}
             </select>
           </div>
           
@@ -226,6 +256,11 @@
   <!-- Main Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+    {#if truncated}
+      <p class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        This period has more posts than can be analysed at once, so only the most recent ones are included. Choose a shorter time range for complete results.
+      </p>
+    {/if}
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- Trigrams List -->
       <div class="lg:col-span-3">
@@ -257,7 +292,7 @@
                   <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-3">
                       <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">#{i + 1}</span>
-                      <h3 class="text-lg font-semibold text-gray-900">"{trigram.trigram}"</h3>
+                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: trigramDrilldownFilters({ phrase: trigram.trigram, params: Object.fromEntries($page.url.searchParams), platform: selectedPlatform, defaultDays: DEFAULT_DAYS }) })}>"{trigram.trigram}"</button></h3>
                     </div>
                     <div class="flex items-center space-x-2">
                       <svg class="w-4 h-4 {getTrendColor(trigram.trend)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,15 +360,17 @@
           </div>
         </div>
 
-        <!-- Top Categories -->
+        <!-- Rising phrases -->
         <div class="bg-white rounded-xl shadow-lg p-6">
-          <h3 class="text-lg font-bold text-gray-900 mb-4">Trending Topics</h3>
+          <h3 class="text-lg font-bold text-gray-900 mb-4">Rising Phrases</h3>
           <div class="space-y-3">
-            {#each trigramStats.topCategories as category}
+            {#each risingTrigrams as rising}
               <div class="flex justify-between items-center">
-                <span class="text-sm text-gray-700">{category.category}</span>
-                <span class="text-sm font-medium text-purple-600">{category.percentage}%</span>
+                <span class="text-sm text-gray-700">{rising.trigram}</span>
+                <span class="text-sm font-medium text-purple-600">{rising.frequency}</span>
               </div>
+            {:else}
+              <p class="text-sm text-gray-500">No rising phrases in this period.</p>
             {/each}
           </div>
         </div>
@@ -342,30 +379,28 @@
         <div class="bg-white rounded-xl shadow-lg p-6">
           <h3 class="text-lg font-bold text-gray-900 mb-4">Pattern Insights</h3>
           <div class="space-y-4">
-            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div class="flex items-center mb-2">
-                <svg class="w-4 h-4 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                </svg>
-                <span class="text-sm font-medium text-green-800">Most Positive</span>
+            {#if mostPositive}
+              <div class="bg-sentiment-positive/10 border border-sentiment-positive/40 rounded-lg p-3">
+                <span class="text-sm font-medium text-ink-900">Most positive</span>
+                <p class="text-sm text-ink-700">"{mostPositive.trigram}"</p>
+                <p class="text-xs text-ink-600 mt-1">{signed(mostPositive.sentiment)} sentiment score</p>
               </div>
-              <p class="text-sm text-green-700">"sustainable energy solutions"</p>
-              <p class="text-xs text-green-600 mt-1">+0.78 sentiment score</p>
-            </div>
-            
-            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-              <div class="flex items-center mb-2">
-                <svg class="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                </svg>
-                <span class="text-sm font-medium text-red-800">Most Critical</span>
+            {/if}
+            {#if mostCritical}
+              <div class="bg-sentiment-negative/10 border border-sentiment-negative/40 rounded-lg p-3">
+                <span class="text-sm font-medium text-ink-900">Most critical</span>
+                <p class="text-sm text-ink-700">"{mostCritical.trigram}"</p>
+                <p class="text-xs text-ink-600 mt-1">{signed(mostCritical.sentiment)} sentiment score</p>
               </div>
-              <p class="text-sm text-red-700">"data privacy concerns"</p>
-              <p class="text-xs text-red-600 mt-1">-0.34 sentiment score</p>
-            </div>
+            {/if}
+            {#if !mostPositive && !mostCritical}
+              <p class="text-sm text-gray-500">No clearly positive or negative phrases in this period.</p>
+            {/if}
           </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing these words in this order, ignoring punctuation, case and links, the way the counts on this page do." onclose={() => (drilldown = null)} />

@@ -1,6 +1,7 @@
 // Database connection and query service for Language Detection data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
 import type {
   LanguageStats,
@@ -58,6 +59,21 @@ interface LanguageDetectionStats {
   lastUpdated: string;
 }
 
+/** The API returns numeric columns as strings. */
+const toNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const round = (value: number, places: number): number => Number(value.toFixed(places));
+
+/** The database returns naive UTC timestamps like '2026-10-07 08:30:00'. */
+const toIsoString = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const text = String(value);
+  const date = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(text) ? text : `${text.replace(' ', 'T')}Z`);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+};
+
 /**
  * Language Detection Database Service
  * Provides language detection and analysis data from PostgreSQL with pg_duckdb extension
@@ -77,7 +93,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageStats(workspaceId?: string): Promise<LanguageStats[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
 
     if (!data || data.length === 0) {
@@ -101,7 +117,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageAnalysis(workspaceId?: string): Promise<LanguageAnalysis[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-stats',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
 
     if (!data || data.length === 0) {
@@ -114,22 +130,18 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
       'ru': 'Русский', 'ar': 'العربية', 'zh': '中文', 'ja': '日本語'
     };
 
-    return data.map((item: any) => {
-      const totalDetections = item.post_count || 0;
-      const confidence = item.confidence || 0;
-      return {
-        code: item.language_code,
-        name: item.language,
-        native_name: nativeNames[item.language_code] || item.language,
-        totalDetections,
-        veryHighConfidence: Math.floor(totalDetections * (confidence > 0.9 ? 0.6 : 0.3)),
-        highConfidence: Math.floor(totalDetections * 0.25),
-        mediumConfidence: Math.floor(totalDetections * 0.1),
-        lowConfidence: Math.floor(totalDetections * 0.05),
-        avgConfidence: Math.round(confidence * 100) / 100,
-        confidenceStddev: 0.05
-      };
-    });
+    return data.map((item: any) => ({
+      code: item.language_code,
+      name: item.language,
+      native_name: nativeNames[item.language_code] || item.language,
+      totalDetections: toNumber(item.post_count),
+      veryHighConfidence: toNumber(item.very_high_count),
+      highConfidence: toNumber(item.high_count),
+      mediumConfidence: toNumber(item.medium_count),
+      lowConfidence: toNumber(item.low_count),
+      avgConfidence: round(toNumber(item.confidence), 2),
+      confidenceStddev: round(toNumber(item.confidence_stddev), 2)
+    }));
   }
 
   /**
@@ -153,148 +165,89 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   }
 
   /**
-   * Get sample posts with language detection
+   * Get posts with the language detected for each
    */
   async getSamplePosts(filters: FilterOptions = {}, workspaceId?: string): Promise<LanguagePost[]> {
-    const params = {
-      ...(workspaceId ? { workspace_id: workspaceId } : {}),
-      platform: filters.platform || 'all',
-      limit: (filters.limit || 50).toString()
-    };
-
+    const f = filters as any;
     const data = await this.queryAPI<any>({
-      endpoint: 'sample-posts',
-      params
+      endpoint: 'language-posts',
+      params: {
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
+        ...currentRangeQuery(),
+        platform: f.platform || 'all',
+        language: f.language || 'all',
+        ...(typeof f.confidenceThreshold === 'number' ? { minConfidence: f.confidenceThreshold } : {}),
+        limit: String(f.limit || 50)
+      }
     });
 
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    // TODO: Get actual language mappings from database
-    const languageMapping: Record<string, { code: string; name: string }> = {
-      'twitter': { code: 'en', name: 'English' },
-      'facebook': { code: 'es', name: 'Spanish' },
-      'instagram': { code: 'fr', name: 'French' },
-      'reddit': { code: 'de', name: 'German' },
-      'linkedin': { code: 'it', name: 'Italian' }
-    };
-
-    const posts = this.safeTransform(
-      data,
-      (post) => {
-        const lang = languageMapping[post.platform] || { code: 'en', name: 'English' };
-        const confidence = Math.round((post.confidence || 0.85) * 100) / 100;
-
-        return {
-          id: post.id,
-          text: post.text,
-          language: lang.code,
-          language_name: lang.name,
-          confidence,
-          timestamp: new Date(post.timestamp).toISOString(),
-          platform: post.platform,
-          secondary_language: lang.code !== 'en' && confidence > 0.9 ? 'en' : null,
-          secondary_confidence: lang.code !== 'en' && confidence > 0.9 ? Math.round((1 - confidence) * 100) / 100 : null
-        };
-      },
-      []
-    );
-
-    // Apply filters
-    return posts.filter(post => {
-      if (filters.sentiment && filters.sentiment !== 'all') {
-        if (post.language !== filters.sentiment) return false;
-      }
-      if (filters.startDate) {
-        if (post.confidence < parseFloat(filters.startDate)) return false;
-      }
-      return true;
-    });
+    return data.map((row: any) => ({
+      id: row.id,
+      text: row.text,
+      language: row.language_code,
+      language_name: row.language_name,
+      confidence: round(toNumber(row.confidence), 2),
+      timestamp: toIsoString(row.timestamp),
+      platform: row.platform,
+      secondary_language: row.secondary_language ?? null,
+      secondary_confidence: row.secondary_language ? round(toNumber(row.secondary_confidence), 2) : null
+    }));
   }
 
   /**
-   * Get language mixing analysis (code-switching)
+   * Get language mixing (code-switching) pairs, with each pair's share of all mixed posts
    */
   async getLanguageMixing(workspaceId?: string): Promise<LanguageMixing[]> {
     const data = await this.queryAPI<any>({
-      endpoint: 'emotion-correlations',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      endpoint: 'language-mixing',
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
+    const total = data.reduce((sum: number, row: any) => sum + toNumber(row.occurrence_count), 0);
 
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    const languages = ['English', 'Spanish', 'French', 'German', 'Italian'];
-    const mixingTypes = ['code-switching', 'borrowing', 'interference'];
-
-    return this.safeTransform(
-      data.slice(0, 10),
-      (item, index) => ({
-        primary_language: languages[index % languages.length],
-        secondary_language: languages[(index + 1) % languages.length],
-        occurrence_count: Math.max(10, Math.floor((item.score || item.value || 50) * (index + 1))),
-        percentage: Math.round(((100 - index * 8) / (data.length || 1)) * 100) / 100
-      }),
-      []
-    );
+    return data.map((row: any) => ({
+      primary_language: row.primary_language,
+      secondary_language: row.secondary_language,
+      occurrence_count: toNumber(row.occurrence_count),
+      percentage: total > 0 ? round((toNumber(row.occurrence_count) / total) * 100, 2) : 0
+    }));
   }
 
   /**
-   * Get geographic language distribution
+   * Geographic distribution is not available: posts carry no location data, so there is nothing
+   * truthful to report. Returns an empty list rather than inventing one.
    */
-  async getGeographicDistribution(workspaceId?: string): Promise<GeographicDistribution[]> {
-    const data = await this.queryAPI<any>({
-      endpoint: 'platform-performance',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
-    });
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    const totalPosts = data.reduce((sum: number, item: any) => sum + item.total_posts, 0);
-
-    const geoMapping = [
-      { language: 'English', country_code: 'US', region: 'North America' },
-      { language: 'Spanish', country_code: 'ES', region: 'Europe' },
-      { language: 'French', country_code: 'FR', region: 'Europe' },
-      { language: 'German', country_code: 'DE', region: 'Europe' },
-      { language: 'Italian', country_code: 'IT', region: 'Europe' }
-    ];
-
-    return geoMapping.map((geo, index) => {
-      const postCount = Math.floor(totalPosts * (0.6 - index * 0.1));
-      return {
-        language_name: geo.language,
-        country_code: geo.country_code,
-        region: geo.region,
-        post_count: postCount,
-        percentage: totalPosts > 0 ? Math.round((postCount / totalPosts * 100) * 100) / 100 : 0,
-        country_rank: index + 1
-      };
-    });
+  async getGeographicDistribution(_workspaceId?: string): Promise<GeographicDistribution[]> {
+    return [];
   }
 
   /**
-   * Get overall language detection statistics
+   * Get overall language detection statistics, aggregated from the per-language stats
    */
   async getLanguageDetectionStats(workspaceId?: string): Promise<LanguageDetectionStats> {
     const data = await this.queryAPI<any>({
-      endpoint: 'cross-platform-sentiment',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      endpoint: 'language-stats',
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
+    if (data.length === 0) return this.getDefaultDetectionStats();
 
-    if (!data || data.length === 0) {
-      return this.getDefaultDetectionStats();
-    }
+    const sum = (key: string) => data.reduce((total: number, row: any) => total + toNumber(row[key]), 0);
+    const totalPosts = sum('post_count');
+    const weightedConfidence = data.reduce((total: number, row: any) => total + toNumber(row.confidence) * toNumber(row.post_count), 0);
+    const top = data.reduce((best: any, row: any) => (toNumber(row.post_count) > toNumber(best.post_count) ? row : best), data[0]);
 
-    return this.safeTransform(
-      [data],
-      () => this.calculateDetectionStats(data),
-      [this.getDefaultDetectionStats()]
-    )[0];
+    return {
+      totalPosts,
+      totalLanguages: data.length,
+      avgConfidence: totalPosts > 0 ? round(weightedConfidence / totalPosts, 2) : 0,
+      topLanguage: { name: top.language },
+      confidenceDistribution: {
+        veryHigh: sum('very_high_count'),
+        high: sum('high_count'),
+        medium: sum('medium_count'),
+        low: sum('low_count')
+      },
+      lastUpdated: new Date().toISOString()
+    };
   }
 
   /**
@@ -340,28 +293,6 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
       avgConfidence: 0,
       topLanguage: { name: 'English' },
       confidenceDistribution: { veryHigh: 0, high: 0, medium: 0, low: 0 },
-      lastUpdated: new Date().toISOString()
-    };
-  }
-
-  /**
-   * Calculate detection statistics from raw data
-   */
-  private calculateDetectionStats(data: any[]): LanguageDetectionStats {
-    const totalPosts = data.reduce((sum, item) => sum + item.post_count, 0);
-    const avgConfidence = data.reduce((sum, item) => sum + (item.avg_confidence || 0.85), 0) / data.length;
-
-    return {
-      totalPosts,
-      totalLanguages: 5, // English, Spanish, French, German, Italian
-      avgConfidence: Math.round(avgConfidence * 100) / 100,
-      topLanguage: { name: 'English' },
-      confidenceDistribution: {
-        veryHigh: Math.floor(totalPosts * 0.4),
-        high: Math.floor(totalPosts * 0.3),
-        medium: Math.floor(totalPosts * 0.2),
-        low: Math.floor(totalPosts * 0.1)
-      },
       lastUpdated: new Date().toISOString()
     };
   }

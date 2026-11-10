@@ -1,5 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
+  import MethodNote from '$lib/components/ui/MethodNote.svelte';
+  import { apiErrors } from '$lib/stores/apiErrors';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
@@ -35,11 +42,18 @@
   // No onMount load — FilterBar's onReady callback triggers the initial load
 
   // Comprehensive sentiment analysis data - loaded from database
-  let sentimentStats: any = {
+  const emptySentimentStats = () => ({
     positive: { count: 0, percentage: 0, confidence: 0 },
     negative: { count: 0, percentage: 0, confidence: 0 },
     neutral: { count: 0, percentage: 0, confidence: 0 }
-  };
+  });
+  let sentimentStats: any = emptySentimentStats();
+  // A failed load is not the same as an empty range, so the two are told apart in the page
+  let loadFailed = false;
+  // Sections that failed while the rest loaded, so one bad request does not blank the whole page
+  let failedSections: string[] = [];
+  // The sentiment segment whose posts are open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
 
   let totalPosts = 0;
 
@@ -57,16 +71,28 @@
 
   // Load sentiment analysis data from database service
   async function loadSentimentData() {
+    loadFailed = false;
+    failedSections = [];
     try {
-      // Load all sentiment data from database service
-      const fp = { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams };
-      const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp);
-      sentimentStats = stats;
-      totalPosts = stats.total;
+      // The four requests are independent, so they run together and each section loads or fails on its own.
+      // Only the headline figures are essential: without them the page cannot say anything true.
+      const fp = requestFilters();
+      const [stats, detailed, emotions, trends] = await Promise.allSettled([
+        sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getEmotionStats(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, fp)
+      ]);
+      if (stats.status === 'rejected') throw stats.reason;
+      sentimentStats = stats.value;
+      totalPosts = stats.value.total;
 
-      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined, fp);
-      emotionStats = await sentimentAnalysisDb.getEmotionStats(workspaceId || undefined, fp);
-      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, fp);
+      const failed: string[] = [];
+      if (detailed.status === 'fulfilled') detailedSentiments = detailed.value; else { detailedSentiments = []; failed.push('the sentiment breakdown'); }
+      if (emotions.status === 'fulfilled') emotionStats = emotions.value; else { emotionStats = []; failed.push('emotions'); }
+      if (trends.status === 'fulfilled') sentimentTrends = trends.value; else { sentimentTrends = []; failed.push('the trend over time'); }
+      for (const result of [detailed, emotions, trends]) if (result.status === 'rejected') console.error('Sentiment section failed:', result.reason);
+      failedSections = failed;
       
       // Load posts with current filters
       await loadFilteredPosts();
@@ -83,23 +109,57 @@
       }
     } catch (error) {
       console.error('Error loading sentiment data:', error);
-      // No fallback - sentiment analysis requires database connection
+      // No fallback - sentiment analysis requires database connection. Clear the numbers so a failed reload
+      // does not leave the previous filter's figures on screen as if they were current.
+      loadFailed = true;
+      failedSections = [];
+      sentimentStats = emptySentimentStats();
+      totalPosts = 0;
+      detailedSentiments = [];
+      emotionStats = [];
+      sentimentTrends = [];
+      samplePosts = [];
+      filteredPosts = [];
       loading = false;
     }
   }
 
+  // The list shows a page of posts at a time, and "Show more" asks for another page
+  const POST_PAGE = 50;
+  const POST_MAX = 500;
+  let postLimit = POST_PAGE;
+  let postsLoading = false;
+  let postRequest = 0; // only the newest request may set the list, so a slow older answer cannot overwrite it
+  // One extra post is requested, so "there is more" is known exactly rather than guessed from a full page
+  let postsAvailable = 0;
+  $: hasMorePosts = postsAvailable > postLimit && postLimit < POST_MAX;
+
+  function showMorePosts() {
+    if (postsLoading) return;
+    postLimit = Math.min(postLimit + POST_PAGE, POST_MAX);
+    return loadFilteredPosts();
+  }
+
   // Load filtered posts from database
   async function loadFilteredPosts() {
+    const request = ++postRequest;
+    postsLoading = true;
     try {
       const filters = {
+        limit: postLimit + 1,
         sentiment: selectedSentiment,
         platform: selectedPlatform,
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      const posts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      if (request !== postRequest) return;
+      postsAvailable = posts.length;
+      samplePosts = posts.slice(0, postLimit);
     } catch (error) {
       console.error('Error loading filtered posts:', error);
+    } finally {
+      if (request === postRequest) postsLoading = false;
     }
   }
 
@@ -108,20 +168,26 @@
   let selectedSentiment = 'all';
   let selectedPlatform = 'all';
   let confidenceThreshold = 0.7;
-  let timeRange = '7d';
+  // Used when the date bar is empty; the date bar wins when it is set
+  let timeRange = '30d';
   let showEmotions = true;
 
-  // Reactive statements for filter changes
-  $: if (selectedSentiment || selectedPlatform || confidenceThreshold || timeRange) {
+  // The filters every request carries: the workspace and the shared filter bar (sources and dates)
+  const requestFilters = () => ({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams });
+
+  // Reload when a page-level filter changes. The key is compared first, so the block does nothing when it
+  // re-runs only because `loading` changed, and the trends carry the same filters as the first load.
+  let lastFilterKey = '';
+  $: filterKey = [selectedSentiment, selectedPlatform, confidenceThreshold, timeRange].join('|');
+  $: if (filterKey !== lastFilterKey) {
+    lastFilterKey = filterKey;
+    postLimit = POST_PAGE; // a new filter starts again from the first page
     if (!loading) {
       loadFilteredPosts();
-      // Also reload trends if time range changed
-      if (timeRange) {
-        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined).then(trends => {
-          sentimentTrends = trends;
-          updateTrendChart();
-        });
-      }
+      sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, requestFilters()).then(trends => {
+        sentimentTrends = trends;
+        updateTrendChart();
+      });
     }
   }
 
@@ -129,36 +195,24 @@
   $: filteredPosts = samplePosts;
 
 
-  async function exportSentimentData() {
-    try {
+  // Matches the limit the export endpoint applies
+  const EXPORT_MAX_ROWS = 10_000;
+  let exportState: ExportState = IDLE_EXPORT;
+
+  function exportSentimentData() {
+    return runExport(async () => {
       const filters = {
         sentiment: selectedSentiment,
         platform: selectedPlatform,
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      
       const exportData = await sentimentAnalysisDb.exportSentimentData(filters, workspaceId || undefined);
-      
-      // Create CSV from the exported data
-      const csvData = (exportData as any).posts.map((post: any) =>
-        `"${post.text}",${post.sentiment},${post.confidence},${post.emotions.join(';')},${post.platform},${post.timestamp}`
-      ).join('\n');
-      
-      const header = 'Text,Sentiment,Confidence,Emotions,Platform,Timestamp\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sentiment_analysis_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting sentiment data:', error);
-      alert('Export failed: Database connection required');
-    }
+      const rows = exportData.data ?? [];
+      // toCsv quotes embedded commas, quotes and line breaks, and neutralises text a spreadsheet would run as a formula
+      downloadCsv('sentiment_analysis_report.csv', toCsv(rows, ['text', 'sentiment', 'confidence', 'platform', 'timestamp']));
+      return { rows: rows.length, capped: rows.length >= EXPORT_MAX_ROWS };
+    }, (state) => (exportState = state));
   }
 
   // Chart initialization
@@ -215,9 +269,22 @@
         trigger: 'item',
         formatter: '{b}: {c} posts ({d}%)'
       },
+      // A legend with the count beside each name replaces labels on the slices, which truncated and collided with the title
+      legend: {
+        bottom: 0,
+        itemWidth: 12,
+        itemHeight: 12,
+        formatter: (name: string) => {
+          const item = detailedSentiments.find((d: any) => d.label === name);
+          return item ? `${name}: ${item.count.toLocaleString()} (${item.percentage}%)` : name;
+        }
+      },
       series: [{
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: ['38%', '62%'],
+        center: ['50%', '45%'],
+        label: { show: false },
+        labelLine: { show: false },
         data: detailedSentiments.map(item => ({
           name: item.label,
           value: item.count,
@@ -231,15 +298,21 @@
             shadowOffsetX: 0,
             shadowColor: 'rgba(0, 0, 0, 0.5)'
           }
-        },
-        label: {
-          show: true,
-          formatter: '{b}\n{d}%'
         }
       }]
     };
 
     sentimentChart.setOption(option);
+    // Clicking a segment opens the posts behind it
+    sentimentChart.off('click');
+    sentimentChart.on('click', (params: { name?: string }) => {
+      if (params?.name) openSentimentDrilldown(params.name);
+    });
+  }
+
+  // The same posts open from a click on a slice and from the buttons beside the chart, so a keyboard can reach them
+  function openSentimentDrilldown(label: string) {
+    drilldown = { title: `${label} posts`, filters: { sentiment: label, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) } };
   }
 
   function updateEmotionChart() {
@@ -298,7 +371,7 @@
     
     const option = {
       title: {
-        text: 'Sentiment Trends Over Time',
+        text: 'Posts per day by sentiment',
         left: 'center',
         textStyle: {
           fontSize: 16,
@@ -317,35 +390,40 @@
         data: dates,
         axisLabel: {
           formatter: function(value: any) {
-            return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            // Days are UTC calendar days, so they are shown in UTC (local time would move them a day west of UTC)
+            return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
           }
         }
       },
       yAxis: {
         type: 'value',
-        name: 'Percentage',
-        max: 100
+        name: 'Posts per day',
+        minInterval: 1
       },
       series: [
         {
           name: 'Positive',
           type: 'line',
           data: sentimentTrends.map(t => t.positive),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: getSentimentColor('positive') },
           lineStyle: { width: 3 }
         },
         {
           name: 'Negative',
           type: 'line',
           data: sentimentTrends.map(t => t.negative),
-          itemStyle: { color: '#f72585' },
-          lineStyle: { width: 3 }
+          itemStyle: { color: getSentimentColor('negative') },
+          lineStyle: { width: 3 },
+          // Label the busiest day for negative posts, so a spike is named, not just drawn
+          markPoint: sentimentTrends.some(t => t.negative > 0)
+            ? { data: [{ type: 'max', name: 'Peak' }], symbolSize: 44, label: { formatter: (p: { value: number }) => `Peak ${p.value}` } }
+            : undefined
         },
         {
           name: 'Neutral',
           type: 'line',
           data: sentimentTrends.map(t => t.neutral),
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: getSentimentColor('neutral') },
           lineStyle: { width: 3 }
         }
       ]
@@ -364,14 +442,13 @@
 
 <svelte:head>
   <title>Sentiment Analysis - Text Analytics - Social Explorer</title>
-  <meta name="description" content="AI-powered sentiment analysis and emotional tone classification for social media content" />
+  <meta name="description" content="Sentiment and emotional tone of social media posts, with how each label is worked out" />
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
   <PageHeader
     title="Sentiment Analysis"
-    subtitle="Analyze emotional tone and sentiment across social media posts with AI-powered classification"
-    accentColor="emerald"
+    subtitle="Emotional tone and sentiment across your social media posts"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
@@ -383,8 +460,9 @@
     <svelte:fragment slot="actions">
       <button
         on:click={exportSentimentData}
+        disabled={exportState.kind === 'working'}
         class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
-        Export Analysis
+        {exportState.kind === 'working' ? 'Exporting…' : 'Export Analysis'}
       </button>
     </svelte:fragment>
   </PageHeader>
@@ -393,11 +471,30 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->
     <div class="mb-6">
       <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} onReady={handleFilterReady} on:change={handleFilterChange} />
+    </div>
+    <div class="mb-6">
+      <MethodNote>
+        <p>
+          Posts processed by the built-in enrichment are labelled by a simple word-list method, not a language model. The distinct words of a post
+          (split on spaces, so "great!" does not match "great") are checked against lists of positive and negative words. More positive than negative words
+          gives <em>Positive</em>, and more than twice as many gives <em>Very Positive</em>, and likewise for negative. A post with no matching words, or an
+          equal number of each, is <em>Neutral</em>.
+        </p>
+        <p>
+          <strong>Confidence is not a probability.</strong> It is a score from how many distinct sentiment words were found (0.5 when there are none or they
+          tie), so a post with several matching words scores higher than one with a single word. Use it to rank posts, not to say how likely a label is to be right.
+        </p>
+        <p>
+          The method does not understand sarcasm, negation ("not good") or context, and its word lists are English, so posts in other languages are mostly Neutral.
+          <strong>The demo dataset is different:</strong> its labels and confidence are generated at random to illustrate the pages, not produced by this method.
+        </p>
+      </MethodNote>
     </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">
@@ -406,15 +503,33 @@
       </div>
     {:else}
 
-    <!-- Overview Stats -->
+    {#if failedSections.length > 0 && !loadFailed}
+      <div role="alert" class="mb-6 rounded-xl border border-danger-200 bg-danger-50 px-6 py-4">
+        <p class="font-medium text-ink-900">Some of this page could not be loaded: {failedSections.join(', ')}.</p>
+        <p class="mt-1 text-sm text-ink-700">The rest is shown. Change a filter or reload the page to try again.</p>
+      </div>
+    {/if}
+    {#if loadFailed}
+      <div role="alert" class="mb-6 rounded-xl border border-danger-200 bg-danger-50 px-6 py-5">
+        <p class="font-medium text-ink-900">We could not load sentiment data.</p>
+        <p class="mt-1 text-sm text-ink-700">Check that the database is running, then change a filter or reload the page to try again.</p>
+      </div>
+    {:else if $apiErrors.length === 0 && sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
+      <div role="status" class="mb-6 rounded-xl border border-ink-200 bg-white px-6 py-5">
+        <p class="font-medium text-ink-900">No posts match these filters.</p>
+        <p class="mt-1 text-sm text-ink-600">Try a wider date range, or turn on more sources in the bar above.</p>
+      </div>
+    {/if}
+
+    <!-- Overview Stats. The large figures use the darker very-positive and very-negative tones: the lighter ones fall below 3:1 on white. -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-emerald-600 mb-1">{sentimentStats.positive.percentage}%</div>
+        <div class="text-2xl font-bold text-sentiment-very-positive mb-1">{sentimentStats.positive.percentage}%</div>
         <div class="text-sm text-gray-600">Positive Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.positive.count.toLocaleString()} posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-red-600 mb-1">{sentimentStats.negative.percentage}%</div>
+        <div class="text-2xl font-bold text-sentiment-very-negative mb-1">{sentimentStats.negative.percentage}%</div>
         <div class="text-sm text-gray-600">Negative Sentiment</div>
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.negative.count.toLocaleString()} posts</div>
       </div>
@@ -424,7 +539,7 @@
         <div class="text-xs text-gray-500 mt-1">{sentimentStats.neutral.count.toLocaleString()} posts</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-emerald-600 mb-1">{Math.round((sentimentStats.avgConfidence || 0.89) * 100)}%</div>
+        <div class="text-2xl font-bold text-emerald-600 mb-1">{sentimentStats.avgConfidence != null && sentimentStats.avgConfidence > 0 ? `${Math.round(sentimentStats.avgConfidence * 100)}%` : '\u2014'}</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
         <div class="text-xs text-gray-500 mt-1">AI Classification</div>
       </div>
@@ -436,7 +551,7 @@
       
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Sentiment <span class="font-normal text-gray-500">(filters the post list)</span></label>
           <select bind:value={selectedSentiment} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
             <option value="all">All Sentiments</option>
             <option value="Very Positive">Very Positive</option>
@@ -458,14 +573,26 @@
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
         </div>
       </div>
-      <p class="text-xs text-gray-400 mt-3">Data source and date range filters are in the bar above.</p>
+      <p class="text-xs text-gray-500 mt-3">Data source and date range filters are in the bar above.</p>
     </div>
 
     <!-- Charts Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8" class:hidden={loadFailed}>
       <!-- Sentiment Distribution Chart -->
       <div class="bg-white rounded-xl shadow-sm p-6">
         <div id="sentiment-chart" class="w-full h-80"></div>
+        <!-- The chart's slices are mouse-only; these buttons open the same posts from the keyboard -->
+        {#if detailedSentiments.length > 0}
+          <ul role="list" class="mt-3 flex flex-wrap gap-2" aria-label="Open the posts behind each sentiment">
+            {#each detailedSentiments.filter((entry) => entry.label) as item}
+              <li>
+                <button type="button" on:click={() => openSentimentDrilldown(item.label)} class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600">
+                  View {item.label} posts <span class="text-gray-500">({item.count.toLocaleString()})</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
       
       <!-- Emotion Analysis Chart -->
@@ -534,9 +661,20 @@
         <div class="text-center py-8">
           <p class="text-gray-500">No posts match your current filters.</p>
         </div>
+      {:else}
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <p>
+            {#if hasMorePosts}Showing the first {filteredPosts.length} posts.{:else if postsAvailable > POST_MAX}Showing the first {POST_MAX} posts, the most this list shows. Narrow the filters to see others.{:else}All {filteredPosts.length} matching posts are shown.{/if}
+          </p>
+          {#if hasMorePosts}
+            <button type="button" on:click={showMorePosts} disabled={postsLoading} class="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">{postsLoading ? 'Loading…' : `Show ${POST_PAGE} more`}</button>
+          {/if}
+        </div>
       {/if}
     </div>
     
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

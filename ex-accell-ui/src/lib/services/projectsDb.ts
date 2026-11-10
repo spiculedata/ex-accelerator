@@ -73,8 +73,9 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Project>('SELECT * FROM project_overview WHERE id = $1', [id]);
       return rows[0] || null;
     } catch (error) {
+      // A failed query is not "no such project": let the route answer 500 so callers do not treat it as deleted
       console.error('Error fetching project:', error);
-      return null;
+      throw error;
     }
   }
 
@@ -83,7 +84,6 @@ class ProjectsDatabase {
     description: string;
     project_type: string;
     created_by: string;
-    data_sources?: string[];
     team_members?: string[];
   }): Promise<Project | null> {
     try {
@@ -186,8 +186,9 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Workspace>('SELECT * FROM workspace_overview WHERE id = $1', [id]);
       return rows[0] || null;
     } catch (error) {
+      // A failed query is not "no such workspace": let the caller answer 500, not 404
       console.error('Error fetching workspace:', error);
-      return null;
+      throw error;
     }
   }
 
@@ -285,7 +286,7 @@ class ProjectsDatabase {
 
   async removeProjectMember(projectId: number, email: string): Promise<boolean> {
     try {
-      await postgresPool.query('DELETE FROM project_members WHERE project_id = $1 AND email = $2', [projectId, email]);
+      await postgresPool.query('DELETE FROM project_members WHERE project_id = $1 AND lower(email) = lower($2)', [projectId, email]);
       return true;
     } catch (error) {
       console.error('Error removing project member:', error);

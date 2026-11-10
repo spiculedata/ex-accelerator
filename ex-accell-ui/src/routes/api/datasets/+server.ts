@@ -1,6 +1,7 @@
 // Dataset API Endpoints
 // RESTful API for managing datasets, permissions, and workspace associations
 
+import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { datasetsDb } from '$lib/services/datasetsDb';
@@ -109,7 +110,6 @@ export const GET: RequestHandler = async ({ url }) => {
  *   "action": "link",
  *   "workspace_id": 1,
  *   "dataset_id": 1,
- *   "added_by": "user@example.com",
  *   "settings": {}
  * }
  *
@@ -119,30 +119,35 @@ export const GET: RequestHandler = async ({ url }) => {
  *   "dataset_id": 1,
  *   "user_email": "user@example.com",
  *   "access_level": "read",
- *   "granted_by": "admin@example.com",
  *   "expires_at": "2025-12-31T23:59:59Z"
  * }
  */
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     const body = await request.json();
     const { action } = body;
 
     if (action === 'link') {
-      const { workspace_id, dataset_id, added_by, settings } = body;
+      const { workspace_id, dataset_id, settings } = body;
+      // Who is linking comes from the session, never from the request body
+      const addedBy = locals.user?.email;
+      // Datasets are linked only into a workspace of a project the person belongs to
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [workspace_id] });
+      if (refused) return refused;
 
-      if (!workspace_id || !dataset_id || !added_by) {
+      if (!workspace_id || !dataset_id || !addedBy) {
         return json(
           {
             success: false,
-            error: 'Missing required fields: workspace_id, dataset_id, added_by'
+            error: 'Missing required fields: workspace_id, dataset_id'
           },
           { status: 400 }
         );
       }
 
-      // Check if user has access to the dataset
-      const { hasAccess } = await datasetsDb.checkUserAccess(dataset_id, added_by);
+      // Admins may use any dataset; everyone else needs access to it
+      const isAdmin = locals.user?.role === 'admin';
+      const { hasAccess } = isAdmin ? { hasAccess: true } : await datasetsDb.checkUserAccess(dataset_id, addedBy);
 
       if (!hasAccess) {
         return json(
@@ -157,7 +162,7 @@ export const POST: RequestHandler = async ({ request }) => {
       const workspaceDataset = await datasetsDb.linkDatasetToWorkspace(
         workspace_id,
         dataset_id,
-        added_by,
+        addedBy,
         settings || {}
       );
 
@@ -167,13 +172,18 @@ export const POST: RequestHandler = async ({ request }) => {
         message: 'Dataset linked to workspace successfully'
       });
     } else if (action === 'grant_permission') {
-      const { dataset_id, user_email, access_level, granted_by, expires_at } = body;
+      const { dataset_id, user_email, access_level, expires_at } = body;
 
-      if (!dataset_id || !user_email || !granted_by) {
+      // Granting access to a dataset is an administrator action
+      if (locals.user?.role !== 'admin') {
+        return json({ success: false, error: 'Only administrators can grant dataset access' }, { status: 403 });
+      }
+
+      if (!dataset_id || !user_email) {
         return json(
           {
             success: false,
-            error: 'Missing required fields: dataset_id, user_email, granted_by'
+            error: 'Missing required fields: dataset_id, user_email'
           },
           { status: 400 }
         );
@@ -183,7 +193,7 @@ export const POST: RequestHandler = async ({ request }) => {
         dataset_id,
         user_email,
         access_level || 'read',
-        granted_by,
+        locals.user.email,
         expires_at ? new Date(expires_at) : null
       );
 

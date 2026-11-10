@@ -1,16 +1,29 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
-  title: 'ex-accelerator',
+  title: 'Social Explorer',
   description: 'Open-source social media analytics platform for collecting, analysing and investigating online data.',
-  base: '/ex-accelerator/',
+  base: '/social-explorer/',
   cleanUrls: true,
+  head: [
+    // og:title and og:description come from each page (the landing page sets its own in index.md)
+    // The favicon and og:image URLs include the base path; forks or a custom domain should change them
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/social-explorer/brand/mark.svg' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    // Absolute URL: link previews need one. Forks or a custom domain should change it.
+    ['meta', { property: 'og:image', content: 'https://spiculedata.github.io/social-explorer/screenshots/sentiment-analysis.png' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
+  ],
   lastUpdated: true,
   themeConfig: {
+    logo: { light: '/brand/mark.svg', dark: '/brand/mark-on-dark.svg', alt: 'Social Explorer' },
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Tutorials', link: '/tutorials/' },
       { text: 'Architecture', link: '/architecture/overview' },
-      { text: 'Contributing', link: 'https://github.com/spiculedata/ex-accelerator/blob/main/CONTRIBUTING.md' }
+      { text: 'Reference', link: '/reference/api' },
+      { text: 'Brand', link: '/brand/' },
+      { text: 'Contributing', link: 'https://github.com/spiculedata/social-explorer/blob/main/CONTRIBUTING.md' }
     ],
     sidebar: [
       {
@@ -18,17 +31,53 @@ export default defineConfig({
         items: [
           { text: 'Getting started', link: '/guide/getting-started' },
           { text: 'Configuration', link: '/guide/configuration' },
-          { text: 'Authentication and roles', link: '/guide/authentication' }
+          { text: 'Authentication and roles', link: '/guide/authentication' },
+          { text: 'Deployment', link: '/guide/deployment' },
+          { text: 'Try it with demo data', link: '/guide/demo-data' }
+        ]
+      },
+      {
+        text: 'Tutorials',
+        items: [
+          { text: 'Overview', link: '/tutorials/' },
+          { text: 'Your first project', link: '/tutorials/first-project' },
+          { text: 'Explore the dashboards', link: '/tutorials/explore-dashboards' },
+          { text: 'Investigate a question', link: '/tutorials/investigations' },
+          { text: 'Build and publish a workflow', link: '/tutorials/workflows' },
+          { text: 'Schedule a crawl', link: '/tutorials/schedule-a-crawl' },
+          { text: 'Research in Jupyter', link: '/tutorials/jupyter' },
+          { text: 'Troubleshooting and FAQ', link: '/tutorials/troubleshooting' },
+          { text: 'Glossary', link: '/tutorials/glossary' }
+        ]
+      },
+      {
+        text: 'Brand',
+        items: [
+          { text: 'Overview', link: '/brand/' },
+          { text: 'Logo', link: '/brand/logo' },
+          { text: 'Colour', link: '/brand/colour' },
+          { text: 'Typography', link: '/brand/typography' },
+          { text: 'Layout and components', link: '/brand/components' },
+          { text: 'Data visualisation', link: '/brand/data-visualisation' },
+          { text: 'Voice and content', link: '/brand/voice' }
         ]
       },
       {
         text: 'Architecture',
-        items: [{ text: 'Overview', link: '/architecture/overview' }]
+        items: [
+          { text: 'Overview', link: '/architecture/overview' },
+          { text: 'Data model', link: '/architecture/data-model' },
+          { text: 'Crawler', link: '/architecture/crawler' }
+        ]
+      },
+      {
+        text: 'Reference',
+        items: [{ text: 'API', link: '/reference/api' }]
       }
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/ex-accelerator' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/spiculedata/social-explorer' }],
     editLink: {
-      pattern: 'https://github.com/spiculedata/ex-accelerator/edit/main/docs-site/:path',
+      pattern: 'https://github.com/spiculedata/social-explorer/edit/main/docs-site/:path',
       text: 'Edit this page on GitHub'
     },
     search: { provider: 'local' },

@@ -1,11 +1,10 @@
 // Server-side Workflow Service
 // Handles workflow operations on the server with PostgreSQL persistence
 
-import { daprWorkflowGenerator, type GeneratedWorkflow } from './daprWorkflowGenerator';
-import { daprWorkflowExecutor } from './daprWorkflowExecutor';
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
-import { pythonDaprWorkflowGenerator } from './pythonDaprWorkflowGenerator';
+import { pythonDaprWorkflowGenerator, type GeneratedWorkflow } from './pythonDaprWorkflowGenerator';
 import { postgresPool } from './postgres';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Helper function to safely extract error messages
@@ -135,6 +134,63 @@ class ServerWorkflowService {
   }
 
   /**
+   * Save a workflow as a draft. Drafts skip code generation, so a half-built workflow can be saved and
+   * reopened. Passing the id of an existing draft updates it; a published workflow is never overwritten,
+   * so saving over one creates a new draft instead.
+   */
+  async saveDraft(
+    workflowDefinition: any,
+    metadata: { name: string; description: string; createdBy: string },
+    existingId?: string
+  ): Promise<{ id: string; name: string; status: 'draft'; updatedAt: string }> {
+    try {
+      const now = new Date().toISOString();
+      const workflowMetadata = {
+        stepCount: workflowDefinition.steps.length,
+        estimatedDuration: this.estimateWorkflowDuration(workflowDefinition),
+        datasetRequirements: this.extractDatasetRequirements(workflowDefinition),
+        tags: [] as string[]
+      };
+
+      if (existingId) {
+        // One statement: it only matches the caller's own row, and only while it is still a draft, so a
+        // concurrent publish or someone else's draft is never overwritten
+        const updated = await postgresPool.query(
+          `UPDATE published_workflows
+           SET name = $1, description = $2, workflow_definition = $3, metadata = $4, updated_at = $5
+           WHERE id = $6 AND status = 'draft' AND created_by = $7
+           RETURNING id`,
+          [metadata.name, metadata.description, JSON.stringify(workflowDefinition), JSON.stringify(workflowMetadata), now, existingId, metadata.createdBy]
+        );
+        if (updated.length > 0) {
+          return { id: existingId, name: metadata.name, status: 'draft', updatedAt: now };
+        }
+      }
+
+      const id = `wf_${randomUUID()}`;
+      await postgresPool.query(
+        `INSERT INTO published_workflows
+          (id, name, description, version, status, workflow_definition, generated_code, metadata, created_by, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [id, metadata.name, metadata.description, '0.1.0', 'draft', JSON.stringify(workflowDefinition), JSON.stringify({}), JSON.stringify(workflowMetadata), metadata.createdBy, now, now]
+      );
+      return { id, name: metadata.name, status: 'draft', updatedAt: now };
+    } catch (error) {
+      console.error('Error saving workflow draft:', error);
+      throw new Error(`Failed to save workflow draft: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /** Deletes the publisher's own draft once it has been published. A failure is logged, not raised: the workflow is already stored. */
+  private async removeDraft(draftId: string, createdBy: string): Promise<void> {
+    try {
+      await postgresPool.query(`DELETE FROM published_workflows WHERE id = $1 AND status = 'draft' AND created_by = $2`, [draftId, createdBy]);
+    } catch (error) {
+      console.error('Could not remove the draft after publishing:', error);
+    }
+  }
+
+  /**
    * Publish a workflow
    */
   async publishWorkflow(
@@ -145,13 +201,17 @@ class ServerWorkflowService {
       version?: string;
       tags?: string[];
       createdBy: string;
+      /** The draft this was published from; it is removed so the list shows one workflow, not a draft and a copy. */
+      draftId?: string;
     }
   ): Promise<PublishedWorkflow> {
     try {
-      // Generate Dapr workflow code
-      const generatedCode = daprWorkflowGenerator.generateWorkflowCode(workflowDefinition);
+      // Keep a snapshot of the generated Python for display. Runs regenerate from the definition (they
+      // do not execute this copy), and the generator's server-side paths are not worth storing or exposing.
+      const { virtualEnvPath: _venv, activationScript: _activation, ...generatedCode } =
+        await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
 
-      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `wf_${randomUUID()}`;
       const now = new Date().toISOString();
       const version = metadata.version || '1.0.0';
       const tags = metadata.tags || [];
@@ -180,6 +240,8 @@ class ServerWorkflowService {
           now
         ]
       );
+
+      if (metadata.draftId) await this.removeDraft(metadata.draftId, metadata.createdBy);
 
       const publishedWorkflow: PublishedWorkflow = {
         id,
@@ -365,9 +427,12 @@ class ServerWorkflowService {
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
     }
+    if (workflow.status !== 'published') {
+      throw new Error(`Workflow ${workflowId} is a ${workflow.status}. Only published workflows can be run: publish it first.`);
+    }
 
     // Create execution record
-    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const executionId = `exec_${randomUUID()}`;
     const now = new Date().toISOString();
     const logs: WorkflowExecution['logs'] = [];
 
@@ -430,12 +495,12 @@ class ServerWorkflowService {
       let paramIndex = 1;
 
       if (filters.workflowId) {
-        conditions.push(`workflow_id = $${paramIndex++}`);
+        conditions.push(`e.workflow_id = $${paramIndex++}`);
         params.push(filters.workflowId);
       }
 
       if (filters.status) {
-        conditions.push(`status = $${paramIndex++}`);
+        conditions.push(`e.status = $${paramIndex++}`);
         params.push(filters.status);
       }
 
@@ -445,7 +510,7 @@ class ServerWorkflowService {
         params.push(filters.limit);
       }
 
-      const sql = `SELECT * FROM workflow_executions ${whereClause} ORDER BY started_at DESC ${limitClause}`;
+      const sql = `SELECT e.*, w.name AS workflow_name FROM workflow_executions e LEFT JOIN published_workflows w ON w.id = e.workflow_id ${whereClause} ORDER BY e.started_at DESC ${limitClause}`;
 
       const rows = await postgresPool.query(sql, params);
       return rows.map((row: any) => this.mapRowToExecution(row));
@@ -461,7 +526,7 @@ class ServerWorkflowService {
   async getWorkflowExecution(executionId: string): Promise<WorkflowExecution | null> {
     try {
       const rows = await postgresPool.query(
-        'SELECT * FROM workflow_executions WHERE id = $1',
+        'SELECT e.*, w.name AS workflow_name FROM workflow_executions e LEFT JOIN published_workflows w ON w.id = e.workflow_id WHERE e.id = $1',
         [executionId]
       );
 
@@ -608,7 +673,7 @@ class ServerWorkflowService {
     const requirements: string[] = [];
 
     workflowDefinition.steps.forEach((step: any) => {
-      if (step.type === 'dataset_input' && step.config.dataset_id) {
+      if (step.type === 'dataset_input' && step.config?.dataset_id) {
         requirements.push(step.config.dataset_id);
       }
     });

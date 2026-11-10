@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { formatDay } from '$lib/utils/dayFormat';
+  import { commitKeywords } from '$lib/utils/keywords';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { currentProject } from '$lib/stores/projectStore';
 
   interface Investigation {
     id: string;
@@ -26,19 +30,72 @@
   let newDateStart = '';
   let newDateEnd = '';
   let newSources = { gdelt: true, radio: true, social: true };
+  let createError = '';
   let creating = false;
+  let createInWorkspace: number | null = null;
 
+  // Opened from a workspace page (?workspace=<id>): create the investigation inside that workspace
+  // Reactive: the page is reused on same-route navigation, so a stale workspace must not stick
+  $: workspaceParam = Number.parseInt($page.url.searchParams.get('workspace') ?? '', 10);
+  $: workspaceId = Number.isInteger(workspaceParam) && workspaceParam > 0 ? workspaceParam : null;
+
+  // Opened from a workspace: list only that workspace's investigations and name it, so it is clear whose they are
+  let workspaceName = '';
+  async function loadWorkspaceName(id: number | null) {
+    workspaceName = '';
+    if (!id) return;
+    try {
+      const response = await fetch(`/api/workspace-overview?id=${id}`);
+      const result = await response.json();
+      if (result.success) workspaceName = result.workspace?.name ?? '';
+    } catch {
+      // The name is a convenience; the list and form still work without it
+    }
+  }
+
+  // ?project=<id> limits the list to that project's workspaces; without it the list spans every project, and says so
+  $: projectParam = Number.parseInt($page.url.searchParams.get('project') ?? '', 10);
+  $: projectId = !workspaceId && Number.isInteger(projectParam) && projectParam > 0 ? projectParam : null;
+  $: projectLabel = $currentProject && Number($currentProject.id) === projectId ? $currentProject.name : `#${projectId}`;
+
+  // "Show all" drops ?workspace= or ?project=, which is a same-page navigation: reload the list and the name when it changes
+  let loadedWorkspace: number | null | undefined;
+  let loadedProject: number | null | undefined;
+  $: if (mounted && (workspaceId !== loadedWorkspace || projectId !== loadedProject)) {
+    loadedWorkspace = workspaceId;
+    loadedProject = projectId;
+    void loadWorkspaceName(workspaceId);
+    void loadInvestigations();
+  }
+
+  let mounted = false;
   onMount(async () => {
+    mounted = true;
+    loadedWorkspace = workspaceId;
+    loadedProject = projectId;
+    await loadWorkspaceName(workspaceId);
     await loadInvestigations();
+    if (workspaceId) {
+      openModal();
+      createInWorkspace = workspaceId;
+    }
   });
 
   async function loadInvestigations() {
     loading = true;
     try {
-      const response = await fetch('/api/investigations');
+      const scope = workspaceId ? `?workspace_id=${workspaceId}` : projectId ? `?project_id=${projectId}` : '';
+      const response = await fetch(`/api/investigations${scope}`);
       const result = await response.json();
       if (result.success) {
-        investigations = result.investigations || [];
+        // The list returns the query inside query_config; the cards read keywords, dates and sources directly
+        investigations = (result.investigations || []).map((inv: any) => ({
+          ...inv,
+          keywords: inv.keywords ?? inv.query_config?.keywords ?? [],
+          date_start: inv.date_start ?? inv.query_config?.dateStart ?? '',
+          date_end: inv.date_end ?? inv.query_config?.dateEnd ?? '',
+          sources: inv.sources ?? inv.query_config?.sources ?? []
+        }));
       }
     } catch (error) {
       console.error('Error loading investigations:', error);
@@ -48,10 +105,7 @@
   }
 
   function addKeyword() {
-    const trimmed = newKeywordsInput.trim();
-    if (!trimmed) return;
-    const tags = trimmed.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0 && !newKeywords.includes(k));
-    newKeywords = [...newKeywords, ...tags];
+    newKeywords = commitKeywords(newKeywords, newKeywordsInput);
     newKeywordsInput = '';
   }
 
@@ -74,6 +128,7 @@
     newDateStart = '';
     newDateEnd = '';
     newSources = { gdelt: true, radio: true, social: true };
+    createInWorkspace = null;
     showNewModal = true;
   }
 
@@ -81,9 +136,17 @@
     showNewModal = false;
   }
 
+  // A reversed range is caught here, before the request, so the message sits beside the dates
+  $: rangeError = newDateStart && newDateEnd && newDateStart > newDateEnd ? 'The start date is after the end date.' : '';
+
   async function createInvestigation() {
-    if (!newName.trim()) return;
+    // Create is disabled while the range is wrong; the message is beside the dates
+    if (!newName.trim() || rangeError) return;
+    // A keyword typed but not confirmed with Enter or a comma still counts
+    newKeywords = commitKeywords(newKeywords, newKeywordsInput);
+    newKeywordsInput = '';
     creating = true;
+    createError = '';
     try {
       const sources: string[] = [];
       if (newSources.gdelt) sources.push('gdelt');
@@ -99,15 +162,19 @@
           keywords: newKeywords,
           date_start: newDateStart,
           date_end: newDateEnd,
-          sources
+          sources,
+          ...(createInWorkspace ? { workspace_id: createInWorkspace } : {})
         })
       });
-      const result = await response.json();
-      if (result.success && result.investigation) {
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.success && result.investigation) {
         goto(`/investigations/${result.investigation.id}`);
+      } else {
+        createError = result.error || `Could not create the investigation (HTTP ${response.status})`;
       }
     } catch (error) {
       console.error('Error creating investigation:', error);
+      createError = 'Could not create the investigation. Please try again.';
     } finally {
       creating = false;
     }
@@ -146,7 +213,7 @@
 </script>
 
 <svelte:head>
-  <title>Research Investigations - Social Explorer</title>
+  <title>Investigations - Social Explorer</title>
   <meta name="description" content="Cross-dataset research investigations" />
 </svelte:head>
 
@@ -161,8 +228,12 @@
           </svg>
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-white">Research Investigations</h1>
-          <p class="text-sm text-indigo-300">Cross-dataset correlation analysis</p>
+          <h1 class="text-2xl font-bold text-white">Investigations</h1>
+          <p class="text-sm text-indigo-300">
+            {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>
+            {:else if projectId}In project: {projectLabel} · <a href="/investigations" class="underline hover:text-white">Show all projects</a>
+            {:else}All projects{#if $currentProject} · <a href="/investigations?project={$currentProject.id}" class="underline hover:text-white">Only {$currentProject.name}</a>{/if}{/if}
+          </p>
         </div>
       </div>
       <button
@@ -222,7 +293,7 @@
             <h3 class="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">
               {investigation.name}
             </h3>
-            <span class="text-xs text-gray-400 whitespace-nowrap ml-4">
+            <span class="text-xs text-gray-500 whitespace-nowrap ml-4">
               {formatDate(investigation.created_at)}
             </span>
           </div>
@@ -249,7 +320,7 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>{formatDate(investigation.date_start)} - {formatDate(investigation.date_end)}</span>
+                <span>{formatDay(investigation.date_start, { year: true })} - {formatDay(investigation.date_end, { year: true })}</span>
               {/if}
             </div>
             <div class="flex items-center space-x-1.5">
@@ -280,8 +351,13 @@
       <!-- Modal -->
       <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 z-10">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-bold text-gray-900">New Investigation</h2>
-          <button on:click={closeModal} class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close modal">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">New Investigation</h2>
+            {#if createInWorkspace}
+              <p class="mt-0.5 text-sm text-ink-600">Will be created in workspace: <span class="font-medium text-ink-900">{workspaceName || `#${createInWorkspace}`}</span></p>
+            {/if}
+          </div>
+          <button on:click={closeModal} class="text-gray-500 hover:text-gray-600 transition-colors" aria-label="Close modal">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -360,6 +436,8 @@
                 id="inv-date-start"
                 type="date"
                 bind:value={newDateStart}
+                aria-invalid={rangeError ? 'true' : undefined}
+                aria-describedby="inv-date-hint"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               />
             </div>
@@ -369,10 +447,15 @@
                 id="inv-date-end"
                 type="date"
                 bind:value={newDateEnd}
+                aria-invalid={rangeError ? 'true' : undefined}
+                aria-describedby="inv-date-hint"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               />
             </div>
           </div>
+          <p id="inv-date-hint" class="-mt-2 text-xs {rangeError ? 'text-danger-700' : 'text-ink-500'}">
+            {rangeError || 'Leave both blank to use the last 90 days. The end date is included.'}
+          </p>
 
           <!-- Sources -->
           <div>
@@ -394,6 +477,10 @@
           </div>
         </div>
 
+        {#if createError}
+          <p role="alert" class="mt-4 text-sm text-red-600">{createError}</p>
+        {/if}
+
         <!-- Actions -->
         <div class="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
           <button
@@ -404,7 +491,7 @@
           </button>
           <button
             on:click={createInvestigation}
-            disabled={!newName.trim() || creating}
+            disabled={!newName.trim() || creating || !!rangeError}
             class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {#if creating}

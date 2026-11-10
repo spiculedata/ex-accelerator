@@ -3,9 +3,11 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
 
   // Date range filter — default to last 12 months rolling window
   const _now = new Date();
@@ -86,9 +88,7 @@
       eventTypes = eventData.success ? eventData.data || [] : [];
       actors = actorData.success ? actorData.data || [] : [];
 
-      if (!summary && countries.length === 0 && eventTypes.length === 0) {
-        errorMessage = 'No GDELT data found. Ensure the gdelt_events table is populated in the PostgreSQL database.';
-      }
+      unavailable = !summary && countries.length === 0 && eventTypes.length === 0;
     } catch (err) {
       errorMessage = err instanceof Error ? err.message : 'Failed to load GDELT analytics data';
     } finally {
@@ -152,17 +152,17 @@
   }
 
   function toneColor(val: number | null | undefined): string {
-    if (val == null || isNaN(val)) return 'text-gray-400';
+    if (val == null || isNaN(val)) return 'text-gray-500';
     if (val > 2) return 'text-emerald-600';
     if (val < -2) return 'text-red-600';
     return 'text-gray-600';
   }
 
   function goldsteinColor(val: number | null | undefined): string {
-    if (val == null || isNaN(val)) return 'text-gray-400';
+    if (val == null || isNaN(val)) return 'text-gray-500';
     if (val > 2) return 'text-emerald-600';
     if (val < -2) return 'text-red-600';
-    return 'text-amber-600';
+    return 'text-signal-700';
   }
 
   let refreshingViews = false;
@@ -199,13 +199,13 @@
 </script>
 
 <svelte:head>
-  <title>GDELT Analytics</title>
+  <title>GDELT Analytics - Social Explorer</title>
+  <meta name="description" content="Trends, actors and tone across global news events from GDELT." />
 </svelte:head>
 
 <PageHeader
   title="GDELT Analytics"
-  subtitle="Explore 23M+ global events from the GDELT Project"
-  accentColor="amber"
+  subtitle="Explore global news events from the GDELT Project"
   backHref="/gdelt"
 >
   <div slot="icon">
@@ -242,7 +242,7 @@
           on:change={onDateChange}
           class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
-        <span class="text-gray-400">to</span>
+        <span class="text-gray-500">to</span>
         <input
           type="date"
           bind:value={dateEnd}
@@ -288,6 +288,11 @@
       {/if}
     </div>
 
+    {#if unavailable}
+      <DataUnavailable
+        title="No GDELT events are loaded"
+        description="These tables summarise GDELT news events. They fill in once GDELT data has been loaded into the database." />
+    {/if}
     {#if errorMessage}
       <ErrorAlert message={errorMessage} />
     {/if}
@@ -314,12 +319,12 @@
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Avg Goldstein</p>
             <p class="text-2xl font-bold {goldsteinColor(summary.avg_goldstein)}">{formatGoldstein(summary.avg_goldstein)}</p>
-            <p class="text-xs text-gray-400 mt-1">-10 (conflict) to +10 (cooperation)</p>
+            <p class="text-xs text-gray-500 mt-1">-10 (conflict) to +10 (cooperation)</p>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Avg Tone</p>
             <p class="text-2xl font-bold {toneColor(summary.avg_tone)}">{formatTone(summary.avg_tone)}</p>
-            <p class="text-xs text-gray-400 mt-1">Negative &larr; 0 &rarr; Positive</p>
+            <p class="text-xs text-gray-500 mt-1">Negative &larr; 0 &rarr; Positive</p>
           </div>
         </div>
       {/if}
@@ -333,7 +338,7 @@
             <p class="text-xs text-gray-500 mt-1">By event count (top 20)</p>
           </div>
           {#if countries.length === 0}
-            <div class="px-5 py-8 text-center text-gray-400 text-sm">No country data available</div>
+            <div class="px-5 py-8 text-center text-gray-500 text-sm">No country data available</div>
           {:else}
             <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
               <table class="w-full text-sm">
@@ -375,7 +380,7 @@
             <p class="text-xs text-gray-500 mt-1">Root event codes with labels</p>
           </div>
           {#if eventTypes.length === 0}
-            <div class="px-5 py-8 text-center text-gray-400 text-sm">No event type data available</div>
+            <div class="px-5 py-8 text-center text-gray-500 text-sm">No event type data available</div>
           {:else}
             <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
               <table class="w-full text-sm">
@@ -418,7 +423,7 @@
           <p class="text-xs text-gray-500 mt-1">Most mentioned actors across events (top 20)</p>
         </div>
         {#if actors.length === 0}
-          <div class="px-5 py-8 text-center text-gray-400 text-sm">No actor data available</div>
+          <div class="px-5 py-8 text-center text-gray-500 text-sm">No actor data available</div>
         {:else}
           <div class="overflow-x-auto">
             <table class="w-full text-sm">

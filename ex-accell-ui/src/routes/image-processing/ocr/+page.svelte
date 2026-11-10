@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
@@ -10,6 +11,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let ocrStats: any = { summary: {}, languages: [] };
   let results: any[] = [];
   let searchQuery = '';
@@ -25,6 +27,7 @@
         fetch('/api/image-processing?action=ocr-results&limit=20'),
       ]);
       const [statsData, resultsData] = await Promise.all([statsRes.json(), resultsRes.json()]);
+      unavailable = !!statsData.meta?.unavailable;
       if (statsData.success) ocrStats = statsData.data;
       if (resultsData.success) results = resultsData.data || [];
     } catch (err: any) { errorMessage = err.message; }
@@ -61,18 +64,28 @@
   onMount(loadData);
 </script>
 
-<svelte:head><title>OCR & Text Extraction - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>OCR & Text Extraction - Social Explorer</title>
+  <meta name="description" content="Extract and search the text inside images." />
+</svelte:head>
 
-<PageHeader title="OCR & Text Extraction" subtitle="Extract and search text from images using PaddleOCR" accentColor="amber" />
+<PageHeader title="OCR & Text Extraction" subtitle="Extract and search text from images using PaddleOCR" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <!-- Extract Panel -->
   <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
     <h2 class="text-lg font-semibold text-gray-900 mb-3">Extract Text from Image</h2>
     <div class="mb-3">
-      <ModelTierSelector bind:selectedTier disabled={analyzing} />
+      <ModelTierSelector tool="ocr" bind:selectedTier disabled={analyzing} />
     </div>
     <div class="flex gap-3 mb-4">
       <input type="text" bind:value={imageUrl} placeholder="Paste image URL..." disabled={analyzing}
@@ -100,7 +113,7 @@
           <p class="text-sm text-gray-600">No text found in this image.</p>
         {/if}
         {#if analysis._note}
-          <p class="text-xs text-amber-600 mt-2 bg-amber-100/50 rounded p-2">{analysis._note}</p>
+          <p class="text-xs text-signal-700 mt-2 bg-amber-100/50 rounded p-2">{analysis._note}</p>
         {/if}
       </div>
     {/if}
@@ -119,7 +132,7 @@
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase mb-1">With Text Found</p>
-        <p class="text-2xl font-bold text-amber-600">{formatNumber(parseInt(ocrStats.summary?.with_text) || 0)}</p>
+        <p class="text-2xl font-bold text-signal-700">{formatNumber(parseInt(ocrStats.summary?.with_text) || 0)}</p>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase mb-1">Avg Confidence</p>
@@ -160,7 +173,7 @@
         </div>
       </div>
       {#if results.length === 0}
-        <div class="p-12 text-center text-gray-400">
+        <div class="p-12 text-center text-gray-500">
           <span class="text-4xl block mb-2">📝</span>
           <p class="text-sm">No OCR results yet. Process images to extract text.</p>
         </div>

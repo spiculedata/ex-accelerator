@@ -1,7 +1,11 @@
 // Database connection and query service for Sentiment Analysis data
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
+import { toIsoTimestamp } from '$lib/utils/timestamps';
+import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
+import { getSentimentColor } from '$lib/utils/colorUtils';
+import { CHART } from '$lib/utils/chartColors';
 import type {
   SentimentStats,
   SentimentCategory,
@@ -88,7 +92,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
   /**
    * Get sentiment trends over time
    */
-  async getSentimentTrends(timeRange: string = '7d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
+  async getSentimentTrends(timeRange: string = '30d', workspaceId?: string, extraParams?: Record<string, string>): Promise<SentimentTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'sentiment-trends',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), timeRange, ...extraParams }
@@ -108,7 +112,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         total: (item.positive || 0) + (item.negative || 0) + (item.neutral || 0)
       }),
       []
-    ).reverse(); // Reverse to get chronological order
+    ).sort((a, b) => String(a.date).localeCompare(String(b.date))); // oldest to newest, whatever order the API used
   }
 
   /**
@@ -140,7 +144,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(',') : [],
         platform: post.platform,
-        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
+        timestamp: toIsoTimestamp(post.timestamp),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,
@@ -257,10 +261,13 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    */
   async exportSentimentData(filters: FilterOptions = {}, workspaceId?: string): Promise<ExportData<SentimentPost>> {
     const wsParam = workspaceId ? { workspace_id: workspaceId } : {};
+    // The export honours the date bar and the confidence slider, not only the dropdowns
     const params = {
       ...wsParam,
+      ...currentRangeQuery(),
       sentiment: filters.sentiment || 'all',
       platform: filters.platform || 'all',
+      ...(typeof (filters as any).confidenceThreshold === 'number' ? { minConfidence: (filters as any).confidenceThreshold } : {}),
       timeRange: filters.timeRange || '7d'
     };
 
@@ -282,7 +289,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
         confidence: post.confidence,
         emotions: post.emotions ? post.emotions.split(';') : [],
         platform: post.platform,
-        timestamp: post.timestamp ? (isNaN(new Date(post.timestamp).getTime()) ? new Date().toISOString() : new Date(post.timestamp).toISOString()) : new Date().toISOString(),
+        timestamp: toIsoTimestamp(post.timestamp),
         engagement: {
           likes: post.engagement_likes || 0,
           shares: post.engagement_shares || 0,
@@ -382,14 +389,6 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    * Transform to detailed sentiment categories
    */
   private transformToDetailedSentiments(data: any[]): SentimentCategory[] {
-    const sentimentColors: Record<string, string> = {
-      'Very Positive': '#22c55e',
-      'Positive': '#84cc16',
-      'Neutral': '#6b7280',
-      'Negative': '#f97316',
-      'Very Negative': '#ef4444'
-    };
-
     const sentimentTotals = new Map<string, number>();
     let totalPosts = 0;
 
@@ -405,7 +404,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
     return Array.from(sentimentTotals.entries()).map(([category, count]) => ({
       label: category,
       count: count,
-      color: sentimentColors[category] || '#6b7280',
+      color: getSentimentColor(category),
       percentage: totalPosts > 0 ? Math.round((count / totalPosts * 100) * 100) / 100 : 0
     }));
   }
@@ -415,13 +414,13 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    */
   private transformToEmotionStat(item: any): EmotionStat {
     const emotionColors: Record<string, string> = {
-      'Joy': '#fbbf24',
-      'Trust': '#3b82f6',
-      'Fear': '#8b5cf6',
-      'Surprise': '#f59e0b',
-      'Sadness': '#6366f1',
-      'Disgust': '#10b981',
-      'Anger': '#ef4444'
+      'Joy': CHART.catOrange,
+      'Trust': CHART.catBlue,
+      'Fear': CHART.catPink,
+      'Surprise': CHART.catSky,
+      'Sadness': CHART.primary600,
+      'Disgust': CHART.catGreen,
+      'Anger': CHART.danger500
     };
 
     const emotion = item.emotion1 || item.emotion;
@@ -430,7 +429,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
       emotion: emotion,
       count: item.count || item.co_occurrence_count || item.post_count || 0,
       percentage: item.percentage || 0,
-      color: emotionColors[emotion] || '#6b7280'
+      color: emotionColors[emotion] || CHART.ink500
     };
   }
 }

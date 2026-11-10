@@ -59,7 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({
       success: true,
       message: 'Workflow deployed successfully',
-      deployedFile: workflowFile
+      workflowId
     });
   } catch (err) {
     console.error('Error deploying workflow:', err);

@@ -1,3 +1,6 @@
+-- SUPERSEDED by db/migrations/0006_workflows.sql. This DuckDB-dialect file does not match the columns
+-- the application uses; it is kept only as design history.
+
 -- Workflow Management Schema
 -- Tables for publishing, executing, and managing workflows within the webapp
 -- Integrates with the unified social analytics database

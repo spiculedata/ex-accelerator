@@ -7,12 +7,28 @@
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { languageDetectionDb } from '$lib/services/languageDetectionDb';
   import { onMount } from 'svelte';
+  import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
+  import { toCsv } from '$lib/utils/evidenceExport';
+  import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
   import { getConfidenceColor } from '$lib/utils/colorUtils';
   import { ErrorAlert } from '$lib/components/ui';
+  import { platformOptions } from '$lib/utils/platformOptions';
+  import { rangeReloader } from '$lib/utils/filterRange';
+  import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
+  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
 
   $: workspaceId = $page.url.searchParams.get('workspace');
 
   let currentFilterParams: Record<string, string> = {};
+
+  // The language whose posts were chosen; they open in the side panel
+  let drilldown: { title: string; filters: PostFilters } | null = null;
+  function openLanguagePosts(code: string, name: string) {
+    drilldown = {
+      title: `${name} posts`,
+      filters: { language: code, ...filtersFromParams({ ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentFilterParams }) }
+    };
+  }
 
   function handleFilterChange(event: CustomEvent) {
     const detail = event.detail || {};
@@ -21,7 +37,10 @@
     currentFilterParams.platforms = (detail.platforms || []).join(',');
     if (detail.dateStart) currentFilterParams.date_start = detail.dateStart;
     if (detail.dateEnd) currentFilterParams.date_end = detail.dateEnd;
+    // A new date range changes every figure on the page; the reloader makes sure the newest range wins
+    rangeSync.sync();
   }
+  const rangeSync = rangeReloader(loadLanguageDetectionData, () => loading);
   
   // Loading state
   let loading = true;
@@ -29,7 +48,9 @@
 
   onMount(async () => {
     // Load language detection data from database
+    rangeSync.markLoaded();
     await loadLanguageDetectionData();
+    await rangeSync.sync();
   });
 
   // Language detection data - loaded from database
@@ -44,7 +65,14 @@
   async function loadLanguageDetectionData() {
     try {
       // Load all language data from database service
-      languageStats = await languageDetectionDb.getLanguageStats(workspaceId || undefined);
+      const stats = await languageDetectionDb.getLanguageStats(workspaceId || undefined);
+      languageStats = stats.map((stat) => ({
+        code: stat.language_code,
+        name: stat.language,
+        count: stat.post_count,
+        percentage: stat.percentage,
+        confidence: stat.confidence
+      }));
       languageAnalysis = await languageDetectionDb.getLanguageAnalysis(workspaceId || undefined);
       detectionStats = await languageDetectionDb.getLanguageDetectionStats(workspaceId || undefined);
       
@@ -59,9 +87,8 @@
       loading = false;
     } catch (error) {
       console.error('Error loading language detection data:', error);
-      errorMessage = 'Failed to load language detection data. Showing sample data.';
-      // Fallback to sample data if database fails
-      loadFallbackData();
+      errorMessage = 'Failed to load language detection data. Please try again.';
+      loading = false;
     }
   }
   
@@ -81,41 +108,47 @@
     }
   }
   
-  // Fallback sample data if database connection fails
-  function loadFallbackData() {
-    languageStats = [
-      { code: 'en', name: 'English', count: 45230, percentage: 67.2, confidence: 0.95 },
-      { code: 'es', name: 'Spanish', count: 8945, percentage: 13.3, confidence: 0.92 },
-      { code: 'fr', name: 'French', count: 4521, percentage: 6.7, confidence: 0.89 },
-      { code: 'de', name: 'German', count: 3210, percentage: 4.8, confidence: 0.91 },
-      { code: 'pt', name: 'Portuguese', count: 2134, percentage: 3.2, confidence: 0.88 },
-      { code: 'it', name: 'Italian', count: 1567, percentage: 2.3, confidence: 0.90 },
-      { code: 'ja', name: 'Japanese', count: 987, percentage: 1.5, confidence: 0.87 },
-      { code: 'ko', name: 'Korean', count: 678, percentage: 1.0, confidence: 0.85 }
-    ];
-    
-    detectionStats = {
-      totalPosts: languageStats.reduce((sum, lang) => sum + lang.count, 0),
-      totalLanguages: languageStats.length,
-      avgConfidence: 0.90,
-      topLanguage: languageStats[0]
-    };
-    
-    loading = false;
-  }
-
   let selectedLanguage = 'all';
   let selectedPlatform = 'all';
+  // Only the platforms the project's datasets actually come from are offered
+  let platformChoices: { value: string; label: string }[] = [];
+  async function loadPlatformChoices() {
+    try {
+      const result = await (await fetch('/api/datasets?status=available')).json();
+      platformChoices = platformOptions((result.datasets ?? []).map((d: any) => d.source_platform));
+    } catch {
+      platformChoices = [];
+    }
+  }
+  onMount(loadPlatformChoices);
   let confidenceThreshold = 0.5;
   let timeRange = '7d';
 
   // Reactive statements for filter changes
-  $: if ((selectedLanguage !== 'all' || selectedPlatform !== 'all' || confidenceThreshold !== 0.5 || timeRange !== '7d') && !loading) {
+  $: if ((selectedLanguage !== 'all' || selectedPlatform !== 'all' || confidenceThreshold !== 0.5) && !loading) {
     loadFilteredPosts();
   }
 
   // Filtered posts and stats (for display purposes, actual filtering happens in database)
   $: filteredPosts = samplePosts;
+
+  // Detection quality figures, computed from the loaded data
+  const CONFIDENCE_BANDS = [
+    { key: 'veryHigh', label: 'Very high (95-100%)', barClass: 'bg-blue-600' },
+    { key: 'high', label: 'High (85-95%)', barClass: 'bg-blue-400' },
+    { key: 'medium', label: 'Medium (70-85%)', barClass: 'bg-yellow-600' },
+    { key: 'low', label: 'Low (below 70%)', barClass: 'bg-red-600' }
+  ] as const;
+  const percentOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0);
+
+  $: distribution = detectionStats.confidenceDistribution ?? { veryHigh: 0, high: 0, medium: 0, low: 0 };
+  $: distributionTotal = distribution.veryHigh + distribution.high + distribution.medium + distribution.low;
+  $: confidenceRows = CONFIDENCE_BANDS.map((band) => ({
+    ...band,
+    percent: percentOf(distribution[band.key], distributionTotal)
+  }));
+  $: mixedPercent = percentOf(mixingData.reduce((sum, pair) => sum + pair.occurrence_count, 0), totalPosts);
+  $: highQualityPercent = percentOf(distribution.veryHigh + distribution.high, distributionTotal);
   $: totalPosts = detectionStats.totalPosts || languageStats.reduce((sum, lang) => sum + lang.count, 0);
 
   function getLanguageName(code: string) {
@@ -128,51 +161,15 @@
     return new Date(timestamp).toLocaleString();
   }
 
-  async function exportLanguageData() {
-    try {
-      const filters = {
-        language: selectedLanguage,
-        platform: selectedPlatform,
-        confidenceThreshold: confidenceThreshold,
-        timeRange: timeRange
-      };
-      
-      const exportData = await languageDetectionDb.exportLanguageData(filters, workspaceId || undefined);
-      
-      // Create CSV from the exported data
-      const csvData = (exportData as any).languages.map((lang: any) =>
-        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
-      ).join('\n');
-      
-      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'language_detection_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting language data:', error);
-      errorMessage = 'Failed to export language data. Using cached data instead.';
-      // Fallback to current data
-      const csvData = languageStats.map(lang => 
-        `"${lang.name}",${lang.code},${lang.count},${lang.percentage}%,${lang.confidence}`
-      ).join('\n');
-      
-      const header = 'Language,Code,Count,Percentage,Avg Confidence\n';
-      const csv = header + csvData;
-      
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'language_detection_report.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
+  let exportState: ExportState = IDLE_EXPORT;
+
+  // Exports the languages as listed for the current filters
+  function exportLanguageData() {
+    return runExport(async () => {
+      const rows = filteredStats.map((lang) => ({ language: lang.name, code: lang.code, posts: lang.count, percentage: lang.percentage, confidence: lang.confidence }));
+      downloadCsv('language_detection_report.csv', toCsv(rows, ['language', 'code', 'posts', 'percentage', 'confidence']));
+      return { rows: rows.length };
+    }, (state) => (exportState = state));
   }
 
   // Filtered stats for display
@@ -190,7 +187,6 @@
   <PageHeader
     title="Language Detection"
     subtitle="Analyze language distribution and detection confidence in your social media data"
-    accentColor="amber"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
@@ -212,6 +208,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
     <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
+    <ExportStatus state={exportState} />
 
 
     <!-- Data Source Filter -->
@@ -229,19 +226,19 @@
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalPosts ? detectionStats.totalPosts.toLocaleString() : totalPosts.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.totalPosts ? detectionStats.totalPosts.toLocaleString() : totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts Analyzed</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalLanguages || languageStats.length}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.totalLanguages || languageStats.length}</div>
         <div class="text-sm text-gray-600">Languages Detected</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{Math.round((detectionStats.avgConfidence || 0.90) * 100)}%</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{Math.round((detectionStats.avgConfidence || 0) * 100)}%</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.topLanguage?.name || languageStats[0]?.name || 'English'}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.topLanguage?.name || languageStats[0]?.name || 'n/a'}</div>
         <div class="text-sm text-gray-600">Top Language</div>
       </div>
     </div>
@@ -264,13 +261,9 @@
           <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
           <select bind:value={selectedPlatform} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500">
             <option value="all">All Platforms</option>
-            <option value="twitter">Twitter</option>
-            <option value="facebook">Facebook</option>
-            <option value="instagram">Instagram</option>
-            <option value="reddit">Reddit</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="telegram">Telegram</option>
-            <option value="whatsapp">WhatsApp</option>
+            {#each platformChoices as choice}
+              <option value={choice.value}>{choice.label}</option>
+            {/each}
           </select>
         </div>
         
@@ -283,16 +276,6 @@
             max="1" 
             step="0.05"
             class="w-full h-2 bg-gray-200 rounded-xl appearance-none cursor-pointer">
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-          <select bind:value={timeRange} class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="1d">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-          </select>
         </div>
       </div>
     </div>
@@ -314,7 +297,9 @@
                   <span class="text-white font-bold text-xs">{lang.code.toUpperCase()}</span>
                 </div>
                 <div>
-                  <div class="font-medium text-gray-900">{lang.name}</div>
+                  <div class="font-medium text-gray-900">
+                    <button type="button" class="hover:text-primary-700 hover:underline" on:click={() => openLanguagePosts(lang.code, lang.name)}>{lang.name}</button>
+                  </div>
                   <div class="text-sm text-gray-500">{lang.count.toLocaleString()} posts</div>
                 </div>
               </div>
@@ -344,33 +329,17 @@
           <div>
             <h3 class="text-sm font-medium text-gray-700 mb-3">Confidence Distribution</h3>
             <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">High (90-100%)</span>
-                <div class="flex items-center">
-                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
-                    <div class="bg-blue-600 h-2 rounded-full" style="width: 72%"></div>
+              {#each confidenceRows as row}
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600">{row.label}</span>
+                  <div class="flex items-center">
+                    <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
+                      <div class="{row.barClass} h-2 rounded-full" style="width: {row.percent}%"></div>
+                    </div>
+                    <span class="text-sm font-medium w-12 text-right">{row.percent}%</span>
                   </div>
-                  <span class="text-sm font-medium">72%</span>
                 </div>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">Medium (80-90%)</span>
-                <div class="flex items-center">
-                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
-                    <div class="bg-yellow-600 h-2 rounded-full" style="width: 23%"></div>
-                  </div>
-                  <span class="text-sm font-medium">23%</span>
-                </div>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600">Low (50-80%)</span>
-                <div class="flex items-center">
-                  <div class="w-32 bg-gray-200 rounded-full h-2 mr-2">
-                    <div class="bg-red-600 h-2 rounded-full" style="width: 5%"></div>
-                  </div>
-                  <span class="text-sm font-medium">5%</span>
-                </div>
-              </div>
+              {/each}
             </div>
           </div>
 
@@ -379,28 +348,10 @@
             <h3 class="text-sm font-medium text-gray-700 mb-3">Detection Challenges</h3>
             <div class="space-y-3">
               <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
-                <div class="flex items-center">
-                  <svg class="w-4 h-4 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-21 12a9 9 0 1118 0 9 9 0 01-18 0z"></path>
-                  </svg>
-                  <span class="text-sm text-yellow-800">Mixed language posts: 3.2%</span>
-                </div>
+                <span class="text-sm text-yellow-800">Mixed language posts: {mixedPercent}%</span>
               </div>
               <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <div class="flex items-center">
-                  <svg class="w-4 h-4 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="text-sm text-amber-800">Short text (&lt;20 chars): 8.7%</span>
-                </div>
-              </div>
-              <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <div class="flex items-center">
-                  <svg class="w-4 h-4 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
-                  <span class="text-sm text-amber-800">High quality detections: 88.1%</span>
-                </div>
+                <span class="text-sm text-amber-800">High quality detections (85% confidence or more): {highQualityPercent}%</span>
               </div>
             </div>
           </div>
@@ -446,3 +397,5 @@
     {/if}
   </div>
 </div>
+
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} onclose={() => (drilldown = null)} />

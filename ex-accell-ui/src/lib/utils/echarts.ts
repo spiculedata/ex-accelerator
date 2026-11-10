@@ -1,46 +1,47 @@
-// ECharts utility — resilient initialization without setTimeout hacks
+// ECharts utilities: lazy loading of the bundled package plus safe init, dispose and resize helpers
 
 type EChartsInstance = any;
 type EChartsStatic = any;
 
+let loading: Promise<EChartsStatic> | null = null;
+
+const BRAND_THEME = 'social-explorer';
+const SANS = "'Atkinson Hyperlegible Next Variable', ui-sans-serif, system-ui, sans-serif";
+
 /**
- * Wait for ECharts to load from CDN with exponential backoff.
- * Rejects after ~10 seconds if not available.
+ * Brand chart theme (docs-site/brand/data-visualisation): the brand sans for all chart text, ink for
+ * labels and grid, and the colour-blind-safe categorical series order. Per-chart options still win, so
+ * sentiment charts set their own colours from getSentimentColor.
  */
-export function waitForEcharts(): Promise<EChartsStatic> {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined') {
-      reject(new Error('Not in browser environment'));
-      return;
-    }
+export const brandChartTheme = {
+  color: ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'],
+  backgroundColor: 'transparent',
+  // ECharts writes a generated text description (title, series, values) onto the chart for screen readers
+  aria: { enabled: true },
+  textStyle: { fontFamily: SANS, color: '#344253' },
+  title: { textStyle: { fontFamily: SANS, color: '#0f1926', fontWeight: 600 }, subtextStyle: { fontFamily: SANS, color: '#667384' } },
+  legend: { textStyle: { fontFamily: SANS, color: '#344253' } },
+  tooltip: { textStyle: { fontFamily: SANS } },
+  categoryAxis: { axisLine: { lineStyle: { color: '#cfd5de' } }, axisTick: { lineStyle: { color: '#cfd5de' } }, axisLabel: { color: '#485567' }, splitLine: { lineStyle: { color: '#e3e8ee' } } },
+  valueAxis: { axisLine: { lineStyle: { color: '#cfd5de' } }, axisLabel: { color: '#485567' }, splitLine: { lineStyle: { color: '#e3e8ee' } } }
+};
 
-    const echarts = (window as any).echarts;
-    if (echarts) {
-      resolve(echarts);
-      return;
-    }
+/**
+ * Load ECharts (bundled from npm, code-split) and expose it on `window.echarts` for the helpers
+ * below. Safe to call repeatedly; browser only.
+ */
+export async function waitForEcharts(): Promise<EChartsStatic> {
+  if (typeof window === 'undefined') throw new Error('Not in browser environment');
 
-    let attempts = 0;
-    const maxAttempts = 20;
-    const baseDelay = 100;
-
-    function poll() {
-      attempts++;
-      const echarts = (window as any).echarts;
-      if (echarts) {
-        resolve(echarts);
-        return;
-      }
-      if (attempts >= maxAttempts) {
-        reject(new Error('ECharts failed to load from CDN after 10 seconds'));
-        return;
-      }
-      const delay = Math.min(baseDelay * Math.pow(1.5, attempts), 2000);
-      requestAnimationFrame(() => setTimeout(poll, delay));
-    }
-
-    requestAnimationFrame(poll);
+  loading ??= import('echarts').catch((error: unknown) => {
+    loading = null; // allow a retry after a failed (for example offline) load
+    throw error;
   });
+  const echarts = await loading;
+  // Registered here so charts created directly with echarts.init(el, 'social-explorer') get the theme too
+  echarts.registerTheme?.(BRAND_THEME, brandChartTheme);
+  (window as any).echarts ??= echarts;
+  return echarts;
 }
 
 /**
@@ -62,7 +63,9 @@ export function initChart(container: HTMLElement | null): EChartsInstance | null
     existing.dispose();
   }
 
-  return echarts.init(container);
+  // Registering is a cheap overwrite, so do it on every init instead of tracking state
+  echarts.registerTheme(BRAND_THEME, brandChartTheme);
+  return echarts.init(container, BRAND_THEME);
 }
 
 /**

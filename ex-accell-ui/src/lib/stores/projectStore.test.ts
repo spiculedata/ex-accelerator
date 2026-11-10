@@ -5,6 +5,7 @@ import {
   currentProject,
   setCurrentProject,
   loadCurrentProject,
+  projectNotice,
   clearCurrentProject,
   type Project
 } from './projectStore';
@@ -39,6 +40,7 @@ beforeEach(() => {
   localStorageMock.clear();
   currentProject.set(null);
   availableProjects.set([]);
+  projectNotice.set(null);
 });
 
 describe('projectStore', () => {
@@ -176,6 +178,59 @@ describe('projectStore', () => {
       clearCurrentProject();
       expect(get(currentProject)).toBeNull();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith('currentProject');
+    });
+  });
+
+  describe('a saved project that is no longer available', () => {
+    const reply = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
+    const fallbackFetch = (saved: ReturnType<typeof reply> | Error) => {
+      const fn = vi.fn();
+      if (saved instanceof Error) fn.mockRejectedValueOnce(saved); else fn.mockResolvedValueOnce(saved);
+      fn.mockResolvedValueOnce(reply({ success: true, projects: [{ id: 1 }] })).mockResolvedValueOnce(reply({ success: true, project: { id: 1, name: 'Marlow' } }));
+      vi.stubGlobal('fetch', fn);
+    };
+
+    it('forgets the stale id, falls back to the first project and says so', async () => {
+      localStorageMock.setItem('currentProject', '99');
+      fallbackFetch(reply({ success: true, project: null })); // what the API sends for an id that does not exist
+
+      expect(await loadCurrentProject()).toBe(true);
+      expect(get(currentProject)!.id).toBe('1');
+      expect(localStorageMock.getItem('currentProject')).toBe('1');
+      expect(get(projectNotice)).toContain('Marlow');
+    });
+
+    it('treats a saved id that is not a number as stale', async () => {
+      localStorageMock.setItem('currentProject', 'not-a-number');
+      const fn = vi.fn()
+        .mockResolvedValueOnce(reply({ success: true, projects: [{ id: 1 }] }))
+        .mockResolvedValueOnce(reply({ success: true, project: { id: 1, name: 'Marlow' } }));
+      vi.stubGlobal('fetch', fn);
+
+      expect(await loadCurrentProject()).toBe(true);
+      expect(fn).toHaveBeenCalledTimes(2); // never asked the server about the bad id
+      expect(localStorageMock.getItem('currentProject')).toBe('1');
+    });
+
+    it.each([
+      ['the network is down', new Error('offline')],
+      ['the server answers 500', reply({ success: false, error: 'db down' }, false)],
+      ['the session has expired and an error body comes back', reply({ success: false, error: 'Authentication required' }, false)]
+    ])('keeps the saved id when %s, so a blip does not change the project', async (_name, failure) => {
+      localStorageMock.setItem('currentProject', '10');
+      fallbackFetch(failure);
+
+      expect(await loadCurrentProject()).toBe(false);
+      expect(localStorageMock.getItem('currentProject')).toBe('10');
+      expect(get(projectNotice)).toBeNull();
+      expect(get(currentProject)).toBeNull();
+    });
+
+    it('stays quiet when the saved project loads', async () => {
+      localStorageMock.setItem('currentProject', '10');
+      mockFetch({ success: true, project: { id: 10, name: 'Saved' } });
+      await loadCurrentProject();
+      expect(get(projectNotice)).toBeNull();
     });
   });
 });

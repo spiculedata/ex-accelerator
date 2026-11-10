@@ -100,7 +100,7 @@
           <h3 id="publish-workflow-title" class="text-lg font-semibold text-gray-900">Publish Workflow</h3>
           <button
             onclick={handleClose}
-            class="text-gray-400 hover:text-gray-600 transition-colors"
+            class="text-gray-500 hover:text-gray-600 transition-colors"
             aria-label="Close dialog">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -141,7 +141,7 @@
               placeholder="Describe what this workflow does"></textarea>
           </div>
 
-          <!-- Version and Created By -->
+          <!-- Version (the creator is the signed-in user) -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label for="workflow-version" class="block text-sm font-medium text-gray-700 mb-2">
@@ -153,17 +153,6 @@
                 bind:value={metadata.version}
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 placeholder="1.0.0">
-            </div>
-            <div>
-              <label for="workflow-creator" class="block text-sm font-medium text-gray-700 mb-2">
-                Created By
-              </label>
-              <input
-                id="workflow-creator"
-                type="text"
-                bind:value={metadata.createdBy}
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Your name">
             </div>
           </div>
 

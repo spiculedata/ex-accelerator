@@ -1,17 +1,21 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
   import { waitForEcharts, initChart } from '$lib/utils/echarts';
   import ModelTierSelector from '$lib/components/ui/ModelTierSelector.svelte';
+  import ResponsibleUse from '$lib/components/ui/ResponsibleUse.svelte';
 
   let selectedTier = 'fast';
 
   // State
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let faceStats: { distribution: { range: string; count: number }[]; summary: { totalFaces: number; imagesWithFaces: number; avgFacesPerImage: number; totalImages: number } } = {
     distribution: [],
     summary: { totalFaces: 0, imagesWithFaces: 0, avgFacesPerImage: 0, totalImages: 0 }
@@ -39,6 +43,8 @@
       if (!resultsRes.ok) throw new Error(`Failed to load face results: ${resultsRes.statusText}`);
 
       const statsData = await statsRes.json();
+
+      unavailable = !!statsData.meta?.unavailable;
       const resultsData = await resultsRes.json();
 
       // Map API response to expected format
@@ -83,9 +89,10 @@
         body: JSON.stringify({ action: 'analyze', image_url: imageUrl, tier: selectedTier })
       });
 
-      if (!res.ok) throw new Error(`Analysis failed: ${res.statusText}`);
+      const data = await res.json().catch(() => ({}));
+      // The server explains what was wrong (a bad address, an empty file); the status text alone says nothing
+      if (!res.ok) throw new Error(data.error || 'The image could not be analysed. Try again in a moment.');
 
-      const data = await res.json();
       const analysis = data.data?.analysis || {};
       singleResult = {
         face_count: analysis.face_count || 0,
@@ -133,18 +140,18 @@
         type: 'category',
         data: categories.length > 0 ? categories : ['0 faces', '1 face', '2-5 faces', '6+ faces'],
         axisLabel: {
-          color: '#6b7280',
+          color: CHART.ink500,
           fontSize: 12
         },
-        axisLine: { lineStyle: { color: '#e5e7eb' } }
+        axisLine: { lineStyle: { color: CHART.ink200 } }
       },
       yAxis: {
         type: 'value',
         axisLabel: {
-          color: '#6b7280',
+          color: CHART.ink500,
           fontSize: 12
         },
-        splitLine: { lineStyle: { color: '#f3f4f6' } }
+        splitLine: { lineStyle: { color: CHART.ink100 } }
       },
       series: [
         {
@@ -157,8 +164,8 @@
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: '#34d399' },
-                { offset: 1, color: '#059669' }
+                { offset: 0, color: CHART.catGreen },
+                { offset: 1, color: CHART.success600 }
               ]
             },
             borderRadius: [4, 4, 0, 0]
@@ -185,7 +192,6 @@
   <PageHeader
     title="Face Detection"
     subtitle="Privacy-first face counting — no biometric data stored"
-    accentColor="emerald"
     backHref="/image-processing"
   >
     <div slot="icon">
@@ -198,6 +204,8 @@
   </PageHeader>
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <ResponsibleUse tool="face detection" />
+
     <!-- Privacy Banner -->
     <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-8">
       <div class="flex items-start">
@@ -218,12 +226,19 @@
         <ErrorAlert message={errorMessage} />
       </div>
     {/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
     <!-- Analyze Panel -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Analyze an Image</h2>
       <div class="mb-3">
-        <ModelTierSelector bind:selectedTier disabled={analyzing} />
+        <ModelTierSelector tool="faces" bind:selectedTier disabled={analyzing} />
       </div>
       <div class="flex flex-col sm:flex-row gap-3">
         <input

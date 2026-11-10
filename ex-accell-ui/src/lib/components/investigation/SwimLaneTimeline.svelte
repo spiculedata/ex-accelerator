@@ -16,7 +16,9 @@
 </script>
 
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, createEventDispatcher } from 'svelte';
+	import { getSentimentColor } from '$lib/utils/colorUtils';
 	import * as d3 from 'd3';
 
 	export let data: TimelineEntry[] = [];
@@ -37,12 +39,12 @@
 	const laneGap = 6;
 
 	const colors = {
-		gdeltBar: '#64748b',
-		goldsteinNeg: '#ef4444',
-		goldsteinPos: '#22c55e',
-		positive: '#06d6a0',
-		negative: '#f72585',
-		neutral: '#8b5cf6'
+		gdeltBar: CHART.ink500,
+		goldsteinNeg: CHART.catVermilion,
+		goldsteinPos: CHART.catBlue,
+		positive: getSentimentColor('positive'),
+		negative: getSentimentColor('negative'),
+		neutral: getSentimentColor('neutral')
 	};
 
 	onMount(() => {
@@ -110,7 +112,9 @@
 
 		// ---- LANE 1: GDELT (area chart with Goldstein colour encoding) ----
 		const gdeltY = 0;
-		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 1;
+		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 0;
+		// With no events there is nothing to draw: a scale from 0 to 0 would paint a full bar and a flat line
+		const hasGdelt = gdeltMaxEvents > 0;
 		const yGdelt = d3.scaleLinear().domain([0, gdeltMaxEvents]).nice().range([laneHeight, 0]);
 
 		const gdeltGroup = g.append('g').attr('transform', `translate(0,${gdeltY})`);
@@ -120,7 +124,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label
@@ -132,17 +136,17 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('GDELT');
 
 		// Goldstein colour scale: red (negative) → slate → green (positive)
 		const goldsteinColor = d3.scaleLinear<string>()
 			.domain([-10, 0, 10])
-			.range([colors.goldsteinNeg, '#64748b', colors.goldsteinPos])
+			.range([colors.goldsteinNeg, CHART.ink500, colors.goldsteinPos])
 			.clamp(true);
 
 		// Create per-segment gradient that encodes Goldstein as fill colour
-		for (let i = 0; i < parsedData.length - 1; i++) {
+		for (let i = 0; hasGdelt && i < parsedData.length - 1; i++) {
 			const d0 = parsedData[i];
 			const d1 = parsedData[i + 1];
 			const gradId = `gdelt-seg-${i}`;
@@ -177,14 +181,28 @@
 			.append('path')
 			.datum(parsedData)
 			.attr('fill', 'none')
-			.attr('stroke', '#94a3b8')
+			.attr('stroke', CHART.ink400)
 			.attr('stroke-width', 1)
-			.attr('opacity', 0.5)
+			.attr('opacity', hasGdelt ? 0.5 : 0)
 			.attr('d', gdeltLine);
+
+		if (!hasGdelt) {
+			gdeltGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', CHART.ink400)
+				.text('No GDELT events for these keywords');
+		}
 
 		// ---- LANE 2: Radio ----
 		const radioY = laneHeight + laneGap;
-		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 1;
+		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 0;
+		// Segments can exist without a sentiment label, so count them as well as the labelled ones
+		const hasRadio = radioMaxSegments > 0 || (d3.max(parsedData, (d) => d.radio_segments) ?? 0) > 0;
 		const yRadio = d3.scaleLinear().domain([0, radioMaxSegments]).nice().range([laneHeight, 0]);
 
 		const radioGroup = g.append('g').attr('transform', `translate(0,${radioY})`);
@@ -193,7 +211,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label: left of lane, vertically centered
@@ -205,7 +223,7 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('Radio');
 
 		// Stacked area for radio
@@ -231,16 +249,29 @@
 
 		radioGroup
 			.selectAll('.radio-area')
-			.data(radioStacked)
+			.data(hasRadio ? radioStacked : [])
 			.join('path')
 			.attr('class', 'radio-area')
 			.attr('fill', (d) => radioColorMap[d.key] ?? '#999')
 			.attr('opacity', 0.75)
 			.attr('d', radioArea);
 
+		if (!hasRadio) {
+			radioGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', CHART.ink400)
+				.text('No radio transcripts for these keywords');
+		}
+
 		// ---- LANE 3: Social ----
 		const socialY = 2 * (laneHeight + laneGap);
-		const socialMaxPosts = d3.max(parsedData, (d) => d.social_positive + d.social_negative + d.social_neutral) ?? 1;
+		const socialMaxPosts = d3.max(parsedData, (d) => d.social_positive + d.social_negative + d.social_neutral) ?? 0;
+		const hasSocial = socialMaxPosts > 0;
 		const ySocial = d3.scaleLinear().domain([0, socialMaxPosts]).nice().range([laneHeight, 0]);
 
 		const socialGroup = g.append('g').attr('transform', `translate(0,${socialY})`);
@@ -249,7 +280,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label: left of lane, vertically centered
@@ -261,7 +292,7 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('Social');
 
 		// Stacked area for social
@@ -287,12 +318,24 @@
 
 		socialGroup
 			.selectAll('.social-area')
-			.data(socialStacked)
+			.data(hasSocial ? socialStacked : [])
 			.join('path')
 			.attr('class', 'social-area')
 			.attr('fill', (d) => socialColorMap[d.key] ?? '#999')
 			.attr('opacity', 0.75)
 			.attr('d', socialArea);
+
+		if (!hasSocial) {
+			socialGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', CHART.ink400)
+				.text('No social posts for these keywords');
+		}
 
 		// ---- SHARED X AXIS ----
 		g
@@ -304,9 +347,9 @@
 					.ticks(d3.timeDay.every(Math.max(1, Math.floor(parsedData.length / 8))) ?? 7)
 					.tickFormat((d) => d3.timeFormat('%b %d')(d as Date))
 			)
-			.call((g2) => g2.select('.domain').attr('stroke', '#475569'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '9px'))
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
+			.call((g2) => g2.select('.domain').attr('stroke', CHART.ink600))
+			.call((g2) => g2.selectAll('.tick text').attr('fill', CHART.ink400).attr('font-size', '9px'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', CHART.ink600));
 
 		// ---- BRUSH ----
 		const fmtShort = d3.timeFormat('%b %d');
@@ -320,15 +363,15 @@
 			.append('rect')
 			.attr('rx', 4)
 			.attr('ry', 4)
-			.attr('fill', '#1e293b')
-			.attr('stroke', '#3b82f6')
+			.attr('fill', CHART.ink800)
+			.attr('stroke', CHART.catBlue)
 			.attr('stroke-width', 1);
 
 		const brushLabel = labelGroup
 			.append('text')
 			.attr('text-anchor', 'middle')
 			.attr('dominant-baseline', 'middle')
-			.attr('fill', '#e2e8f0')
+			.attr('fill', CHART.ink200)
 			.attr('font-size', '11px')
 			.attr('font-weight', '600');
 
@@ -416,7 +459,7 @@
 		const brushGroup = g.append('g').attr('class', 'brush').call(brush);
 
 		// Style brush
-		brushGroup.selectAll('.selection').attr('fill', '#3b82f6').attr('fill-opacity', 0.15).attr('stroke', '#3b82f6').attr('stroke-width', 1);
+		brushGroup.selectAll('.selection').attr('fill', CHART.catBlue).attr('fill-opacity', 0.15).attr('stroke', CHART.catBlue).attr('stroke-width', 1);
 		brushGroup.selectAll('.overlay').style('cursor', 'crosshair');
 
 		// Vertical hover line (above brush, no pointer events)
@@ -424,7 +467,7 @@
 			.append('line')
 			.attr('y1', 0)
 			.attr('y2', innerHeight)
-			.attr('stroke', '#94a3b8')
+			.attr('stroke', CHART.ink400)
 			.attr('stroke-width', 1)
 			.attr('stroke-dasharray', '4,3')
 			.attr('pointer-events', 'none')

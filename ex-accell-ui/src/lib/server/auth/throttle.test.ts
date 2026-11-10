@@ -50,4 +50,22 @@ describe('createLoginThrottle', () => {
 
     expect(throttle.size()).toBeLessThanOrEqual(2);
   });
+
+  it('forgives only the most recent attempt', () => {
+    const throttle = createLoginThrottle(options);
+    [0, 1, 2].forEach((time) => throttle.recordFailure('k', time));
+
+    throttle.forgive('k');
+
+    expect(throttle.isBlocked('k', 3)).toBe(false);
+    throttle.recordFailure('k', 3);
+    expect(throttle.isBlocked('k', 4)).toBe(true);
+  });
+
+  it('forgiving an unknown key does nothing', () => {
+    const throttle = createLoginThrottle(options);
+
+    expect(() => throttle.forgive('missing')).not.toThrow();
+    expect(throttle.size()).toBe(0);
+  });
 });

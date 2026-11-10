@@ -1,0 +1,33 @@
+name: Dependency audit
+
+# Separate from the test workflow so a new upstream advisory reads as "dependency advisory",
+# not as broken tests. Also runs weekly, so advisories are noticed without an unrelated PR.
+on:
+  pull_request:
+    paths: ['ex-accell-ui/package.json', 'ex-accell-ui/package-lock.json']
+  push:
+    branches: [main]
+    paths: ['ex-accell-ui/package.json', 'ex-accell-ui/package-lock.json']
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: npm audit (production)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.x
+
+      # Fails on high or critical advisories in shipped (production) dependencies
+      - name: Audit production dependencies
+        working-directory: ex-accell-ui
+        run: npm audit --omit=dev --audit-level=high

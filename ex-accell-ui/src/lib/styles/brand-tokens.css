@@ -1,0 +1,142 @@
+/*
+ * Social Explorer brand tokens: the single source of truth for colour, type, shape and elevation.
+ * Plain CSS custom properties, so the app (via Tailwind's @theme in app.css), the docs site and any
+ * future surface read the same values. The brand guidelines in docs-site/brand explain how to use them.
+ *
+ * Colour is written in OKLCH so each ramp steps evenly in lightness. Contrast is checked by design:
+ * white on primary-600 is 4.9:1, primary-700 on white is 7.0:1, ink-500 on white is 4.8:1.
+ * Signal (amber) is a fill and highlight colour, never text on white.
+ */
+:root {
+
+  /* Ink: neutrals with a cool blue lean, for text, surfaces and borders */
+  --se-ink-50: oklch(0.985 0.004 255);
+  --se-ink-100: oklch(0.967 0.006 255);
+  --se-ink-200: oklch(0.928 0.010 255);
+  --se-ink-300: oklch(0.872 0.014 255);
+  --se-ink-400: oklch(0.707 0.022 255);
+  --se-ink-500: oklch(0.551 0.030 255);
+  --se-ink-600: oklch(0.446 0.034 255);
+  --se-ink-700: oklch(0.373 0.034 255);
+  --se-ink-800: oklch(0.278 0.032 255);
+  --se-ink-900: oklch(0.210 0.030 255);
+  --se-ink-950: oklch(0.130 0.028 255);
+
+  /* Tidewater: the brand colour, for actions, links, selection and focus */
+  --se-primary-50: oklch(0.975 0.014 215);
+  --se-primary-100: oklch(0.940 0.030 215);
+  --se-primary-200: oklch(0.890 0.055 215);
+  --se-primary-300: oklch(0.820 0.080 215);
+  --se-primary-400: oklch(0.720 0.105 215);
+  --se-primary-500: oklch(0.620 0.115 215);
+  --se-primary-600: oklch(0.530 0.115 215);
+  --se-primary-700: oklch(0.450 0.100 215);
+  --se-primary-800: oklch(0.380 0.085 215);
+  --se-primary-900: oklch(0.310 0.068 215);
+  --se-primary-950: oklch(0.230 0.050 215);
+
+  /* Signal: amber for highlights and evidence marks; a fill colour, never text on white */
+  --se-signal-50: oklch(0.985 0.020 78);
+  --se-signal-100: oklch(0.960 0.045 78);
+  --se-signal-200: oklch(0.920 0.090 78);
+  --se-signal-300: oklch(0.870 0.130 78);
+  --se-signal-400: oklch(0.800 0.155 78);
+  --se-signal-500: oklch(0.730 0.160 78);
+  --se-signal-600: oklch(0.630 0.145 78);
+  --se-signal-700: oklch(0.530 0.125 78);
+  --se-signal-800: oklch(0.440 0.100 78);
+  --se-signal-900: oklch(0.360 0.075 78);
+  --se-signal-950: oklch(0.260 0.050 78);
+
+  /* Success: confirmations and healthy states */
+  --se-success-50: oklch(0.975 0.014 160);
+  --se-success-100: oklch(0.940 0.030 160);
+  --se-success-200: oklch(0.890 0.055 160);
+  --se-success-300: oklch(0.820 0.080 160);
+  --se-success-400: oklch(0.720 0.100 160);
+  --se-success-500: oklch(0.620 0.110 160);
+  --se-success-600: oklch(0.530 0.105 160);
+  --se-success-700: oklch(0.450 0.095 160);
+  --se-success-800: oklch(0.380 0.080 160);
+  --se-success-900: oklch(0.310 0.065 160);
+  --se-success-950: oklch(0.230 0.050 160);
+
+  /* Danger: errors and destructive actions only (never used for sentiment) */
+  --se-danger-50: oklch(0.975 0.014 27);
+  --se-danger-100: oklch(0.940 0.030 27);
+  --se-danger-200: oklch(0.890 0.060 27);
+  --se-danger-300: oklch(0.820 0.100 27);
+  --se-danger-400: oklch(0.720 0.160 27);
+  --se-danger-500: oklch(0.620 0.200 27);
+  --se-danger-600: oklch(0.530 0.200 27);
+  --se-danger-700: oklch(0.450 0.180 27);
+  --se-danger-800: oklch(0.380 0.150 27);
+  --se-danger-900: oklch(0.310 0.120 27);
+  --se-danger-950: oklch(0.230 0.085 27);
+
+  /* Data visualisation. Sentiment runs blue (positive) to orange (negative), a diverging pair that stays
+     distinguishable for the common forms of colour blindness. Never rely on colour alone: add a label or icon. */
+  --se-sentiment-very-positive: #0072b2;
+  --se-sentiment-positive: #56b4e9;
+  --se-sentiment-neutral: #98a2ae;
+  --se-sentiment-negative: #e69f00;
+  --se-sentiment-very-negative: #d55e00;
+
+  /* Categorical series (Okabe-Ito order). Use them in sequence; four or fewer series read best. */
+  --se-cat-1: #0072b2;
+  --se-cat-2: #e69f00;
+  --se-cat-3: #009e73;
+  --se-cat-4: #cc79a7;
+  --se-cat-5: #56b4e9;
+  --se-cat-6: #d55e00;
+  --se-cat-7: #f0e442;
+  --se-cat-8: #0f1926;
+
+  /* Type */
+  --se-font-sans: 'Atkinson Hyperlegible Next Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --se-font-display: 'Newsreader Variable', ui-serif, Georgia, 'Times New Roman', serif;
+  --se-font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Shape: tighter than a consumer app, like an instrument panel */
+  --se-radius-sm: 0.1875rem;
+  --se-radius-md: 0.3125rem;
+  --se-radius-lg: 0.4375rem;
+  --se-radius-xl: 0.625rem;
+  --se-radius-2xl: 0.875rem;
+
+  /* Elevation: cool-tinted, low and short. Borders do most of the separating. */
+  --se-shadow-sm: 0 1px 2px 0 oklch(0.21 0.03 255 / 0.06);
+  --se-shadow: 0 1px 3px 0 oklch(0.21 0.03 255 / 0.08), 0 1px 2px -1px oklch(0.21 0.03 255 / 0.06);
+  --se-shadow-md: 0 4px 8px -2px oklch(0.21 0.03 255 / 0.09), 0 2px 4px -2px oklch(0.21 0.03 255 / 0.06);
+  --se-shadow-lg: 0 12px 20px -6px oklch(0.21 0.03 255 / 0.12), 0 4px 8px -4px oklch(0.21 0.03 255 / 0.06);
+
+  /* Semantic roles (light). Components use these, not raw ramp steps, when a role exists. */
+  --se-bg: var(--se-ink-50);
+  --se-surface: #ffffff;
+  --se-surface-sunken: var(--se-ink-100);
+  --se-border: var(--se-ink-200);
+  --se-border-strong: var(--se-ink-300);
+  --se-text: var(--se-ink-900);
+  --se-text-muted: var(--se-ink-500);
+  --se-link: var(--se-primary-700);
+  --se-action: var(--se-primary-600);
+  --se-action-hover: var(--se-primary-700);
+  --se-focus: var(--se-primary-500);
+  --se-highlight: var(--se-signal-200);
+}
+
+/* Dark roles. The ramps are shared; only the roles flip. */
+:root[data-theme='dark'] {
+  --se-bg: var(--se-ink-950);
+  --se-surface: var(--se-ink-900);
+  --se-surface-sunken: var(--se-ink-950);
+  --se-border: var(--se-ink-800);
+  --se-border-strong: var(--se-ink-700);
+  --se-text: var(--se-ink-100);
+  --se-text-muted: var(--se-ink-400);
+  --se-link: var(--se-primary-300);
+  --se-action: var(--se-primary-500);
+  --se-action-hover: var(--se-primary-400);
+  --se-focus: var(--se-primary-400);
+  --se-highlight: var(--se-signal-700);
+}

@@ -6,7 +6,9 @@
    * Provides search functionality and visual feedback during drag operations.
    */
 
-  import { workflowBuilder } from '$lib/stores/workflowBuilderStore';
+  import { get } from 'svelte/store';
+  import { workflowBuilder, workflowSteps } from '$lib/stores/workflowBuilderStore';
+  import { nextFreePosition } from '$lib/utils/workflowSteps';
   import { stepLibrary, getStepColorClasses, searchSteps, type StepTemplate } from './stepLibraryData';
 
   // Search state
@@ -37,16 +39,24 @@
     return `${classes.bg} ${classes.border} ${classes.text}`;
   }
 
-  // Keyboard accessibility for drag
+  // Clicking, or pressing Enter or Space on, a component adds it to the canvas, so the library works
+  // without a mouse drag. The announcement tells screen reader users what happened.
+  let announcement = '';
+  function addToCanvas(step: StepTemplate) {
+    const { x, y } = nextFreePosition(get(workflowSteps).map((step) => step.position));
+    workflowBuilder.addStep(step, x, y);
+    announcement = `Added ${step.name} to the workflow`;
+  }
+
   function handleKeyDown(event: KeyboardEvent, step: StepTemplate) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      // Keyboard users can't drag - provide alternative interaction
-      // Could open a modal or add to center of canvas
-      console.log('Keyboard add step:', step.name);
+      addToCanvas(step);
     }
   }
 </script>
+
+<span class="sr-only" role="status" aria-live="polite">{announcement}</span>
 
 <!-- Component Library Sidebar -->
 <div class="w-80 bg-white border-r border-gray-200 overflow-y-auto">
@@ -65,7 +75,7 @@
           aria-label="Search workflow components"
         />
         <svg
-          class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+          class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24">
@@ -77,11 +87,11 @@
     <!-- Step Categories -->
     {#if filteredSteps.length === 0}
       <div class="text-center py-8">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <p class="text-sm text-gray-500">No components found</p>
-        <p class="text-xs text-gray-400 mt-1">Try a different search term</p>
+        <p class="text-xs text-gray-500 mt-1">Try a different search term</p>
       </div>
     {:else}
       {#each filteredSteps as category}
@@ -100,10 +110,11 @@
                 draggable="true"
                 ondragstart={(e) => handleDragStart(e, step)}
                 ondragend={handleDragEnd}
+                onclick={() => addToCanvas(step)}
                 onkeydown={(e) => handleKeyDown(e, step)}
                 role="button"
                 tabindex="0"
-                aria-label="Drag to add {step.name} component">
+                aria-label="Add {step.name} to the workflow, or drag it onto the canvas">
 
                 <div class="flex items-center space-x-3">
                   <span class="text-lg" aria-hidden="true">{step.icon}</span>

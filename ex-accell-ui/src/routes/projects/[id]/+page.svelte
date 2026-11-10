@@ -4,7 +4,9 @@
 </svelte:head>
 
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, onDestroy } from 'svelte';
+  import { typeLabel } from '$lib/utils/projectForm';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
 
@@ -62,6 +64,10 @@
   $: projectId = $page.params.id;
   let loading = true;
   let error = '';
+  // Shown inline when a workspace was created but some datasets could not be linked
+  let workspaceNotice = '';
+  // Confirms what just happened, so creating a workspace is not silent
+  let workspaceCreated = '';
   let project: ProjectData | null = null;
   let workspaces: Workspace[] = [];
   let activity: Activity[] = [];
@@ -88,7 +94,7 @@
   function freshness(dateStr: string): { label: string; color: string } {
     const hours = (Date.now() - new Date(dateStr).getTime()) / 3600000;
     if (hours < 24) return { label: 'just now', color: 'text-emerald-600' };
-    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-amber-600' };
+    if (hours < 168) return { label: `${Math.floor(hours / 24)}d ago`, color: 'text-signal-700' };
     return { label: `${Math.floor(hours / 168)}w ago`, color: 'text-slate-400' };
   }
 
@@ -119,7 +125,7 @@
       case 'data_ingestion':
         return { symbol: '\u25CF', bg: 'text-emerald-500' };
       case 'sentiment_shift':
-        return { symbol: '\u25B2', bg: 'text-amber-500' };
+        return { symbol: '\u25B2', bg: 'text-signal-700' };
       case 'system_health':
         return { symbol: '\u25CF', bg: 'text-red-500' };
       default:
@@ -190,29 +196,33 @@
           project_id: parseInt(projectId ?? '0'),
           name: newWorkspaceName,
           description: newWorkspaceDescription,
-          workspace_type: newWorkspaceType,
-          created_by: 'current_user@example.com'
+          workspace_type: newWorkspaceType
         })
       });
       const result = await response.json();
       if (result.success && result.workspace) {
         const workspaceId = result.workspace.id;
+        const createdName = newWorkspaceName.trim();
+        let linkProblem = '';
         if (selectedDatasets.length > 0) {
+          const failures: string[] = [];
           for (const datasetId of selectedDatasets) {
             try {
-              await fetch('/api/datasets', {
+              const linkResponse = await fetch('/api/datasets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'link',
-                  workspace_id: workspaceId,
-                  dataset_id: datasetId,
-                  added_by: 'current_user@example.com'
-                })
+                body: JSON.stringify({ action: 'link', workspace_id: workspaceId, dataset_id: datasetId })
               });
+              if (!linkResponse.ok) {
+                const detail = await linkResponse.json().catch(() => ({}));
+                failures.push(detail.error || `HTTP ${linkResponse.status}`);
+              }
             } catch (err) {
-              console.error(`Error linking dataset ${datasetId}:`, err);
+              failures.push(err instanceof Error ? err.message : String(err));
             }
+          }
+          if (failures.length > 0) {
+            linkProblem = `The workspace was created, but ${failures.length} dataset(s) could not be added: ${failures[0]}`;
           }
         }
         showCreateWorkspace = false;
@@ -221,6 +231,8 @@
         newWorkspaceType = 'general';
         selectedDatasets = [];
         await loadData();
+        workspaceNotice = linkProblem;
+        workspaceCreated = `Workspace "${createdName}" created.`;
       }
     } catch (e) {
       console.error('Error creating workspace:', e);
@@ -232,8 +244,66 @@
     loadDatasets();
   }
 
+  // ---------- team ----------
+  interface TeamMember { email: string; role: string; addedAt: string | null }
+  let teamMembers: TeamMember[] = [];
+  let teamCreator: string | null = null;
+  let canManageTeam = false;
+  let teamError = '';
+  let teamNotice = '';
+  let newMemberEmail = '';
+  let savingMember = false;
+
+  async function loadTeam() {
+    try {
+      const res = await fetch(`/api/project-members?project_id=${projectId}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      teamMembers = data.data.members;
+      teamCreator = data.data.createdBy;
+      canManageTeam = data.data.canManage;
+      teamError = '';
+    } catch (e) {
+      teamError = e instanceof Error ? e.message : 'Could not load the team.';
+    }
+  }
+
+  async function changeTeam(request: Promise<Response>, done: string) {
+    teamNotice = '';
+    savingMember = true;
+    try {
+      const res = await request;
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        teamError = data?.error ?? `The change failed (HTTP ${res.status}).`;
+        return;
+      }
+      teamError = '';
+      teamNotice = done;
+      await loadTeam();
+    } catch {
+      teamError = 'Could not reach the server. Try again.';
+    } finally {
+      savingMember = false;
+    }
+  }
+
+  async function addTeamMember() {
+    const email = newMemberEmail.trim();
+    if (!email) return;
+    await changeTeam(
+      fetch('/api/project-members', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: Number(projectId), email }) }),
+      `${email} can now see this project.`
+    );
+    if (!teamError) newMemberEmail = '';
+  }
+
+  const removeTeamMember = (email: string) =>
+    changeTeam(fetch(`/api/project-members?project_id=${projectId}&email=${encodeURIComponent(email)}`, { method: 'DELETE' }), `${email} can no longer see this project.`);
+
   onMount(() => {
     loadData();
+    loadTeam();
     refreshTimer = setInterval(loadData, 60000);
   });
 
@@ -301,7 +371,7 @@
         </button>
         <h1 class="text-lg font-semibold text-slate-900 truncate">{project.name}</h1>
         {#if project.project_type}
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-800 shrink-0">{project.project_type}</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-100 text-indigo-800 shrink-0">{typeLabel(project.project_type)}</span>
         {/if}
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -338,6 +408,20 @@
             + New Workspace
           </button>
         </div>
+
+        {#if workspaceCreated}
+          <div role="status" class="mb-4 flex items-start justify-between gap-3 rounded-lg border border-success-300 bg-success-50 px-4 py-3 text-xs text-success-900">
+            <span>{workspaceCreated}</span>
+            <button type="button" class="shrink-0 font-medium underline" onclick={() => (workspaceCreated = '')}>Dismiss</button>
+          </div>
+        {/if}
+
+        {#if workspaceNotice}
+          <div role="alert" class="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <span>{workspaceNotice}</span>
+            <button type="button" class="shrink-0 font-medium underline" onclick={() => (workspaceNotice = '')}>Dismiss</button>
+          </div>
+        {/if}
 
         <!-- Create Workspace Form (inline) -->
         {#if showCreateWorkspace}
@@ -417,6 +501,7 @@
 
         <!-- Workspace cards grid -->
         {#if workspaces.length === 0}
+          {#if !showCreateWorkspace}
           <div class="flex flex-col items-center justify-center py-20 text-center">
             <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-4">
               <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -424,8 +509,9 @@
               </svg>
             </div>
             <p class="text-slate-600 font-medium mb-1">No workspaces yet</p>
-            <p class="text-sm text-slate-400">Create a workspace to organize your analysis</p>
+            <p class="text-sm text-slate-500">Create a workspace to organize your analysis</p>
           </div>
+          {/if}
         {:else}
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {#each workspaces as ws (ws.id)}
@@ -438,7 +524,7 @@
                 <!-- Top: name + type badge -->
                 <div class="flex items-center justify-between gap-2 mb-1.5">
                   <h3 class="text-sm font-semibold text-slate-900 truncate">{ws.name}</h3>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 {typeBadgeColor(ws.workspace_type)}">{ws.workspace_type}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 {typeBadgeColor(ws.workspace_type)}">{typeLabel(ws.workspace_type)}</span>
                 </div>
 
                 <!-- Source name pills + freshness -->
@@ -458,7 +544,7 @@
                       <polyline
                         points={sparklinePath(ws.sparkline, 100, 24)}
                         fill="none"
-                        stroke="#6366f1"
+                        stroke={CHART.primary600}
                         stroke-width="1.5"
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -494,7 +580,42 @@
       </section>
 
       <!-- ===== ACTIVITY FEED (35%) ===== -->
-      <aside class="lg:w-[35%] lg:overflow-hidden flex flex-col">
+      <aside class="lg:w-[35%] lg:overflow-hidden flex flex-col gap-4">
+        <section aria-labelledby="team-heading" class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 pt-5 pb-3 border-b border-slate-100">
+            <h2 id="team-heading" class="text-sm font-semibold text-slate-900">Team</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Only these people (and admins) can see this project and what is in it.</p>
+          </div>
+          <ul class="divide-y divide-slate-100">
+            {#if teamCreator}
+              <li class="px-5 py-2.5 flex items-center justify-between gap-2 text-xs">
+                <span class="truncate text-slate-800">{teamCreator}</span>
+                <span class="shrink-0 text-slate-500">Creator</span>
+              </li>
+            {/if}
+            {#each teamMembers.filter((m) => m.email.toLowerCase() !== (teamCreator ?? '').toLowerCase()) as member (member.email)}
+              <li class="px-5 py-2.5 flex items-center justify-between gap-2 text-xs">
+                <span class="truncate text-slate-800">{member.email}</span>
+                {#if canManageTeam}
+                  <button type="button" onclick={() => removeTeamMember(member.email)} disabled={savingMember} class="shrink-0 text-slate-600 hover:text-danger-700 underline disabled:opacity-60" aria-label="Remove {member.email} from this project">Remove</button>
+                {:else}
+                  <span class="shrink-0 text-slate-500">Member</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          {#if canManageTeam}
+            <form class="px-5 py-3 border-t border-slate-100 flex gap-2" onsubmit={(event) => { event.preventDefault(); addTeamMember(); }}>
+              <label class="sr-only" for="new-member-email">Email of the person to add</label>
+              <input id="new-member-email" type="email" required bind:value={newMemberEmail} placeholder="colleague@company.com" autocomplete="off" class="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs" />
+              <button type="submit" disabled={savingMember} class="shrink-0 rounded-md bg-primary-700 px-3 py-1 text-xs font-medium text-white hover:bg-primary-800 disabled:opacity-60">Add</button>
+            </form>
+          {:else}
+            <p class="px-5 py-3 border-t border-slate-100 text-xs text-slate-500">Only the creator or an admin can change the team.</p>
+          {/if}
+          {#if teamError}<p role="alert" class="px-5 pb-3 text-xs text-danger-700">{teamError}</p>{/if}
+          {#if teamNotice}<p role="status" class="px-5 pb-3 text-xs text-success-700">{teamNotice}</p>{/if}
+        </section>
         <div class="bg-white rounded-xl shadow-sm flex flex-col overflow-hidden">
           <div class="px-5 pt-5 pb-3 border-b border-slate-100">
             <h2 class="text-sm font-semibold text-slate-900">Recent Activity</h2>

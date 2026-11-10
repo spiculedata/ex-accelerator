@@ -1,4 +1,10 @@
 <script lang="ts">
+  import { resolveInvestigationRange } from '$lib/utils/investigationRange';
+  import { formatDay } from '$lib/utils/dayFormat';
+  import { isPostNoted, noteFromPost, notesToMarkdown, parseAnnotations, type Annotation } from '$lib/utils/annotations';
+  import { createSingleFlight } from '$lib/utils/singleFlight';
+  import { beforeNavigate } from '$app/navigation';
+  import { getSentimentColor } from '$lib/utils/colorUtils';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { highlightKeywords } from '$lib/utils/highlight';
@@ -27,6 +33,7 @@
   import TopicsPortal from '$lib/components/investigation/portals/TopicsPortal.svelte';
   import GeographyPortal from '$lib/components/investigation/portals/GeographyPortal.svelte';
   import ActorsPortal from '$lib/components/investigation/portals/ActorsPortal.svelte';
+  import { CSV_BOM, socialPostRecord, toCsv } from '$lib/utils/evidenceExport';
 
   export const ssr = false;
 
@@ -39,6 +46,8 @@
     date_end: string;
     sources: string[];
     created_at: string;
+    /** Notes as stored: an array, or older double-encoded JSON text; read with parseAnnotations */
+    annotations?: unknown;
     query_config?: {
       keywords?: string[];
       dateStart?: string;
@@ -357,9 +366,9 @@
     }
 
     return [
-      { label: 'Positive', value: positive, color: '#06d6a0' },
-      { label: 'Negative', value: negative, color: '#f72585' },
-      { label: 'Neutral', value: neutral, color: '#8b5cf6' }
+      { label: 'Positive', value: positive, color: getSentimentColor('positive') },
+      { label: 'Negative', value: negative, color: getSentimentColor('negative') },
+      { label: 'Neutral', value: neutral, color: getSentimentColor('neutral') }
     ];
   }
 
@@ -375,10 +384,17 @@
       const result = await response.json();
       if (result.success && result.investigation) {
         investigation = result.investigation;
+        annotations = parseAnnotations(investigation?.annotations);
+        savedSnapshot = JSON.stringify(annotations);
         const config = investigation?.query_config || {};
         keywords = investigation?.keywords || config.keywords || [];
-        dateStart = investigation?.date_start || config.dateStart || '';
-        dateEnd = investigation?.date_end || config.dateEnd || '';
+        // The queries need both dates, so a blank range falls back to the last 90 days
+        const range = resolveInvestigationRange(
+          investigation?.date_start || config.dateStart || '',
+          investigation?.date_end || config.dateEnd || ''
+        );
+        dateStart = range.start;
+        dateEnd = range.end;
 
         if (dateStart && dateEnd) {
           setTimeRange(dateStart, dateEnd);
@@ -389,6 +405,12 @@
           loadDetailPanels(keywords, dateStart, dateEnd),
           loadKeywordData(keywords, dateStart, dateEnd)
         ]);
+
+        // Open on the first source that has results rather than an empty tab
+        if (gdeltEvents.length === 0) {
+          if (radioSegments.length > 0) activeTab = 'radio';
+          else if (socialPosts.length > 0) activeTab = 'social';
+        }
       }
     } catch (error) {
       console.error('Error loading investigation:', error);
@@ -543,14 +565,7 @@
   }
 
   function formatDateCompact(dateStr: string): string {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return '';
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
+    return formatDay(dateStr);
   }
 
   function formatGdeltDate(sqldate: string | number): string {
@@ -594,48 +609,106 @@
 
   function sentimentDotColor(sentiment?: string): string {
     const s = (sentiment || 'neutral').toLowerCase();
-    if (s === 'positive') return 'bg-emerald-500';
-    if (s === 'negative') return 'bg-rose-500';
-    return 'bg-slate-500';
+    if (s === 'positive') return 'bg-sentiment-positive';
+    if (s === 'negative') return 'bg-sentiment-negative';
+    return 'bg-sentiment-neutral';
   }
 
 
   // Annotations
-  let annotations: { id: string; text: string; timestamp: string }[] = [];
+  let annotations: Annotation[] = [];
   let newAnnotation = '';
   let showAnnotations = false;
-  let saveStatus = '';
+  let saveStatus: '' | 'saving' | 'saved' | 'error' = '';
+  // Why a save failed, when the reason is one the visitor can act on (someone else's investigation)
+  let saveErrorMessage = '';
+  let savedSnapshot = '[]';
+  // Notes that exist on screen but not yet in the database
+  $: unsaved = JSON.stringify(annotations) !== savedSnapshot;
 
+  // Adding or removing a note saves straight away. Saves are serialised so that two quick edits cannot
+  // finish out of order: a save that arrives while another is running is folded into one follow-up that
+  // sends the latest notes.
   function addAnnotation() {
     if (!newAnnotation.trim()) return;
     annotations = [...annotations, { id: crypto.randomUUID(), text: newAnnotation.trim(), timestamp: new Date().toISOString() }];
     newAnnotation = '';
+    void saveNotes();
+  }
+
+  // Quotes a post into the notes with its citation; a post already cited there is not added twice
+  function addPostToNotes(post: SocialPost) {
+    if (isPostNoted(annotations, post)) return;
+    annotations = [...annotations, noteFromPost(post, crypto.randomUUID(), new Date().toISOString())];
+    showAnnotations = true;
+    void saveNotes();
   }
 
   function removeAnnotation(id: string) {
     annotations = annotations.filter(a => a.id !== id);
+    void saveNotes();
   }
 
-  async function handleSave() {
+  async function persist(includeConfig: boolean) {
     saveStatus = 'saving';
+    saveErrorMessage = '';
+    const toSave = annotations;
     try {
-      await fetch('/api/investigations', {
+      const response = await fetch('/api/investigations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        // Autosaving a note sends only the notes, so keyword and date edits being tried out are not saved with it
         body: JSON.stringify({
           id: investigationId,
-          query_config: { ...investigation?.query_config, keywords, dateStart, dateEnd },
-          annotations: JSON.stringify(annotations)
+          ...(includeConfig ? { query_config: { ...investigation?.query_config, keywords, dateStart, dateEnd } } : {}),
+          annotations: toSave
         })
       });
+      const result = await response.json().catch(() => null);
+      if (response.status === 403) saveErrorMessage = 'Only the person who created this investigation, or an admin, can change it. Your changes were not saved.';
+      if (!response.ok || !result?.success) throw new Error(result?.error ?? `HTTP ${response.status}`);
+      savedSnapshot = JSON.stringify(toSave);
       saveStatus = 'saved';
-      setTimeout(() => { saveStatus = ''; }, 2000);
+      setTimeout(() => { if (saveStatus === 'saved') saveStatus = ''; }, 2000);
     } catch (error) {
       console.error('Error saving investigation:', error);
       saveStatus = 'error';
     }
   }
 
+  // Which payload the next run sends: an explicit Save also saves keywords and dates
+  let nextSaveIncludesConfig = false;
+  const runSave = createSingleFlight(() => {
+    const includeConfig = nextSaveIncludesConfig;
+    nextSaveIncludesConfig = false;
+    return persist(includeConfig);
+  });
+  const saveNotes = () => runSave();
+  function handleSave() {
+    nextSaveIncludesConfig = true;
+    return runSave();
+  }
+
+  // Leaving the page with notes that are unsaved, or whose save failed, would lose them
+  // Closing the tab or going to another site ('leave') cannot show our own dialog, so cancelling lets the
+  // browser ask; in-app navigation can ask here. An unsaved list already covers a failed save.
+  beforeNavigate(({ cancel, type }) => {
+    if (!unsaved) return;
+    if (type === 'leave') cancel();
+    else if (!confirm('Your latest notes have not been saved. Leave this page anyway?')) cancel();
+  });
+
+  function downloadFile(contents: string, type: string, extension: string) {
+    const blob = new Blob([contents], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investigation-${(investigation?.name ?? 'export').replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.${extension}`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Every post that was loaded (up to 200), not a sample, with the fields needed to cite and find each one again
   async function handleExport() {
     const report = {
       investigation: { name: investigation?.name, keywords, dateStart, dateEnd },
@@ -643,16 +716,22 @@
       summary: { gdelt_events: gdeltEvents.length, radio_segments: radioSegments.length, social_posts: socialPosts.length, timeline_days: timelineData.length },
       gdelt_sample: gdeltEvents.slice(0, 50),
       radio_sample: radioSegments.slice(0, 20),
-      social_sample: socialPosts.slice(0, 50),
+      social_posts: socialPosts.map(socialPostRecord),
+      note: `Posts carry no permalink in this data. Each has a citation (platform, post id, author, ISO 8601 UTC time) to find it again. This export holds the ${socialPosts.length} posts loaded for this investigation (the workbench loads at most 200) and ignores any cross-filter on screen.`,
       exported_at: new Date().toISOString()
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `investigation-${investigation?.name?.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(JSON.stringify(report, null, 2), 'application/json', 'json');
+  }
+
+  function handleExportNotes() {
+    downloadFile(notesToMarkdown(investigation?.name ?? 'Investigation', annotations), 'text/markdown', 'md');
+  }
+
+  function handleExportCsv() {
+    const rows = socialPosts.map(socialPostRecord);
+    // Text starting with = + - @ gets a leading ' so a spreadsheet cannot run it; the JSON export holds the verbatim text
+    const columns = ['id', 'platform', 'author', 'posted_at', 'text', 'sentiment', 'confidence', 'emotions', 'likes', 'shares', 'comments', 'citation'] as const;
+    downloadFile(CSV_BOM + toCsv(rows, columns), 'text/csv;charset=utf-8', 'csv');
   }
 
   $: totalItems = crossFilteredGdelt.length + crossFilteredRadio.length + crossFilteredSocial.length;
@@ -667,7 +746,8 @@
 </script>
 
 <svelte:head>
-  <title>{investigation?.name || 'Investigation'} - Workbench</title>
+  <title>{investigation?.name || 'Investigation'} - Workbench - Social Explorer</title>
+  <meta name="description" content="Search, annotate and export the evidence in one investigation." />
 </svelte:head>
 
 {#if loading}
@@ -700,11 +780,11 @@
       </div>
 
       {#if dateStart || dateEnd}
-        <span class="text-[9px] font-mono text-slate-500 flex-shrink-0">{formatDateCompact(dateStart)}-{formatDateCompact(dateEnd)}</span>
+        <span class="text-[11px] font-mono text-slate-500 flex-shrink-0">{formatDateCompact(dateStart)}-{formatDateCompact(dateEnd)}</span>
       {/if}
 
       {#if $investigationSelection.timeRange && ($investigationSelection.timeRange.start !== dateStart || $investigationSelection.timeRange.end !== dateEnd)}
-        <button on:click={resetBrush} class="text-[9px] text-amber-400 hover:text-amber-300 flex-shrink-0" title="Reset time range">
+        <button on:click={resetBrush} class="text-[9px] text-amber-400 hover:text-amber-300 flex-shrink-0" title="Reset time range" aria-label="Reset time range">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -718,6 +798,8 @@
         on:click={() => showAnnotations = !showAnnotations}
         class="relative p-1 rounded transition-colors {showAnnotations ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 hover:text-slate-300'}"
         title="Notes"
+        aria-label="Notes"
+        aria-pressed={showAnnotations}
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -726,16 +808,21 @@
           <span class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-amber-500 rounded-full text-[7px] text-white flex items-center justify-center">{annotations.length}</span>
         {/if}
       </button>
-      <button on:click={handleExport} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors" title="Export">
+      <button on:click={handleExportCsv} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors text-xs font-semibold" title="Export posts as CSV (text starting with = + - @ is prefixed with an apostrophe; JSON is verbatim)" aria-label="Export posts as CSV">CSV</button>
+      <button on:click={handleExport} class="p-1 rounded text-slate-500 hover:text-slate-300 transition-colors" title="Export everything as JSON" aria-label="Export everything as JSON">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </button>
       <button
         on:click={handleSave}
-        class="p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
-        title="Save"
+        class="relative p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'error' ? 'text-danger-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
+        title={saveStatus === 'error' ? (saveErrorMessage || 'Could not save. Click to try again') : unsaved ? 'Save (you have unsaved changes)' : 'Save'}
+        aria-label={saveStatus === 'error' ? 'Could not save. Try again' : unsaved ? 'Save, you have unsaved changes' : 'Save'}
       >
+        {#if unsaved && saveStatus !== 'saving'}
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-signal-500 rounded-full" aria-hidden="true"></span>
+        {/if}
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {#if saveStatus === 'saved'}
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -751,7 +838,7 @@
       <div class="flex-shrink-0 bg-slate-900 border-b border-slate-700/50 px-3 py-1">
         <div class="flex items-center gap-2">
           <div class="flex-1 flex flex-wrap gap-1">
-            {#each annotations as annotation}
+            {#each annotations as annotation (annotation.id)}
               <div class="flex items-center gap-1 bg-slate-800 border border-slate-700/50 rounded px-1.5 py-0.5 max-w-[200px]">
                 <p class="text-[9px] text-slate-300 truncate">{annotation.text}</p>
                 <button on:click={() => removeAnnotation(annotation.id)} class="text-slate-600 hover:text-rose-400 text-[9px] flex-shrink-0">x</button>
@@ -761,6 +848,9 @@
               <span class="text-[9px] text-slate-600">No notes yet</span>
             {/if}
           </div>
+          <span role="status" class="text-[9px] {saveStatus === 'error' ? 'text-danger-400' : 'text-slate-500'}">
+            {#if saveStatus === 'error'}{saveErrorMessage || 'Could not save notes. Try again.'}{:else if saveStatus === 'saving'}Saving…{:else if unsaved}Unsaved{:else if annotations.length > 0}Saved, {annotations.length} note{annotations.length === 1 ? '' : 's'}{/if}
+          </span>
           <input
             bind:value={newAnnotation}
             placeholder="Add note..."
@@ -768,6 +858,7 @@
             on:keydown={(e) => { if (e.key === 'Enter') addAnnotation(); }}
           />
           <button on:click={addAnnotation} class="px-1.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-medium rounded">Add</button>
+          <button on:click={handleExportNotes} disabled={annotations.length === 0} class="px-1.5 py-0.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 text-[9px] font-medium rounded" title="Download the notes as a Markdown file">Export notes</button>
         </div>
       </div>
     {/if}
@@ -800,7 +891,7 @@
     </div>
 
     <!-- ============ TABS ============ -->
-    <div class="h-8 flex-shrink-0 bg-slate-900 border-b border-slate-700/50 flex items-end px-2 gap-0">
+    <div role="tablist" aria-label="Investigation sources" class="min-h-8 flex-shrink-0 bg-slate-900 border-b border-slate-700/50 flex items-end px-2 gap-0">
       <!-- Global cross-filter pill — visible on all tabs -->
       {#if activeCrossFilter}
         <div class="flex items-center gap-1.5 px-2 py-0.5 mb-0.5 mr-2 bg-indigo-500/15 border border-indigo-500/30 rounded-full self-center">
@@ -810,6 +901,7 @@
             on:click={() => clearCrossFilter()}
             class="text-indigo-400/50 hover:text-indigo-300 transition-colors"
             title="Clear filter"
+            aria-label="Clear filter"
           >
             <svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 3l6 6M9 3l-6 6" />
@@ -819,31 +911,47 @@
       {/if}
       <button
         on:click={() => activeTab = 'gdelt'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'gdelt' ? 'text-amber-400 border-amber-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-gdelt"
+        aria-selected={activeTab === 'gdelt'}
+        aria-controls="panel-gdelt"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'gdelt' ? 'text-amber-400 border-amber-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'gdelt' ? 'bg-amber-500' : 'bg-slate-600'}"></span>
         GDELT
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'gdelt' ? 'text-amber-400/70' : 'text-slate-600'}">{tabCounts.gdelt >= 200 ? '200+' : tabCounts.gdelt}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'gdelt' ? 'text-amber-400/70' : 'text-slate-600'}">{tabCounts.gdelt >= 200 ? '200 max' : tabCounts.gdelt}</span>
       </button>
       <button
         on:click={() => activeTab = 'radio'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'radio' ? 'text-violet-400 border-violet-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-radio"
+        aria-selected={activeTab === 'radio'}
+        aria-controls="panel-radio"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'radio' ? 'text-violet-400 border-violet-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'radio' ? 'bg-violet-500' : 'bg-slate-600'}"></span>
         Radio
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'radio' ? 'text-violet-400/70' : 'text-slate-600'}">{tabCounts.radio}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'radio' ? 'text-violet-400/70' : 'text-slate-600'}">{tabCounts.radio}</span>
       </button>
       <button
         on:click={() => activeTab = 'social'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'social' ? 'text-sky-400 border-sky-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-social"
+        aria-selected={activeTab === 'social'}
+        aria-controls="panel-social"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'social' ? 'text-sky-400 border-sky-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'social' ? 'bg-sky-500' : 'bg-slate-600'}"></span>
         Social
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'social' ? 'text-sky-400/70' : 'text-slate-600'}">{tabCounts.social >= 200 ? '200+' : tabCounts.social}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'social' ? 'text-sky-400/70' : 'text-slate-600'}">{tabCounts.social >= 200 ? '200 max' : tabCounts.social}</span>
       </button>
       <button
         on:click={() => activeTab = 'visualizations'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'visualizations' ? 'text-indigo-400 border-indigo-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-visualizations"
+        aria-selected={activeTab === 'visualizations'}
+        aria-controls="panel-visualizations"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'visualizations' ? 'text-indigo-400 border-indigo-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <svg class="inline-block w-3 h-3 mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -857,10 +965,20 @@
 
       <!-- GDELT Tab -->
       {#if activeTab === 'gdelt'}
+        <div role="tabpanel" id="panel-gdelt" aria-labelledby="tab-gdelt" class="h-full">
         {#if gdeltLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
+        {:else if crossFilteredGdelt.length === 0}
+          <div class="flex flex-col items-center justify-center h-full gap-1 text-sm text-slate-400">
+            <p>No GDELT events match these keywords{activeCrossFilter ? ' and the active filter' : ''}.</p>
+            <p class="text-xs text-slate-500">Matching looks for the keyword anywhere in a word. Try different keywords or a wider date range.</p>
+          </div>
         {:else}
           <div class="h-full overflow-y-auto">
+            <p class="px-3 py-1.5 text-xs text-slate-400 bg-slate-900/60 border-b border-slate-800">
+              Keywords match anywhere in a word, so “bus” also finds “business”.
+              {#if tabCounts.gdelt >= 200}<span class="text-amber-300">Showing the first 200 matches; narrow the keywords or dates to see others.</span>{/if}
+            </p>
             <table class="w-full text-xs">
               <thead class="sticky top-0 z-10">
                 <tr class="bg-slate-900">
@@ -932,7 +1050,7 @@
                               <span class="text-slate-500">Unknown</span>
                             {/if}
                             {#if event.actiongeo_lat && event.actiongeo_long}
-                              <span class="text-[9px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
+                              <span class="text-[11px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
                             {/if}
                           </div>
                           <div>
@@ -958,10 +1076,12 @@
             </table>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Radio Tab -->
       {#if activeTab === 'radio'}
+        <div role="tabpanel" id="panel-radio" aria-labelledby="tab-radio" class="h-full">
         {#if radioLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
         {:else if crossFilteredRadio.length === 0}
@@ -1019,16 +1139,22 @@
             </div>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Social Tab -->
       {#if activeTab === 'social'}
+        <div role="tabpanel" id="panel-social" aria-labelledby="tab-social" class="h-full">
         {#if socialLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-sky-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
         {:else if crossFilteredSocial.length === 0}
           <div class="flex items-center justify-center h-full text-slate-500 text-sm">No social posts found</div>
         {:else}
           <div class="h-full overflow-y-auto">
+            <p class="px-3 py-1.5 text-xs text-slate-400 bg-slate-900/60 border-b border-slate-800">
+              Keywords match anywhere in a word, so “bus” also finds “business”.
+              {#if tabCounts.social >= 200}<span class="text-amber-300">Showing the first 200 matches; narrow the keywords or dates to see others.</span>{/if}
+            </p>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-slate-800/30 p-1">
               {#each crossFilteredSocial as post}
                 {@const isExpanded = expandedSocialId === post.id}
@@ -1039,7 +1165,7 @@
                 <div
                   class="bg-slate-900 p-3 hover:bg-slate-800/50 transition-colors cursor-pointer {isExpanded ? 'col-span-1 md:col-span-2 xl:col-span-3 bg-slate-800/50' : ''}"
                   on:click={() => expandedSocialId = isExpanded ? null : post.id}
-                  on:keydown={(e) => { if (e.key === 'Enter') expandedSocialId = isExpanded ? null : post.id; }}
+                  on:keydown={(e) => { if (e.target === e.currentTarget && e.key === 'Enter') expandedSocialId = isExpanded ? null : post.id; }}
                   role="button"
                   tabindex="0"
                 >
@@ -1053,7 +1179,7 @@
                         {@const sentNorm = (post.sentiment_category || '').toLowerCase().includes('positive') ? 'positive' : (post.sentiment_category || '').toLowerCase().includes('negative') ? 'negative' : 'neutral'}
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <span
-                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-emerald-500/15 text-emerald-400' : sentNorm === 'negative' ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-700/50 text-slate-400'}"
+                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-sentiment-positive/20 text-sentiment-positive' : sentNorm === 'negative' ? 'bg-sentiment-negative/20 text-sentiment-negative' : 'bg-sentiment-neutral/20 text-slate-400'}"
                           on:click|stopPropagation={() => setCrossFilter({ dimension: 'sentiment', value: sentNorm, label: post.sentiment_category || sentNorm })}
                           role="button"
                           tabindex="0"
@@ -1070,10 +1196,10 @@
                         </div>
                       {/if}
                       {#if post.confidence_score}
-                        <span class="text-[9px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
+                        <span class="text-[11px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
                       {/if}
                       {#if post.timestamp}
-                        <span class="text-[9px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
+                        <span class="text-[11px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
                       {/if}
                     </div>
                   </div>
@@ -1081,6 +1207,12 @@
                   {#if isExpanded}
                     <!-- Expanded view -->
                     <p class="text-sm text-slate-200 leading-relaxed mb-3 whitespace-pre-wrap">{post.text}</p>
+                    <button
+                      type="button"
+                      on:click|stopPropagation={() => addPostToNotes(post)}
+                      disabled={isPostNoted(annotations, post)}
+                      class="mb-3 px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white"
+                    >{isPostNoted(annotations, post) ? 'In your notes' : 'Add to notes'}</button>
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-700/30">
                       <div>
                         <span class="text-[9px] uppercase tracking-wider text-slate-600 block mb-0.5">Engagement</span>
@@ -1119,10 +1251,12 @@
             </div>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Visualizations Tab — Analytical Portals -->
       {#if activeTab === 'visualizations'}
+        <div role="tabpanel" id="panel-visualizations" aria-labelledby="tab-visualizations" class="h-full">
         <div class="h-full overflow-y-auto p-3">
           <!-- Portal toolbar -->
           <div class="flex items-center gap-1.5 mb-3">
@@ -1147,6 +1281,7 @@
                   on:click={() => clearCrossFilter()}
                   class="text-indigo-400/50 hover:text-indigo-300 transition-colors ml-0.5"
                   title="Clear filter"
+                  aria-label="Clear filter"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 3l6 6M9 3l-6 6" />
@@ -1212,6 +1347,8 @@
                   <CorrelationPortal
                     timelineData={filteredTimelineData}
                     gdeltEvents={crossFilteredGdelt}
+                    gdeltTotal={gdeltEvents.length}
+                    {gdeltLoading}
                     height={portalHeight(item)}
                     crossFilter={activeCrossFilter}
                     on:crossfilter={handleCrossFilter}
@@ -1248,6 +1385,7 @@
               </div>
             {/each}
           </div>
+        </div>
         </div>
       {/if}
 

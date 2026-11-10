@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
@@ -80,9 +81,9 @@
   }
 
   function toneColor(tone: number): string {
-    if (tone > 1) return '#22c55e';
-    if (tone > -1) return '#eab308';
-    return '#ef4444';
+    if (tone > 1) return CHART.catGreen;
+    if (tone > -1) return CHART.catOrange;
+    return CHART.danger500;
   }
 
   $: maxMentions = d3.max(actorData, (d: any) => Number(d.mention_count)) ?? 1;
@@ -150,7 +151,7 @@
       .attr('y1', (d: any) => nodes[d.source]?.y ?? 0)
       .attr('x2', (d: any) => nodes[d.target]?.x ?? 0)
       .attr('y2', (d: any) => nodes[d.target]?.y ?? 0)
-      .attr('stroke', '#334155')
+      .attr('stroke', CHART.ink700)
       .attr('opacity', (d: any) => {
         if (!hasHighlight) return 1;
         const srcNode = nodes[d.source];
@@ -167,7 +168,7 @@
       .attr('r', (d: any) => d.radius)
       .attr('fill', (d: any) => toneColor(d.tone))
       .attr('fill-opacity', (d: any) => hasHighlight ? (highlightedActors.has(d.id) ? 0.5 : 0.08) : 0.2)
-      .attr('stroke', (d: any) => highlightedActors.has(d.id) ? '#818cf8' : toneColor(d.tone))
+      .attr('stroke', (d: any) => highlightedActors.has(d.id) ? CHART.primary400 : toneColor(d.tone))
       .attr('stroke-width', (d: any) => highlightedActors.has(d.id) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
       .on('click', (_event: any, d: any) => {
@@ -176,7 +177,7 @@
 
     nodeG.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-      .attr('fill', '#e2e8f0')
+      .attr('fill', CHART.ink200)
       .attr('opacity', (d: any) => hasHighlight ? (highlightedActors.has(d.id) ? 1 : 0.2) : 1)
       .attr('font-size', (d: any) => Math.max(7, Math.min(10, d.radius * 0.45)) + 'px')
       .attr('font-weight', '500')

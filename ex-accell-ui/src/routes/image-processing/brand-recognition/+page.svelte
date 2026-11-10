@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount } from 'svelte';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
@@ -7,6 +9,7 @@
 
   let loading = true;
   let errorMessage = '';
+  let unavailable = false;
   let brandStats: any[] = [];
   let brandChart: any = null;
   let imageUrl = '';
@@ -18,6 +21,7 @@
     try {
       const res = await fetch('/api/image-processing?action=brand-stats&limit=20');
       const data = await res.json();
+      unavailable = !!data.meta?.unavailable;
       if (data.success) brandStats = data.data || [];
     } catch (err: any) { errorMessage = err.message; }
     finally { loading = false; await initCharts(); }
@@ -51,23 +55,33 @@
       grid: { left: 10, right: 40, top: 40, bottom: 20, containLabel: true },
       xAxis: { type: 'value' },
       yAxis: { type: 'category', data: brandStats.map((b: any) => b.brand_name).reverse(), axisLabel: { fontSize: 11 } },
-      series: [{ type: 'bar', data: brandStats.map((b: any) => parseInt(b.count)).reverse(), itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
+      series: [{ type: 'bar', data: brandStats.map((b: any) => parseInt(b.count)).reverse(), itemStyle: { color: CHART.catOrange, borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
     });
   }
 
   onMount(loadData);
 </script>
 
-<svelte:head><title>Brand Recognition - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>Brand Recognition - Social Explorer</title>
+  <meta name="description" content="Find brands and logos in images." />
+</svelte:head>
 
-<PageHeader title="Brand Recognition" subtitle="Detect logos and brand placements in visual content" accentColor="amber" />
+<PageHeader title="Brand Recognition" subtitle="Detect logos and brand placements in visual content" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
+  {#if unavailable}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <DataUnavailable
+        title="No images have been analysed yet"
+        description="This page fills in once images have been processed. You can try the analysis on a single image below." />
+    </div>
+  {/if}
 
   <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
     <div class="flex items-center">
-      <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-5 h-5 text-signal-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
       </svg>
       <div>
@@ -113,7 +127,7 @@
       {#if brandStats.length > 0}
         <div id="brand-chart" class="w-full h-96"></div>
       {:else}
-        <div class="flex items-center justify-center h-48 text-gray-400">
+        <div class="flex items-center justify-center h-48 text-gray-500">
           <div class="text-center">
             <span class="text-4xl block mb-2">🏢</span>
             <p class="text-sm">No brand detections yet. Process images to detect brands and logos.</p>

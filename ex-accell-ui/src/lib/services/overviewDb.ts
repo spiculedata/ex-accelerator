@@ -3,6 +3,7 @@
 
 import { BaseDatabaseService } from './baseDatabaseService';
 
+import { CHART } from '$lib/utils/chartColors';
 interface OverviewStats {
   activeProjects: number;
   postsAnalyzed: number;
@@ -132,12 +133,12 @@ class OverviewDatabase extends BaseDatabaseService {
     }
 
     const platformColors: Record<string, string> = {
-      twitter: '#1da1f2',
-      facebook: '#1877f2',
-      instagram: '#e4405f',
-      youtube: '#ff0000',
-      telegram: '#0088cc',
-      reddit: '#ff4500'
+      twitter: CHART.twitter,
+      facebook: CHART.facebook,
+      instagram: CHART.instagram,
+      youtube: CHART.danger500,
+      telegram: CHART.telegram,
+      reddit: CHART.catVermilion
     };
 
     return this.safeTransform(
@@ -154,7 +155,7 @@ class OverviewDatabase extends BaseDatabaseService {
           totalProcessed: platform.total_posts,
           statusDisplay: isActive ? 'Active' : 'Idle',
           activityDisplay: `${platform.total_posts} posts analyzed`,
-          iconColor: platformColors[name] || '#6b7280'
+          iconColor: platformColors[name] || CHART.ink500
         };
       },
       []
@@ -175,9 +176,9 @@ class OverviewDatabase extends BaseDatabaseService {
     }
 
     const sentimentColors: Record<string, string> = {
-      positive: '#10b981',
-      negative: '#ef4444',
-      neutral: '#6b7280'
+      positive: CHART.catGreen,
+      negative: CHART.danger500,
+      neutral: CHART.ink500
     };
 
     return this.safeTransform(
@@ -196,7 +197,7 @@ class OverviewDatabase extends BaseDatabaseService {
           module: 'sentiment-analysis',
           status: 'completed',
           timeAgo: this.getTimeAgo(new Date(post.timestamp)),
-          iconColor: sentimentColors[sentimentKey] || '#6b7280'
+          iconColor: sentimentColors[sentimentKey] || CHART.ink500
         };
       },
       []
@@ -362,7 +363,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: totalPosts,
         metricUnit: 'posts',
         status: totalPosts > 1000 ? 'healthy' : 'warning',
-        statusColor: totalPosts > 1000 ? '#10b981' : '#f59e0b',
+        statusColor: totalPosts > 1000 ? CHART.catGreen : CHART.catOrange,
         statusDisplay: totalPosts > 1000 ? 'Healthy' : 'Low Volume'
       },
       {
@@ -371,7 +372,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: Math.round(avgConfidence * 100),
         metricUnit: '%',
         status: avgConfidence > 0.8 ? 'healthy' : 'warning',
-        statusColor: avgConfidence > 0.8 ? '#10b981' : '#f59e0b',
+        statusColor: avgConfidence > 0.8 ? CHART.catGreen : CHART.catOrange,
         statusDisplay: avgConfidence > 0.8 ? 'High Quality' : 'Moderate Quality'
       },
       {
@@ -380,7 +381,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: activePlatforms,
         metricUnit: 'platforms',
         status: activePlatforms > 2 ? 'healthy' : 'warning',
-        statusColor: activePlatforms > 2 ? '#10b981' : '#f59e0b',
+        statusColor: activePlatforms > 2 ? CHART.catGreen : CHART.catOrange,
         statusDisplay: activePlatforms > 2 ? 'Multi-Platform' : 'Limited Sources'
       }
     ];
