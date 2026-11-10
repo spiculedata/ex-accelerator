@@ -136,6 +136,10 @@ features:
     details: Schedule crawls.
   - title: Analyse
     details: Sentiment and topics.
+  - title: Share
+    details: Publish over IPFS.
+    link: /guide/data-sharing
+    linkText: How sharing works
 ---
 `;
   const out = buildHome(index);
@@ -145,6 +149,8 @@ features:
   assert.ok(out.includes('**Collect**'));
   assert.ok(out.includes('Sentiment and topics.'));
   assert.ok(out.includes('[Get started](Guide-Getting-started)'));
+  assert.ok(out.includes('**Share**. Publish over IPFS. [How sharing works](Guide-Data-sharing)'));
+  assert.ok(!out.includes('link:'));
 });
 
 // --- the real docs, converted ---

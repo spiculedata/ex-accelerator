@@ -87,4 +87,5 @@ Jupyter, the WavePulse radio service and an Ollama container for local models. I
 
 - [Configuration](./configuration)
 - [Authentication and roles](./authentication)
+- [Data sharing over IPFS](./data-sharing) (optional, off by default)
 - [Architecture overview](../architecture/overview)

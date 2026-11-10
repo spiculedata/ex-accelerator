@@ -58,7 +58,7 @@ for signing in and out, and `/api/health`.
 
 | Role | Can do |
 |------|--------|
-| `admin` | Everything, including deploying and executing workflows and starting Jupyter |
+| `admin` | Everything, including deploying and executing workflows, starting Jupyter and publishing or importing data over IPFS |
 | `user` | Read and write application data |
 | `viewer` | Read-only (`GET`, `HEAD`, `OPTIONS`) |
 
@@ -67,6 +67,11 @@ Endpoints that run code or start processes are admin-only: workflow deployment a
 endpoints. Anyone can read executions and their status. Editing or deleting a workflow is limited to its creator
 and admins. Treat admin accounts as having shell-level
 access to the server.
+
+[Data sharing](./data-sharing) is admin-only on the write side: generating a package, publishing it to the public
+IPFS network (which cannot be undone) and importing one (which creates tables) all need the `admin` role, and the
+feature itself is off unless the server sets `IPFS_ENABLED=true`. Every signed-in role can list packages, preview
+them and see the registry of published CIDs.
 
 ## First admin
 

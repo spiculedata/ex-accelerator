@@ -33,6 +33,7 @@ export default defineConfig({
           { text: 'Configuration', link: '/guide/configuration' },
           { text: 'Authentication and roles', link: '/guide/authentication' },
           { text: 'Deployment', link: '/guide/deployment' },
+          { text: 'Data sharing over IPFS', link: '/guide/data-sharing' },
           { text: 'Try it with demo data', link: '/guide/demo-data' }
         ]
       },

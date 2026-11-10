@@ -25,7 +25,7 @@ Errors set `success` to `false` and return a message in `error` with a matching 
 
 ## Endpoint groups
 
-The main groups; others (GDELT, image processing, data sharing, overview and monitoring endpoints) follow the same rules.
+The main groups; others (GDELT, image processing, overview and monitoring endpoints) follow the same rules.
 
 | Prefix | Purpose | Role |
 |--------|---------|------|
@@ -37,6 +37,7 @@ The main groups; others (GDELT, image processing, data sharing, overview and mon
 | `/api/investigations`, `/api/wavepulse` | Transcript investigations and radio data | user |
 | `/api/unified-analytics/query` | Raw SQL | admin |
 | `/api/deploy-workflow`, `/api/generate-python-workflow`, `/api/workflows/:id/execute`, `/api/jupyter/*` | Generate, deploy and run code | admin |
+| `/api/data-sharing` | Data packages and IPFS publishing ([details](#data-sharing)) | any signed-in user (read), admin (write) |
 
 Viewers are read-only: requests other than `GET`, `HEAD` and `OPTIONS` return `403` (except the public auth routes, so a viewer can still sign out).
 
@@ -45,3 +46,43 @@ Viewers are read-only: requests other than `GET`, `HEAD` and `OPTIONS` return `4
 `/api/unified-analytics` returns HTTP 200 with empty `data` and `meta.unavailable` when the
 underlying table does not exist, so modules you have not set up stay quiet. Any other failure
 returns `500` with a generic message; details are logged on the server.
+
+## Data sharing
+
+`/api/data-sharing` generates Frictionless Data Packages and publishes them to, or imports them from, the IPFS
+network. See the [data sharing guide](/guide/data-sharing); publishing is public and permanent. Reads are open
+to every signed-in role; `POST` is admin-only (`403` otherwise). When `IPFS_ENABLED` is not `true`, publishing
+and importing answer `503` and the other actions still work.
+
+### `GET /api/data-sharing?action=...`
+
+| Action | Parameters | Response (`200`) |
+|--------|------------|------------------|
+| `status` | none | `{ success, data: { enabled } }` |
+| `list` (default) | none | `{ success, packages: [{ id, name, title, description, version, created, resources, totalRows, previewRows, publishable }] }` (`publishable` is false for an imported package) |
+| `get` | `id` (package id: letters, digits, `-`, `_`) | `{ success, datapackage, preview }` with up to 20 preview rows as objects. `400` for a malformed id, `404` if unknown |
+| `registry` | none | `{ success, enabled, packages: [registry rows] }`: packages this install published (rows with status `imported` are kept in the table but not listed) |
+| `resolve` | `cid` | `{ success, found: true, package }` when the registry knows the CID, else `{ success, found: false, gateway_url }`. `400` for a malformed CID |
+
+Registry rows have `id`, `dataset_id`, `package_id`, `cid`, `gateway_url`, `package_name`, `description`,
+`row_count`, `file_size_bytes`, `status` (`published` or `imported`), `published_at` and `metadata`; admins
+also get `published_by`.
+
+### `POST /api/data-sharing` (admin)
+
+The JSON body's `action` selects the operation; without one, a package is generated.
+
+| Body | What happens | Response |
+|------|--------------|----------|
+| `{ dataset_id, preview_rows? }` | Generates a package for a catalogued dataset: writes `datapackage.json` and a preview CSV (`preview_rows` defaults to 100, at most 1,000). A bare `table_name` is not accepted. | `{ success, package_id, datapackage, preview }`. `400` for a bad id, `404` for an unknown dataset or table, `403` for an application table, `422` when the catalogue row names a table that cannot be exported |
+| `{ action: "publish", package_id }` | Exports the full table (up to `MAX_EXPORT_ROWS`), publishes and pins the package directory, records it in the registry. | `{ success, cid, gateway_url, package_id }`. `400`, `403`, `404`, `422` as above; `503` when sharing is off |
+| `{ action: "import", cid }` | Fetches the package, validates it and loads it into a new table named `ipfs_` plus the last 40 characters of the CID (lower-cased), cataloguing it as an `imported` dataset. | `{ success, table_name, row_count, fields, cid, package_title }`. `400` for a malformed CID, `409` if the CID was already imported, `422` when the package is not one this app can load (bad names, header, values or file count) or is over `IPFS_MAX_FETCH_BYTES`, `504` after `IPFS_FETCH_TIMEOUT_MS`, `503` when sharing is off |
+
+Any other failure is a `500` with a generic message; the detail is logged on the server.
+
+```bash
+curl -b cookies.txt -H 'content-type: application/json' \
+  -d '{"dataset_id": 3}' http://localhost:3000/api/data-sharing
+curl -b cookies.txt -H 'content-type: application/json' \
+  -d '{"action": "publish", "package_id": "telegram-posts"}' http://localhost:3000/api/data-sharing
+```

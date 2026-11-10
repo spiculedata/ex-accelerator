@@ -71,6 +71,9 @@ services:
       IPFS_BLOCKSTORE_PATH: /data/ipfs/blocks
       IPFS_DATASTORE_PATH: /data/ipfs/datastore
       IPFS_GATEWAY_URL: ${IPFS_GATEWAY_URL:-https://ipfs.io/ipfs}
+      IPFS_FETCH_TIMEOUT_MS: ${IPFS_FETCH_TIMEOUT_MS:-120000}
+      IPFS_MAX_FETCH_BYTES: ${IPFS_MAX_FETCH_BYTES:-268435456}
+      MAX_EXPORT_ROWS: ${MAX_EXPORT_ROWS:-500000}
       PACKAGES_DIR: /data/packages
     volumes:
       - ${DATA_DIR:-/data}/ipfs:/data/ipfs

@@ -37,6 +37,10 @@ Social Explorer is a monorepo of cooperating services around one PostgreSQL data
   Publishing stores the definition and a generated script in `published_workflows`; each run is a row
   in `workflow_executions`. There is a single generator (`pythonDaprWorkflowGenerator`) and the hybrid
   executor runs what it produces.
+- **Data sharing.** `src/lib/server/dataSharing/` builds Frictionless Data Packages from catalogued datasets
+  and, when `IPFS_ENABLED=true`, `src/lib/services/ipfsService.ts` runs a Helia IPFS node inside the app process
+  to publish and fetch them; `ipfs_published_packages` is the registry. Off by default and admin-only, because
+  published data is public and permanent. See [Data sharing over IPFS](../guide/data-sharing).
 
 ## Data model in brief
 
