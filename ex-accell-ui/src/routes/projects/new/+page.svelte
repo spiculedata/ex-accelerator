@@ -64,11 +64,18 @@
 
       if (result.success && result.project) {
         // Make it the open project, so the header and the next pages are about the project just created
-        await setCurrentProject(String(result.project.id));
+        try {
+          await setCurrentProject(String(result.project.id));
+        } catch (error) {
+          console.error('Could not open the new project:', error); // it was created; go to it regardless
+        }
         goto(`/projects/${result.project.id}`);
       } else {
         const failure = createFailureMessage(result.error);
-        if (failure.field === 'name') nameError = failure.message;
+        if (failure.field === 'name') {
+          nameError = failure.message;
+          document.getElementById('project-name')?.focus();
+        }
         else formError = failure.message;
         isCreating = false;
       }
