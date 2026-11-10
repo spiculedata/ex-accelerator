@@ -98,14 +98,15 @@ interface HashtagPerformance {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const PLATFORM_COLORS: Record<string, string> = {
+  // Eight platforms, eight different series colours, so a chart never shows two platforms alike
   instagram: CHART.catPink,
-  tiktok: CHART.primary600,
-  twitter: CHART.primary500,
-  linkedin: CHART.primary600,
-  facebook: CHART.catPink,
-  youtube: CHART.catPink,
-  telegram: CHART.catBlue,
-  bluesky: CHART.catSky
+  tiktok: CHART.ink900,
+  twitter: CHART.catSky,
+  linkedin: CHART.catBlue,
+  facebook: CHART.catOrange,
+  youtube: CHART.catVermilion,
+  telegram: CHART.catGreen,
+  bluesky: CHART.primary500
 };
 
 /** The API returns numeric columns as strings. */

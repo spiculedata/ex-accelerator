@@ -24,9 +24,9 @@
 		{ key: 'gdelt_events', label: 'GDELT Events', color: CHART.catOrange, source: 'gdelt', unit: '' },
 		{ key: 'gdelt_avg_goldstein', label: 'Goldstein Scale', color: CHART.catGreen, source: 'gdelt', unit: '' },
 		{ key: 'radio_volume', label: 'Radio Segments', color: CHART.catPink, source: 'radio', unit: '' },
-		{ key: 'radio_sentiment', label: 'Radio Sentiment', color: CHART.catPink, source: 'radio', unit: '' },
+		{ key: 'radio_sentiment', label: 'Radio Sentiment', color: CHART.catVermilion, source: 'radio', unit: '' },
 		{ key: 'social_volume', label: 'Social Posts', color: CHART.catSky, source: 'social', unit: '' },
-		{ key: 'social_sentiment', label: 'Social Sentiment', color: CHART.catSky, source: 'social', unit: '' },
+		{ key: 'social_sentiment', label: 'Social Sentiment', color: CHART.primary500, source: 'social', unit: '' },
 	];
 
 	const sourceColors: Record<string, string> = {

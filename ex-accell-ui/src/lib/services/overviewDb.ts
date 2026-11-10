@@ -138,7 +138,7 @@ class OverviewDatabase extends BaseDatabaseService {
       instagram: CHART.instagram,
       youtube: CHART.danger500,
       telegram: CHART.telegram,
-      reddit: CHART.danger500
+      reddit: CHART.catVermilion
     };
 
     return this.safeTransform(

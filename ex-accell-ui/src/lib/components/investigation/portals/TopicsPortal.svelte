@@ -95,7 +95,7 @@
 
     if (allTerms.length === 0) {
       g.append('text').attr('x', w / 2).attr('y', h / 2).attr('text-anchor', 'middle')
-        .attr('fill', CHART.ink600).attr('font-size', '12px').text('No keyword data');
+        .attr('fill', CHART.ink400).attr('font-size', '12px').text('No keyword data');
       return;
     }
 

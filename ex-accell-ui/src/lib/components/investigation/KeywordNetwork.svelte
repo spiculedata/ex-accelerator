@@ -58,7 +58,7 @@
 		}
 
 		if (sources === 2) {
-			if (hasGdelt && hasRadio) return CHART.catPink;
+			if (hasGdelt && hasRadio) return CHART.catVermilion;
 			if (hasGdelt && hasSocial) return CHART.primary500;
 			if (hasRadio && hasSocial) return CHART.catSky;
 		}

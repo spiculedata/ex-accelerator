@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CHART } from '$lib/utils/chartColors';
+  import { CATEGORICAL, CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -169,7 +169,7 @@
   function updateLanguageChart() {
     if (!languageChart || languageData.length === 0) return;
 
-    const colors = [CHART.catBlue, CHART.catGreen, CHART.catOrange, CHART.danger500, CHART.catPink, CHART.catPink, CHART.primary500, CHART.catVermilion, CHART.primary600, CHART.catGreen];
+    const colors = [...CATEGORICAL, CHART.primary600, CHART.ink500];
     languageChart.setOption({
       title: { text: 'Language Distribution', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },

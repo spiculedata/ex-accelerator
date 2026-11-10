@@ -266,7 +266,7 @@
 		'material_cooperation': {
 			codes: ['20', '21', '22', '23', '24', '25', '26', '27'],
 			label: 'Material Cooperation', 
-			color: CHART.catGreen,
+			color: CHART.catSky,
 			description: 'Appeal, express intent to cooperate, provide aid'
 		},
 		'verbal_conflict': {
@@ -308,7 +308,7 @@
 		'political': {
 			codes: ['70', '71', '72', '73', '74', '75', '76'],
 			label: 'Political Actions', 
-			color: CHART.danger600,
+			color: CHART.ink600,
 			description: 'Provide diplomatic cooperation, host meetings'
 		},
 		'military': {
@@ -326,7 +326,7 @@
 		'violence': {
 			codes: ['17', '18', '19', '190', '193', '194', '195'],
 			label: 'Violence & Conflict',
-			color: CHART.danger700,
+			color: CHART.ink900,
 			description: 'Violence, fighting, armed conflict'
 		}
 	};
@@ -1094,7 +1094,7 @@
 	function getEventColor(goldstein: number): string {
 		if (!goldstein) return '#999';
 		if (goldstein > 5) return CHART.catGreen; // Green for very positive
-		if (goldstein > 0) return CHART.catGreen; // Light green for positive
+		if (goldstein > 0) return CHART.primary500; // Light green for positive
 		if (goldstein > -5) return CHART.catOrange; // Orange for slightly negative
 		return CHART.danger500; // Red for very negative
 	}

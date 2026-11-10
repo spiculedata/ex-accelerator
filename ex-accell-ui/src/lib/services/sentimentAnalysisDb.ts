@@ -417,7 +417,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
       'Joy': CHART.catOrange,
       'Trust': CHART.catBlue,
       'Fear': CHART.catPink,
-      'Surprise': CHART.catOrange,
+      'Surprise': CHART.catSky,
       'Sadness': CHART.primary600,
       'Disgust': CHART.catGreen,
       'Anger': CHART.danger500

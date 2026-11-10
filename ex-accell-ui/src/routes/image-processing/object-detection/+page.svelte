@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CHART } from '$lib/utils/chartColors';
+  import { CATEGORICAL, CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
@@ -418,7 +418,7 @@
           />
           <!-- Bounding box overlays -->
           {#each objects as obj, i}
-            {@const colors = [CHART.danger500, CHART.catBlue, CHART.catGreen, CHART.catOrange, CHART.catPink, CHART.catPink, CHART.primary500, CHART.catVermilion]}
+            {@const colors = CATEGORICAL}
             {@const color = colors[i % colors.length]}
             {@const bbox = obj.bbox || []}
             {#if bbox.length === 4}
@@ -447,7 +447,7 @@
         <!-- Object list -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
           {#each objects as obj, i}
-            {@const colors = [CHART.danger500, CHART.catBlue, CHART.catGreen, CHART.catOrange, CHART.catPink, CHART.catPink, CHART.primary500, CHART.catVermilion]}
+            {@const colors = CATEGORICAL}
             <div class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 border border-gray-200">
               <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {colors[i % colors.length]}"></div>
               <span class="text-sm font-medium text-gray-900">{obj.class}</span>

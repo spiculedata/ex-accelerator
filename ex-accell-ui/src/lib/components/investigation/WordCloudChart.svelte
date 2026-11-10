@@ -21,7 +21,7 @@
 	let containerWidth = 800;
 
 	export let height: number = 250;
-	const colors = [CHART.catGreen, CHART.catPink, CHART.catPink, CHART.catBlue, CHART.catOrange];
+	const colors = [CHART.catGreen, CHART.catPink, CHART.catBlue, CHART.catOrange, CHART.catSky];
 
 	onMount(() => {
 		const ro = new ResizeObserver((entries) => {

@@ -304,7 +304,7 @@
               x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
                 { offset: 0, color: CHART.catPink },
-                { offset: 1, color: CHART.catPink }
+                { offset: 1, color: CHART.catVermilion }
               ]
             }
           }
