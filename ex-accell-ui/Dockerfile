@@ -1,4 +1,4 @@
-FROM node:22-slim AS builder
+FROM node:26-slim AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npm run build
 # Prune dev dependencies
 RUN npm ci --omit=dev
 
-FROM node:22-slim
+FROM node:26-slim
 
 WORKDIR /app
 
