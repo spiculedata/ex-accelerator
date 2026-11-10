@@ -1091,13 +1091,6 @@
 		});
 	}
 	
-	function getEventColor(goldstein: number): string {
-		if (!goldstein) return '#999';
-		if (goldstein > 5) return CHART.catGreen; // Green for very positive
-		if (goldstein > 0) return CHART.primary500; // Light green for positive
-		if (goldstein > -5) return CHART.catOrange; // Orange for slightly negative
-		return CHART.danger500; // Red for very negative
-	}
 </script>
 
 <svelte:head>
@@ -1753,8 +1746,7 @@
 							</div>
 						</div>
 						<div class="relative">
-							<div bind:this={mapContainer} class="h-[calc(100vh-220px)] min-h-[350px] max-h-[700px] w-full"></div>
-							
+							<div bind:this={mapContainer} class="h-[calc(100vh-220px)] min-h-[350px] max-h-[700px] w-full"></div>							
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}
 								<div class="absolute inset-0 bg-white/75 flex items-center justify-center z-50">

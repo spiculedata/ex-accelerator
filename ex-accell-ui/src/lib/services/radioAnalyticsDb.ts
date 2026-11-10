@@ -3,6 +3,7 @@
 
 import { BaseDatabaseService } from './baseDatabaseService';
 import { CHART } from '$lib/utils/chartColors';
+import { getSentimentColor } from '$lib/utils/colorUtils';
 import type {
   RadioOverviewStats,
   StationStats,
@@ -77,11 +78,12 @@ class RadioAnalyticsDatabase extends BaseDatabaseService {
       return [];
     }
 
+    // Mixed is not on the sentiment scale, so it takes a categorical colour that no sentiment level uses
     const sentimentColors: Record<string, string> = {
-      positive: CHART.catGreen,
-      negative: CHART.danger500,
-      neutral: CHART.ink500,
-      mixed: CHART.catOrange
+      positive: getSentimentColor('positive'),
+      negative: getSentimentColor('negative'),
+      neutral: getSentimentColor('neutral'),
+      mixed: CHART.catPink
     };
 
     const total = data.reduce((sum: number, row: any) => sum + (row.post_count || 0), 0);

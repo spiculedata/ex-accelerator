@@ -4,6 +4,7 @@
 import { BaseDatabaseService } from './baseDatabaseService';
 
 import { CHART } from '$lib/utils/chartColors';
+import { getSentimentColor } from '$lib/utils/colorUtils';
 interface OverviewStats {
   activeProjects: number;
   postsAnalyzed: number;
@@ -176,9 +177,9 @@ class OverviewDatabase extends BaseDatabaseService {
     }
 
     const sentimentColors: Record<string, string> = {
-      positive: CHART.catGreen,
-      negative: CHART.danger500,
-      neutral: CHART.ink500
+      positive: getSentimentColor('positive'),
+      negative: getSentimentColor('negative'),
+      neutral: getSentimentColor('neutral')
     };
 
     return this.safeTransform(
@@ -363,7 +364,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: totalPosts,
         metricUnit: 'posts',
         status: totalPosts > 1000 ? 'healthy' : 'warning',
-        statusColor: totalPosts > 1000 ? CHART.catGreen : CHART.catOrange,
+        statusColor: totalPosts > 1000 ? CHART.success600 : CHART.catOrange,
         statusDisplay: totalPosts > 1000 ? 'Healthy' : 'Low Volume'
       },
       {
@@ -372,7 +373,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: Math.round(avgConfidence * 100),
         metricUnit: '%',
         status: avgConfidence > 0.8 ? 'healthy' : 'warning',
-        statusColor: avgConfidence > 0.8 ? CHART.catGreen : CHART.catOrange,
+        statusColor: avgConfidence > 0.8 ? CHART.success600 : CHART.catOrange,
         statusDisplay: avgConfidence > 0.8 ? 'High Quality' : 'Moderate Quality'
       },
       {
@@ -381,7 +382,7 @@ class OverviewDatabase extends BaseDatabaseService {
         metricValue: activePlatforms,
         metricUnit: 'platforms',
         status: activePlatforms > 2 ? 'healthy' : 'warning',
-        statusColor: activePlatforms > 2 ? CHART.catGreen : CHART.catOrange,
+        statusColor: activePlatforms > 2 ? CHART.success600 : CHART.catOrange,
         statusDisplay: activePlatforms > 2 ? 'Multi-Platform' : 'Limited Sources'
       }
     ];
