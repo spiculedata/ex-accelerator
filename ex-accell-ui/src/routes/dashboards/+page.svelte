@@ -520,7 +520,7 @@
   <PageHeader
     title="Interactive Dashboards"
     subtitle={workspaceId ? 'Workspace-scoped analytics and insights' : 'Comprehensive analytics and insights across all your social media data sources'}
-    backHref="/text-analytics">
+    backHref="/">
     <svelte:fragment slot="actions">
       <div class="flex items-center space-x-3 bg-white/10 rounded-xl px-4 py-3 border border-white/20 backdrop-blur-sm">
         <span class="text-sm text-slate-300 font-medium">Auto-refresh:</span>

@@ -11,7 +11,6 @@
   import { platformOptions } from '$lib/utils/platformOptions';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import MethodNote from '$lib/components/ui/MethodNote.svelte';
-  import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
 
   // The phrase the visitor chose; its posts open in the side panel
@@ -184,7 +183,6 @@
 
   <!-- Dates: the same bar as the other analysis pages; with no dates set the last 7 days are analysed -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-    <WorkspaceBanner workspaceId={workspaceId || ''} workspaceName="" />
     <FilterBar datesOnly compact on:change={() => { hasRange = Object.keys(currentRangeQuery()).length > 0; rangeSync.sync(); }} />
     {#if !hasRange}
       <p class="mt-2 text-xs text-ink-600">Showing the last 7 days. Pick dates above to analyse a different period.</p>
