@@ -6,7 +6,7 @@ const access = vi.hoisted(() => ({ checkAccess: vi.fn() }));
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
 vi.mock('$lib/server/auth/accessCheck', () => access);
 
-import { GET, POST, PATCH } from './+server';
+import { GET, POST, PATCH, DELETE } from './+server';
 
 const call = (body: unknown, email: string | null = 'ada@example.com') =>
   POST({
@@ -222,5 +222,37 @@ describe('investigations and project membership', () => {
     deny();
     const response = await PATCH({ request: new Request('http://localhost/api/investigations', { method: 'PATCH', body: JSON.stringify({ id: 7, name: 'x' }) }), locals: { user: { email: 'bob@example.com', role: 'user' } } } as any);
     expect(response.status).toBe(403);
+  });
+});
+
+describe('investigation ids are read one way for the check and the change', () => {
+  const user = { email: 'bob@example.com', role: 'user' };
+  const noWrites = () => query.mock.calls.every(([sql]) => !/UPDATE investigations|DELETE FROM investigations/.test(String(sql)));
+
+  // Number('1e1') is 10 but parseInt('1e1') is 1: checking one row and changing another
+  it.each(['1e1', '10e-1', ' 7', '7abc', '+7', '07', '0x7', '7.0'])('refuses a PATCH with id %j before any change', async (id) => {
+    const response = await PATCH({ request: new Request('http://localhost/api/investigations', { method: 'PATCH', body: JSON.stringify({ id, name: 'x' }) }), locals: { user } } as any);
+    expect(response.status).toBe(400);
+    expect(noWrites()).toBe(true);
+  });
+
+  it.each(['1e1', '10e-1', ' 7', '7abc', '+7', '07', '0x7', '7.0'])('refuses a DELETE with id %j before any change', async (id) => {
+    const response = await DELETE({ url: new URL(`http://localhost/api/investigations?id=${encodeURIComponent(id)}`), locals: { user } } as any);
+    expect(response.status).toBe(400);
+    expect(noWrites()).toBe(true);
+  });
+
+  it('refuses a GET by id that is not a plain whole number', async () => {
+    const response = await GET({ url: new URL('http://localhost/api/investigations?id=1e1'), locals: { user } } as any);
+    expect(response.status).toBe(400);
+  });
+
+  it('changes exactly the row it checked', async () => {
+    query.mockImplementation(async (sql: string) => (String(sql).startsWith('SELECT created_by') ? [{ created_by: user.email, workspace_id: null }] : [{ id: 7 }]));
+    await DELETE({ url: new URL('http://localhost/api/investigations?id=7'), locals: { user } } as any);
+    const check = query.mock.calls.find(([sql]) => String(sql).startsWith('SELECT created_by'))!;
+    const del = query.mock.calls.find(([sql]) => String(sql).includes('DELETE FROM investigations'))!;
+    expect(check[1]).toEqual([7]);
+    expect(del[1]).toEqual([7]);
   });
 });
