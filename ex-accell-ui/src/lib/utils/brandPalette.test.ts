@@ -44,8 +44,13 @@ describe('the docs palette', () => {
   });
 
   it('matches the sentiment and categorical hexes in docs-site/brand/data-visualisation.md', () => {
-    const doc = readFileSync('../docs-site/brand/data-visualisation.md', 'utf8').toLowerCase();
-    for (const [name, hex] of Object.entries(tokens.named)) expect(doc, name).toContain(hex);
+    const lines = readFileSync('../docs-site/brand/data-visualisation.md', 'utf8').toLowerCase().split('\n');
+    for (const [name, hex] of Object.entries(tokens.named)) {
+      // The hex must sit on the line that names the token (a table row or a swatch), not just anywhere in the file
+      const named = lines.filter((line) => line.includes(`--se-${name}`));
+      expect(named.length, name).toBeGreaterThan(0);
+      for (const line of named) expect(line, name).toContain(hex);
+    }
   });
 });
 
