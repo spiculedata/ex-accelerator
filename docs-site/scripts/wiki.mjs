@@ -132,8 +132,10 @@ export function buildHome(indexSource) {
   }
   if (actions.length > 0) lines.push('');
 
-  for (const [, title, details] of front.matchAll(/-\s*title:\s*(.+)\n\s*details:\s*(.+)/g)) {
-    lines.push(`**${title.trim()}**. ${details.trim()}`, '');
+  // A feature may carry a link (and its text) on the lines after its details
+  for (const [, title, details, link, linkText] of front.matchAll(/-\s*title:\s*(.+)\n\s*details:\s*(.+)(?:\n\s*link:\s*(\S+))?(?:\n\s*linkText:\s*(.+))?/g)) {
+    const more = link ? ` [${(linkText ?? 'Read more').trim()}](${link.startsWith('http') ? link : wikiPageName(`${link.replace(/^\/|\/$/g, '')}.md`)})` : '';
+    lines.push(`**${title.trim()}**. ${details.trim()}${more}`, '');
   }
   return lines.join('\n').trimEnd() + '\n';
 }

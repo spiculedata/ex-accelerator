@@ -36,4 +36,8 @@ features:
     details: Group work into projects and workspaces, then follow a keyword across social, news and radio on one timeline.
   - title: Research
     details: Built-in Jupyter notebooks, plus a visual workflow builder (early preview).
+  - title: Share
+    details: Publish a dataset as an open data package over the IPFS peer-to-peer network, where anyone with its ID can fetch it. Opt-in, and what you publish is public for good.
+    link: /guide/data-sharing
+    linkText: How sharing works
 ---
