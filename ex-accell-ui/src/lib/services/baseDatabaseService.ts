@@ -138,7 +138,9 @@ export abstract class BaseDatabaseService {
 
   /**
    * Query the unified analytics API
-   * Provides type-safe querying with automatic error handling
+   * A failed request is reported to the error banner and answered with an empty list, so a page
+   * that cannot tell "nothing there" from "nothing loaded" still renders. Use queryAPIOrThrow when
+   * the caller needs to tell them apart.
    *
    * @param options Query options including endpoint and parameters
    * @returns Promise resolving to typed data array
@@ -146,60 +148,60 @@ export abstract class BaseDatabaseService {
   protected async queryAPI<T = QueryResult>(
     options: QueryOptions
   ): Promise<T[]> {
+    try {
+      return await this.queryAPIOrThrow<T>(options);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.log('error', `Query failed for endpoint '${options.endpoint}': ${errorMsg}`);
+      this.reportFailure(this.requestKey(options.endpoint, options.params), friendlyMessage(error));
+      return [];
+    }
+  }
+
+  /**
+   * Query the unified analytics API and throw when the request fails, so a caller can tell an
+   * empty module (a successful, empty response) from a failed load and show each honestly.
+   * Nothing is reported to the error banner; the caller shows the failure.
+   */
+  protected async queryAPIOrThrow<T = QueryResult>(
+    options: QueryOptions
+  ): Promise<T[]> {
     if (!this.initialized) {
       await this.connect();
     }
 
     const { endpoint, params = {}, timeout = 30000 } = options;
+    const urlParams = new URLSearchParams();
+    urlParams.append('type', endpoint);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        urlParams.append(key, String(value));
+      }
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const urlParams = new URLSearchParams();
-      urlParams.append('type', endpoint);
+      const response = await fetch(
+        `${this.config.apiEndpoint}?${urlParams.toString()}`,
+        { signal: controller.signal }
+      );
 
-      // Add additional parameters
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          urlParams.append(key, String(value));
-        }
-      });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const response = await fetch(
-          `${this.config.apiEndpoint}?${urlParams.toString()}`,
-          { signal: controller.signal }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const result: ApiResponse<T[]> = await response.json();
-
-        if (!result.success) {
-          throw new Error(result.error || result.message || 'Query failed');
-        }
-
-        this.clearFailure(this.requestKey(endpoint, params));
-        return result.data || [];
-
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        throw fetchError;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      this.log('error', `Query failed for endpoint '${endpoint}': ${errorMsg}`);
-      this.reportFailure(this.requestKey(endpoint, params), friendlyMessage(error));
+      const result: ApiResponse<T[]> = await response.json();
 
-      // Return empty array instead of throwing to prevent UI crashes; the failure is surfaced to the
-      // user through the error banner rather than silently looking like "no data".
-      return [];
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Query failed');
+      }
+
+      this.clearFailure(this.requestKey(endpoint, params));
+      return result.data || [];
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

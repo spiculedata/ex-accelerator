@@ -2,34 +2,70 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { androidAnalyticsDb } from '$lib/services/androidAnalyticsDb';
+  import type {
+    AndroidAccessibilityEvent,
+    AndroidAnalyticsSummary,
+    AndroidAppSegment,
+    AndroidScreenshot
+  } from '$lib/services/types/databaseTypes';
+  import { hasAndroidData } from '$lib/utils/androidData';
+  import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
 
-  let errorMessage = '';
+  const LOAD_ERROR = 'Could not load Android analytics data. Check the connection and try again.';
+  const MS_PER_MINUTE = 60000;
+  const MS_PER_SECOND = 1000;
+  const TOP_APP_COUNT = 5;
+  const PERCENT = 100;
 
-  // Data from the Princeton SMART / Screenlake research kit
-  let appAccessibilityData: any[] = [];
-  let appSegmentData: any[] = [];
-  let screenshotData: any[] = [];
+  interface AppTotal {
+    app: string;
+    duration: number;
+    percentage: number;
+  }
+
+  interface TimelineEntry {
+    app: string;
+    startTime: string;
+    duration: number;
+    timestamp: number;
+  }
+
+  interface BehaviourPattern {
+    type: string;
+    description: string;
+    count: number;
+    icon: string;
+  }
+
   let loading = true;
+  let loadError = '';
+  let hasData = false;
 
-  // Analytics calculations
+  // Rows from the Princeton SMART / Screenlake research kit
+  let appAccessibilityData: AndroidAccessibilityEvent[] = [];
+  let appSegmentData: AndroidAppSegment[] = [];
+  let screenshotData: AndroidScreenshot[] = [];
+
+  // Figures on the dashboard, every one derived from the rows above
   let totalSessions = 0;
   let totalScreenshots = 0;
-  let uniqueApps = new Set();
+  let uniqueApps = new Set<string>();
   let sessionDuration = 0;
-  let topApps: any[] = [];
-  let appUsageTimeline: any[] = [];
-  let userBehaviorPatterns: any[] = [];
+  let avgScreenshotInterval = 0;
+  let topApps: AppTotal[] = [];
+  let appUsageTimeline: TimelineEntry[] = [];
+  let userBehaviorPatterns: BehaviourPattern[] = [];
 
-  onMount(async () => {
-    // Load data from database service
-    await loadAndroidAnalyticsData();
+  onMount(() => {
+    void loadAndroidAnalyticsData();
   });
 
-  // Load all Android analytics data from database
   async function loadAndroidAnalyticsData() {
+    loading = true;
+    loadError = '';
+    hasData = false;
     try {
-      // Load analytics summary and raw data from database service
       const [summary, accessibility, segments, screenshots] = await Promise.all([
         androidAnalyticsDb.getAnalyticsSummary(),
         androidAnalyticsDb.getAccessibilityEvents(),
@@ -37,176 +73,66 @@
         androidAnalyticsDb.getScreenshots()
       ]);
 
-      // Set raw data for detailed analysis
       appAccessibilityData = accessibility;
       appSegmentData = segments;
       screenshotData = screenshots;
-
-      // Use database summary for key metrics
-      totalSessions = summary.totalSessions;
-      totalScreenshots = summary.totalScreenshots;
-      uniqueApps = new Set(segments.map(s => s.apk));
-      sessionDuration = summary.sessionDuration;
-
-      console.log('Android analytics data loaded successfully from database');
-      
-      // Calculate additional analytics from the loaded data  
-      calculateAnalytics();
-      loading = false;
+      hasData = hasAndroidData([summary, accessibility, segments, screenshots]);
+      if (hasData) calculateAnalytics(summary.data);
     } catch (error) {
-      console.error('Error loading Android analytics data:', error);
-      errorMessage = 'Failed to load Android analytics data. Showing sample data instead.';
-      // Fallback to sample data if database fails
-      loadFallbackData();
+      console.error('Android analytics data failed to load:', error);
+      loadError = LOAD_ERROR;
     }
-  }
-
-  // Fallback sample data if database connection fails
-  function loadFallbackData() {
-    appAccessibilityData = [
-      {
-        id_user: "7324",
-        type: "SESSION_START",
-        t_unix_ts_ms: 1744765248255,
-        apk: null,
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        text: null
-      },
-      {
-        id_user: "7324", 
-        type: "SCREEN_TEXT",
-        t_unix_ts_ms: 1744765268335,
-        apk: "com.android.systemui",
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        text: "Internet AndroidWifi Bluetooth On Flashlight Camera in use Do Not Disturb Off"
-      },
-      {
-        id_user: "7324",
-        type: "URL", 
-        t_unix_ts_ms: 1744765042854,
-        apk: "com.android.chrome",
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        text: "amazon.com/amazonprime"
-      },
-      {
-        id_user: "7324",
-        type: "SCREEN_TEXT",
-        t_unix_ts_ms: 1744765017542,
-        apk: "com.android.chrome", 
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        text: "TAP TO UNMUTE Dialog Search YouTube Account Open App 1 000 000 Villager MANHUNT"
-      }
-    ];
-
-    appSegmentData = [
-      {
-        apk: "com.google.android.youtube",
-        t_unix_ts_segment_start: 1744668380017,
-        duration_segment_ms: 480032,
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        id_user: "7324"
-      },
-      {
-        apk: "com.android.chrome", 
-        t_unix_ts_segment_start: 1744765042854,
-        duration_segment_ms: 245000,
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        id_user: "7324"
-      },
-      {
-        apk: "com.google.android.apps.nexuslauncher",
-        t_unix_ts_segment_start: 1744668862080,
-        duration_segment_ms: 193172,
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f", 
-        id_user: "7324"
-      },
-      {
-        apk: "com.screenlake",
-        t_unix_ts_segment_start: 1744669057265,
-        duration_segment_ms: 434279,
-        id_session: "5db4bc90-8fcf-4d20-b6d7-4474def9786f",
-        id_user: "7324"
-      }
-    ];
-
-    screenshotData = [
-      {
-        id_user: "7324",
-        file: "img_06a60ee6-006f-40f6-95d4-65fdce368553Screenshot_2025-04-14_18-06-14.jpg",
-        apk: "com.google.android.permissioncontroller",
-        app: "Permission controller",
-        text: "srk ned screenshot service now taking screenshots every 3 seconds",
-        t_epoch_ts_ms: 1744668374979,
-        t_natural_day_ts: "04/14/2025"
-      },
-      {
-        id_user: "7324", 
-        file: "img_d9e776fb-a51b-47a7-a697-0be76429cfb9Screenshot_2025-04-14_18-06-20.jpg",
-        apk: "com.google.android.youtube",
-        app: "YouTube",
-        text: "youtube search try searching to get started home shorts subscriptions library",
-        t_epoch_ts_ms: 1744668380017,
-        t_natural_day_ts: "04/14/2025"
-      },
-      {
-        id_user: "7324",
-        file: "img_91c04571-f0ea-4e05-814e-6b0cd36a472fScreenshot_2025-04-14_18-06-25.jpg", 
-        apk: "com.google.android.youtube",
-        app: "YouTube",
-        text: "cat videos for cats to watch cat videos funny cat videos for kids",
-        t_epoch_ts_ms: 1744668385039,
-        t_natural_day_ts: "04/14/2025"
-      }
-    ];
-
-    calculateAnalytics();
     loading = false;
   }
 
-  function calculateAnalytics() {
-    // Calculate total sessions
-    totalSessions = new Set(appAccessibilityData.map(d => d.id_session)).size;
-    
-    // Calculate total screenshots
-    totalScreenshots = screenshotData.length;
-    
-    // Calculate unique apps
-    appSegmentData.forEach(segment => {
-      uniqueApps.add(segment.apk);
-    });
-    
-    // Calculate total session duration (in minutes)
-    sessionDuration = Math.round(appSegmentData.reduce((sum, segment) => sum + segment.duration_segment_ms, 0) / 60000);
-    
-    // Calculate top apps by usage time
-    const appUsage: Record<string, number> = {};
-    appSegmentData.forEach(segment => {
-      const appName = getAppDisplayName(segment.apk) ?? segment.apk;
-      appUsage[appName] = (appUsage[appName] || 0) + segment.duration_segment_ms;
-    });
+  // BIGINT columns can arrive as strings, so every millisecond value goes through Number()
+  const segmentMs = (segment: AndroidAppSegment): number => Number(segment.duration_segment_ms) || 0;
+  const segmentStart = (segment: AndroidAppSegment): number => Number(segment.t_unix_ts_segment_start) || 0;
 
-    topApps = Object.entries(appUsage)
+  function calculateAnalytics(summary: AndroidAnalyticsSummary) {
+    const totalSegmentMs = appSegmentData.reduce((sum, segment) => sum + segmentMs(segment), 0);
+
+    totalSessions = summary.totalSessions || new Set(appAccessibilityData.map((event) => event.id_session)).size;
+    totalScreenshots = summary.totalScreenshots || screenshotData.length;
+    uniqueApps = new Set(appSegmentData.map((segment) => segment.apk));
+    sessionDuration = summary.sessionDuration || Math.round(totalSegmentMs / MS_PER_MINUTE);
+    avgScreenshotInterval = measureScreenshotInterval();
+
+    const usageByApp = appSegmentData.reduce<Record<string, number>>((totals, segment) => {
+      const name = getAppDisplayName(segment.apk);
+      return { ...totals, [name]: (totals[name] ?? 0) + segmentMs(segment) };
+    }, {});
+
+    topApps = Object.entries(usageByApp)
       .map(([app, duration]) => ({
         app,
-        duration: Math.round(duration / 60000), // Convert to minutes
-        percentage: Math.round((duration / appSegmentData.reduce((sum, s) => sum + s.duration_segment_ms, 0)) * 100)
+        duration: Math.round(duration / MS_PER_MINUTE),
+        percentage: totalSegmentMs === 0 ? 0 : Math.round((duration / totalSegmentMs) * PERCENT)
       }))
       .sort((a, b) => b.duration - a.duration)
-      .slice(0, 5);
+      .slice(0, TOP_APP_COUNT);
 
-    // Create app usage timeline
-    appUsageTimeline = appSegmentData.map(segment => ({
-      app: getAppDisplayName(segment.apk),
-      startTime: new Date(segment.t_unix_ts_segment_start).toLocaleTimeString(),
-      duration: Math.round(segment.duration_segment_ms / 60000),
-      timestamp: segment.t_unix_ts_segment_start
-    })).sort((a, b) => a.timestamp - b.timestamp);
+    appUsageTimeline = appSegmentData
+      .map((segment) => ({
+        app: getAppDisplayName(segment.apk),
+        startTime: new Date(segmentStart(segment)).toLocaleTimeString(),
+        duration: Math.round(segmentMs(segment) / MS_PER_MINUTE),
+        timestamp: segmentStart(segment)
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp);
 
-    // Analyze user behavior patterns
     userBehaviorPatterns = analyzeUserPatterns();
   }
 
-  function getAppDisplayName(apk: string) {
+  /** Mean seconds between the first and last screenshot, or 0 when there are fewer than two. */
+  function measureScreenshotInterval(): number {
+    const firstShot = Number(screenshotData[0]?.t_epoch_ts_ms);
+    const lastShot = Number(screenshotData[screenshotData.length - 1]?.t_epoch_ts_ms);
+    if (totalScreenshots < 2 || !Number.isFinite(firstShot) || !Number.isFinite(lastShot)) return 0;
+    return Math.round((lastShot - firstShot) / (totalScreenshots - 1) / MS_PER_SECOND);
+  }
+
+  function getAppDisplayName(apk: string | null): string {
     const appMap: Record<string, string> = {
       'com.google.android.youtube': 'YouTube',
       'com.android.chrome': 'Chrome Browser',
@@ -216,62 +142,45 @@
       'com.google.android.permissioncontroller': 'Permission Controller',
       'com.google.android.googlequicksearchbox': 'Google Search'
     };
-    return appMap[apk] || apk.split('.').pop();
+    if (!apk) return 'Unknown app';
+    return appMap[apk] ?? apk.split('.').pop() ?? apk;
   }
 
-  function analyzeUserPatterns() {
-    const patterns = [];
-    
-    // Analyze screen text patterns
-    const textEntries = appAccessibilityData.filter(d => d.type === 'SCREEN_TEXT' && d.text);
-    if (textEntries.length > 0) {
-      patterns.push({
+  function analyzeUserPatterns(): BehaviourPattern[] {
+    const textEntries = appAccessibilityData.filter((event) => event.type === 'SCREEN_TEXT' && event.text);
+    const urlEntries = appAccessibilityData.filter((event) => event.type === 'URL');
+
+    return [
+      textEntries.length > 0 && {
         type: 'Content Interaction',
-        description: `User interacted with ${textEntries.length} different screen elements`,
+        description: `Interacted with ${textEntries.length} screen elements`,
         count: textEntries.length,
         icon: '👆'
-      });
-    }
-
-    // Analyze URL visits
-    const urlEntries = appAccessibilityData.filter(d => d.type === 'URL');
-    if (urlEntries.length > 0) {
-      patterns.push({
+      },
+      urlEntries.length > 0 && {
         type: 'Web Browsing',
-        description: `Visited ${urlEntries.length} different URLs including Amazon and YouTube`,
+        description: `Visited ${urlEntries.length} URLs`,
         count: urlEntries.length,
         icon: '🌐'
-      });
-    }
-
-    // Analyze app switching behavior
-    if (appSegmentData.length > 1) {
-      patterns.push({
+      },
+      appSegmentData.length > 1 && {
         type: 'App Switching',
-        description: `Switched between ${uniqueApps.size} different applications`,
+        description: `Switched between ${uniqueApps.size} applications`,
         count: uniqueApps.size,
         icon: '🔄'
-      });
-    }
-
-    // Analyze screenshot frequency
-    const avgScreenshotInterval = totalScreenshots > 1 ? 
-      Math.round((screenshotData[screenshotData.length - 1]?.t_epoch_ts_ms - screenshotData[0]?.t_epoch_ts_ms) / (totalScreenshots - 1) / 1000) : 0;
-    
-    if (avgScreenshotInterval > 0) {
-      patterns.push({
+      },
+      avgScreenshotInterval > 0 && {
         type: 'Capture Frequency',
         description: `Screenshots captured every ~${avgScreenshotInterval} seconds on average`,
         count: avgScreenshotInterval,
         icon: '📸'
-      });
-    }
-
-    return patterns;
+      }
+    ].filter((pattern): pattern is BehaviourPattern => pattern !== false);
   }
 
-  function formatTimestamp(timestamp: any) {
-    return new Date(timestamp).toLocaleString();
+  function formatTimestamp(timestamp: number) {
+    const ms = Number(timestamp);
+    return Number.isFinite(ms) ? new Date(ms).toLocaleString() : 'Unknown time';
   }
 
   function exportData() {
@@ -286,7 +195,7 @@
       userBehaviorPatterns,
       timeline: appUsageTimeline
     };
-    
+
     const dataStr = JSON.stringify(analysisData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -308,7 +217,7 @@
   <div class="relative bg-gradient-to-br from-blue-900 via-purple-900 to-blue-900 overflow-hidden">
     <!-- Background pattern -->
     <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 opacity-40"></div>
-    
+
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
@@ -330,9 +239,9 @@
             </div>
           </div>
         </div>
-        
+
         <div class="flex items-center space-x-3">
-          <button 
+          <button
             on:click={() => goto('/android-research')}
             class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,10 +249,10 @@
             </svg>
             Advanced Research
           </button>
-          <button 
+          <button
             on:click={exportData}
-            disabled
-            title="Export is available once Android data is connected"
+            disabled={!hasData}
+            title={hasData ? 'Export the analysis as JSON' : 'Export is available once Android data is loaded'}
             class="disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
             Export Analysis
           </button>
@@ -354,26 +263,24 @@
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-      <div class="flex items-center">
-        <svg class="w-5 h-5 text-signal-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <div>
-          <p class="text-sm font-medium text-amber-800">No Android data is connected</p>
-          <p class="text-xs text-amber-700">These charts stay empty until Android research data is loaded into this installation.</p>
-        </div>
-      </div>
-    </div>
-    {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}
-
     {#if loading}
       <div class="flex items-center justify-center py-16">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-        <span class="ml-4 text-lg text-gray-600">Loading Android analytics from database...</span>
+        <span class="ml-4 text-lg text-gray-600">Loading Android analytics...</span>
       </div>
+    {:else if loadError}
+      <ErrorAlert message={loadError} dismissable={false} />
+      <button
+        on:click={loadAndroidAnalyticsData}
+        class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
+        Retry
+      </button>
+    {:else if !hasData}
+      <DataUnavailable
+        title="No Android data yet"
+        description="This page reads data from the Princeton SMART / Screenlake research kit. Loading that data is not available in this release, so there is nothing to show." />
     {:else}
-      
+
       <!-- Key Metrics -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
@@ -384,7 +291,7 @@
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
           <div class="text-3xl font-bold text-blue-600 mb-1">{totalScreenshots}</div>
           <div class="text-sm text-gray-600">Screenshots Captured</div>
-          <div class="text-xs text-gray-500 mt-1">Every ~3-5 seconds</div>
+          <div class="text-xs text-gray-500 mt-1">{avgScreenshotInterval > 0 ? `Every ~${avgScreenshotInterval}s on average` : 'Interval not measured'}</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
           <div class="text-3xl font-bold text-emerald-600 mb-1">{uniqueApps.size}</div>
@@ -399,14 +306,14 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        
+
         <!-- Top Applications -->
         <div class="bg-white rounded-xl shadow-sm p-6">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold text-gray-900">Top Applications by Usage</h2>
             <span class="text-sm text-gray-500">{topApps.length} apps</span>
           </div>
-          
+
           <div class="space-y-4">
             {#each topApps as app, index}
               <div class="flex items-center justify-between">
@@ -419,15 +326,15 @@
                     <div class="text-sm text-gray-500">{app.duration} minutes</div>
                   </div>
                 </div>
-                
+
                 <div class="flex items-center space-x-3">
                   <div class="text-right">
                     <div class="font-semibold text-gray-900">{app.percentage}%</div>
                     <div class="text-xs text-gray-500">of total time</div>
                   </div>
                   <div class="w-24 bg-gray-200 rounded-full h-2">
-                    <div 
-                      class="bg-purple-600 h-2 rounded-full transition-all duration-300" 
+                    <div
+                      class="bg-purple-600 h-2 rounded-full transition-all duration-300"
                       style="width: {app.percentage}%"></div>
                   </div>
                 </div>
@@ -439,7 +346,7 @@
         <!-- User Behavior Patterns -->
         <div class="bg-white rounded-xl shadow-sm p-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-6">User Behavior Patterns</h2>
-          
+
           <div class="space-y-4">
             {#each userBehaviorPatterns as pattern}
               <div class="border border-gray-200 rounded-xl p-4">
@@ -465,7 +372,7 @@
           <h2 class="text-xl font-semibold text-gray-900">App Usage Timeline</h2>
           <span class="text-sm text-gray-500">{appUsageTimeline.length} segments</span>
         </div>
-        
+
         <div class="space-y-3">
           {#each appUsageTimeline as segment}
             <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -487,13 +394,13 @@
 
       <!-- Raw Data Insights -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         <!-- Screen Text Analysis -->
         <div class="bg-white rounded-xl shadow-sm p-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-6">Screen Text Analysis</h2>
-          
+
           <div class="space-y-4">
-            {#each appAccessibilityData.filter(d => d.type === 'SCREEN_TEXT' && d.text) as textData}
+            {#each appAccessibilityData.filter((event) => event.type === 'SCREEN_TEXT' && event.text) as textData}
               <div class="border-l-4 border-purple-600 pl-4">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-medium text-purple-600">{getAppDisplayName(textData.apk)}</span>
@@ -508,9 +415,9 @@
         <!-- URL Visits -->
         <div class="bg-white rounded-xl shadow-sm p-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-6">Web Browsing Activity</h2>
-          
+
           <div class="space-y-4">
-            {#each appAccessibilityData.filter(d => d.type === 'URL') as urlData}
+            {#each appAccessibilityData.filter((event) => event.type === 'URL') as urlData}
               <div class="border border-gray-200 rounded-lg p-3">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-medium text-blue-600">🌐 Web Visit</span>

@@ -173,9 +173,9 @@ await androidAnalyticsDb.getAnalyticsSummary();     // Dashboard summary metrics
 ### Dashboard Integration
 The Android Analytics dashboard (`/android-analytics/+page.svelte`) now uses the database service:
 
-1. **Data Loading**: Async loading from database with fallback to sample data
+1. **Data Loading**: Async loading from the database; when nothing is loaded the page shows an empty state, never sample data
 2. **Real Metrics**: Calculations based on actual database queries
-3. **Error Handling**: Graceful fallback if database connection fails
+3. **Error Handling**: A failed request shows an error state with a Retry button (the service throws; nothing is swallowed into an empty result)
 4. **Performance**: Efficient loading and chart rendering
 
 ### Key Features
