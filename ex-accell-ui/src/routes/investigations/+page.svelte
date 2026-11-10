@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { onMount } from 'svelte';
   import { formatDay } from '$lib/utils/dayFormat';
   import { commitKeywords } from '$lib/utils/keywords';
@@ -217,37 +218,23 @@
   <meta name="description" content="Cross-dataset research investigations" />
 </svelte:head>
 
-<!-- Header -->
-<div class="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10">
-          <svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold text-white">Investigations</h1>
-          <p class="text-sm text-indigo-300">
-            {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>
-            {:else if projectId}In project: {projectLabel} · <a href="/investigations" class="underline hover:text-white">Show all projects</a>
-            {:else}All projects{#if $currentProject} · <a href="/investigations?project={$currentProject.id}" class="underline hover:text-white">Only {$currentProject.name}</a>{/if}{/if}
-          </p>
-        </div>
-      </div>
-      <button
-        on:click={openModal}
-        class="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
-      >
-        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        New Investigation
-      </button>
-    </div>
-  </div>
-</div>
+<PageHeader title="Investigations" showProject={false} iconPath="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z">
+  <svelte:fragment slot="subtitle">
+    {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>
+    {:else if projectId}In project: {projectLabel} · <a href="/investigations" class="underline hover:text-white">Show all projects</a>
+    {:else}All projects{#if $currentProject} · <a href="/investigations?project={$currentProject.id}" class="underline hover:text-white">Only {$currentProject.name}</a>{/if}{/if}
+  </svelte:fragment>
+  <svelte:fragment slot="actions">
+    <button
+      on:click={openModal}
+      class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-md transition-colors">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      New Investigation
+    </button>
+  </svelte:fragment>
+</PageHeader>
 
 <!-- Content -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

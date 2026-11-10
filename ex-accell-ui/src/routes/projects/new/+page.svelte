@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { setCurrentProject } from '$lib/stores/projectStore';
   import { createFailureMessage, isEmail, nameProblem } from '$lib/utils/projectForm';
@@ -93,24 +94,12 @@
   <meta name="description" content="Create a new data analysis project" />
 </svelte:head>
 
-<!-- Header -->
-<div class="bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex items-center">
-      <button 
-        on:click={() => window.history.back()}
-        class="mr-4 p-2 text-white hover:bg-white/20 rounded-xl transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
-      </button>
-      <div>
-        <h1 class="text-3xl font-bold text-white">Create New Project</h1>
-        <p class="text-blue-100 mt-2">Set up a new data analysis workspace</p>
-      </div>
-    </div>
-  </div>
-</div>
+<PageHeader
+  title="Create New Project"
+  subtitle="Set up a new data analysis workspace"
+  backHref="/projects"
+  showProject={false}
+  iconPath="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
 
 <!-- Form Content -->
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { androidAnalyticsDb } from '$lib/services/androidAnalyticsDb';
@@ -213,53 +214,29 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-blue-900 via-purple-900 to-blue-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 opacity-40"></div>
-
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center">
-          <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Android Analytics Dashboard</h1>
-            <p class="text-slate-300 text-sm font-medium">Princeton SMART • Screenlake Research Kit Data Analysis</p>
-            <div class="flex items-center mt-2 space-x-4">
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                📱 Mobile Device Interactions
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                🔬 Research Data
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-3">
-          <button
-            on:click={() => goto('/android-research')}
-            class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-            </svg>
-            Advanced Research
-          </button>
-          <button
-            on:click={exportData}
-            disabled={!hasData}
-            title={hasData ? 'Export the analysis as JSON' : 'Export is available once Android data is loaded'}
-            class="disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors">
-            Export Analysis
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader
+    title="Android Analytics Dashboard"
+    subtitle="Princeton SMART and Screenlake Research Kit data analysis"
+    showProject={false}
+    iconPath="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z">
+    <svelte:fragment slot="actions">
+      <button
+        on:click={() => goto('/android-research')}
+        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+        </svg>
+        Advanced Research
+      </button>
+      <button
+        on:click={exportData}
+        disabled={!hasData}
+        title={hasData ? 'Export the analysis as JSON' : 'Export is available once Android data is loaded'}
+        class="px-4 py-2 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Export Analysis
+      </button>
+    </svelte:fragment>
+  </PageHeader>
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

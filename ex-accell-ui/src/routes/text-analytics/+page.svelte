@@ -1,7 +1,8 @@
 <script lang="ts">
+  import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
+  import { loadCurrentProject } from '$lib/stores/projectStore';
   import WorkspaceBanner from '$lib/components/ui/WorkspaceBanner.svelte';
   import { onMount } from 'svelte';
 
@@ -20,33 +21,10 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
-  <!-- Page Header -->
-  <div class="relative bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 overflow-hidden">
-    <!-- Background pattern -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-slate-900/10 opacity-40"></div>
-    
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-      <div class="flex items-center">
-        <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl shadow-lg flex items-center justify-center mr-4 border border-white/20 backdrop-blur-sm">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold text-white mb-1 tracking-tight">Text Analytics Apps</h1>
-          <p class="text-slate-300 text-sm font-medium">Advanced NLP processing for sentiment analysis, topic modeling, and content insights</p>
-          {#if $currentProject}
-            <div class="flex items-center mt-2">
-              <span class="text-sm text-slate-400">Project:</span>
-              <span class="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                {$currentProject.name}
-              </span>
-            </div>
-          {/if}
-        </div>
-      </div>
-    </div>
-  </div>
+  <PageHeader
+    title="Text Analytics Apps"
+    subtitle="Advanced NLP processing for sentiment analysis, topic modeling, and content insights"
+    iconPath="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 
   <!-- Content -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
