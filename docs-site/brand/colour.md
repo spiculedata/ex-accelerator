@@ -10,6 +10,10 @@ Every ramp has eleven steps, from 50 (lightest) to 950 (darkest). Steps are defi
 equal steps look equally different, and the lightness curve is shared, which keeps contrast
 predictable: a `-600` text on a `-50` background behaves similarly in every ramp.
 
+The tokens in `src/lib/styles/brand-tokens.css` are the source. The hex values below, the swatches and the
+chart colours in code are converted from them: `npm run brand:palette` (in `ex-accell-ui`) regenerates the
+docs palette, and a unit test fails if any copy drifts from the tokens.
+
 ### Ink
 
 Neutrals with a slight cool blue lean. Text, surfaces, borders and anything that is not a call to action.
