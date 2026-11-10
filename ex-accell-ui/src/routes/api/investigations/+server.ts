@@ -150,7 +150,9 @@ function safeJsonParse(text: string): unknown {
 
 /** A 403 when the signed-in user may not change this investigation, or null when they may (or it does not exist yet to be refused). */
 async function refuseUnlessAllowed(id: unknown, user: { email: string; role?: string } | null | undefined): Promise<Response | null> {
-  const rows = await postgresPool.query('SELECT created_by FROM investigations WHERE id = $1', [parseInt(String(id))]);
+  const numericId = typeof id === 'number' || typeof id === 'string' ? Number(id) : NaN;
+  if (!Number.isInteger(numericId) || numericId < 1) return json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
+  const rows = await postgresPool.query('SELECT created_by FROM investigations WHERE id = $1', [numericId]);
   if (rows.length === 0) return null; // the handler reports not found
   return canModifyInvestigation(user, rows[0].created_by) ? null : json({ success: false, error: 'Only the person who created this investigation, or an admin, can change it.' }, { status: 403 });
 }

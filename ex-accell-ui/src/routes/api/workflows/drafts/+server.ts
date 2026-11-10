@@ -22,6 +22,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return json({ success: false, error: 'Send a JSON body' }, { status: 400 });
   }
 
+  if (!body || typeof body !== 'object') return json({ success: false, error: 'Send a JSON object' }, { status: 400 });
   const definition = body?.workflowDefinition;
   if (!definition || typeof definition !== 'object' || !Array.isArray(definition.steps)) {
     return json({ success: false, error: 'workflowDefinition must include a steps list' }, { status: 400 });

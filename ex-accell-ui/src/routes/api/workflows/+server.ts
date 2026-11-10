@@ -49,6 +49,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (error instanceof BodyTooLargeError) return json({ success: false, error: error.message }, { status: 413 });
       return json({ success: false, error: 'Send a JSON body' }, { status: 400 });
     }
+    if (!body || typeof body !== 'object') return json({ success: false, error: 'Send a JSON object' }, { status: 400 });
     const { workflowDefinition, metadata, draftId } = body;
 
     if (!workflowDefinition || !metadata) {

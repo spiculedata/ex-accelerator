@@ -30,6 +30,7 @@ test.describe('Sentiment Analysis', () => {
     // A failed request is reported once, by the error banner, instead of looking like "no data"
     await page.route('**/api/unified-analytics**', (route) => route.fulfill({ status: 500, json: { success: false, error: 'Request failed' } }));
     await page.goto('/text-analytics/sentiment-analysis');
-    await expect(page.getByRole('alert').first()).toBeVisible();
+    // The message names what failed, so an unrelated alert cannot satisfy this
+    await expect(page.getByRole('alert').filter({ hasText: /sentiment/i }).first()).toBeVisible();
   });
 });

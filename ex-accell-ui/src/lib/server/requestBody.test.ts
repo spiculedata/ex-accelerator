@@ -21,4 +21,22 @@ describe('readJsonLimited', () => {
   it('still reports bad JSON as a syntax error, so callers can answer 400', async () => {
     await expect(readJsonLimited(post('{nope'), 100)).rejects.toBeInstanceOf(SyntaxError);
   });
+
+  it('stops reading a body with no declared length as soon as it passes the limit, without buffering the rest', async () => {
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(new Uint8Array(60));
+        if (pulled > 1000) controller.close();
+      }
+    });
+    const request = new Request('http://localhost/x', { method: 'POST', body: stream, duplex: 'half' } as RequestInit);
+    await expect(readJsonLimited(request, 100)).rejects.toBeInstanceOf(BodyTooLargeError);
+    expect(pulled).toBeLessThan(10); // it gave up after a couple of chunks rather than draining the stream
+  });
+
+  it('treats an empty body as bad JSON', async () => {
+    await expect(readJsonLimited(post(''), 100)).rejects.toBeInstanceOf(SyntaxError);
+  });
 });
