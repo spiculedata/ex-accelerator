@@ -22,7 +22,8 @@ const SHOTS: Shot[] = [
   { name: 'engagement-analysis', path: '/text-analytics/engagement-analysis', fullPage: false, height: 1350 },
   { name: 'language-detection', path: '/text-analytics/language-detection', fullPage: false, height: 1350 },
   { name: 'trigram-analysis', path: '/text-analytics/trigrams', fullPage: false, height: 1350 },
-  { name: 'hashtag-analysis', path: '/text-analytics/hashtag-analysis', fullPage: false, height: 1100 }
+  { name: 'hashtag-analysis', path: '/text-analytics/hashtag-analysis', fullPage: false, height: 1100 },
+  { name: 'users', path: '/settings/users', fullPage: false, height: 1000 }
 ];
 
 const SETTLE_MS = 2000;

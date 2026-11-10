@@ -23,6 +23,8 @@ You land on the project page, which is empty until you add a workspace.
 
 ![A new project with no workspaces](/screenshots/tutorials/project-empty.png)
 
+The **Team** panel on the right lists who can see this project. The person who created it can add or remove people there.
+
 ## 2. Create a workspace and attach datasets
 
 Choose **+ New Workspace**.
