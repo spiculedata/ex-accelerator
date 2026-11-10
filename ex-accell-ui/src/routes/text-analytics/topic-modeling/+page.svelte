@@ -610,7 +610,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             Min mentions: {minTopicSize >= 1000 ? (minTopicSize / 1000).toFixed(1) + 'K' : minTopicSize}
-            <span class="text-gray-400 font-normal">({filteredTopics.length} of {topicsData.length} topics)</span>
+            <span class="text-gray-500 font-normal">({filteredTopics.length} of {topicsData.length} topics)</span>
           </label>
           <input
             type="range"

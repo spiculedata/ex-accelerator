@@ -175,6 +175,7 @@
 
 <svelte:head>
   <title>Data Sharing - Social Explorer</title>
+  <meta name="description" content="Share datasets and workspaces with other people." />
 </svelte:head>
 
 <PageHeader
@@ -273,7 +274,7 @@
                 </button>
               {/if}
             </div>
-            <div class="text-xs text-gray-400 mt-2">Created {formatDate(pkg.created)}</div>
+            <div class="text-xs text-gray-500 mt-2">Created {formatDate(pkg.created)}</div>
           </div>
         {/each}
       </div>
@@ -312,7 +313,7 @@
           {/if}
         </button>
       </div>
-      <p class="text-xs text-gray-400 mt-2">The CID will be resolved from the IPFS network. This may take a moment for the first fetch.</p>
+      <p class="text-xs text-gray-500 mt-2">The CID will be resolved from the IPFS network. This may take a moment for the first fetch.</p>
     </div>
   </div>
 
@@ -373,7 +374,7 @@
       <div class="p-6 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">{previewPackage.title}</h3>
         <p class="text-sm text-gray-500 mt-1">{previewPackage.description}</p>
-        <div class="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+        <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
           <span>v{previewPackage.version}</span>
           <span>{previewPackage.resources?.length || 0} resources</span>
           <span>Created {formatDate(previewPackage.created)}</span>

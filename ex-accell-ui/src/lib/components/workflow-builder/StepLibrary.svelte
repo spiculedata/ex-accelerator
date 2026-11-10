@@ -75,7 +75,7 @@
           aria-label="Search workflow components"
         />
         <svg
-          class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+          class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24">
@@ -87,11 +87,11 @@
     <!-- Step Categories -->
     {#if filteredSteps.length === 0}
       <div class="text-center py-8">
-        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <p class="text-sm text-gray-500">No components found</p>
-        <p class="text-xs text-gray-400 mt-1">Try a different search term</p>
+        <p class="text-xs text-gray-500 mt-1">Try a different search term</p>
       </div>
     {:else}
       {#each filteredSteps as category}

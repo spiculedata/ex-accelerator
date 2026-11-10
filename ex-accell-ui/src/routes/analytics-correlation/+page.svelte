@@ -247,6 +247,7 @@
 
 <svelte:head>
   <title>Analytics Correlation - Social Explorer</title>
+  <meta name="description" content="Sentiment, topics, languages and platforms side by side, and how daily sentiment moves together." />
 </svelte:head>
 
 <PageHeader

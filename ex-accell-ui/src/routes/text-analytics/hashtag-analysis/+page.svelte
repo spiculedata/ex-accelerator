@@ -112,6 +112,7 @@
 
 <svelte:head>
   <title>Hashtag Analysis - Social Explorer</title>
+  <meta name="description" content="The hashtags used in your posts, how often, and how they trend." />
 </svelte:head>
 
 <PageHeader
@@ -164,7 +165,7 @@
         {#if hashtags.length > 0}
           <div id="hashtag-chart" class="w-full h-96"></div>
         {:else}
-          <div class="flex items-center justify-center h-96 text-gray-400">
+          <div class="flex items-center justify-center h-96 text-gray-500">
             <div class="text-center">
               <span class="text-4xl block mb-2">#</span>
               <p class="text-sm">No hashtags found in posts</p>
@@ -180,7 +181,7 @@
           <p class="text-xs text-gray-500 mt-1">Hashtags that frequently appear together</p>
         </div>
         {#if cooccurrence.length === 0}
-          <div class="p-8 text-center text-gray-400 text-sm">No co-occurrence data</div>
+          <div class="p-8 text-center text-gray-500 text-sm">No co-occurrence data</div>
         {:else}
           <div class="max-h-96 overflow-y-auto">
             <table class="w-full text-sm">
@@ -221,7 +222,7 @@
         />
       </div>
       {#if filteredHashtags.length === 0}
-        <div class="p-8 text-center text-gray-400 text-sm">No hashtags match your search</div>
+        <div class="p-8 text-center text-gray-500 text-sm">No hashtags match your search</div>
       {:else}
         <div class="max-h-[500px] overflow-y-auto">
           <table class="w-full text-sm">

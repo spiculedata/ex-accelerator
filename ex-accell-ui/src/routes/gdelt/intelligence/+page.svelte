@@ -222,6 +222,7 @@
 
 <svelte:head>
   <title>GDELT Intelligence - Social Explorer</title>
+  <meta name="description" content="Explore global events, conflicts and media narratives from GDELT." />
 </svelte:head>
 
 <PageHeader
@@ -255,14 +256,14 @@
             placeholder="Search countries, actors, locations... (e.g. Iran, UNITED STATES, Ukraine)"
             class="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
           />
-          <svg class="absolute left-3 top-3 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="absolute left-3 top-3 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
         </div>
       </div>
-      <div class="flex gap-2 items-center">
+      <div class="flex flex-wrap gap-2 items-center">
         <input type="date" bind:value={dateStart} class="text-sm border border-gray-200 rounded-lg px-3 py-2" />
-        <span class="text-gray-400 text-sm">to</span>
+        <span class="text-gray-500 text-sm">to</span>
         <input type="date" bind:value={dateEnd} class="text-sm border border-gray-200 rounded-lg px-3 py-2" />
         <button on:click={handleSearch} class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">
           Search
@@ -560,7 +561,7 @@
         <div>
           <h3 class="text-sm font-semibold text-gray-700 mb-2" title="Top events ranked by number of source articles — more articles indicates higher media significance">
             Key Events
-            <span class="text-xs font-normal text-gray-400 ml-1 cursor-help" title="Sorted by number of source news articles covering the event. Higher article count = more media attention.">ⓘ</span>
+            <span class="text-xs font-normal text-gray-500 ml-1 cursor-help" title="Sorted by number of source news articles covering the event. Higher article count = more media attention.">ⓘ</span>
           </h3>
           <div class="space-y-2 max-h-48 overflow-y-auto">
             {#each (countryDetail.keyEvents || []).slice(0, 5) as event}

@@ -730,7 +730,8 @@
 </script>
 
 <svelte:head>
-  <title>{investigation?.name || 'Investigation'} - Workbench</title>
+  <title>{investigation?.name || 'Investigation'} - Workbench - Social Explorer</title>
+  <meta name="description" content="Search, annotate and export the evidence in one investigation." />
 </svelte:head>
 
 {#if loading}

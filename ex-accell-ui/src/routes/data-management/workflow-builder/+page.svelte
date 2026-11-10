@@ -412,7 +412,7 @@
   <!-- Page Header -->
   <div class="bg-white shadow-sm border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-      <div class="flex items-center justify-between">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-4">
           <button
             onclick={() => goto('/data-management')}
@@ -428,7 +428,7 @@
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex flex-wrap items-center gap-3">
           <span role="status" class="text-sm {saveState.kind === 'error' ? 'text-danger-700' : 'text-ink-600'}">{saveState.message}</span>
           <button
             onclick={saveWorkflow}

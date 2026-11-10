@@ -64,7 +64,10 @@
   onMount(loadData);
 </script>
 
-<svelte:head><title>OCR & Text Extraction - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>OCR & Text Extraction - Social Explorer</title>
+  <meta name="description" content="Extract and search the text inside images." />
+</svelte:head>
 
 <PageHeader title="OCR & Text Extraction" subtitle="Extract and search text from images using PaddleOCR" accentColor="amber" />
 
@@ -170,7 +173,7 @@
         </div>
       </div>
       {#if results.length === 0}
-        <div class="p-12 text-center text-gray-400">
+        <div class="p-12 text-center text-gray-500">
           <span class="text-4xl block mb-2">📝</span>
           <p class="text-sm">No OCR results yet. Process images to extract text.</p>
         </div>

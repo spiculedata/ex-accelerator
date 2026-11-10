@@ -11,6 +11,11 @@
   });
 </script>
 
+<svelte:head>
+  <title>Data Management - Social Explorer</title>
+  <meta name="description" content="Manage datasets and data processing workflows." />
+</svelte:head>
+
 <div class="flex items-center justify-center min-h-screen">
   <p class="text-gray-500">Redirecting to Data Management...</p>
 </div>

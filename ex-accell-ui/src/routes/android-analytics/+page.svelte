@@ -299,7 +299,7 @@
 </script>
 
 <svelte:head>
-  <title>Android Analytics Dashboard - Princeton SMART Data</title>
+  <title>Android Analytics - Social Explorer</title>
   <meta name="description" content="Analyze Android mobile device user interactions and app usage patterns" />
 </svelte:head>
 

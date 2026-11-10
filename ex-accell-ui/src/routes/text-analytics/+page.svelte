@@ -95,7 +95,7 @@
               <div class="bg-blue-600 h-2 rounded-full" style="width: 68%"></div>
             </div>
           </div>
-          <svg class="w-5 h-5 text-gray-400 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -123,7 +123,7 @@
             <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Health</span>
             <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Politics</span>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -150,7 +150,7 @@
             <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">social media marketing</span>
             <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">artificial intelligence technology</span>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -177,7 +177,7 @@
             <span class="text-2xl font-bold text-blue-600">25+</span>
             <p class="text-gray-500 text-sm">Languages Supported</p>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -205,7 +205,7 @@
             <span class="px-2 py-1 bg-pink-100 text-pink-800 text-xs rounded-full">#viral</span>
             <span class="px-2 py-1 bg-pink-100 text-pink-800 text-xs rounded-full">#popular</span>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -232,7 +232,7 @@
             <span class="text-2xl font-bold text-cyan-600">4.2%</span>
             <p class="text-gray-500 text-sm">Avg Engagement Rate</p>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
@@ -323,7 +323,7 @@
             <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">scikit-learn</span>
             <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">nltk</span>
           </div>
-          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>

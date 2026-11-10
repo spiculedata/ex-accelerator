@@ -92,6 +92,7 @@
 
 <svelte:head>
   <title>Image Processing Suite - Social Explorer</title>
+  <meta name="description" content="Classify images, read text, detect faces and objects, recognise brands and moderate content." />
 </svelte:head>
 
 <PageHeader
@@ -124,7 +125,7 @@
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Objects Detected</p>
         <p class="text-2xl font-bold text-blue-600">{formatNumber(stats.totalObjects || 0)}</p>
-        <p class="text-xs text-gray-400 mt-1">{stats.objectClasses || 0} unique classes</p>
+        <p class="text-xs text-gray-500 mt-1">{stats.objectClasses || 0} unique classes</p>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Content Safety</p>

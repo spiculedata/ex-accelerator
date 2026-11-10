@@ -38,7 +38,8 @@
 </script>
 
 <svelte:head>
-  <title>Sign in | Social Explorer</title>
+  <title>Sign in - Social Explorer</title>
+  <meta name="description" content="Sign in to Social Explorer to analyse social media, news and image data." />
 </svelte:head>
 
 <div class="min-h-screen bg-slate-50 flex items-center justify-center px-4">

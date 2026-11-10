@@ -86,7 +86,10 @@
   onMount(loadData);
 </script>
 
-<svelte:head><title>Image Classification - Social Explorer</title></svelte:head>
+<svelte:head>
+  <title>Image Classification - Social Explorer</title>
+  <meta name="description" content="Tag and categorise images with zero-shot classification." />
+</svelte:head>
 
 <PageHeader title="Image Classification" subtitle="CLIP zero-shot classification with custom taxonomy" accentColor="purple" />
 
@@ -162,13 +165,13 @@
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <div id="tag-chart" class="w-full h-96"></div>
         {#if classStats.topTags?.length === 0}
-          <div class="flex items-center justify-center h-96 text-gray-400"><p class="text-sm">No classification data yet</p></div>
+          <div class="flex items-center justify-center h-96 text-gray-500"><p class="text-sm">No classification data yet</p></div>
         {/if}
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
         <div id="category-chart" class="w-full h-96"></div>
         {#if classStats.categories?.length === 0}
-          <div class="flex items-center justify-center h-96 text-gray-400"><p class="text-sm">No category data yet</p></div>
+          <div class="flex items-center justify-center h-96 text-gray-500"><p class="text-sm">No category data yet</p></div>
         {/if}
       </div>
     </div>
@@ -179,7 +182,7 @@
         <h2 class="text-lg font-semibold text-gray-900">Classification Results</h2>
       </div>
       {#if results.length === 0}
-        <div class="p-12 text-center text-gray-400">
+        <div class="p-12 text-center text-gray-500">
           <span class="text-4xl block mb-2">🏷️</span>
           <p class="text-sm">No classified images yet. Use the classify panel above or run batch processing.</p>
         </div>

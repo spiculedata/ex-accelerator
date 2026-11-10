@@ -16,8 +16,8 @@
   <div class="absolute inset-0 bg-gradient-to-br from-primary-800/50 via-transparent to-transparent"></div>
 
   <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex min-w-0 items-center">
         {#if backHref}
           <button
             on:click={() => goto(backHref)}
@@ -38,7 +38,7 @@
         </slot>
 
         <div>
-          <h1 class="text-4xl font-semibold text-white mb-2 tracking-tight">{title}</h1>
+          <h1 class="text-3xl sm:text-4xl font-semibold text-white mb-2 tracking-tight">{title}</h1>
           {#if subtitle}
             <p class="text-slate-300 text-lg font-medium">{subtitle}</p>
           {/if}
@@ -53,7 +53,7 @@
         </div>
       </div>
 
-      <div class="flex items-center space-x-3">
+      <div class="flex flex-wrap items-center gap-3">
         <slot name="actions"></slot>
       </div>
     </div>

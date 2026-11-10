@@ -152,14 +152,14 @@
   }
 
   function toneColor(val: number | null | undefined): string {
-    if (val == null || isNaN(val)) return 'text-gray-400';
+    if (val == null || isNaN(val)) return 'text-gray-500';
     if (val > 2) return 'text-emerald-600';
     if (val < -2) return 'text-red-600';
     return 'text-gray-600';
   }
 
   function goldsteinColor(val: number | null | undefined): string {
-    if (val == null || isNaN(val)) return 'text-gray-400';
+    if (val == null || isNaN(val)) return 'text-gray-500';
     if (val > 2) return 'text-emerald-600';
     if (val < -2) return 'text-red-600';
     return 'text-amber-600';
@@ -199,7 +199,8 @@
 </script>
 
 <svelte:head>
-  <title>GDELT Analytics</title>
+  <title>GDELT Analytics - Social Explorer</title>
+  <meta name="description" content="Trends, actors and tone across global news events from GDELT." />
 </svelte:head>
 
 <PageHeader
@@ -242,7 +243,7 @@
           on:change={onDateChange}
           class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
-        <span class="text-gray-400">to</span>
+        <span class="text-gray-500">to</span>
         <input
           type="date"
           bind:value={dateEnd}
@@ -319,12 +320,12 @@
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Avg Goldstein</p>
             <p class="text-2xl font-bold {goldsteinColor(summary.avg_goldstein)}">{formatGoldstein(summary.avg_goldstein)}</p>
-            <p class="text-xs text-gray-400 mt-1">-10 (conflict) to +10 (cooperation)</p>
+            <p class="text-xs text-gray-500 mt-1">-10 (conflict) to +10 (cooperation)</p>
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Avg Tone</p>
             <p class="text-2xl font-bold {toneColor(summary.avg_tone)}">{formatTone(summary.avg_tone)}</p>
-            <p class="text-xs text-gray-400 mt-1">Negative &larr; 0 &rarr; Positive</p>
+            <p class="text-xs text-gray-500 mt-1">Negative &larr; 0 &rarr; Positive</p>
           </div>
         </div>
       {/if}
@@ -338,7 +339,7 @@
             <p class="text-xs text-gray-500 mt-1">By event count (top 20)</p>
           </div>
           {#if countries.length === 0}
-            <div class="px-5 py-8 text-center text-gray-400 text-sm">No country data available</div>
+            <div class="px-5 py-8 text-center text-gray-500 text-sm">No country data available</div>
           {:else}
             <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
               <table class="w-full text-sm">
@@ -380,7 +381,7 @@
             <p class="text-xs text-gray-500 mt-1">Root event codes with labels</p>
           </div>
           {#if eventTypes.length === 0}
-            <div class="px-5 py-8 text-center text-gray-400 text-sm">No event type data available</div>
+            <div class="px-5 py-8 text-center text-gray-500 text-sm">No event type data available</div>
           {:else}
             <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
               <table class="w-full text-sm">
@@ -423,7 +424,7 @@
           <p class="text-xs text-gray-500 mt-1">Most mentioned actors across events (top 20)</p>
         </div>
         {#if actors.length === 0}
-          <div class="px-5 py-8 text-center text-gray-400 text-sm">No actor data available</div>
+          <div class="px-5 py-8 text-center text-gray-500 text-sm">No actor data available</div>
         {:else}
           <div class="overflow-x-auto">
             <table class="w-full text-sm">

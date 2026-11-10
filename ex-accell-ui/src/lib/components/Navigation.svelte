@@ -216,14 +216,14 @@
       requiresProject: false,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Dashboard', href: '/dashboards', requiresProject: false, useWorkspace: true },
+        { name: 'Interactive Dashboards', href: '/dashboards', requiresProject: false, useWorkspace: true },
         { name: 'Sentiment Analysis', href: '/text-analytics/sentiment-analysis', requiresProject: false, useWorkspace: true },
         { name: 'Topic Modeling', href: '/text-analytics/topic-modeling', requiresProject: false, useWorkspace: true },
         { name: 'Language Detection', href: '/text-analytics/language-detection', requiresProject: false, useWorkspace: true },
-        { name: 'Engagement', href: '/text-analytics/engagement-analysis', requiresProject: false, useWorkspace: true },
-        { name: 'Hashtags', href: '/text-analytics/hashtag-analysis', requiresProject: false, useWorkspace: true },
-        { name: 'Trigrams', href: '/text-analytics/trigrams', requiresProject: false, useWorkspace: true },
-        { name: 'Correlation', href: '/analytics-correlation', requiresProject: false, useWorkspace: true },
+        { name: 'Engagement Analysis', href: '/text-analytics/engagement-analysis', requiresProject: false, useWorkspace: true },
+        { name: 'Hashtag Analysis', href: '/text-analytics/hashtag-analysis', requiresProject: false, useWorkspace: true },
+        { name: 'Trigrams Analysis', href: '/text-analytics/trigrams', requiresProject: false, useWorkspace: true },
+        { name: 'Analytics Correlation', href: '/analytics-correlation', requiresProject: false, useWorkspace: true },
         { name: 'Radio Analytics', href: '/radio-analytics', requiresProject: false, useWorkspace: true }
       ]
     },
@@ -234,9 +234,9 @@
       requiresProject: false,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Intelligence Dashboard', href: '/gdelt/intelligence', requiresProject: false },
-        { name: 'World Map', href: '/gdelt', requiresProject: false },
-        { name: 'Analytics Tables', href: '/gdelt/analytics', requiresProject: false }
+        { name: 'GDELT Intelligence', href: '/gdelt/intelligence', requiresProject: false },
+        { name: 'GDELT World Events', href: '/gdelt', requiresProject: false },
+        { name: 'GDELT Analytics', href: '/gdelt/analytics', requiresProject: false }
       ]
     },
     {
@@ -246,12 +246,12 @@
       requiresProject: false,
       hasDropdown: true,
       dropdownItems: [
-        { name: 'Overview', href: '/image-processing', requiresProject: false },
+        { name: 'Image Processing Suite', href: '/image-processing', requiresProject: false },
         { name: 'Object Detection', href: '/image-processing/object-detection', requiresProject: false },
         { name: 'Face Detection', href: '/image-processing/face-detection', requiresProject: false },
         { name: 'Content Moderation', href: '/image-processing/content-moderation', requiresProject: false },
-        { name: 'OCR & Text', href: '/image-processing/ocr', requiresProject: false },
-        { name: 'Classification', href: '/image-processing/classification', requiresProject: false },
+        { name: 'OCR & Text Extraction', href: '/image-processing/ocr', requiresProject: false },
+        { name: 'Image Classification', href: '/image-processing/classification', requiresProject: false },
         { name: 'Brand Recognition', href: '/image-processing/brand-recognition', requiresProject: false }
       ]
     },
@@ -400,7 +400,7 @@
                           (dropdownItem.requiresProject && !$currentProject) ||
                           (dropdownItem?.requiresWorkspace && !currentWorkspace) ||
                           (dropdownItem?.requiresDataType && !hasRequiredData(dropdownItem))
-                          ? 'text-gray-400 cursor-not-allowed'
+                          ? 'text-gray-500 cursor-not-allowed'
                           : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                         }"
                         title={getDataAvailabilityTooltip(dropdownItem)}
@@ -450,7 +450,7 @@
                   <span class="text-white font-medium text-xs">{$currentProject?.name?.charAt(0) || 'P'}</span>
                 </div>
                 <span class="text-xs font-medium text-gray-700 truncate max-w-28">{$currentProject?.name || 'Select Project'}</span>
-                <svg class="ml-1.5 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="ml-1.5 w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
@@ -530,7 +530,7 @@
                   <span class="text-xs font-medium text-gray-700 truncate max-w-24">
                     {currentWorkspace?.name || 'Workspace'}
                   </span>
-                  <svg class="ml-1.5 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="ml-1.5 w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                   </svg>
                 </button>
@@ -564,7 +564,7 @@
                               <div class="flex items-center space-x-2 mb-1">
                                 <span class="text-xs text-gray-500">{workspace.workspace_type}</span>
                                 {#if summary && summary.datasetCount > 0}
-                                  <span class="text-xs text-gray-400">•</span>
+                                  <span class="text-xs text-gray-500">•</span>
                                   <span class="text-xs text-gray-600 font-medium">{formatRecordCount(summary.recordCount)} posts</span>
                                 {/if}
                               </div>
@@ -580,7 +580,7 @@
                                   {/if}
                                 </div>
                               {:else if summary}
-                                <div class="text-xs text-gray-400 italic mt-1">No datasets</div>
+                                <div class="text-xs text-gray-500 italic mt-1">No datasets</div>
                               {/if}
                             </div>
                           </div>
@@ -651,13 +651,13 @@
               <button
                 on:click={() => toggleDropdown(item.name)}
                 class="w-full flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.requiresProject && !$currentProject 
-                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed' 
+                  ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
               >
                 <span>
                   {item.name}
                   {#if item.requiresProject && !$currentProject}
-                    <span class="ml-1 text-xs text-gray-400">*</span>
+                    <span class="ml-1 text-xs text-gray-500">*</span>
                   {/if}
                 </span>
                 <svg class="w-4 h-4 transition-transform {openDropdowns[item.name] ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -679,7 +679,7 @@
                         (dropdownItem.requiresProject && !$currentProject) ||
                         (dropdownItem?.requiresWorkspace && !currentWorkspace) ||
                         (dropdownItem?.requiresDataType && !hasRequiredData(dropdownItem))
-                        ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
+                        ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
                       title={getDataAvailabilityTooltip(dropdownItem)}
                     >
@@ -693,7 +693,7 @@
                         {#if dropdownItem?.requiresWorkspace && !currentWorkspace}
                           <span class="text-xs text-amber-500">↻</span>
                         {:else if dropdownItem.requiresProject && !$currentProject}
-                          <span class="text-xs text-gray-400">*</span>
+                          <span class="text-xs text-gray-500">*</span>
                         {/if}
                       </div>
                     </a>
@@ -712,7 +712,7 @@
               class="flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 {item.current
                 ? 'bg-blue-100 text-blue-700'
                 : (item.requiresProject && !$currentProject) || (item?.requiresDataType && !hasRequiredData(item))
-                  ? 'text-gray-400 hover:text-gray-500 cursor-not-allowed'
+                  ? 'text-gray-500 hover:text-gray-500 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
               title={getDataAvailabilityTooltip(item)}
               aria-current={item.current ? 'page' : undefined}
@@ -724,7 +724,7 @@
                     {getDataAvailabilityIcon(item)}
                   </span>
                 {:else if item.requiresProject && !$currentProject}
-                  <span class="text-xs text-gray-400">*</span>
+                  <span class="text-xs text-gray-500">*</span>
                 {/if}
               </div>
             </a>
@@ -733,7 +733,7 @@
         
         <!-- Project requirement notice (mobile) -->
         {#if !$currentProject}
-          <div class="px-3 py-1 text-xs text-gray-400">
+          <div class="px-3 py-1 text-xs text-gray-500">
             * Requires project selection
           </div>
         {/if}
