@@ -453,7 +453,7 @@
                         <div class="flex items-center justify-between">
                           <span>{dropdownItem.name}</span>
                           {#if dropdownItem?.requiresDataType && currentWorkspace}
-                            <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-500' : 'text-amber-400'}">
+                            <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-500' : 'text-signal-700'}">
                               {getDataAvailabilityIcon(dropdownItem)}
                             </span>
                           {/if}
@@ -731,12 +731,12 @@
                       <span>{dropdownItem.name}</span>
                       <div class="flex items-center space-x-1">
                         {#if dropdownItem?.requiresDataType && currentWorkspace}
-                          <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-amber-500'}">
+                          <span class="text-xs {hasRequiredData(dropdownItem) ? 'text-emerald-600' : 'text-signal-700'}">
                             {getDataAvailabilityIcon(dropdownItem)}
                           </span>
                         {/if}
                         {#if dropdownItem?.requiresWorkspace && !currentWorkspace}
-                          <span class="text-xs text-amber-500">↻</span>
+                          <span class="text-xs text-signal-700">↻</span>
                         {:else if dropdownItem.requiresProject && !$currentProject}
                           <span class="text-xs text-gray-500">*</span>
                         {/if}
@@ -765,7 +765,7 @@
               <span>{item.name}</span>
               <div class="flex items-center space-x-1">
                 {#if item?.requiresDataType && currentWorkspace}
-                  <span class="text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-amber-500'}">
+                  <span class="text-xs {hasRequiredData(item) ? 'text-emerald-600' : 'text-signal-700'}">
                     {getDataAvailabilityIcon(item)}
                   </span>
                 {:else if item.requiresProject && !$currentProject}

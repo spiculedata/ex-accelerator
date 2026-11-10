@@ -1685,7 +1685,7 @@
 									<div class="animate-spin rounded-full h-3 w-3 border border-amber-200 border-t-amber-600"></div>
 								</div>
 							{/if}
-							<div class="text-xl xl:text-2xl font-bold text-amber-600">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
+							<div class="text-xl xl:text-2xl font-bold text-signal-700">{Object.keys(eventTypes).filter(k => visibleEvents.some((e: any) => getEventType(e.eventCode) === k)).length}</div>
 							<div class="text-xs text-gray-600">Event Types</div>
 						</div>
 						<div class="bg-white rounded-lg shadow-sm px-3 py-2 text-center relative {isUpdatingFilter ? 'opacity-75' : ''}">

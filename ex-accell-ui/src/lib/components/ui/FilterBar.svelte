@@ -277,7 +277,7 @@
     </div>
 
     {#if !datesOnly && enabledIds.size < visibleDatasets.length}
-      <div class="mt-2 text-xs text-amber-600">
+      <div class="mt-2 text-xs text-signal-700">
         Showing {enabledIds.size} of {visibleDatasets.length} data sources
       </div>
     {/if}

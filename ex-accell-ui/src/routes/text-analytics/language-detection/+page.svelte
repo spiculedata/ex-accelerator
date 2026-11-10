@@ -216,19 +216,19 @@
     <!-- Overview Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalPosts ? detectionStats.totalPosts.toLocaleString() : totalPosts.toLocaleString()}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.totalPosts ? detectionStats.totalPosts.toLocaleString() : totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts Analyzed</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.totalLanguages || languageStats.length}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.totalLanguages || languageStats.length}</div>
         <div class="text-sm text-gray-600">Languages Detected</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{Math.round((detectionStats.avgConfidence || 0) * 100)}%</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{Math.round((detectionStats.avgConfidence || 0) * 100)}%</div>
         <div class="text-sm text-gray-600">Avg Confidence</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-amber-600 mb-1">{detectionStats.topLanguage?.name || languageStats[0]?.name || 'n/a'}</div>
+        <div class="text-2xl font-bold text-signal-700 mb-1">{detectionStats.topLanguage?.name || languageStats[0]?.name || 'n/a'}</div>
         <div class="text-sm text-gray-600">Top Language</div>
       </div>
     </div>

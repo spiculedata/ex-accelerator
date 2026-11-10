@@ -368,7 +368,7 @@
           <div class="text-xs text-gray-600">Active Stations</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
-          <div class="text-2xl font-bold text-amber-600 mb-1">{typeof overviewStats.avgDuration === 'number' ? overviewStats.avgDuration.toFixed(0) : overviewStats.avgDuration}s</div>
+          <div class="text-2xl font-bold text-signal-700 mb-1">{typeof overviewStats.avgDuration === 'number' ? overviewStats.avgDuration.toFixed(0) : overviewStats.avgDuration}s</div>
           <div class="text-xs text-gray-600">Avg Duration</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
@@ -376,7 +376,7 @@
           <div class="text-xs text-gray-600">Political Content</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4 text-center">
-          <div class="text-2xl font-bold text-orange-600 mb-1">{typeof overviewStats.adPercent === 'number' ? overviewStats.adPercent.toFixed(1) : overviewStats.adPercent}%</div>
+          <div class="text-2xl font-bold text-signal-700 mb-1">{typeof overviewStats.adPercent === 'number' ? overviewStats.adPercent.toFixed(1) : overviewStats.adPercent}%</div>
           <div class="text-xs text-gray-600">Ad Content</div>
         </div>
       </div>

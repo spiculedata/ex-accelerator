@@ -105,7 +105,7 @@
   function getSentimentColor(sentiment: number) {
     if (sentiment > 0.3) return 'text-green-600';
     if (sentiment < -0.3) return 'text-red-600';
-    return 'text-yellow-600';
+    return 'text-signal-700';
   }
 
   function getSentimentLabel(sentiment: number) {

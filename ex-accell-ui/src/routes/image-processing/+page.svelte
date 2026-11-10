@@ -137,7 +137,7 @@
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Text Extractions</p>
-        <p class="text-2xl font-bold text-amber-600">{formatNumber(stats.ocrExtractions || 0)}</p>
+        <p class="text-2xl font-bold text-signal-700">{formatNumber(stats.ocrExtractions || 0)}</p>
       </div>
     </div>
 

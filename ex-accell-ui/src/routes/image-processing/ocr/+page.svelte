@@ -113,7 +113,7 @@
           <p class="text-sm text-gray-600">No text found in this image.</p>
         {/if}
         {#if analysis._note}
-          <p class="text-xs text-amber-600 mt-2 bg-amber-100/50 rounded p-2">{analysis._note}</p>
+          <p class="text-xs text-signal-700 mt-2 bg-amber-100/50 rounded p-2">{analysis._note}</p>
         {/if}
       </div>
     {/if}
@@ -132,7 +132,7 @@
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase mb-1">With Text Found</p>
-        <p class="text-2xl font-bold text-amber-600">{formatNumber(parseInt(ocrStats.summary?.with_text) || 0)}</p>
+        <p class="text-2xl font-bold text-signal-700">{formatNumber(parseInt(ocrStats.summary?.with_text) || 0)}</p>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-200">
         <p class="text-xs font-medium text-gray-500 uppercase mb-1">Avg Confidence</p>

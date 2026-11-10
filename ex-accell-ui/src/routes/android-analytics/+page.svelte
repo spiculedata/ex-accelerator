@@ -356,7 +356,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
       <div class="flex items-center">
-        <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-signal-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
@@ -392,7 +392,7 @@
           <div class="text-xs text-gray-500 mt-1">Different apps used</div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-          <div class="text-3xl font-bold text-amber-600 mb-1">{sessionDuration}</div>
+          <div class="text-3xl font-bold text-signal-700 mb-1">{sessionDuration}</div>
           <div class="text-sm text-gray-600">Total Duration (min)</div>
           <div class="text-xs text-gray-500 mt-1">Active usage time</div>
         </div>

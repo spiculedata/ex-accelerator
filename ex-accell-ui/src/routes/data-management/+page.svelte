@@ -387,7 +387,7 @@
         <button on:click={() => activeTab = 'capture'} class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
           <span class="text-2xl mb-1">⚡</span>
           <span class="text-xs font-medium text-gray-700">Jobs</span>
-          <span class="text-lg font-bold text-amber-600">{dataStats.activeWorkflows}</span>
+          <span class="text-lg font-bold text-signal-700">{dataStats.activeWorkflows}</span>
         </button>
         <div class="flex-shrink-0 w-8 h-0.5 bg-gray-300"></div>
         <button class="flex flex-col items-center px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">

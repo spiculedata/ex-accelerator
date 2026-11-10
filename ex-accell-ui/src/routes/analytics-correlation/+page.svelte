@@ -285,7 +285,7 @@
         <div class="text-xs text-gray-500">Languages</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 text-center">
-        <div class="text-xl font-bold text-amber-600">{platformData.length}</div>
+        <div class="text-xl font-bold text-signal-700">{platformData.length}</div>
         <div class="text-xs text-gray-500">Platforms</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-200 text-center">
