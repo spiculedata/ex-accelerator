@@ -50,6 +50,10 @@
   // Saving drafts: the id of the saved draft, so later saves update it instead of creating copies
   let savedWorkflowId: string | null = $state(null);
   let saveState: { kind: 'idle' | 'saving' | 'saved' | 'error'; message: string } = $state({ kind: 'idle', message: '' });
+  // Results and problems appear in the toolbar status, not in a blocking browser alert
+  const notify = (kind: 'saved' | 'error', message: string) => {
+    saveState = { kind, message };
+  };
 
   // Publish workflow state
   let loadingPublish = $state(false);
@@ -185,7 +189,7 @@
 
   function runWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before running');
+      notify('error', 'Add steps to the workflow before running it.');
       return;
     }
     workflowBuilder.toggleExecuteDialog(true);
@@ -193,7 +197,7 @@
 
   async function publishWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before publishing');
+      notify('error', 'Add steps to the workflow before publishing it.');
       return;
     }
 
@@ -229,14 +233,14 @@
       const result = await response.json();
 
       if (result.success) {
-        alert(`Workflow "${publishMetadata.name}" published successfully!`);
+        notify('saved', `Workflow "${publishMetadata.name}" published.`);
         workflowBuilder.togglePublishDialog(false);
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error publishing workflow:', error);
-      alert('Error publishing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be published. Try again.');
     } finally {
       loadingPublish = false;
     }
@@ -295,13 +299,13 @@
 
       if (result.success) {
         workflowBuilder.toggleExecuteDialog(false);
-        alert('Workflow execution started successfully!');
+        notify('saved', 'Workflow execution started.');
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error executing workflow:', error);
-      alert('Error executing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be started. Try again.');
     } finally {
       loadingExecute = false;
     }
@@ -313,7 +317,7 @@
 
   async function generateDaprCode() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before generating code');
+      notify('error', 'Add steps to the workflow before generating code.');
       return;
     }
 
@@ -348,7 +352,7 @@
       }
     } catch (error) {
       console.error('Error generating Python workflow code:', error);
-      alert('Error generating Python workflow code: ' + (error as Error).message);
+      notify('error', 'The code could not be generated. Check that every step is set up, then try again.');
     }
   }
 
@@ -398,7 +402,7 @@
       // Success feedback handled by modal
     }).catch(err => {
       console.error('Failed to copy to clipboard:', err);
-      alert('Failed to copy to clipboard');
+      notify('error', 'Copying failed. Select the code and copy it by hand.');
     });
   }
 </script>

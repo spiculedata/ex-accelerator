@@ -111,7 +111,9 @@
 
 		// ---- LANE 1: GDELT (area chart with Goldstein colour encoding) ----
 		const gdeltY = 0;
-		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 1;
+		const gdeltMaxEvents = d3.max(parsedData, (d) => d.gdelt_events) ?? 0;
+		// With no events there is nothing to draw: a scale from 0 to 0 would paint a full bar and a flat line
+		const hasGdelt = gdeltMaxEvents > 0;
 		const yGdelt = d3.scaleLinear().domain([0, gdeltMaxEvents]).nice().range([laneHeight, 0]);
 
 		const gdeltGroup = g.append('g').attr('transform', `translate(0,${gdeltY})`);
@@ -143,7 +145,7 @@
 			.clamp(true);
 
 		// Create per-segment gradient that encodes Goldstein as fill colour
-		for (let i = 0; i < parsedData.length - 1; i++) {
+		for (let i = 0; hasGdelt && i < parsedData.length - 1; i++) {
 			const d0 = parsedData[i];
 			const d1 = parsedData[i + 1];
 			const gradId = `gdelt-seg-${i}`;
@@ -180,12 +182,25 @@
 			.attr('fill', 'none')
 			.attr('stroke', '#94a3b8')
 			.attr('stroke-width', 1)
-			.attr('opacity', 0.5)
+			.attr('opacity', hasGdelt ? 0.5 : 0)
 			.attr('d', gdeltLine);
+
+		if (!hasGdelt) {
+			gdeltGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', '#94a3b8')
+				.text('No GDELT events for these keywords');
+		}
 
 		// ---- LANE 2: Radio ----
 		const radioY = laneHeight + laneGap;
-		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 1;
+		const radioMaxSegments = d3.max(parsedData, (d) => d.radio_positive + d.radio_negative + d.radio_neutral) ?? 0;
+		const hasRadio = radioMaxSegments > 0;
 		const yRadio = d3.scaleLinear().domain([0, radioMaxSegments]).nice().range([laneHeight, 0]);
 
 		const radioGroup = g.append('g').attr('transform', `translate(0,${radioY})`);
@@ -232,12 +247,24 @@
 
 		radioGroup
 			.selectAll('.radio-area')
-			.data(radioStacked)
+			.data(hasRadio ? radioStacked : [])
 			.join('path')
 			.attr('class', 'radio-area')
 			.attr('fill', (d) => radioColorMap[d.key] ?? '#999')
 			.attr('opacity', 0.75)
 			.attr('d', radioArea);
+
+		if (!hasRadio) {
+			radioGroup
+				.append('text')
+				.attr('x', innerWidth / 2)
+				.attr('y', laneHeight / 2)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle')
+				.attr('font-size', '11px')
+				.attr('fill', '#94a3b8')
+				.text('No radio transcripts for these keywords');
+		}
 
 		// ---- LANE 3: Social ----
 		const socialY = 2 * (laneHeight + laneGap);

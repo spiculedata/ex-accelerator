@@ -1,6 +1,7 @@
 // Investigations API Endpoint
 // CRUD operations for investigation configurations
 
+import { investigationListQuery } from '$lib/server/investigationQuery';
 import { json } from '@sveltejs/kit';
 import { validateDayRange } from '$lib/utils/calendarDay';
 import type { RequestHandler } from './$types';
@@ -43,6 +44,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const id = url.searchParams.get('id');
     const workspaceId = url.searchParams.get('workspace_id');
+    const projectId = url.searchParams.get('project_id');
 
     if (id) {
       const rows = await postgresPool.query(
@@ -57,16 +59,13 @@ export const GET: RequestHandler = async ({ url }) => {
       return json({ success: true, investigation: rows[0] });
     }
 
-    // List investigations, optionally filtered by workspace_id
-    let sql = 'SELECT * FROM investigations';
-    const params: any[] = [];
-
-    if (workspaceId) {
-      sql += ' WHERE workspace_id = $1';
-      params.push(parseInt(workspaceId));
-    }
-
-    sql += ' ORDER BY updated_at DESC';
+    // List investigations, optionally limited to one workspace or to the workspaces of one project
+    const wsNumber = workspaceId ? parseInt(workspaceId) : NaN;
+    const projectNumber = projectId ? parseInt(projectId) : NaN;
+    const { sql, params } = investigationListQuery({
+      workspaceId: Number.isInteger(wsNumber) ? wsNumber : undefined,
+      projectId: Number.isInteger(projectNumber) ? projectNumber : undefined
+    });
 
     const investigations = await postgresPool.query(sql, params);
     return json({ success: true, investigations });

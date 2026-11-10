@@ -102,6 +102,12 @@
       if (portType === 'output') {
         workflowBuilder.startConnection(step.id);
 
+        // Start the preview line at the port that was clicked; until the mouse moves it would sit at the canvas corner
+        if (canvasElement) {
+          const rect = canvasElement.getBoundingClientRect();
+          workflowBuilder.updateMousePosition(event.clientX - rect.left, event.clientY - rect.top);
+        }
+
         // Track mouse movement for temporary connection line
         const handleMouseMove = (e: MouseEvent) => {
           if (!canvasElement) return;
@@ -262,7 +268,7 @@
         <div class="flex flex-col space-y-1">
           {#each step.inputs as input, index}
             <div
-              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group"
+              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group before:absolute before:-inset-2.5 before:content-['']"
               onclick={(e) => handlePortClick(e, step, 'input', index)}
               role="button"
               tabindex="0"
@@ -277,7 +283,7 @@
         <div class="flex flex-col space-y-1">
           {#each step.outputs as output, index}
             <div
-              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group"
+              class="port w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow cursor-pointer hover:bg-blue-600 transition-colors relative group before:absolute before:-inset-2.5 before:content-['']"
               onclick={(e) => handlePortClick(e, step, 'output', index)}
               role="button"
               tabindex="0"

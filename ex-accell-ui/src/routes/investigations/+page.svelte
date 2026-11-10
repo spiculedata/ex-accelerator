@@ -4,6 +4,7 @@
   import { commitKeywords } from '$lib/utils/keywords';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { currentProject } from '$lib/stores/projectStore';
 
   interface Investigation {
     id: string;
@@ -52,10 +53,17 @@
     }
   }
 
-  // "Show all" drops ?workspace=, which is a same-page navigation: reload the list and the name when it changes
+  // ?project=<id> limits the list to that project's workspaces; without it the list spans every project, and says so
+  $: projectParam = Number.parseInt($page.url.searchParams.get('project') ?? '', 10);
+  $: projectId = !workspaceId && Number.isInteger(projectParam) && projectParam > 0 ? projectParam : null;
+  $: projectLabel = $currentProject && Number($currentProject.id) === projectId ? $currentProject.name : `#${projectId}`;
+
+  // "Show all" drops ?workspace= or ?project=, which is a same-page navigation: reload the list and the name when it changes
   let loadedWorkspace: number | null | undefined;
-  $: if (mounted && workspaceId !== loadedWorkspace) {
+  let loadedProject: number | null | undefined;
+  $: if (mounted && (workspaceId !== loadedWorkspace || projectId !== loadedProject)) {
     loadedWorkspace = workspaceId;
+    loadedProject = projectId;
     void loadWorkspaceName(workspaceId);
     void loadInvestigations();
   }
@@ -75,7 +83,8 @@
   async function loadInvestigations() {
     loading = true;
     try {
-      const response = await fetch(workspaceId ? `/api/investigations?workspace_id=${workspaceId}` : '/api/investigations');
+      const scope = workspaceId ? `?workspace_id=${workspaceId}` : projectId ? `?project_id=${projectId}` : '';
+      const response = await fetch(`/api/investigations${scope}`);
       const result = await response.json();
       if (result.success) {
         // The list returns the query inside query_config; the cards read keywords, dates and sources directly
@@ -220,7 +229,9 @@
         <div>
           <h1 class="text-2xl font-bold text-white">Investigations</h1>
           <p class="text-sm text-indigo-300">
-            {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>{:else}Cross-dataset correlation analysis{/if}
+            {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>
+            {:else if projectId}In project: {projectLabel} · <a href="/investigations" class="underline hover:text-white">Show all projects</a>
+            {:else}All projects{#if $currentProject} · <a href="/investigations?project={$currentProject.id}" class="underline hover:text-white">Only {$currentProject.name}</a>{/if}{/if}
           </p>
         </div>
       </div>
