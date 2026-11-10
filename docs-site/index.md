@@ -37,7 +37,7 @@ features:
   - title: Research
     details: Built-in Jupyter notebooks, plus a visual workflow builder (early preview).
   - title: Share
-    details: Hand a collaborator, a reviewer or a journal the dataset behind your findings as one content ID. It travels as an open Frictionless Data Package (CSV plus a schema) that opens in Python, R, Excel or a notebook, and because the ID is a hash of the content, a paper can cite exactly the version used and nobody can change it quietly. Opt-in and admin-only, because what you publish to the IPFS network is public for good.
+    details: Give a collaborator, a reviewer or a journal one content ID for the dataset behind your findings, and anyone with it can fetch the same package. It travels as an open Frictionless Data Package (a plain CSV plus a schema) that opens in Python, R or Excel, and the ID always resolves to the same bytes, so a paper can cite exactly the version published and any change gives a new ID. Opt-in and admin-only, because what you publish to the IPFS network is public for good, and it stays reachable only while a node holds a copy.
     link: /guide/data-sharing
     linkText: How sharing works
 ---

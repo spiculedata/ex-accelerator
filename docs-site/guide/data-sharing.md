@@ -16,30 +16,37 @@ confirmation before each publish. Read [Before you publish](#before-you-publish)
 
 ## Why researchers use it
 
-A published package is a plain CSV with a `datapackage.json` schema, so it opens in Python, R, Excel or a notebook
-without Social Explorer. Its CID is a hash of the content: the same CID always resolves to the same bytes, and a
-single changed byte gives a different CID. That makes it useful for:
+A published package is a plain CSV (which opens in Python, R or Excel) plus a `datapackage.json` schema that
+Frictionless libraries read, so nobody needs Social Explorer to use it. Its CID is a content fingerprint: the same
+CID always resolves to the same bytes, and any change gives a new CID. That makes it useful for:
 
-- **The dataset behind a paper or preprint.** Put the CID in the data availability statement. Readers fetch exactly
-  the version you analysed, from any IPFS node or public gateway, with no account and nothing to host yourself.
-- **The same snapshot for every collaborator.** Send one CID instead of emailing CSVs that drift apart. Each
-  collaborator's install imports it into a table with the same rows.
+- **The dataset behind a paper or preprint.** Put the CID in the data availability statement. Readers fetch the
+  table exactly as it was when you published it, from any IPFS node or public gateway, with no account and without
+  you running a separate download server: your app's own node serves it while the app runs.
+- **The same snapshot for every collaborator.** Send one CID instead of emailing CSVs that drift apart. A
+  collaborator's install (with sharing turned on there) imports it into a table with the same rows.
 - **Reproducible figures.** Cite the CID next to the figure or in the notebook that draws it. Anyone can fetch that
   version and run the code against it.
 - **A supplement or replication package for reviewers.** Generate the package, check the preview, publish once and
-  include the CID in the submission. It stays unchanged through review.
-- **A subset from an investigation.** Put the posts you selected in a view or table, catalogue it (a row in
-  `datasets`) and publish that instead of the raw crawl, which keeps the package small and easier to anonymise.
+  include the CID in the submission. The content cannot change during review; keep it pinned so it stays reachable.
+- **A subset from an investigation.** Create a view or table of the posts you selected, add a row for it to the
+  `datasets` catalogue (in SQL; the interface cannot do this yet) and publish that instead of the raw crawl, which
+  keeps the package small and easier to anonymise.
+
+Publish before the table changes: the CSV is exported when you click **Publish**, not when you ran the analysis,
+and a publish that hits `MAX_EXPORT_ROWS` says so in `datapackage.json` (see [Limits](#limits)).
 
 An imported package becomes a catalogued dataset on the **Data Management** page, and the built-in
 [Jupyter notebooks](/tutorials/jupyter) read the same database, so you can query the new table like any other.
+The dashboards and investigations read the platform tables only, so an imported table does not appear there.
 
 What it is not:
 
 - **Not private.** There is no restricted or person-to-person sharing. Anyone who has the CID has the data, and a
-  CID is not a secret. For data you cannot make public, use a channel you control instead: your institution's
-  repository, a managed transfer service, or the per-server **Copy Link** described below, which needs an account.
-- **Not reversible.** There is no unpublish. Once fetched, the data is out.
+  CID is not a secret. For data you cannot make public, use a channel you control instead, such as your
+  institution's repository or a managed transfer service. The **Copy Link** button described below shares only
+  the schema and a short preview with people who have an account on your server, not the dataset.
+- **Not reversible.** There is no unpublish. Once someone has fetched it, treat the data as disclosed.
 - **Not guaranteed to stay available.** Content is served by whoever holds a copy, starting with your own node. If
   you stop your app and nobody else has pinned the package, the CID stops resolving. For long-term citation, keep
   your node running or pin the CID with a pinning service as well.

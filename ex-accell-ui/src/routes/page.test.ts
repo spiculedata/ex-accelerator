@@ -39,10 +39,11 @@ describe('/ first run', () => {
     render(Page);
 
     expect(await screen.findByText('Start here')).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Share a dataset with collaborators' });
+    const link = screen.getByRole('link', { name: 'Open Data Sharing' });
     expect(link).toHaveAttribute('href', '/data-sharing');
     const mention = link.closest('p');
     expect(mention).toHaveTextContent(/optional/i);
+    expect(mention).toHaveTextContent(/anyone with its content ID can fetch/i);
     expect(mention).toHaveTextContent(/off until an administrator turns it on/i);
   });
 
@@ -52,6 +53,6 @@ describe('/ first run', () => {
 
     expect(await screen.findByText('Harbour works')).toBeInTheDocument();
     expect(screen.queryByText('Start here')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Share a dataset with collaborators' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Open Data Sharing' })).toBeNull();
   });
 });

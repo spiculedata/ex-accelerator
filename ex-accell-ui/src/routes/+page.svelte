@@ -213,7 +213,7 @@
             </ol>
             <!-- Sharing is opt-in and off by default, so this only points the way; the Data Sharing page explains the current state -->
             <p class="mt-4 text-xs text-ink-500">
-              Later, and optional: <a class="text-primary-700 underline" href="/data-sharing">Share a dataset with collaborators</a> as an open data package by content ID. Publishing stays off until an administrator turns it on.
+              Optional, later: publish a dataset as an open data package that anyone with its content ID can fetch, for a collaborator or a paper. It is off until an administrator turns it on. <a class="text-primary-700 underline" href="/data-sharing">Open Data Sharing</a>
             </p>
           </div>
         {/if}
