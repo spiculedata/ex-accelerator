@@ -23,6 +23,8 @@
 
   let posts: Post[] = $state([]);
   let total = $state(0);
+  // Where the next page starts; null when everything has been loaded
+  let nextCursor: string | null = $state(null);
   let loading = $state(false);
   let loadingMore = $state(false);
   let errorMessage = $state('');
@@ -34,7 +36,8 @@
   // Responses from an older request must not overwrite a newer one
   let requestId = 0;
 
-  const highlightTerms = $derived([filters.q, filters.hashtag ? `#${filters.hashtag.replace(/^#/, '')}` : undefined].filter((t): t is string => !!t));
+  // A counted phrase can have punctuation between its words, so each word is marked rather than the phrase as written
+  const highlightTerms = $derived([filters.q, ...(filters.phrase ? filters.phrase.split(/\s+/) : []), filters.hashtag ? `#${filters.hashtag.replace(/^#/, '')}` : undefined].filter((t): t is string => !!t));
 
   async function load() {
     const current = ++requestId;
@@ -45,11 +48,13 @@
     unavailable = false;
     posts = [];
     total = 0;
+    nextCursor = null;
     try {
-      const page = await fetchPosts(filters, { limit: PAGE_SIZE, offset: 0 });
+      const page = await fetchPosts(filters, { limit: PAGE_SIZE });
       if (current !== requestId) return;
       posts = page.posts;
-      total = page.total;
+      total = page.total ?? page.posts.length;
+      nextCursor = page.nextCursor;
       unavailable = !!page.unavailable;
     } catch (error) {
       if (current !== requestId) return;
@@ -60,15 +65,18 @@
   }
 
   async function loadMore() {
+    if (nextCursor === null) return;
     const current = requestId;
     loadingMore = true;
     try {
-      const page = await fetchPosts(filters, { limit: PAGE_SIZE, offset: posts.length });
+      const page = await fetchPosts(filters, { limit: PAGE_SIZE, cursor: nextCursor });
       if (current !== requestId) return;
-      // New posts arriving between pages shift the offsets, so skip any that are already listed
+      // Paging follows the sort key, so nothing repeats; a post already listed is still skipped as a precaution
       const listed = new Set(posts.map((p) => p.id));
       posts = [...posts, ...page.posts.filter((p) => !listed.has(p.id))];
-      total = page.total;
+      // Only the first page counts the matches, so the count stays as it was unless this page reports one
+      if (page.total !== null) total = page.total;
+      nextCursor = page.nextCursor;
     } catch (error) {
       if (current !== requestId) return;
       errorMessage = error instanceof Error ? error.message : 'Could not load more posts.';
@@ -207,7 +215,7 @@
           {#if errorMessage}
             <p role="alert" class="mt-3 text-sm text-danger-700">{errorMessage}</p>
           {/if}
-          {#if posts.length < total}
+          {#if nextCursor !== null}
             <div class="mt-4 text-center">
               <button type="button" onclick={() => void loadMore()} disabled={loadingMore} class="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60">
                 {loadingMore ? 'Loading…' : `Show ${Math.min(PAGE_SIZE, total - posts.length)} more`}

@@ -3,7 +3,7 @@ import { buildPostsQuery, filtersFromParams } from './postsApi';
 
 describe('buildPostsQuery', () => {
   it('builds a query string from the filters that are set, leaving out the rest', () => {
-    const query = buildPostsQuery({ topic: 'topic-transit', sentiment: 'Very Negative', platforms: ['telegram', 'bluesky'], dateStart: '2026-11-02' }, { limit: 25, offset: 50 });
+    const query = buildPostsQuery({ topic: 'topic-transit', sentiment: 'Very Negative', platforms: ['telegram', 'bluesky'], dateStart: '2026-11-02' }, { limit: 25, cursor: '1731146400000_42' });
 
     const params = new URLSearchParams(query);
     expect(params.get('topic')).toBe('topic-transit');
@@ -11,9 +11,16 @@ describe('buildPostsQuery', () => {
     expect(params.get('platforms')).toBe('telegram,bluesky');
     expect(params.get('date_start')).toBe('2026-11-02');
     expect(params.get('limit')).toBe('25');
-    expect(params.get('offset')).toBe('50');
+    expect(params.get('cursor')).toBe('1731146400000_42');
+    expect(params.has('offset')).toBe(false);
     expect(params.has('hashtag')).toBe(false);
     expect(params.has('date_end')).toBe(false);
+  });
+
+  it('sends a counted phrase as phrase, not as free text', () => {
+    const params = new URLSearchParams(buildPostsQuery({ phrase: 'tram delays now' }));
+    expect(params.get('phrase')).toBe('tram delays now');
+    expect(params.has('q')).toBe(false);
   });
 
   it('strips a leading # from a hashtag and encodes phrases', () => {

@@ -19,7 +19,7 @@ const post = (id: number, text = `post ${id}`) => ({
   engagement_shares: 2,
   engagement_comments: 3
 });
-const page = (ids: number[], total = ids.length) => ({ posts: ids.map((id) => post(id)), total, limit: 25, offset: 0 });
+const page = (ids: number[], total = ids.length, nextCursor: string | null = null) => ({ posts: ids.map((id) => post(id)), total, limit: 25, nextCursor });
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
@@ -38,7 +38,7 @@ describe('PostDrilldown', () => {
     expect(await screen.findByText('post 1')).toBeTruthy();
     expect(screen.getByText('post 2')).toBeTruthy();
     expect(screen.getByText(/2 posts match/)).toBeTruthy();
-    expect(fetchPosts).toHaveBeenCalledWith({ sentiment: 'Positive' }, { limit: 25, offset: 0 });
+    expect(fetchPosts).toHaveBeenCalledWith({ sentiment: 'Positive' }, { limit: 25 });
   });
 
   it('does nothing while closed', () => {
@@ -65,14 +65,15 @@ describe('PostDrilldown', () => {
 
   it('pages: asks for the next 25, appends them and skips any already listed', async () => {
     const first = Array.from({ length: 25 }, (_, i) => i + 1);
-    fetchPosts.mockResolvedValueOnce(page(first, 30)).mockResolvedValueOnce(page([25, 26, 27, 28, 29, 30], 30));
+    fetchPosts.mockResolvedValueOnce(page(first, 30, 'cursor-after-25')).mockResolvedValueOnce({ ...page([25, 26, 27, 28, 29, 30], 0), total: null });
     render(PostDrilldown, props());
 
     const more = await screen.findByRole('button', { name: 'Show 5 more' });
     await fireEvent.click(more);
 
     await waitFor(() => expect(screen.getByText('post 30')).toBeTruthy());
-    expect(fetchPosts).toHaveBeenLastCalledWith({ sentiment: 'Positive' }, { limit: 25, offset: 25 });
+    expect(fetchPosts).toHaveBeenLastCalledWith({ sentiment: 'Positive' }, { limit: 25, cursor: 'cursor-after-25' });
+    expect(screen.getByText(/30 posts match/)).toBeTruthy(); // the count from the first page is kept
     expect(screen.getAllByText('post 25')).toHaveLength(1); // the overlap was not listed twice
     expect(screen.queryByRole('button', { name: /more/ })).toBeNull(); // everything is shown
   });
@@ -117,7 +118,7 @@ describe('PostDrilldown', () => {
   it('does not leave "Show more" stuck on Loading when the choice changes while a page is loading', async () => {
     const first = Array.from({ length: 25 }, (_, i) => i + 1);
     const slowMore = deferred<ReturnType<typeof page>>();
-    fetchPosts.mockResolvedValueOnce(page(first, 40)).mockReturnValueOnce(slowMore.promise).mockResolvedValueOnce(page(Array.from({ length: 25 }, (_, i) => i + 101), 40));
+    fetchPosts.mockResolvedValueOnce(page(first, 40, 'c25')).mockReturnValueOnce(slowMore.promise).mockResolvedValueOnce(page(Array.from({ length: 25 }, (_, i) => i + 101), 40, 'c125'));
     const { rerender } = render(PostDrilldown, props());
     await fireEvent.click(await screen.findByRole('button', { name: 'Show 15 more' }));
     expect(screen.getByRole('button', { name: 'Loading…' })).toBeTruthy();
@@ -153,7 +154,7 @@ describe('PostDrilldown focus', () => {
   });
 
   it('keeps Tab inside the open panel', async () => {
-    fetchPosts.mockResolvedValue(page(Array.from({ length: 25 }, (_, i) => i + 1), 30));
+    fetchPosts.mockResolvedValue(page(Array.from({ length: 25 }, (_, i) => i + 1), 30, 'c25'));
     render(PostDrilldown, props());
     const more = await screen.findByRole('button', { name: 'Show 5 more' });
     more.focus(); // the last focusable control in the panel

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
-  import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
+  import type { PostFilters } from '$lib/services/postsApi';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -12,6 +12,7 @@
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import MethodNote from '$lib/components/ui/MethodNote.svelte';
   import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
+  import { trigramDrilldownFilters } from '$lib/utils/trigramDrilldown';
 
   // The phrase the visitor chose; its posts open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
@@ -36,6 +37,7 @@
   let selectedPlatform = 'all';
   // Phrases are counted over the last 7 days unless the date bar sets a range
   const DEFAULT_TIME_RANGE = '7d';
+  const DEFAULT_DAYS = 7;
   let hasRange = false;
   // Two mentions is already a repeated phrase; a higher default hid most of them
   let minFrequency = 2;
@@ -290,7 +292,7 @@
                   <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-3">
                       <span class="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">#{i + 1}</span>
-                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: { q: trigram.trigram, ...(workspaceId ? { workspaceId } : {}) } })}>"{trigram.trigram}"</button></h3>
+                      <h3 class="text-lg font-semibold text-gray-900"><button type="button" class="text-left hover:text-primary-700 hover:underline" on:click={() => (drilldown = { title: `Phrase: “${trigram.trigram}”`, filters: trigramDrilldownFilters({ phrase: trigram.trigram, params: Object.fromEntries($page.url.searchParams), platform: selectedPlatform, defaultDays: DEFAULT_DAYS }) })}>"{trigram.trigram}"</button></h3>
                     </div>
                     <div class="flex items-center space-x-2">
                       <svg class="w-4 h-4 {getTrendColor(trigram.trend)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,4 +403,4 @@
   </div>
 </div>
 
-<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing this text. The counts on this page ignore punctuation and case, so they can differ." onclose={() => (drilldown = null)} />
+<PostDrilldown open={drilldown !== null} title={drilldown?.title ?? ''} filters={drilldown?.filters ?? {}} note="Posts containing these words in this order, ignoring punctuation, case and links, the way the counts on this page do." onclose={() => (drilldown = null)} />
