@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { signOut } from '$lib/utils/signOut';
+  import { signOut, signOutEverywhere } from '$lib/utils/signOut';
+  import ChangePasswordForm from '$lib/components/ChangePasswordForm.svelte';
   import { initials } from '$lib/utils/initials';
   import BrandMark from '$lib/components/ui/BrandMark.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
@@ -798,6 +799,16 @@
               <a href="/projects" class="flex-1 text-center px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Switch project</a>
               <button type="button" on:click={signOut} class="flex-1 px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Sign out</button>
             </div>
+            <div class="mt-2 flex gap-2">
+              <button type="button" on:click={signOutEverywhere} class="flex-1 px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Sign out on all devices</button>
+              {#if user.role === 'admin'}
+                <a href="/settings/users" class="flex-1 text-center px-3 py-2 text-sm font-medium text-ink-700 border border-ink-300 rounded-md hover:bg-ink-50">Manage users</a>
+              {/if}
+            </div>
+            <details class="mt-2 rounded-md border border-ink-300 px-3 py-2">
+              <summary class="cursor-pointer text-sm font-medium text-ink-700">Change password</summary>
+              <div class="mt-2"><ChangePasswordForm /></div>
+            </details>
           </div>
         {/if}
       </div>

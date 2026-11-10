@@ -28,11 +28,13 @@ and analytics that belong to them; administrators see everything.
 A session is a signed token, so signing out on one device cannot reach a token that is still on another. Each user
 has a **session version**: the token carries the version it was issued under, and raising the version on the server
 ends every older session. **Sign out on all devices** (the arrow beside *Sign out*) raises it. An account that no
-longer exists has no valid session. (There is no password change yet; when there is, it will raise the version too.)
+longer exists, or that is disabled, has no valid session. Changing a password, changing a role and disabling an
+account raise the version too.
 
 The version is checked on each request but remembered for **30 seconds**. On the instance where you sign out
 everywhere the change applies at once; on another instance a revoked session can keep working for up to those 30
-seconds. If the database cannot be asked, an answer remembered in the last five minutes is still used; past that, or
+seconds. This applies to role changes and disabled accounts too: on another instance, a demoted or disabled person can keep their
+old access for up to that long. If the database cannot be asked, an answer remembered in the last five minutes is still used; past that, or
 for someone never checked, the request gets `503` and the cookie is kept, so an outage never signs anyone out. Sessions issued before this existed count as version 0 and stay valid until their normal expiry.
 
 Writes (`POST`, `PUT`, `PATCH`, `DELETE`) sent by a page on another site are refused with `403`, signed in or not,
@@ -72,11 +74,32 @@ is empty. See [Configuration](./configuration).
 Failed sign-ins are rate limited to 5 attempts per 15 minutes for each IP address and email
 combination. Responses do not reveal whether an email exists.
 
+## Managing users
+
+Admins open **Manage users** from the user menu (the arrow beside *Sign out*), or go to `/settings/users`.
+From there an admin can:
+
+- **Add a person** with an email, name, role and a starting password (12 or more characters). Give them the password; they change it after signing in.
+- **Change a role.** The person's sessions end, so the new role applies at once.
+- **Disable or enable** an account. A disabled person cannot sign in and is signed out everywhere. Accounts are disabled, not deleted, so history such as who created a workflow stays attributable. A disabled account looks like a wrong password at sign-in.
+- **Reset a password.** The person's sessions end.
+
+You cannot change your own role, disable yourself or reset your own password from this page, and the last active
+admin cannot be demoted or disabled, so the install cannot lock itself out (changes to admins take turns, so
+two made at the same moment cannot both pass that check). The same actions are available as
+`GET`/`POST /api/users` and `PATCH /api/users/<id>`, for admins only.
+
+## Changing your password
+
+Every role, including viewers, can change their own password from the user menu: enter the current password and a
+new one. Wrong guesses at the current password are throttled like sign-in. Your other devices are signed out and
+this one stays signed in.
+
 ## Current limitations
 
-- There is no user-management screen yet. Additional users must be created in the database.
-- Sessions are stateless: signing out removes the cookie but does not revoke the token before it
-  expires (12 hours by default).
-- Access is by role, not per project or workspace.
+- Roles are global. Project membership limits who can see a project, but there is no per-project role (everyone in a project has the same rights as their global role), and members are chosen when the project is created.
+- The sign-in throttle lives in memory, per server process. Behind several replicas each keeps its own count.
+- There is no password reset by email and no single sign-on; an admin resets passwords.
+- Rate limiting of the rest of `/api/*` and a Content-Security-Policy are not in place yet.
 
 These are tracked in [issue #65](https://github.com/spiculedata/social-explorer/issues/65).

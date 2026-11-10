@@ -106,6 +106,19 @@ describe('POST /api/auth/login', () => {
     expect(mocks.recordFailure).toHaveBeenCalledTimes(2);
   });
 
+  it('refuses a disabled account with the same 401, even with the right password, and sets no cookie', async () => {
+    mocks.findUserByEmail.mockResolvedValue({ ...member, isDisabled: true });
+    mocks.verifyPassword.mockResolvedValue(true);
+
+    const { cookies, result } = call({ email: 'a@b.co', password: 'a-long-password-1' });
+    const response = await result;
+
+    expect(response.status).toBe(401);
+    expect((await response.json()).error).toBe('Invalid email or password');
+    expect(cookies.set).not.toHaveBeenCalled();
+    expect(mocks.recordFailure).toHaveBeenCalled();
+  });
+
   it('still verifies against a dummy hash for unknown users (timing equalisation)', async () => {
     mocks.findUserByEmail.mockResolvedValue(null);
     mocks.verifyPassword.mockResolvedValue(false);

@@ -134,3 +134,17 @@ describe('workflow executions', () => {
     }
   });
 });
+
+describe('account management', () => {
+  it('lets any signed-in role change their own password', () => {
+    for (const user of [admin, member, viewer]) expect(req('/api/auth/password', 'POST', user).action).toBe('allow');
+  });
+
+  it.each(['/api/users', '/api/users/5b1c7e3a-0000-4000-8000-000000000001', '/api/%75sers', '/api//users', '/settings/users', '/settings/%75sers'])('keeps %s for admins only, even for reads', (path) => {
+    for (const method of ['GET', 'POST', 'PATCH']) {
+      expect(req(path, method, member).action).toBe('forbidden');
+      expect(req(path, method, viewer).action).toBe('forbidden');
+      expect(req(path, method, admin).action).toBe('allow');
+    }
+  });
+});

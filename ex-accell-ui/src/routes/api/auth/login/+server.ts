@@ -58,7 +58,8 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
     const user = await findUserByEmail(credentials.email);
     const isValid = await verifyPassword(credentials.password, user?.passwordHash ?? (await dummyHash));
 
-    if (!user || !isValid) {
+    // A disabled account fails exactly like a wrong password, so nothing reveals that it exists
+    if (!user || user.isDisabled || !isValid) {
       log.warn('Failed login attempt', { ip: clientAddress });
       return failure(INVALID_CREDENTIALS, 401);
     }
