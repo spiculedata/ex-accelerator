@@ -116,3 +116,21 @@ describe('sign out everywhere', () => {
     }
   });
 });
+
+describe('workflow executions', () => {
+  it.each([
+    ['/api/workflow-executions/ex_1', 'DELETE'],
+    ['/api/workflow-executions/ex_1/manage', 'POST'],
+    ['/api/workflow-executions/%65x_1/manage', 'POST']
+  ])('only an admin may change %s (%s)', (path, method) => {
+    expect(req(path, method, member).action).toBe('forbidden');
+    expect(req(path, method, admin).action).toBe('allow');
+  });
+
+  it('lets any signed-in role read executions and their status', () => {
+    for (const user of [admin, member, viewer]) {
+      expect(req('/api/workflow-executions', 'GET', user).action).toBe('allow');
+      expect(req('/api/workflow-executions/ex_1/manage', 'GET', user, '?action=status').action).toBe('allow');
+    }
+  });
+});

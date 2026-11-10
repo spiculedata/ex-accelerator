@@ -56,8 +56,10 @@ for signing in and out, and `/api/health`.
 | `user` | Read and write application data |
 | `viewer` | Read-only (`GET`, `HEAD`, `OPTIONS`) |
 
-Endpoints that run code or start processes are admin-only: workflow deployment and execution,
-Python workflow generation, and the Jupyter endpoints. Treat admin accounts as having shell-level
+Endpoints that run code or start processes are admin-only: workflow deployment and execution
+(and pausing, resuming, cancelling or purging a running one), Python workflow generation, and the Jupyter
+endpoints. Anyone can read executions and their status. Editing or deleting a workflow is limited to its creator
+and admins. Treat admin accounts as having shell-level
 access to the server.
 
 ## First admin

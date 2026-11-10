@@ -1,5 +1,6 @@
 // GDELT Events API — optimised for map display
 import { json } from '@sveltejs/kit';
+import { validateDateParams } from '$lib/server/dateBounds';
 import { isMissingRelationError } from '$lib/server/queryErrors';
 import { postgresPool } from '$lib/services/postgres';
 
@@ -11,15 +12,16 @@ export async function GET({ url }) {
 			return json({ error: 'Invalid goldstein scale values' }, { status: 400 });
 		}
 
-		const dateStart = url.searchParams.get('dateStart');
-		const dateEnd = url.searchParams.get('dateEnd');
-		const dateFormat = /^\d{8}$/;
-		if (dateStart && !dateFormat.test(dateStart.replace(/-/g, ''))) {
-			return json({ error: 'Invalid dateStart format' }, { status: 400 });
+		// GDELT days may come as 2026-01-31 or 20260131; both are checked as real days, and a reversed range is refused
+		const days = new URLSearchParams();
+		for (const name of ['dateStart', 'dateEnd']) {
+			const value = url.searchParams.get(name);
+			if (value) days.set(name, /^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value);
 		}
-		if (dateEnd && !dateFormat.test(dateEnd.replace(/-/g, ''))) {
-			return json({ error: 'Invalid dateEnd format' }, { status: 400 });
-		}
+		const dateProblem = validateDateParams(days);
+		if (dateProblem) return json({ error: dateProblem }, { status: 400 });
+		const dateStart = days.get('dateStart');
+		const dateEnd = days.get('dateEnd');
 
 		const conditions: string[] = [
 			'actiongeo_lat IS NOT NULL',

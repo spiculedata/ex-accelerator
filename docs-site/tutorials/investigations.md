@@ -40,13 +40,15 @@ The investigation opens full screen.
 - **Visualizations**: a set of "portals". With social data, **Sentiment** (trend, breakdown, by source)
   and **Volume** (attention, metrics, stacked) work. **Correlation**, **Topics**, **Geography** and
   **Actors** need the optional GDELT and radio data, so they stay empty on the demo.
-- **Toolbar** (top right): **Notes**, **Export** and **Save**.
+- **Toolbar** (top right): **Notes**, **CSV** and **JSON** export, and **Save**.
 
 ## 3. Try it
 
 - Change the keywords to `fare` and compare the shape of the timeline.
 - Narrow the dates around the spike to see only that week.
-- Add a note with **Notes** to record what you found, then **Save**.
+- Add a note with **Notes** to record what you found. Notes save as you add them.
+- Open a post and choose **Add to notes** to quote it with a citation (platform, post id, author and time) so you
+  can find it again. **Export notes** in the notes bar downloads them as a Markdown list.
 
 ::: tip Optional data
 GDELT events come from the ETL pipeline (`etl/`) and radio transcripts from the WavePulse service.

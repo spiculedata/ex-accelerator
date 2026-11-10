@@ -6,7 +6,7 @@ vi.mock('$lib/services/postgres', () => ({ postgresPool: { query } }));
 
 import { GET } from './+server';
 
-const call = () => GET({ url: new URL('http://localhost/api/gdelt') } as unknown as Parameters<typeof GET>[0]);
+const call = (search = '') => GET({ url: new URL(`http://localhost/api/gdelt${search}`) } as unknown as Parameters<typeof GET>[0]);
 
 beforeEach(() => {
   query.mockReset();
@@ -40,5 +40,26 @@ describe('GET /api/gdelt', () => {
 
     expect(body.count).toBe(1);
     expect(body.unavailable).toBeUndefined();
+  });
+});
+
+describe('GET /api/gdelt date range', () => {
+  it.each([
+    ['an impossible day', '?dateStart=20269999'],
+    ['a day that does not exist', '?dateEnd=2026-02-30'],
+    ['a reversed range', '?dateStart=2026-03-01&dateEnd=2026-01-01'],
+    ['text', '?dateStart=yesterday']
+  ])('answers %s with a 400 before touching the database', async (_label, search) => {
+    const response = await call(search);
+    expect(response.status).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('still accepts dashed and plain 8-digit days and queries them as numbers', async () => {
+    query.mockResolvedValue([]);
+    await call('?dateStart=2026-01-01&dateEnd=20260131');
+    const params = query.mock.calls[0][1] as unknown[];
+    expect(params).toContain(20260101);
+    expect(params).toContain(20260131);
   });
 });
