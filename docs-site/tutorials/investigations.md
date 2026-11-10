@@ -22,8 +22,9 @@ Open **Investigations** in the navigation and choose **New Investigation**.
 5. Choose **Create**.
 
 ::: tip Starting from a workspace
-A workspace's *Create Investigation* button opens this same page with the workspace already chosen, so
-the investigation belongs to it and follows its project's membership.
+When a workspace has no investigations yet, its *Create Investigation* button opens this same page with the
+form open and the workspace already chosen, so the investigation belongs to it and follows its project's
+membership.
 :::
 
 ## 2. Read the workbench

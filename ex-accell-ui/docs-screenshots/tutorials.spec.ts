@@ -139,7 +139,7 @@ test('tutorial walkthrough', async ({ page }) => {
     const body = await (await published).json();
     created.workflow = body.workflow?.id;
     expect(created.workflow, 'publishing returned a workflow id').toBeTruthy();
-    // Publishing confirms with a browser dialog (Playwright dismisses it); the workflow is then listed on Data Management
+    // Publishing confirms with a toast; the workflow is then listed on Data Management
     await page.goto('/data-management', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /Processing Workflows/ }).click();
     await expect(page.getByText(WORKFLOW_NAME).first()).toBeVisible();
