@@ -47,8 +47,8 @@ export function formatDate(date: string | Date | undefined | null): string {
  */
 export function formatTimestamp(date: string | number | Date | undefined | null): string {
   if (date === undefined || date === null || date === '') return '—';
-  // The posts view stores times as epoch milliseconds, which arrive as a number or a numeric string
-  const value = typeof date === 'string' && /^\d{10,}$/.test(date.trim()) ? Number(date) : date;
+  // The posts view stores times as epoch milliseconds (13 digits today), which arrive as a number or a numeric string; shorter digit strings are not treated as times
+  const value = typeof date === 'string' && /^\d{12,}$/.test(date.trim()) ? Number(date) : date;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '—';
   return parsed.toLocaleString(undefined, {

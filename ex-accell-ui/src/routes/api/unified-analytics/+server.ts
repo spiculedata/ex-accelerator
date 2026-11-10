@@ -11,6 +11,7 @@ import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigr
 import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
 import { dateBoundToEpochMs } from '$lib/server/dateBounds';
 import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
+import { exportRangeConditions } from '$lib/server/exportRange';
 import { parseDateWindow, windowConditions } from '$lib/server/dateWindow';
 import { resolveWorkspaceScope, buildPlatformFilter, hasDataType } from '$lib/services/workspaceContextResolver';
 
@@ -88,6 +89,9 @@ async function hashtagPostSource(): Promise<HashtagPostSource> {
     platformColumn: 'ds.platform'
   };
 }
+
+/** The most rows one export holds, so a very large dataset cannot build an unbounded response. */
+const EXPORT_MAX_ROWS = 10_000;
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
@@ -514,6 +518,8 @@ export const GET: RequestHandler = async ({ url }) => {
     }
     
     if (type === 'export-data') {
+      const range = exportRangeConditions(url.searchParams, 1);
+      if (!range.ok) return json({ success: false, error: range.error }, { status: 400 });
       try {
         if (scope && !scope.hasSocialMedia) return json({ success: true, data: [] });
         const sentiment = url.searchParams.get('sentiment') || 'all';
@@ -541,6 +547,13 @@ export const GET: RequestHandler = async ({ url }) => {
           paramIndex++;
         }
 
+        // The date bar and the confidence slider apply too; the placeholders are renumbered after the filters above
+        const dated = exportRangeConditions(url.searchParams, paramIndex);
+        if (dated.ok) {
+          conditions.push(...dated.conditions);
+          params.push(...dated.params);
+        }
+
         const data = await executeQuery(`
           SELECT
             id,
@@ -553,6 +566,7 @@ export const GET: RequestHandler = async ({ url }) => {
           FROM posts_with_sentiment
           WHERE ${conditions.join(' AND ')}
           ORDER BY timestamp DESC
+          LIMIT ${EXPORT_MAX_ROWS}
         `, params);
         
         return json({ success: true, data: data || [] });

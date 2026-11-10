@@ -113,26 +113,38 @@
   const POST_PAGE = 50;
   const POST_MAX = 500;
   let postLimit = POST_PAGE;
-  $: hasMorePosts = samplePosts.length >= postLimit && postLimit < POST_MAX;
+  let postsLoading = false;
+  let postRequest = 0; // only the newest request may set the list, so a slow older answer cannot overwrite it
+  // One extra post is requested, so "there is more" is known exactly rather than guessed from a full page
+  let postsAvailable = 0;
+  $: hasMorePosts = postsAvailable > postLimit && postLimit < POST_MAX;
 
   function showMorePosts() {
+    if (postsLoading) return;
     postLimit = Math.min(postLimit + POST_PAGE, POST_MAX);
     return loadFilteredPosts();
   }
 
   // Load filtered posts from database
   async function loadFilteredPosts() {
+    const request = ++postRequest;
+    postsLoading = true;
     try {
       const filters = {
-        limit: postLimit,
+        limit: postLimit + 1,
         sentiment: selectedSentiment,
         platform: selectedPlatform,
         confidenceThreshold: confidenceThreshold,
         timeRange: timeRange
       };
-      samplePosts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      const posts = await sentimentAnalysisDb.getSamplePosts(filters, workspaceId || undefined);
+      if (request !== postRequest) return;
+      postsAvailable = posts.length;
+      samplePosts = posts.slice(0, postLimit);
     } catch (error) {
       console.error('Error loading filtered posts:', error);
+    } finally {
+      if (request === postRequest) postsLoading = false;
     }
   }
 
@@ -168,6 +180,8 @@
   $: filteredPosts = samplePosts;
 
 
+  // Matches the limit the export endpoint applies
+  const EXPORT_MAX_ROWS = 10_000;
   let exportState: ExportState = IDLE_EXPORT;
 
   function exportSentimentData() {
@@ -179,10 +193,10 @@
         timeRange: timeRange
       };
       const exportData = await sentimentAnalysisDb.exportSentimentData(filters, workspaceId || undefined);
-      const rows = (exportData.data ?? []).map((post: any) => ({ ...post, emotions: (post.emotions ?? []).join('; ') }));
+      const rows = exportData.data ?? [];
       // toCsv quotes embedded commas, quotes and line breaks, and neutralises text a spreadsheet would run as a formula
-      downloadCsv('sentiment_analysis_report.csv', toCsv(rows, ['text', 'sentiment', 'confidence', 'emotions', 'platform', 'timestamp']));
-      return { rows: rows.length };
+      downloadCsv('sentiment_analysis_report.csv', toCsv(rows, ['text', 'sentiment', 'confidence', 'platform', 'timestamp']));
+      return { rows: rows.length, capped: rows.length >= EXPORT_MAX_ROWS };
     }, (state) => (exportState = state));
   }
 
@@ -613,10 +627,10 @@
       {:else}
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
           <p>
-            {#if hasMorePosts}Showing the first {filteredPosts.length} posts.{:else if samplePosts.length >= POST_MAX}Showing the first {POST_MAX} posts, the most this list shows. Narrow the filters to see others.{:else}All {filteredPosts.length} matching posts are shown.{/if}
+            {#if hasMorePosts}Showing the first {filteredPosts.length} posts.{:else if postsAvailable > POST_MAX}Showing the first {POST_MAX} posts, the most this list shows. Narrow the filters to see others.{:else}All {filteredPosts.length} matching posts are shown.{/if}
           </p>
           {#if hasMorePosts}
-            <button type="button" on:click={showMorePosts} class="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50">Show {POST_PAGE} more</button>
+            <button type="button" on:click={showMorePosts} disabled={postsLoading} class="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">{postsLoading ? 'Loading…' : `Show ${POST_PAGE} more`}</button>
           {/if}
         </div>
       {/if}

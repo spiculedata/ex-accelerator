@@ -8,12 +8,12 @@ export interface ExportState {
 
 export const IDLE_EXPORT: ExportState = { kind: 'idle', message: '' };
 
-export async function runExport(work: () => Promise<{ rows: number }>, set: (state: ExportState) => void): Promise<void> {
+export async function runExport(work: () => Promise<{ rows: number; capped?: boolean }>, set: (state: ExportState) => void): Promise<void> {
   set({ kind: 'working', message: 'Preparing the export…' });
   try {
-    const { rows } = await work();
+    const { rows, capped } = await work();
     if (rows === 0) set({ kind: 'error', message: 'There is nothing to export for the current filters.' });
-    else set({ kind: 'done', message: `Downloaded ${rows} row${rows === 1 ? '' : 's'}.` });
+    else set({ kind: 'done', message: `Downloaded ${rows} row${rows === 1 ? '' : 's'}.${capped ? ' That is the most one export holds; narrow the filters to export the rest.' : ''}` });
   } catch (error) {
     console.error('Export failed:', error);
     set({ kind: 'error', message: 'The export could not be created. Try again in a moment.' });

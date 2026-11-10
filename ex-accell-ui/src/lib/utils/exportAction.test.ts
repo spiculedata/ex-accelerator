@@ -31,4 +31,10 @@ describe('runExport', () => {
     expect(log).toHaveBeenCalled();
     log.mockRestore();
   });
+
+  it('says when the export was cut at its limit', async () => {
+    const { seen, set } = track();
+    await runExport(async () => ({ rows: 10000, capped: true }), set);
+    expect(seen[1].message).toContain('the most one export holds');
+  });
 });
