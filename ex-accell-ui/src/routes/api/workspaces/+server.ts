@@ -1,7 +1,9 @@
 // Workspaces API Endpoint
 // CRUD operations for workspaces within projects
 
+import { canManageProject, parseResourceId } from '$lib/server/auth/access';
 import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
+import { loadProjectAccessInfo } from '$lib/server/auth/accessRepo';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { projectsDb } from '$lib/services/projectsDb';
@@ -103,17 +105,30 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 
 /**
  * DELETE /api/workspaces
- * Delete a workspace
+ * Delete a workspace. Members can use a workspace, but only the person who made it, the project's creator or an admin can
+ * delete it.
  */
-export const DELETE: RequestHandler = async ({ url }) => {
-  try {
-    const workspaceId = url.searchParams.get('id');
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+  const workspaceId = parseResourceId(url.searchParams.get('id'));
+  if (typeof workspaceId !== 'number') {
+    return json({ success: false, error: workspaceId === null ? 'Workspace ID required' : 'Workspace ID must be a whole number' }, { status: 400 });
+  }
+  const user = locals.user;
+  if (!user) return json({ success: false, error: 'Authentication required' }, { status: 401 });
 
-    if (!workspaceId) {
-      return json({ success: false, error: 'Workspace ID required' }, { status: 400 });
+  try {
+    const workspace = await projectsDb.getWorkspaceById(workspaceId);
+    if (!workspace) return json({ success: false, error: 'Workspace not found' }, { status: 404 });
+
+    const madeIt = !!workspace.created_by && workspace.created_by.toLowerCase() === user.email.toLowerCase();
+    if (!madeIt && user.role !== 'admin') {
+      const project = await loadProjectAccessInfo(Number(workspace.project_id));
+      if (!project || !canManageProject(user, project)) {
+        return json({ success: false, error: 'Only the person who made this workspace, the project creator or an admin can delete it.' }, { status: 403 });
+      }
     }
 
-    const success = await projectsDb.deleteWorkspace(parseInt(workspaceId));
+    const success = await projectsDb.deleteWorkspace(workspaceId);
 
     if (!success) {
       return json({ success: false, error: 'Failed to delete workspace' }, { status: 500 });
@@ -121,8 +136,7 @@ export const DELETE: RequestHandler = async ({ url }) => {
 
     return json({ success: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('DELETE /api/workspaces error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    console.error('DELETE /api/workspaces error:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, data: null, error: 'Could not delete the workspace. Try again.' }, { status: 500 });
   }
 };

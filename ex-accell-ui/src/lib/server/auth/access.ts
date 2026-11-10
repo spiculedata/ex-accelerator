@@ -19,6 +19,16 @@ export function canAccessProject(user: Pick<SessionUser, 'email' | 'role'>, proj
   return people.includes(user.email.toLowerCase());
 }
 
+/**
+ * Who may add or remove a project's members: an admin, or the person who created it. Ordinary members can see the project
+ * but not change who else can. A project from before accounts has no real creator, so only an admin manages it.
+ */
+export function canManageProject(user: Pick<SessionUser, 'email' | 'role'>, project: ProjectAccessInfo): boolean {
+  if (user.role === 'admin') return true;
+  if (user.role === 'viewer') return false;
+  return isPerson(project.createdBy) && project.createdBy.toLowerCase() === user.email.toLowerCase();
+}
+
 export interface RequestResources {
   projects: number[];
   workspaces: number[];

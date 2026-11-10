@@ -286,7 +286,7 @@ class ProjectsDatabase {
 
   async removeProjectMember(projectId: number, email: string): Promise<boolean> {
     try {
-      await postgresPool.query('DELETE FROM project_members WHERE project_id = $1 AND email = $2', [projectId, email]);
+      await postgresPool.query('DELETE FROM project_members WHERE project_id = $1 AND lower(email) = lower($2)', [projectId, email]);
       return true;
     } catch (error) {
       console.error('Error removing project member:', error);

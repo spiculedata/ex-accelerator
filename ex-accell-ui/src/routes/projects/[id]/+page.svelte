@@ -243,8 +243,66 @@
     loadDatasets();
   }
 
+  // ---------- team ----------
+  interface TeamMember { email: string; role: string; addedAt: string | null }
+  let teamMembers: TeamMember[] = [];
+  let teamCreator: string | null = null;
+  let canManageTeam = false;
+  let teamError = '';
+  let teamNotice = '';
+  let newMemberEmail = '';
+  let savingMember = false;
+
+  async function loadTeam() {
+    try {
+      const res = await fetch(`/api/project-members?project_id=${projectId}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      teamMembers = data.data.members;
+      teamCreator = data.data.createdBy;
+      canManageTeam = data.data.canManage;
+      teamError = '';
+    } catch (e) {
+      teamError = e instanceof Error ? e.message : 'Could not load the team.';
+    }
+  }
+
+  async function changeTeam(request: Promise<Response>, done: string) {
+    teamNotice = '';
+    savingMember = true;
+    try {
+      const res = await request;
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        teamError = data?.error ?? `The change failed (HTTP ${res.status}).`;
+        return;
+      }
+      teamError = '';
+      teamNotice = done;
+      await loadTeam();
+    } catch {
+      teamError = 'Could not reach the server. Try again.';
+    } finally {
+      savingMember = false;
+    }
+  }
+
+  async function addTeamMember() {
+    const email = newMemberEmail.trim();
+    if (!email) return;
+    await changeTeam(
+      fetch('/api/project-members', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: Number(projectId), email }) }),
+      `${email} can now see this project.`
+    );
+    if (!teamError) newMemberEmail = '';
+  }
+
+  const removeTeamMember = (email: string) =>
+    changeTeam(fetch(`/api/project-members?project_id=${projectId}&email=${encodeURIComponent(email)}`, { method: 'DELETE' }), `${email} can no longer see this project.`);
+
   onMount(() => {
     loadData();
+    loadTeam();
     refreshTimer = setInterval(loadData, 60000);
   });
 
@@ -521,7 +579,42 @@
       </section>
 
       <!-- ===== ACTIVITY FEED (35%) ===== -->
-      <aside class="lg:w-[35%] lg:overflow-hidden flex flex-col">
+      <aside class="lg:w-[35%] lg:overflow-hidden flex flex-col gap-4">
+        <section aria-labelledby="team-heading" class="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div class="px-5 pt-5 pb-3 border-b border-slate-100">
+            <h2 id="team-heading" class="text-sm font-semibold text-slate-900">Team</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Only these people (and admins) can see this project and what is in it.</p>
+          </div>
+          <ul class="divide-y divide-slate-100">
+            {#if teamCreator}
+              <li class="px-5 py-2.5 flex items-center justify-between gap-2 text-xs">
+                <span class="truncate text-slate-800">{teamCreator}</span>
+                <span class="shrink-0 text-slate-500">Creator</span>
+              </li>
+            {/if}
+            {#each teamMembers.filter((m) => m.email.toLowerCase() !== (teamCreator ?? '').toLowerCase()) as member (member.email)}
+              <li class="px-5 py-2.5 flex items-center justify-between gap-2 text-xs">
+                <span class="truncate text-slate-800">{member.email}</span>
+                {#if canManageTeam}
+                  <button type="button" onclick={() => removeTeamMember(member.email)} disabled={savingMember} class="shrink-0 text-slate-600 hover:text-danger-700 underline disabled:opacity-60" aria-label="Remove {member.email} from this project">Remove</button>
+                {:else}
+                  <span class="shrink-0 text-slate-500">Member</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          {#if canManageTeam}
+            <form class="px-5 py-3 border-t border-slate-100 flex gap-2" onsubmit={(event) => { event.preventDefault(); addTeamMember(); }}>
+              <label class="sr-only" for="new-member-email">Email of the person to add</label>
+              <input id="new-member-email" type="email" required bind:value={newMemberEmail} placeholder="colleague@company.com" autocomplete="off" class="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs" />
+              <button type="submit" disabled={savingMember} class="shrink-0 rounded-md bg-primary-700 px-3 py-1 text-xs font-medium text-white hover:bg-primary-800 disabled:opacity-60">Add</button>
+            </form>
+          {:else}
+            <p class="px-5 py-3 border-t border-slate-100 text-xs text-slate-500">Only the creator or an admin can change the team.</p>
+          {/if}
+          {#if teamError}<p role="alert" class="px-5 pb-3 text-xs text-danger-700">{teamError}</p>{/if}
+          {#if teamNotice}<p role="status" class="px-5 pb-3 text-xs text-success-700">{teamNotice}</p>{/if}
+        </section>
         <div class="bg-white rounded-xl shadow-sm flex flex-col overflow-hidden">
           <div class="px-5 pt-5 pb-3 border-b border-slate-100">
             <h2 class="text-sm font-semibold text-slate-900">Recent Activity</h2>

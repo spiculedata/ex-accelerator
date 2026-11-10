@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canAccessProject, parseResourceId, resourcesInRequest, type ProjectAccessInfo } from './access';
+import { canAccessProject, canManageProject, parseResourceId, resourcesInRequest, type ProjectAccessInfo } from './access';
 
 const user = (email: string, role: 'admin' | 'user' | 'viewer' = 'user') => ({ id: 'u', email, name: 'N', role });
 const project = (over: Partial<ProjectAccessInfo> = {}): ProjectAccessInfo => ({ createdBy: 'ada@example.com', memberEmails: ['ada@example.com'], ...over });
@@ -119,5 +119,27 @@ describe('parseResourceId', () => {
     for (const value of [' 9', '9 ', '+9', '09', '9abc', '9.5', 0, -1, 1.5, NaN, Infinity, '1e3', {}, [], true, 'x']) {
       expect(parseResourceId(value)).toBe('invalid');
     }
+  });
+});
+
+describe('canManageProject', () => {
+  it('lets an admin and the project creator manage its members, in any letter case', () => {
+    expect(canManageProject(user('root@example.com', 'admin'), project())).toBe(true);
+    expect(canManageProject(user('ADA@example.com'), project())).toBe(true);
+  });
+
+  it('does not let an ordinary member, or someone outside, manage them', () => {
+    const info = project({ memberEmails: ['ada@example.com', 'bob@example.com'] });
+    expect(canManageProject(user('bob@example.com'), info)).toBe(false);
+    expect(canManageProject(user('eve@example.com'), info)).toBe(false);
+  });
+
+  it('leaves a project from before accounts (no real creator) to admins only', () => {
+    expect(canManageProject(user('bob@example.com'), project({ createdBy: 'default_user', memberEmails: [] }))).toBe(false);
+    expect(canManageProject(user('root@example.com', 'admin'), project({ createdBy: 'default_user', memberEmails: [] }))).toBe(true);
+  });
+
+  it('does not let a read-only viewer manage members even as the creator', () => {
+    expect(canManageProject(user('ada@example.com', 'viewer'), project())).toBe(false);
   });
 });
