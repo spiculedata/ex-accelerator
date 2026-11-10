@@ -81,6 +81,8 @@ combination. Responses do not reveal whether an email exists.
 ## Managing users
 
 Admins open **Manage users** from the user menu (the arrow beside *Sign out*), or go to `/settings/users`.
+![The Users page: add a person, change roles, disable accounts and reset passwords](/screenshots/users.png)
+
 From there an admin can:
 
 - **Add a person** with an email, name, role and a starting password (12 or more characters). Give them the password; they change it after signing in.
