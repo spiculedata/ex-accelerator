@@ -24,7 +24,8 @@ export default defineConfig({
     command: 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
-    env: { SESSION_SECRET: E2E_SESSION_SECRET, COOKIE_SECURE: 'false' },
+    // Every test worker shares one signed-in user, so the per-person API limit is switched off for the suite
+    env: { SESSION_SECRET: E2E_SESSION_SECRET, COOKIE_SECURE: 'false', API_RATE_LIMIT_PER_MINUTE: '0' },
     timeout: 120_000,
   },
 });
