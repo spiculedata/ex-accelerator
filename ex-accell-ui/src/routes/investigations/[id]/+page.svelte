@@ -764,11 +764,11 @@
       </div>
 
       {#if dateStart || dateEnd}
-        <span class="text-[9px] font-mono text-slate-500 flex-shrink-0">{formatDateCompact(dateStart)}-{formatDateCompact(dateEnd)}</span>
+        <span class="text-[11px] font-mono text-slate-500 flex-shrink-0">{formatDateCompact(dateStart)}-{formatDateCompact(dateEnd)}</span>
       {/if}
 
       {#if $investigationSelection.timeRange && ($investigationSelection.timeRange.start !== dateStart || $investigationSelection.timeRange.end !== dateEnd)}
-        <button on:click={resetBrush} class="text-[9px] text-amber-400 hover:text-amber-300 flex-shrink-0" title="Reset time range">
+        <button on:click={resetBrush} class="text-[9px] text-amber-400 hover:text-amber-300 flex-shrink-0" title="Reset time range" aria-label="Reset time range">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -782,6 +782,8 @@
         on:click={() => showAnnotations = !showAnnotations}
         class="relative p-1 rounded transition-colors {showAnnotations ? 'text-amber-400 bg-amber-500/10' : 'text-slate-500 hover:text-slate-300'}"
         title="Notes"
+        aria-label="Notes"
+        aria-pressed={showAnnotations}
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -872,7 +874,7 @@
     </div>
 
     <!-- ============ TABS ============ -->
-    <div class="h-8 flex-shrink-0 bg-slate-900 border-b border-slate-700/50 flex items-end px-2 gap-0">
+    <div role="tablist" aria-label="Investigation sources" class="min-h-8 flex-shrink-0 bg-slate-900 border-b border-slate-700/50 flex items-end px-2 gap-0">
       <!-- Global cross-filter pill — visible on all tabs -->
       {#if activeCrossFilter}
         <div class="flex items-center gap-1.5 px-2 py-0.5 mb-0.5 mr-2 bg-indigo-500/15 border border-indigo-500/30 rounded-full self-center">
@@ -882,6 +884,7 @@
             on:click={() => clearCrossFilter()}
             class="text-indigo-400/50 hover:text-indigo-300 transition-colors"
             title="Clear filter"
+            aria-label="Clear filter"
           >
             <svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 3l6 6M9 3l-6 6" />
@@ -891,31 +894,47 @@
       {/if}
       <button
         on:click={() => activeTab = 'gdelt'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'gdelt' ? 'text-amber-400 border-amber-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-gdelt"
+        aria-selected={activeTab === 'gdelt'}
+        aria-controls="panel-gdelt"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'gdelt' ? 'text-amber-400 border-amber-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'gdelt' ? 'bg-amber-500' : 'bg-slate-600'}"></span>
         GDELT
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'gdelt' ? 'text-amber-400/70' : 'text-slate-600'}">{tabCounts.gdelt >= 200 ? '200+' : tabCounts.gdelt}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'gdelt' ? 'text-amber-400/70' : 'text-slate-600'}">{tabCounts.gdelt >= 200 ? '200 max' : tabCounts.gdelt}</span>
       </button>
       <button
         on:click={() => activeTab = 'radio'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'radio' ? 'text-violet-400 border-violet-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-radio"
+        aria-selected={activeTab === 'radio'}
+        aria-controls="panel-radio"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'radio' ? 'text-violet-400 border-violet-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'radio' ? 'bg-violet-500' : 'bg-slate-600'}"></span>
         Radio
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'radio' ? 'text-violet-400/70' : 'text-slate-600'}">{tabCounts.radio}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'radio' ? 'text-violet-400/70' : 'text-slate-600'}">{tabCounts.radio}</span>
       </button>
       <button
         on:click={() => activeTab = 'social'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'social' ? 'text-sky-400 border-sky-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-social"
+        aria-selected={activeTab === 'social'}
+        aria-controls="panel-social"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'social' ? 'text-sky-400 border-sky-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <span class="inline-block w-1.5 h-1.5 rounded-full mr-1 {activeTab === 'social' ? 'bg-sky-500' : 'bg-slate-600'}"></span>
         Social
-        <span class="ml-1 text-[9px] font-mono {activeTab === 'social' ? 'text-sky-400/70' : 'text-slate-600'}">{tabCounts.social >= 200 ? '200+' : tabCounts.social}</span>
+        <span class="ml-1 text-[11px] font-mono {activeTab === 'social' ? 'text-sky-400/70' : 'text-slate-600'}">{tabCounts.social >= 200 ? '200 max' : tabCounts.social}</span>
       </button>
       <button
         on:click={() => activeTab = 'visualizations'}
-        class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b-2 transition-colors {activeTab === 'visualizations' ? 'text-indigo-400 border-indigo-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
+        role="tab"
+        id="tab-visualizations"
+        aria-selected={activeTab === 'visualizations'}
+        aria-controls="panel-visualizations"
+        class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 {activeTab === 'visualizations' ? 'text-indigo-400 border-indigo-400 bg-slate-800/50' : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'}"
       >
         <svg class="inline-block w-3 h-3 mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -929,10 +948,20 @@
 
       <!-- GDELT Tab -->
       {#if activeTab === 'gdelt'}
+        <div role="tabpanel" id="panel-gdelt" aria-labelledby="tab-gdelt" class="h-full">
         {#if gdeltLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
+        {:else if crossFilteredGdelt.length === 0}
+          <div class="flex flex-col items-center justify-center h-full gap-1 text-sm text-slate-400">
+            <p>No GDELT events match these keywords{activeCrossFilter ? ' and the active filter' : ''}.</p>
+            <p class="text-xs text-slate-500">Matching looks for the keyword anywhere in a word. Try different keywords or a wider date range.</p>
+          </div>
         {:else}
           <div class="h-full overflow-y-auto">
+            <p class="px-3 py-1.5 text-xs text-slate-400 bg-slate-900/60 border-b border-slate-800">
+              Keywords match anywhere in a word, so “bus” also finds “business”.
+              {#if tabCounts.gdelt >= 200}<span class="text-amber-300">Showing the first 200 matches; narrow the keywords or dates to see others.</span>{/if}
+            </p>
             <table class="w-full text-xs">
               <thead class="sticky top-0 z-10">
                 <tr class="bg-slate-900">
@@ -1004,7 +1033,7 @@
                               <span class="text-slate-500">Unknown</span>
                             {/if}
                             {#if event.actiongeo_lat && event.actiongeo_long}
-                              <span class="text-[9px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
+                              <span class="text-[11px] font-mono text-slate-600 ml-1">({Number(event.actiongeo_lat).toFixed(2)}, {Number(event.actiongeo_long).toFixed(2)})</span>
                             {/if}
                           </div>
                           <div>
@@ -1030,10 +1059,12 @@
             </table>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Radio Tab -->
       {#if activeTab === 'radio'}
+        <div role="tabpanel" id="panel-radio" aria-labelledby="tab-radio" class="h-full">
         {#if radioLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
         {:else if crossFilteredRadio.length === 0}
@@ -1091,16 +1122,22 @@
             </div>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Social Tab -->
       {#if activeTab === 'social'}
+        <div role="tabpanel" id="panel-social" aria-labelledby="tab-social" class="h-full">
         {#if socialLoading}
           <div class="flex items-center justify-center h-full"><svg class="animate-spin h-5 w-5 text-sky-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></div>
         {:else if crossFilteredSocial.length === 0}
           <div class="flex items-center justify-center h-full text-slate-500 text-sm">No social posts found</div>
         {:else}
           <div class="h-full overflow-y-auto">
+            <p class="px-3 py-1.5 text-xs text-slate-400 bg-slate-900/60 border-b border-slate-800">
+              Keywords match anywhere in a word, so “bus” also finds “business”.
+              {#if tabCounts.social >= 200}<span class="text-amber-300">Showing the first 200 matches; narrow the keywords or dates to see others.</span>{/if}
+            </p>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-slate-800/30 p-1">
               {#each crossFilteredSocial as post}
                 {@const isExpanded = expandedSocialId === post.id}
@@ -1142,10 +1179,10 @@
                         </div>
                       {/if}
                       {#if post.confidence_score}
-                        <span class="text-[9px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
+                        <span class="text-[11px] font-mono text-slate-600">{(post.confidence_score * 100).toFixed(0)}%</span>
                       {/if}
                       {#if post.timestamp}
-                        <span class="text-[9px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
+                        <span class="text-[11px] font-mono text-slate-600">{formatPostDate(post.timestamp)}</span>
                       {/if}
                     </div>
                   </div>
@@ -1191,10 +1228,12 @@
             </div>
           </div>
         {/if}
+        </div>
       {/if}
 
       <!-- Visualizations Tab — Analytical Portals -->
       {#if activeTab === 'visualizations'}
+        <div role="tabpanel" id="panel-visualizations" aria-labelledby="tab-visualizations" class="h-full">
         <div class="h-full overflow-y-auto p-3">
           <!-- Portal toolbar -->
           <div class="flex items-center gap-1.5 mb-3">
@@ -1219,6 +1258,7 @@
                   on:click={() => clearCrossFilter()}
                   class="text-indigo-400/50 hover:text-indigo-300 transition-colors ml-0.5"
                   title="Clear filter"
+                  aria-label="Clear filter"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 3l6 6M9 3l-6 6" />
@@ -1284,6 +1324,8 @@
                   <CorrelationPortal
                     timelineData={filteredTimelineData}
                     gdeltEvents={crossFilteredGdelt}
+                    gdeltTotal={gdeltEvents.length}
+                    {gdeltLoading}
                     height={portalHeight(item)}
                     crossFilter={activeCrossFilter}
                     on:crossfilter={handleCrossFilter}
@@ -1320,6 +1362,7 @@
               </div>
             {/each}
           </div>
+        </div>
         </div>
       {/if}
 

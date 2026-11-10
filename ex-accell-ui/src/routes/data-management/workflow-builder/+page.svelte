@@ -50,6 +50,16 @@
   // Saving drafts: the id of the saved draft, so later saves update it instead of creating copies
   let savedWorkflowId: string | null = $state(null);
   let saveState: { kind: 'idle' | 'saving' | 'saved' | 'error'; message: string } = $state({ kind: 'idle', message: '' });
+  // Results and problems appear in the toolbar status, not in a blocking browser alert
+  // A toast above any open dialog, so a failed publish or run is seen where the visitor is looking
+  let notice: { kind: 'saved' | 'error'; message: string } | null = $state(null);
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  const NOTICE_MS = 8000;
+  const notify = (kind: 'saved' | 'error', message: string) => {
+    notice = { kind, message };
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = null), NOTICE_MS);
+  };
 
   // Publish workflow state
   let loadingPublish = $state(false);
@@ -185,7 +195,7 @@
 
   function runWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before running');
+      notify('error', 'Add steps to the workflow before running it.');
       return;
     }
     workflowBuilder.toggleExecuteDialog(true);
@@ -193,7 +203,7 @@
 
   async function publishWorkflow() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before publishing');
+      notify('error', 'Add steps to the workflow before publishing it.');
       return;
     }
 
@@ -229,14 +239,14 @@
       const result = await response.json();
 
       if (result.success) {
-        alert(`Workflow "${publishMetadata.name}" published successfully!`);
+        notify('saved', `Workflow "${publishMetadata.name}" published.`);
         workflowBuilder.togglePublishDialog(false);
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error publishing workflow:', error);
-      alert('Error publishing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be published. Try again.');
     } finally {
       loadingPublish = false;
     }
@@ -295,13 +305,13 @@
 
       if (result.success) {
         workflowBuilder.toggleExecuteDialog(false);
-        alert('Workflow execution started successfully!');
+        notify('saved', 'Workflow execution started.');
       } else {
         throw new Error(result.error || 'Unknown error');
       }
     } catch (error) {
       console.error('Error executing workflow:', error);
-      alert('Error executing workflow: ' + (error as Error).message);
+      notify('error', 'The workflow could not be started. Try again.');
     } finally {
       loadingExecute = false;
     }
@@ -313,7 +323,7 @@
 
   async function generateDaprCode() {
     if (workflow.steps.length === 0) {
-      alert('Please add steps to your workflow before generating code');
+      notify('error', 'Add steps to the workflow before generating code.');
       return;
     }
 
@@ -348,7 +358,7 @@
       }
     } catch (error) {
       console.error('Error generating Python workflow code:', error);
-      alert('Error generating Python workflow code: ' + (error as Error).message);
+      notify('error', 'The code could not be generated. Check that every step is set up, then try again.');
     }
   }
 
@@ -398,7 +408,7 @@
       // Success feedback handled by modal
     }).catch(err => {
       console.error('Failed to copy to clipboard:', err);
-      alert('Failed to copy to clipboard');
+      notify('error', 'Copying failed. Select the code and copy it by hand.');
     });
   }
 </script>
@@ -409,6 +419,16 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
+  <!-- Always present so a message added later is announced; sits above the dialogs -->
+  <div role="status" aria-live="polite" class="pointer-events-none fixed inset-x-0 top-4 z-[70] flex justify-center px-4">
+    {#if notice}
+      <div class="pointer-events-auto flex max-w-xl items-start gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg {notice.kind === 'error' ? 'border-danger-300 bg-danger-50 text-danger-900' : 'border-success-300 bg-success-50 text-success-900'}">
+        <span>{notice.message}</span>
+        <button type="button" class="shrink-0 font-medium underline" onclick={() => (notice = null)}>Dismiss</button>
+      </div>
+    {/if}
+  </div>
+
   <!-- Page Header -->
   <div class="bg-white shadow-sm border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
