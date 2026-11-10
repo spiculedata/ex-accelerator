@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ request, cookies, getClientAddress 
 
     const sessionUser: SessionUser = { id: user.id, email: user.email, name: user.name, role: user.role };
     const config = getAuthConfig();
-    cookies.set(SESSION_COOKIE, createSessionToken(sessionUser, config.sessionSecret, config.sessionTtlSeconds), {
+    cookies.set(SESSION_COOKIE, createSessionToken(sessionUser, config.sessionSecret, config.sessionTtlSeconds, Date.now(), user.sessionVersion), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',

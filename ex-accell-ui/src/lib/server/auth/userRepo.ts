@@ -8,6 +8,8 @@ export interface UserRecord {
   name: string;
   role: UserRole;
   passwordHash: string;
+  /** Raised to end every session issued before it (sign out everywhere, a password change, removing the user). */
+  sessionVersion: number;
 }
 
 export interface NewUser {
@@ -25,9 +27,10 @@ interface UserRow {
   name: string;
   role: UserRole;
   password_hash: string;
+  session_version: number | string;
 }
 
-const USER_COLUMNS = 'id, email, name, role, password_hash';
+const USER_COLUMNS = 'id, email, name, role, password_hash, session_version';
 
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS app_users (
@@ -36,13 +39,16 @@ const CREATE_TABLE_SQL = `
     name          text NOT NULL,
     role          text NOT NULL CHECK (role IN ('admin', 'user', 'viewer')),
     password_hash text NOT NULL,
+    session_version integer NOT NULL DEFAULT 0,
     created_at    timestamptz NOT NULL DEFAULT now(),
     last_login_at timestamptz
   )`;
+// For a table made before session versions existed
+const ADD_SESSION_VERSION_SQL = 'ALTER TABLE app_users ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0';
 const CREATE_INDEX_SQL = 'CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_lower_idx ON app_users (lower(email))';
 
 function toRecord(row: UserRow): UserRecord {
-  return { id: row.id, email: row.email, name: row.name, role: row.role, passwordHash: row.password_hash };
+  return { id: row.id, email: row.email, name: row.name, role: row.role, passwordHash: row.password_hash, sessionVersion: Number(row.session_version ?? 0) };
 }
 
 let schemaReady: Promise<void> | null = null;
@@ -52,6 +58,7 @@ export function ensureAuthSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
       await query(CREATE_TABLE_SQL);
+      await query(ADD_SESSION_VERSION_SQL);
       await query(CREATE_INDEX_SQL);
     })().catch((error: unknown) => {
       schemaReady = null;
@@ -76,6 +83,22 @@ export async function createUser(input: NewUser): Promise<UserRecord> {
     [input.email, input.name, input.role, passwordHash]
   );
   return toRecord(rows[0]);
+}
+
+/** The user's current session version, or null when there is no such user (so their sessions end). */
+export async function getSessionVersion(userId: string): Promise<number | null> {
+  const rows = await query<{ session_version: number | string }>('SELECT session_version FROM app_users WHERE id = $1', [userId]);
+  return rows.length > 0 ? Number(rows[0].session_version) : null;
+}
+
+/** Ends every session issued so far for this user. One statement, so simultaneous changes each count. Returns the new version. */
+export async function bumpSessionVersion(userId: string): Promise<number> {
+  const rows = await query<{ session_version: number | string }>(
+    'UPDATE app_users SET session_version = session_version + 1 WHERE id = $1 RETURNING session_version',
+    [userId]
+  );
+  if (rows.length === 0) throw new Error('No such user');
+  return Number(rows[0].session_version);
 }
 
 export async function recordLogin(userId: string): Promise<void> {

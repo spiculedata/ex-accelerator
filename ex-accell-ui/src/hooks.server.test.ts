@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const config = vi.hoisted(() => ({ secureCookies: false }));
 
@@ -6,6 +6,14 @@ vi.mock('$lib/server/auth/runtime', () => ({
   SESSION_COOKIE: 'ex_session',
   getAuthConfig: () => ({ sessionSecret: 's'.repeat(32), sessionTtlSeconds: 3600, secureCookies: config.secureCookies })
 }));
+
+const { isSessionCurrent } = vi.hoisted(() => ({ isSessionCurrent: vi.fn() }));
+vi.mock('$lib/server/auth/revocation', () => ({ isSessionCurrent }));
+
+beforeEach(() => {
+  isSessionCurrent.mockReset();
+  isSessionCurrent.mockResolvedValue(true);
+});
 
 import { handle } from './hooks.server';
 import { createSessionToken, type SessionUser } from '$lib/server/auth/session';
@@ -20,7 +28,7 @@ async function run(path: string, { method = 'GET', user }: { method?: string; us
   const event = {
     url: new URL(`http://localhost${path}`),
     request: new Request(`http://localhost${path}`, { method }),
-    cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined) },
+    cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: () => {} },
     locals: {} as { user: SessionUser | null }
   };
   const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
@@ -60,7 +68,7 @@ describe('handle', () => {
     const event = {
       url: new URL('http://localhost/api/projects'),
       request: new Request('http://localhost/api/projects'),
-      cookies: { get: () => 'forged.token' },
+      cookies: { get: () => 'forged.token', delete: () => {} },
       locals: {} as { user: SessionUser | null }
     };
 
@@ -119,7 +127,7 @@ describe('security headers', () => {
       const event = {
         url: new URL(`http://localhost${path}`),
         request: new Request(`http://localhost${path}`),
-        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined) },
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: () => {} },
         locals: {} as { user: SessionUser | null }
       };
       return handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
@@ -143,7 +151,7 @@ describe('security headers', () => {
       const event = {
         url: new URL('http://localhost/api/projects'),
         request: new Request('http://localhost/api/projects', { method: 'POST', headers }),
-        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined) },
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: () => {} },
         locals: {} as { user: SessionUser | null }
       };
       const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
@@ -167,12 +175,53 @@ describe('security headers', () => {
       const event = {
         url: new URL('http://localhost/api/auth/login'),
         request: new Request('http://localhost/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example' } }),
-        cookies: { get: () => undefined },
+        cookies: { get: () => undefined, delete: () => {} },
         locals: {} as { user: SessionUser | null }
       };
       const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
       expect(response.status).toBe(403);
       expect(resolve).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('revoked sessions', () => {
+    const request = async (revoked: boolean) => {
+      isSessionCurrent.mockResolvedValue(!revoked);
+      const resolve = vi.fn().mockResolvedValue(new Response('ok'));
+      const token = createSessionToken(admin, SECRET, 3600, Date.now(), 4);
+      const deleted: string[] = [];
+      const event = {
+        url: new URL('http://localhost/api/projects'),
+        request: new Request('http://localhost/api/projects'),
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: (name: string) => { deleted.push(name); } },
+        locals: {} as { user: SessionUser | null }
+      };
+      const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
+      return { response, resolve, deleted, event };
+    };
+
+    it('asks whether the session\'s version is still current, using the user and version in the token', async () => {
+      await request(false);
+      expect(isSessionCurrent).toHaveBeenCalledWith(admin.id, 4);
+    });
+
+    it('treats a revoked session as signed out, without reaching the route, and clears the cookie', async () => {
+      const { response, resolve, deleted, event } = await request(true);
+      expect(response.status).toBe(401);
+      expect(resolve).not.toHaveBeenCalled();
+      expect(event.locals.user).toBeNull();
+      expect(deleted).toEqual(['ex_session']);
+    });
+
+    it('lets a current session through', async () => {
+      const { response, resolve } = await request(false);
+      expect(response.status).toBe(200);
+      expect(resolve).toHaveBeenCalled();
+    });
+
+    it('does not ask about a request with no session at all', async () => {
+      await run('/login');
+      expect(isSessionCurrent).not.toHaveBeenCalled();
     });
   });
 });
