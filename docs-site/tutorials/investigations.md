@@ -21,10 +21,9 @@ Open **Investigations** in the navigation and choose **New Investigation**.
 4. Under **Data Sources**, untick the sources you have no data for. The demo data only has *Social Media*.
 5. Choose **Create**.
 
-::: info Use the Investigations page
-The workspace page also shows a *Create Investigation* button, but it does not do anything yet
-([#102](https://github.com/spiculedata/social-explorer/issues/102)). Always create investigations from
-**Investigations** in the navigation.
+::: tip Starting from a workspace
+A workspace's *Create Investigation* button opens this same page with the workspace already chosen, so
+the investigation belongs to it and follows its project's membership.
 :::
 
 ## 2. Read the workbench
@@ -35,7 +34,7 @@ The investigation opens full screen.
 
 - **Timeline** (top): one lane per source, GDELT, Radio and Social, with the volume of matching items
   per day, coloured by sentiment. Here the Social lane shows the spike in transit posts.
-- **Tabs** (middle): each source with its count of matches. It opens on the first tab that has results.
+- **Tabs** (middle): each source with its count of matches, for example *Social 139*. It opens on the first tab that has results.
   The **Social** tab lists each matching post with its platform, sentiment, engagement and date.
 - **Visualizations**: a set of "portals". With social data, **Sentiment** (trend, breakdown, by source)
   and **Volume** (attention, metrics, stacked) work. **Correlation**, **Topics**, **Geography** and

@@ -40,9 +40,15 @@ Stop it (`docker stop dapr_scheduler`) or leave `dapr-placement` out of the comp
 reason. Administrators can add any dataset; other users need access to it, and granting access is an
 administrator action. The demo datasets are public.
 
-**A workspace card says "0 records" although I linked datasets** ([#102](https://github.com/spiculedata/social-explorer/issues/102)). Those counters track data sources
-added through Data Capture. Linked datasets control what the dashboards show; the Workspace selector
-in the navigation shows their post count.
+**A workspace card says "0 records" although I linked datasets.** The count is the posts in the linked
+datasets, so it reads 0 when those datasets hold no posts yet, or when the link did not succeed (a notice
+under the workspaces heading says why). The Workspace selector in the navigation shows the same post count.
+
+**A project or workspace is missing for someone.** Projects that list members are visible only to those
+members, their creator and administrators. Add the person's email to the project's team members.
+
+**Publish is greyed out in the Workflow Builder.** A step still reads *needs setup*. Hover Publish to see which
+setting is missing, and see [Build and publish a workflow](/tutorials/workflows).
 
 ## Data Capture and workflows
 
