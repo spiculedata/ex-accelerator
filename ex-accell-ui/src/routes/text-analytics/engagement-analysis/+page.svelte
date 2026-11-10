@@ -409,16 +409,9 @@
 <div class="min-h-screen bg-gray-50">
   <PageHeader
     title="Engagement Analysis"
-    subtitle="Track likes, shares, comments, and engagement rates across all your social media content"
+    subtitle="Likes, shares, comments and engagement rates across your content"
     accentColor="cyan"
     backHref="/text-analytics">
-    <svelte:fragment slot="icon">
-      <div class="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
-        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-        </svg>
-      </div>
-    </svelte:fragment>
     <svelte:fragment slot="actions">
       <button
         on:click={exportEngagementData}
@@ -427,7 +420,7 @@
       </button>
       <button
         on:click={() => goto('/text-analytics/research-investigation')}
-        class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
+        class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors border border-white/20 backdrop-blur-sm">
         Research Notebooks
       </button>
     </svelte:fragment>
