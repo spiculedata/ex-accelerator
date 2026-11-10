@@ -1,4 +1,4 @@
-// A simple limit on how many API requests one client may make a minute: a fixed window per key, in memory. It stops a
+// A simple limit on how many API requests one signed-in person may make a minute: a fixed window per key, in memory. It stops a
 // runaway script or a flood from one account or address; it is not a defence against a distributed attack, and with
 // several server processes each counts on its own.
 
@@ -48,5 +48,6 @@ export function createRateLimiter({ limit, windowMs, maxKeys = DEFAULT_MAX_KEYS 
 /** Reads API_RATE_LIMIT_PER_MINUTE: a whole number (0 turns the limit off); anything else uses the default. */
 export function parseRateLimit(value: string | undefined): number {
   if (value === undefined || !/^\d+$/.test(value)) return DEFAULT_REQUESTS_PER_MINUTE;
-  return Number(value);
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : DEFAULT_REQUESTS_PER_MINUTE;
 }

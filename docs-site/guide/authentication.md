@@ -101,14 +101,17 @@ this one stays signed in.
 
 ## Request limits and page security
 
-- **API rate limit.** Each signed-in person may make 1200 `/api/*` requests a minute (one address, when not signed in).
-  Beyond that the server answers `429` with `Retry-After`. Pages and `/api/health` are not counted. Change it with
-  `API_RATE_LIMIT_PER_MINUTE` (`0` turns it off). It stops a runaway script, not a distributed flood, and each
-  server process counts separately.
+- **API rate limit.** Each signed-in person may make 1200 `/api/*` requests a minute, across all their tabs and
+  devices. Beyond that the server answers `429` with `Retry-After`. Pages, `/api/health` and requests that are not
+  signed in are not counted (not-signed-in requests are refused cheaply, and sign-in has its own per-address and
+  per-account limits). Change it with `API_RATE_LIMIT_PER_MINUTE` (`0` turns it off). It stops a runaway script, not a
+  distributed flood, and each server process counts separately.
 - **Content-Security-Policy.** Pages are served with a policy that runs scripts only from the site itself (the
   framework's inline scripts carry a per-response nonce), allows no `eval`, lets pages call only their own server,
   and blocks plugins, framing by other sites and form posts elsewhere. Images and media may come from any `https`
-  site (map tiles, post images, radio streams), and the Jupyter page may frame the Jupyter server. A reverse proxy
+  site (map tiles, post images, radio streams), which means a page that were somehow tricked into showing attacker
+  markup could still leak data through an image request; scripts and `fetch` calls cannot. The Jupyter page may frame
+  the Jupyter server (any `http` or `https` address, since its address is configurable). A reverse proxy
   must not strip or replace this header.
 
 ## Current limitations

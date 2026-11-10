@@ -55,7 +55,7 @@ describe('parseRateLimit', () => {
     expect(parseRateLimit('0')).toBe(0);
   });
 
-  it.each(['abc', '-5', '1.5', '10x', ' '])('falls back to the default for %j', (value) => {
+  it.each(['abc', '-5', '1.5', '10x', ' ', '99999999999999999999'])('falls back to the default for %j', (value) => {
     expect(parseRateLimit(value)).toBe(DEFAULT_REQUESTS_PER_MINUTE);
   });
 });

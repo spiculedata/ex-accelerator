@@ -66,9 +66,15 @@ describe('API rate limit', () => {
     }
   });
 
-  it('limits anonymous API calls by address, ahead of the sign-in check', async () => {
-    for (let i = 0; i < 3; i++) expect((await run('/api/projects', { address: '10.0.0.4' })).response.status).toBe(401);
-    expect((await run('/api/projects', { address: '10.0.0.4' })).response.status).toBe(429);
-    expect((await run('/api/projects', { address: '10.0.0.5' })).response.status).toBe(401);
+  it('does not count anonymous requests, so one noisy address (or a proxy shared by everyone) cannot lock people out of signing in', async () => {
+    for (let i = 0; i < 10; i++) {
+      expect((await run('/api/projects', { address: '10.0.0.4' })).response.status).toBe(401);
+      expect((await run('/api/auth/login', { address: '10.0.0.4', method: 'POST' })).response.status).toBe(200);
+    }
+  });
+
+  it('does not count a person whose session has ended either', async () => {
+    isSessionCurrent.mockResolvedValue('revoked');
+    for (let i = 0; i < 10; i++) expect((await run('/api/auth/login', { user: ada, address: '10.0.0.6', method: 'POST' })).response.status).toBe(200);
   });
 });
