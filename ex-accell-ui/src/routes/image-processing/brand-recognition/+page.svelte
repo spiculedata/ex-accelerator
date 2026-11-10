@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount } from 'svelte';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
@@ -54,7 +55,7 @@
       grid: { left: 10, right: 40, top: 40, bottom: 20, containLabel: true },
       xAxis: { type: 'value' },
       yAxis: { type: 'category', data: brandStats.map((b: any) => b.brand_name).reverse(), axisLabel: { fontSize: 11 } },
-      series: [{ type: 'bar', data: brandStats.map((b: any) => parseInt(b.count)).reverse(), itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
+      series: [{ type: 'bar', data: brandStats.map((b: any) => parseInt(b.count)).reverse(), itemStyle: { color: CHART.catOrange, borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
     });
   }
 
@@ -66,7 +67,7 @@
   <meta name="description" content="Find brands and logos in images." />
 </svelte:head>
 
-<PageHeader title="Brand Recognition" subtitle="Detect logos and brand placements in visual content" accentColor="amber" />
+<PageHeader title="Brand Recognition" subtitle="Detect logos and brand placements in visual content" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}

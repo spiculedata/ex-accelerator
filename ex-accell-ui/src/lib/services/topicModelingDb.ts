@@ -2,6 +2,7 @@
 // Uses PostgreSQL with pg_duckdb extension via unified analytics API
 
 import { BaseDatabaseService } from './baseDatabaseService';
+import { CHART } from '$lib/utils/chartColors';
 import type {
   Topic,
   TopicKeyword,
@@ -107,7 +108,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
         id: topic.topic_id,
         name: topic.name,
         category: topic.category || 'General',
-        categoryColor: topic.category_color || '#6b7280',
+        categoryColor: topic.category_color || CHART.ink500,
         size: topic.size || 0,
         weight: topic.coherence_score || 0,
         coherenceScore: topic.coherence_score || 0,
@@ -136,7 +137,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
       categories,
       (category) => ({
         category: category.category,
-        category_color: category.category_color || '#6b7280',
+        category_color: category.category_color || CHART.ink500,
         topic_count: category.topic_count || 0,
         total_size: category.total_size || 0,
         avg_coherence: category.avg_coherence || 0
@@ -194,12 +195,12 @@ class TopicModelingDatabase extends BaseDatabaseService {
         name: topic.name,
         description: `Topic: ${topic.name} (${topic.category || 'General'})`,
         category: topic.category || 'General',
-        categoryColor: topic.category_color || '#6b7280',
+        categoryColor: topic.category_color || CHART.ink500,
         size: topic.size || 0,
         weight: topic.coherence_score || 0,
         coherenceScore: topic.coherence_score || 0,
         topWords: keywordMap.get(topic.topic_id) || [],
-        color: topic.category_color || '#6b7280',
+        color: topic.category_color || CHART.ink500,
         documentCount: topic.size || 0
       }),
       []
@@ -444,7 +445,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
         categoryMap.set(categoryName, {
           name: categoryName,
           value: 0,
-          itemStyle: { color: '#6b7280' },
+          itemStyle: { color: CHART.ink500 },
           children: []
         });
       }
@@ -453,7 +454,7 @@ class TopicModelingDatabase extends BaseDatabaseService {
       category.children!.push({
         name: topic.name,
         value: topic.size,
-        itemStyle: { color: topic.categoryColor || '#6b7280' }
+        itemStyle: { color: topic.categoryColor || CHART.ink500 }
       });
       category.value += topic.size;
     });

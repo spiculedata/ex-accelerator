@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
@@ -67,7 +68,7 @@
         grid: { left: 10, right: 40, top: 40, bottom: 20, containLabel: true },
         xAxis: { type: 'value' },
         yAxis: { type: 'category', data: top15.map((t: any) => t.tag).reverse(), axisLabel: { fontSize: 10, width: 120, overflow: 'truncate' } },
-        series: [{ type: 'bar', data: top15.map((t: any) => parseInt(t.count)).reverse(), itemStyle: { color: '#8b5cf6', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
+        series: [{ type: 'bar', data: top15.map((t: any) => parseInt(t.count)).reverse(), itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', fontSize: 10 } }]
       });
     }
 
@@ -91,7 +92,7 @@
   <meta name="description" content="Tag and categorise images with zero-shot classification." />
 </svelte:head>
 
-<PageHeader title="Image Classification" subtitle="CLIP zero-shot classification with custom taxonomy" accentColor="purple" />
+<PageHeader title="Image Classification" subtitle="CLIP zero-shot classification with custom taxonomy" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}

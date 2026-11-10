@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
 
@@ -20,18 +21,18 @@
 	let containerWidth = 800;
 
 	const metrics: { key: string; label: string; color: string; source: 'gdelt' | 'radio' | 'social'; unit: string }[] = [
-		{ key: 'gdelt_events', label: 'GDELT Events', color: '#f59e0b', source: 'gdelt', unit: '' },
-		{ key: 'gdelt_avg_goldstein', label: 'Goldstein Scale', color: '#22c55e', source: 'gdelt', unit: '' },
-		{ key: 'radio_volume', label: 'Radio Segments', color: '#a78bfa', source: 'radio', unit: '' },
-		{ key: 'radio_sentiment', label: 'Radio Sentiment', color: '#8b5cf6', source: 'radio', unit: '' },
-		{ key: 'social_volume', label: 'Social Posts', color: '#38bdf8', source: 'social', unit: '' },
-		{ key: 'social_sentiment', label: 'Social Sentiment', color: '#0ea5e9', source: 'social', unit: '' },
+		{ key: 'gdelt_events', label: 'GDELT Events', color: CHART.catOrange, source: 'gdelt', unit: '' },
+		{ key: 'gdelt_avg_goldstein', label: 'Goldstein Scale', color: CHART.catGreen, source: 'gdelt', unit: '' },
+		{ key: 'radio_volume', label: 'Radio Segments', color: CHART.catPink, source: 'radio', unit: '' },
+		{ key: 'radio_sentiment', label: 'Radio Sentiment', color: CHART.catPink, source: 'radio', unit: '' },
+		{ key: 'social_volume', label: 'Social Posts', color: CHART.catSky, source: 'social', unit: '' },
+		{ key: 'social_sentiment', label: 'Social Sentiment', color: CHART.catSky, source: 'social', unit: '' },
 	];
 
 	const sourceColors: Record<string, string> = {
-		gdelt: '#f59e0b',
-		radio: '#a78bfa',
-		social: '#38bdf8',
+		gdelt: CHART.catOrange,
+		radio: CHART.catPink,
+		social: CHART.catSky,
 	};
 
 	onMount(() => {
@@ -99,7 +100,7 @@
 
 		const hoverLine = svgEl.append('line')
 			.attr('y1', 0).attr('y2', totalHeight)
-			.attr('stroke', '#475569').attr('stroke-width', 1).attr('stroke-dasharray', '3,3')
+			.attr('stroke', CHART.ink600).attr('stroke-width', 1).attr('stroke-dasharray', '3,3')
 			.attr('pointer-events', 'none').style('opacity', 0);
 
 		metrics.forEach((metric, i) => {
@@ -114,12 +115,12 @@
 			// Cell background
 			cellG.append('rect')
 				.attr('width', cellWidth).attr('height', cellHeight)
-				.attr('fill', '#0f172a').attr('rx', 4).attr('stroke', '#1e293b').attr('stroke-width', 1);
+				.attr('fill', CHART.ink900).attr('rx', 4).attr('stroke', CHART.ink800).attr('stroke-width', 1);
 
 			// Metric label
 			cellG.append('text')
 				.attr('x', 8).attr('y', 13)
-				.attr('fill', '#94a3b8').attr('font-size', '9px').attr('font-weight', '600')
+				.attr('fill', CHART.ink400).attr('font-size', '9px').attr('font-weight', '600')
 				.text(metric.label);
 
 			// Current value (last data point)
@@ -148,7 +149,7 @@
 					sparkG.append('line')
 						.attr('x1', 0).attr('x2', sparkW)
 						.attr('y1', zeroY).attr('y2', zeroY)
-						.attr('stroke', '#334155').attr('stroke-width', 1).attr('stroke-dasharray', '2,2');
+						.attr('stroke', CHART.ink700).attr('stroke-width', 1).attr('stroke-dasharray', '2,2');
 				}
 			}
 
@@ -163,8 +164,8 @@
 			sparkG.append('g')
 				.call(yAxis)
 				.call((g) => g.select('.domain').remove())
-				.call((g) => g.selectAll('.tick line').attr('stroke', '#1e293b'))
-				.call((g) => g.selectAll('.tick text').attr('fill', '#64748b').attr('font-size', '8px'));
+				.call((g) => g.selectAll('.tick line').attr('stroke', CHART.ink800))
+				.call((g) => g.selectAll('.tick text').attr('fill', CHART.ink500).attr('font-size', '8px'));
 
 			// Area fill
 			const area = d3.area<any>()
@@ -201,9 +202,9 @@
 				.attr('cx', (d: any) => xScale(d.parsedDate))
 				.attr('cy', (d: any) => yScale(d[metric.key]))
 				.attr('r', (d: any) => highlightDays?.has(d.date) ? 4.5 : 2.5)
-				.attr('fill', (d: any) => highlightDays?.has(d.date) ? '#818cf8' : metric.color)
+				.attr('fill', (d: any) => highlightDays?.has(d.date) ? CHART.primary400 : metric.color)
 				.attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
-				.attr('stroke', (d: any) => highlightDays?.has(d.date) ? '#e0e7ff' : '#0f172a')
+				.attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary100 : CHART.ink900)
 				.attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
 				.style('cursor', 'pointer')
 				.on('click', (_event: any, d: any) => {
@@ -216,7 +217,7 @@
 				if (cfDate) {
 					const cx = xScale(cfDate);
 					sparkG.append('line').attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', sparkH)
-						.attr('stroke', '#818cf8').attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('opacity', 0.6);
+						.attr('stroke', CHART.primary400).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('opacity', 0.6);
 				}
 			}
 

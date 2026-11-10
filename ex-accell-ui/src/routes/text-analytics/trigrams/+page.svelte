@@ -105,9 +105,10 @@
   const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
 
   function getSentimentColor(sentiment: number) {
-    if (sentiment > 0.3) return 'text-green-600';
-    if (sentiment < -0.3) return 'text-red-600';
-    return 'text-signal-700';
+    // The brand sentiment scale runs blue to orange, so it stays readable for colour-blind people; both are dark enough for text
+    if (sentiment > 0.3) return 'text-primary-700';
+    if (sentiment < -0.3) return 'text-signal-800';
+    return 'text-ink-600';
   }
 
   function getSentimentLabel(sentiment: number) {
@@ -167,8 +168,7 @@
   <PageHeader
     title="Trigram Analysis"
     subtitle="Discover three-word phrase patterns and linguistic trends in your content"
-    backHref="/text-analytics"
-    accentColor="purple">
+    backHref="/text-analytics">
     <svelte:fragment slot="actions">
       <div class="hidden lg:flex items-center space-x-6">
         <div class="text-center">

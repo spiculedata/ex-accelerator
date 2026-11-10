@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { getSentimentColor } from '$lib/utils/colorUtils';
@@ -160,7 +161,7 @@
         data: sentimentBreakdown.map(item => ({
           name: item.label || item.sentiment_category,
           value: item.count || item.post_count,
-          itemStyle: { color: item.color || colorMap[(item.label || item.sentiment_category || '').toLowerCase()] || '#8b5cf6' }
+          itemStyle: { color: item.color || colorMap[(item.label || item.sentiment_category || '').toLowerCase()] || CHART.catPink }
         })),
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
@@ -177,9 +178,9 @@
     if (!politicalChart) return;
 
     const colorMap: Record<string, string> = {
-      political_news: '#ef4444',
-      political_ad: '#f97316',
-      apolitical: '#6b7280'
+      political_news: CHART.danger500,
+      political_ad: CHART.catVermilion,
+      apolitical: CHART.ink500
     };
 
     politicalChart.setOption({
@@ -198,7 +199,7 @@
         data: politicalBreakdown.map(item => ({
           name: item.category,
           value: item.count,
-          itemStyle: { color: colorMap[item.category?.toLowerCase()] || '#6b7280' }
+          itemStyle: { color: colorMap[item.category?.toLowerCase()] || CHART.ink500 }
         })),
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
@@ -302,8 +303,8 @@
               type: 'linear',
               x: 0, y: 0, x2: 1, y2: 0,
               colorStops: [
-                { offset: 0, color: '#7c3aed' },
-                { offset: 1, color: '#a78bfa' }
+                { offset: 0, color: CHART.catPink },
+                { offset: 1, color: CHART.catPink }
               ]
             }
           }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 	import * as d3 from 'd3';
 	import type { CrossFilter } from '$lib/stores/investigationStore';
@@ -50,19 +51,19 @@
 		const sources = [hasGdelt, hasRadio, hasSocial].filter(Boolean).length;
 
 		if (sources <= 1) {
-			if (hasGdelt) return '#64748b';
-			if (hasRadio) return '#8b5cf6';
-			if (hasSocial) return '#06d6a0';
-			return '#475569';
+			if (hasGdelt) return CHART.ink500;
+			if (hasRadio) return CHART.catPink;
+			if (hasSocial) return CHART.catGreen;
+			return CHART.ink600;
 		}
 
 		if (sources === 2) {
-			if (hasGdelt && hasRadio) return '#7c6faa';
-			if (hasGdelt && hasSocial) return '#4a9e8e';
-			if (hasRadio && hasSocial) return '#4fb0cb';
+			if (hasGdelt && hasRadio) return CHART.catPink;
+			if (hasGdelt && hasSocial) return CHART.primary500;
+			if (hasRadio && hasSocial) return CHART.catSky;
 		}
 
-		return '#f59e0b';
+		return CHART.catOrange;
 	}
 
 	function totalCount(d: any): number {
@@ -145,7 +146,7 @@
 			.data(links)
 			.enter()
 			.append('line')
-			.attr('stroke', '#334155')
+			.attr('stroke', CHART.ink700)
 			.attr('stroke-width', (d: any) => d.weight * 1.5)
 			.attr('stroke-opacity', 0.4);
 
@@ -179,7 +180,7 @@
 			.append('circle')
 			.attr('r', (d: any) => d.radius)
 			.attr('fill', sourceColor)
-			.attr('stroke', (d: any) => hasHL && highlightedKeywords.has(d.keyword) ? '#818cf8' : '#0f172a')
+			.attr('stroke', (d: any) => hasHL && highlightedKeywords.has(d.keyword) ? CHART.primary400 : CHART.ink900)
 			.attr('stroke-width', (d: any) => hasHL && highlightedKeywords.has(d.keyword) ? 2.5 : 1.5)
 			.attr('opacity', (d: any) => hasHL ? (highlightedKeywords.has(d.keyword) ? 1 : 0.25) : 0.85);
 
@@ -191,7 +192,7 @@
 			})
 			.attr('text-anchor', 'middle')
 			.attr('dy', '0.35em')
-			.attr('fill', '#f1f5f9')
+			.attr('fill', CHART.ink100)
 			.attr('opacity', (d: any) => hasHL ? (highlightedKeywords.has(d.keyword) ? 1 : 0.15) : 1)
 			.attr('font-size', (d: any) => Math.max(9, Math.min(13, d.radius * 0.6)) + 'px')
 			.attr('font-weight', '500')
@@ -199,12 +200,12 @@
 
 		nodeGroup
 			.on('mouseenter', function (event: MouseEvent, d: any) {
-				d3.select(this).select('circle').attr('opacity', 1).attr('stroke', '#e2e8f0').attr('stroke-width', 2.5);
+				d3.select(this).select('circle').attr('opacity', 1).attr('stroke', CHART.ink200).attr('stroke-width', 2.5);
 				showTooltip(event, d);
 			})
 			.on('mousemove', (event: MouseEvent) => moveTooltip(event))
 			.on('mouseleave', function () {
-				d3.select(this).select('circle').attr('opacity', 0.85).attr('stroke', '#0f172a').attr('stroke-width', 1.5);
+				d3.select(this).select('circle').attr('opacity', 0.85).attr('stroke', CHART.ink900).attr('stroke-width', 1.5);
 				hideTooltip();
 			})
 			.on('click', (_: MouseEvent, d: any) => {
@@ -237,10 +238,10 @@
 
 		const legend = g.append('g').attr('transform', `translate(8, ${innerHeight - 60})`);
 		const legendItems = [
-			{ label: 'GDELT', color: '#64748b' },
-			{ label: 'Radio', color: '#8b5cf6' },
-			{ label: 'Social', color: '#06d6a0' },
-			{ label: 'Multi-source', color: '#f59e0b' }
+			{ label: 'GDELT', color: CHART.ink500 },
+			{ label: 'Radio', color: CHART.catPink },
+			{ label: 'Social', color: CHART.catGreen },
+			{ label: 'Multi-source', color: CHART.catOrange }
 		];
 		legendItems.forEach((item, i) => {
 			const row = legend.append('g').attr('transform', `translate(0, ${i * 16})`);
@@ -249,7 +250,7 @@
 				.append('text')
 				.attr('x', 14)
 				.attr('y', 4)
-				.attr('fill', '#94a3b8')
+				.attr('fill', CHART.ink400)
 				.attr('font-size', '10px')
 				.text(item.label);
 		});

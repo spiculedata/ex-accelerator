@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
@@ -139,18 +140,18 @@
         type: 'category',
         data: categories.length > 0 ? categories : ['0 faces', '1 face', '2-5 faces', '6+ faces'],
         axisLabel: {
-          color: '#6b7280',
+          color: CHART.ink500,
           fontSize: 12
         },
-        axisLine: { lineStyle: { color: '#e5e7eb' } }
+        axisLine: { lineStyle: { color: CHART.ink200 } }
       },
       yAxis: {
         type: 'value',
         axisLabel: {
-          color: '#6b7280',
+          color: CHART.ink500,
           fontSize: 12
         },
-        splitLine: { lineStyle: { color: '#f3f4f6' } }
+        splitLine: { lineStyle: { color: CHART.ink100 } }
       },
       series: [
         {
@@ -163,8 +164,8 @@
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: '#34d399' },
-                { offset: 1, color: '#059669' }
+                { offset: 0, color: CHART.catGreen },
+                { offset: 1, color: CHART.success600 }
               ]
             },
             borderRadius: [4, 4, 0, 0]
@@ -191,7 +192,6 @@
   <PageHeader
     title="Face Detection"
     subtitle="Privacy-first face counting — no biometric data stored"
-    accentColor="emerald"
     backHref="/image-processing"
   >
     <div slot="icon">

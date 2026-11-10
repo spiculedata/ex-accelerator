@@ -27,7 +27,10 @@ approval).
 | Very negative | `--se-sentiment-very-negative` | `#d55e00` | `sentiment-very-negative` |
 
 In code, always get sentiment colours from `getSentimentColor()` in `$lib/utils/colorUtils`. It is the
-single source for charts and badges; do not write sentiment hex values into a page.
+single source for charts and badges; do not write sentiment hex values into a page. Any other colour a chart, canvas or
+SVG needs (axis ink, series, status, a network's own colour) comes from `CHART`, `CATEGORICAL` and `DIVERGING` in
+`$lib/utils/chartColors`, which hold the brand tokens as hex. A test fails if a page writes a hex colour, or colours
+sentiment with green and red classes.
 
 **Rules**
 

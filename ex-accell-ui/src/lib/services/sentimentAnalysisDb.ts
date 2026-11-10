@@ -5,6 +5,7 @@ import { toIsoTimestamp } from '$lib/utils/timestamps';
 import { currentRangeQuery } from '$lib/utils/filterRange';
 import { BaseDatabaseService } from './baseDatabaseService';
 import { getSentimentColor } from '$lib/utils/colorUtils';
+import { CHART } from '$lib/utils/chartColors';
 import type {
   SentimentStats,
   SentimentCategory,
@@ -413,13 +414,13 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
    */
   private transformToEmotionStat(item: any): EmotionStat {
     const emotionColors: Record<string, string> = {
-      'Joy': '#fbbf24',
-      'Trust': '#3b82f6',
-      'Fear': '#8b5cf6',
-      'Surprise': '#f59e0b',
-      'Sadness': '#6366f1',
-      'Disgust': '#10b981',
-      'Anger': '#ef4444'
+      'Joy': CHART.catOrange,
+      'Trust': CHART.catBlue,
+      'Fear': CHART.catPink,
+      'Surprise': CHART.catOrange,
+      'Sadness': CHART.primary600,
+      'Disgust': CHART.catGreen,
+      'Anger': CHART.danger500
     };
 
     const emotion = item.emotion1 || item.emotion;
@@ -428,7 +429,7 @@ class SentimentAnalysisDatabase extends BaseDatabaseService {
       emotion: emotion,
       count: item.count || item.co_occurrence_count || item.post_count || 0,
       percentage: item.percentage || 0,
-      color: emotionColors[emotion] || '#6b7280'
+      color: emotionColors[emotion] || CHART.ink500
     };
   }
 }

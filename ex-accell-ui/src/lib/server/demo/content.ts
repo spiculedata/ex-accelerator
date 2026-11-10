@@ -16,7 +16,7 @@ export interface DemoTopic {
 
 export const TOPICS: DemoTopic[] = [
   {
-    key: 'transit', name: 'Public Transit', category: 'Infrastructure', color: '#3b82f6',
+    key: 'transit', name: 'Public Transit', category: 'Infrastructure', color: '#0072b2',
     keywords: ['bus', 'tram', 'strike', 'delays', 'fare', 'timetable'],
     hashtags: ['#MarlowTransit', '#TramDelays'],
     bias: [3, 10, 25, 40, 22],
@@ -27,7 +27,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'festival', name: 'Harbor Festival', category: 'Culture', color: '#ec4899',
+    key: 'festival', name: 'Harbor Festival', category: 'Culture', color: '#cc79a7',
     keywords: ['festival', 'music', 'fireworks', 'crowds', 'tickets', 'food'],
     hashtags: ['#HarborFest', '#MarlowBay'],
     bias: [28, 40, 22, 8, 2],
@@ -38,7 +38,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'housing', name: 'Housing and Rent', category: 'Society', color: '#f59e0b',
+    key: 'housing', name: 'Housing and Rent', category: 'Society', color: '#e69f00',
     keywords: ['rent', 'landlord', 'housing', 'affordable', 'construction', 'tenants'],
     hashtags: ['#MarlowHousing', '#RentCrisis'],
     bias: [2, 8, 25, 45, 20],
@@ -49,7 +49,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'water', name: 'Water Quality', category: 'Environment', color: '#06b6d4',
+    key: 'water', name: 'Water Quality', category: 'Environment', color: '#56b4e9',
     keywords: ['water', 'tap', 'filter', 'advisory', 'pipes', 'testing'],
     hashtags: ['#CleanWater', '#MarlowBay'],
     bias: [3, 12, 30, 38, 17],
@@ -60,7 +60,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'schools', name: 'Schools and Budget', category: 'Education', color: '#8b5cf6',
+    key: 'schools', name: 'Schools and Budget', category: 'Education', color: '#009e73',
     keywords: ['school', 'budget', 'teachers', 'funding', 'class', 'library'],
     hashtags: ['#MarlowSchools', '#SchoolBudget'],
     bias: [5, 20, 35, 28, 12],
@@ -71,7 +71,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'cycling', name: 'Cycling and Streets', category: 'Infrastructure', color: '#10b981',
+    key: 'cycling', name: 'Cycling and Streets', category: 'Infrastructure', color: '#d55e00',
     keywords: ['bike', 'lane', 'traffic', 'safety', 'parking', 'cars'],
     hashtags: ['#MarlowCycling', '#SafeStreets'],
     bias: [8, 27, 30, 25, 10],
@@ -82,7 +82,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'heat', name: 'Heatwave and Parks', category: 'Environment', color: '#ef4444',
+    key: 'heat', name: 'Heatwave and Parks', category: 'Environment', color: '#a20711',
     keywords: ['heat', 'park', 'shade', 'cooling', 'trees', 'pool'],
     hashtags: ['#MarlowHeat', '#CoolParks'],
     bias: [4, 14, 32, 35, 15],
@@ -93,7 +93,7 @@ export const TOPICS: DemoTopic[] = [
     }
   },
   {
-    key: 'business', name: 'Local Business', category: 'Economy', color: '#14b8a6',
+    key: 'business', name: 'Local Business', category: 'Economy', color: '#344253',
     keywords: ['cafe', 'market', 'shops', 'jobs', 'tourism', 'prices'],
     bias: [10, 30, 32, 21, 7],
     hashtags: ['#ShopLocal', '#MarlowBay'],

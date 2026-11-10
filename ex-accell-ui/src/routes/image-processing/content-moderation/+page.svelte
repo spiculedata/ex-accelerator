@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
   import { onMount } from 'svelte';
@@ -92,7 +93,7 @@
       donutChart = initChart(donutContainer);
       if (donutChart) {
         donutChart.setOption({
-          title: { text: 'Content Status', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: '#374151' } },
+          title: { text: 'Content Status', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: CHART.ink700 } },
           tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
           legend: { bottom: 10, left: 'center', textStyle: { fontSize: 11 } },
           series: [{
@@ -103,9 +104,9 @@
             itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
             label: { show: true, fontSize: 11, formatter: '{b}\n{d}%' },
             data: [
-              { value: moderationStats.summary.safe, name: 'Safe', itemStyle: { color: '#22c55e' } },
-              { value: moderationStats.summary.flagged, name: 'Flagged', itemStyle: { color: '#ef4444' } },
-              { value: moderationStats.summary.pending, name: 'Pending', itemStyle: { color: '#f59e0b' } }
+              { value: moderationStats.summary.safe, name: 'Safe', itemStyle: { color: CHART.catGreen } },
+              { value: moderationStats.summary.flagged, name: 'Flagged', itemStyle: { color: CHART.danger500 } },
+              { value: moderationStats.summary.pending, name: 'Pending', itemStyle: { color: CHART.catOrange } }
             ]
           }]
         });
@@ -120,7 +121,7 @@
         if (categoryChart) {
           const cats = moderationStats.categories.sort((a, b) => b.count - a.count);
           categoryChart.setOption({
-            title: { text: 'Flags by Category', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: '#374151' } },
+            title: { text: 'Flags by Category', left: 'center', top: 10, textStyle: { fontSize: 14, fontWeight: 'bold', color: CHART.ink700 } },
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
             grid: { left: 10, right: 40, top: 50, bottom: 20, containLabel: true },
             xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
@@ -134,7 +135,7 @@
             series: [{
               type: 'bar',
               data: cats.map((c) => c.count).reverse(),
-              itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] },
+              itemStyle: { color: CHART.danger500, borderRadius: [0, 4, 4, 0] },
               label: { show: true, position: 'right', fontSize: 10, color: '#666' }
             }]
           });
@@ -154,7 +155,6 @@
 <PageHeader
   title="Content Moderation"
   subtitle="Automated content safety screening"
-  accentColor="red"
 />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

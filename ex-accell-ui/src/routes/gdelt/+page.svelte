@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   // Tailwind-only styling for the dual-handle range sliders (thumb and track pseudo-elements)
   const rangeSliderClass =
     'absolute w-full h-2 bg-transparent rounded-xl appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-violet-500 [&::-webkit-slider-thumb]:to-purple-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-linear-to-br [&::-moz-range-thumb]:from-violet-500 [&::-moz-range-thumb]:to-purple-500 [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer [&::-webkit-slider-track]:h-1.5 [&::-webkit-slider-track]:bg-gray-300 [&::-webkit-slider-track]:rounded-sm [&::-moz-range-track]:h-1.5 [&::-moz-range-track]:bg-gray-300 [&::-moz-range-track]:rounded-sm';
@@ -259,73 +260,73 @@
 		'verbal_cooperation': { 
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'],
 			label: 'Verbal Cooperation',
-			color: '#22c55e',
+			color: CHART.catGreen,
 			description: 'Make statement, comment, consult, engage in diplomatic cooperation'
 		},
 		'material_cooperation': {
 			codes: ['20', '21', '22', '23', '24', '25', '26', '27'],
 			label: 'Material Cooperation', 
-			color: '#84cc16',
+			color: CHART.catGreen,
 			description: 'Appeal, express intent to cooperate, provide aid'
 		},
 		'verbal_conflict': {
 			codes: ['10', '11', '12', '13', '14', '15', '16', '17'].map(c => '1' + c),
 			label: 'Verbal Conflict',
-			color: '#f59e0b', 
+			color: CHART.catOrange, 
 			description: 'Demand, disapprove, reject, threaten, protest'
 		},
 		'material_conflict': {
 			codes: ['18', '19', '20'],
 			label: 'Material Conflict',
-			color: '#ef4444',
+			color: CHART.danger500,
 			description: 'Exhibit force, reduce relations, coerce'
 		},
 		'diplomacy': {
 			codes: ['30', '31', '32', '33', '34', '35', '36', '37'], 
 			label: 'Diplomacy',
-			color: '#3b82f6',
+			color: CHART.catBlue,
 			description: 'Express intent to cooperate, consult, support'
 		},
 		'support': {
 			codes: ['40', '41', '42', '43', '44', '45', '46'],
 			label: 'Support & Agreements',
-			color: '#06b6d4',
+			color: CHART.primary500,
 			description: 'Cooperate, agree, provide support'
 		},
 		'information': {
 			codes: ['50', '51', '52', '53', '54', '55', '56', '57'],
 			label: 'Information & Media',
-			color: '#8b5cf6',
+			color: CHART.catPink,
 			description: 'Engage in symbolic acts, media statements'
 		},
 		'economic': {
 			codes: ['60', '61', '62', '63', '64', '65', '66', '67'],
 			label: 'Economic Actions',
-			color: '#059669',
+			color: CHART.success600,
 			description: 'Economic cooperation, trade, sanctions'
 		},
 		'political': {
 			codes: ['70', '71', '72', '73', '74', '75', '76'],
 			label: 'Political Actions', 
-			color: '#dc2626',
+			color: CHART.danger600,
 			description: 'Provide diplomatic cooperation, host meetings'
 		},
 		'military': {
 			codes: ['80', '81', '82', '83', '84', '85', '86', '87'],
 			label: 'Military Actions',
-			color: '#b91c1c',
+			color: CHART.danger700,
 			description: 'Military cooperation, exercises, operations'
 		},
 		'protests': {
 			codes: ['14', '141', '142', '143', '144', '145'],
 			label: 'Protests & Demonstrations',
-			color: '#ea580c',
+			color: CHART.catVermilion,
 			description: 'Protests, demonstrations, strikes'
 		},
 		'violence': {
 			codes: ['17', '18', '19', '190', '193', '194', '195'],
 			label: 'Violence & Conflict',
-			color: '#991b1b',
+			color: CHART.danger700,
 			description: 'Violence, fighting, armed conflict'
 		}
 	};
@@ -341,7 +342,7 @@
 
 	function getEventTypeColor(eventCode: string): string {
 		const type = getEventType(eventCode);
-		return eventTypes[type]?.color || '#6b7280';
+		return eventTypes[type]?.color || CHART.ink500;
 	}
 
 	async function toggleEventType(eventType: string) {
@@ -1092,10 +1093,10 @@
 	
 	function getEventColor(goldstein: number): string {
 		if (!goldstein) return '#999';
-		if (goldstein > 5) return '#22c55e'; // Green for very positive
-		if (goldstein > 0) return '#84cc16'; // Light green for positive
-		if (goldstein > -5) return '#f59e0b'; // Orange for slightly negative
-		return '#ef4444'; // Red for very negative
+		if (goldstein > 5) return CHART.catGreen; // Green for very positive
+		if (goldstein > 0) return CHART.catGreen; // Light green for positive
+		if (goldstein > -5) return CHART.catOrange; // Orange for slightly negative
+		return CHART.danger500; // Red for very negative
 	}
 </script>
 

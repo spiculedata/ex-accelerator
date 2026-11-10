@@ -1179,7 +1179,7 @@
                         {@const sentNorm = (post.sentiment_category || '').toLowerCase().includes('positive') ? 'positive' : (post.sentiment_category || '').toLowerCase().includes('negative') ? 'negative' : 'neutral'}
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <span
-                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-sentiment-positive/20 text-sentiment-positive' : sentNorm === 'negative' ? 'bg-sentiment-negative/20 text-sentiment-negative' : 'bg-slate-700/50 text-slate-400'}"
+                          class="text-[9px] px-1 py-0 rounded cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400/40 {sentNorm === 'positive' ? 'bg-sentiment-positive/20 text-sentiment-positive' : sentNorm === 'negative' ? 'bg-sentiment-negative/20 text-sentiment-negative' : 'bg-sentiment-neutral/20 text-slate-400'}"
                           on:click|stopPropagation={() => setCrossFilter({ dimension: 'sentiment', value: sentNorm, label: post.sentiment_category || sentNorm })}
                           role="button"
                           tabindex="0"

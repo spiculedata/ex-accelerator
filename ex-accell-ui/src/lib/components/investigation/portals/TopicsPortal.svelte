@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import KeywordNetwork from '../KeywordNetwork.svelte';
@@ -86,15 +87,15 @@
 
     // Layout: shared terms as large bubbles in center, source-unique terms smaller around edges
     const allTerms = [
-      ...sharedTerms.map(k => ({ ...k, category: 'shared', color: '#f59e0b' })),
-      ...gdeltOnly.slice(0, 5).map(k => ({ ...k, category: 'gdelt', color: '#f59e0b' })),
-      ...radioOnly.slice(0, 5).map(k => ({ ...k, category: 'radio', color: '#a78bfa' })),
-      ...socialOnly.slice(0, 5).map(k => ({ ...k, category: 'social', color: '#38bdf8' })),
+      ...sharedTerms.map(k => ({ ...k, category: 'shared', color: CHART.catOrange })),
+      ...gdeltOnly.slice(0, 5).map(k => ({ ...k, category: 'gdelt', color: CHART.catOrange })),
+      ...radioOnly.slice(0, 5).map(k => ({ ...k, category: 'radio', color: CHART.catPink })),
+      ...socialOnly.slice(0, 5).map(k => ({ ...k, category: 'social', color: CHART.catSky })),
     ];
 
     if (allTerms.length === 0) {
       g.append('text').attr('x', w / 2).attr('y', h / 2).attr('text-anchor', 'middle')
-        .attr('fill', '#475569').attr('font-size', '12px').text('No keyword data');
+        .attr('fill', CHART.ink600).attr('font-size', '12px').text('No keyword data');
       return;
     }
 
@@ -130,12 +131,12 @@
 
     bubbles.append('circle')
       .attr('r', d => d.radius)
-      .attr('fill', d => d.category === 'shared' ? '#f59e0b' : d.color)
+      .attr('fill', d => d.category === 'shared' ? CHART.catOrange : d.color)
       .attr('fill-opacity', d => {
         if (hasHighlight) return highlightedKeywords.has(d.keyword) ? 0.5 : 0.06;
         return d.category === 'shared' ? 0.3 : 0.15;
       })
-      .attr('stroke', d => highlightedKeywords.has(d.keyword) ? '#818cf8' : (d.category === 'shared' ? '#f59e0b' : d.color))
+      .attr('stroke', d => highlightedKeywords.has(d.keyword) ? CHART.primary400 : (d.category === 'shared' ? CHART.catOrange : d.color))
       .attr('stroke-width', d => highlightedKeywords.has(d.keyword) ? 2.5 : (d.category === 'shared' ? 1.5 : 0.5))
       .style('cursor', 'pointer')
       .on('click', (_event: any, d: any) => {
@@ -146,9 +147,9 @@
     bubbles.filter(d => d.category === 'shared').each(function (d) {
       const el = d3.select(this);
       const indicators = [
-        { show: d.inGdelt, color: '#f59e0b', offset: -6 },
-        { show: d.inRadio, color: '#a78bfa', offset: 0 },
-        { show: d.inSocial, color: '#38bdf8', offset: 6 },
+        { show: d.inGdelt, color: CHART.catOrange, offset: -6 },
+        { show: d.inRadio, color: CHART.catPink, offset: 0 },
+        { show: d.inSocial, color: CHART.catSky, offset: 6 },
       ].filter(i => i.show);
       indicators.forEach(ind => {
         el.append('circle').attr('cx', ind.offset).attr('cy', d.radius + 6).attr('r', 2).attr('fill', ind.color);
@@ -157,7 +158,7 @@
 
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-      .attr('fill', '#e2e8f0')
+      .attr('fill', CHART.ink200)
       .attr('opacity', d => hasHighlight ? (highlightedKeywords.has(d.keyword) ? 1 : 0.15) : 1)
       .attr('font-size', d => Math.max(8, Math.min(12, d.radius * 0.5)) + 'px')
       .attr('font-weight', d => d.category === 'shared' ? '600' : '400')
@@ -166,13 +167,13 @@
     // Legend
     const legend = svg.append('g').attr('transform', `translate(${margin.left + 4},${margin.top + h - 12})`);
     const items = [
-      { color: '#f59e0b', label: 'Multi-source' },
-      { color: '#a78bfa', label: 'Radio only' },
-      { color: '#38bdf8', label: 'Social only' },
+      { color: CHART.catOrange, label: 'Multi-source' },
+      { color: CHART.catPink, label: 'Radio only' },
+      { color: CHART.catSky, label: 'Social only' },
     ];
     items.forEach((item, i) => {
       legend.append('circle').attr('cx', i * 80).attr('cy', 0).attr('r', 3).attr('fill', item.color);
-      legend.append('text').attr('x', i * 80 + 6).attr('y', 3).attr('fill', '#64748b').attr('font-size', '7px').text(item.label);
+      legend.append('text').attr('x', i * 80 + 6).attr('y', 3).attr('fill', CHART.ink500).attr('font-size', '7px').text(item.label);
     });
   }
 </script>

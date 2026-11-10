@@ -449,7 +449,6 @@
   <PageHeader
     title="Sentiment Analysis"
     subtitle="Emotional tone and sentiment across your social media posts"
-    accentColor="emerald"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">

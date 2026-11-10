@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -135,7 +136,7 @@
       yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
       series: [{
         type: 'bar', data: counts,
-        itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] },
+        itemStyle: { color: CHART.catBlue, borderRadius: [4, 4, 0, 0] },
         label: { show: true, position: 'top', fontSize: 10 }
       }]
     });
@@ -159,7 +160,7 @@
       series: [{
         type: 'bar',
         data: top10.map((t: any) => parseInt(t.size) || 0).reverse(),
-        itemStyle: { color: '#a855f7', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: CHART.catPink, borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', fontSize: 10, color: '#666' }
       }]
     });
@@ -168,7 +169,7 @@
   function updateLanguageChart() {
     if (!languageChart || languageData.length === 0) return;
 
-    const colors = ['#3b82f6', '#06d6a0', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
+    const colors = [CHART.catBlue, CHART.catGreen, CHART.catOrange, CHART.danger500, CHART.catPink, CHART.catPink, CHART.primary500, CHART.catVermilion, CHART.primary600, CHART.catGreen];
     languageChart.setOption({
       title: { text: 'Language Distribution', left: 'center', textStyle: { fontSize: 14, fontWeight: 'bold' } },
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -227,7 +228,7 @@
       xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
       yAxis: { type: 'category', data: labels, inverse: true, axisLabel: { fontSize: 11 }, splitArea: { show: true } },
       // Diverging scale from -1 to 1, in hues that are not the sentiment colours; the legend sits beside the grid
-      visualMap: { min: -1, max: 1, calculable: false, orient: 'vertical', right: 10, top: 'middle', itemHeight: 140, text: ['+1', '-1'], inRange: { color: ['#cc79a7', '#ffffff', '#009e73'] } },
+      visualMap: { min: -1, max: 1, calculable: false, orient: 'vertical', right: 10, top: 'middle', itemHeight: 140, text: ['+1', '-1'], inRange: { color: [CHART.catPink, CHART.white, CHART.catGreen] } },
       series: [{ type: 'heatmap', data, label: { show: true, fontSize: 12 }, emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.3)' } } }]
     });
   }
@@ -254,7 +255,6 @@
   title="Analytics Correlation"
   subtitle="Sentiment, topics, languages and platforms side by side, with how daily sentiment moves together"
   backHref="/text-analytics"
-  accentColor="cyan"
 />
 
 <WorkspaceBanner />

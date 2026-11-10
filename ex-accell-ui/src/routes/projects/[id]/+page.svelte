@@ -4,6 +4,7 @@
 </svelte:head>
 
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, onDestroy } from 'svelte';
   import { typeLabel } from '$lib/utils/projectForm';
   import { goto } from '$app/navigation';
@@ -543,7 +544,7 @@
                       <polyline
                         points={sparklinePath(ws.sparkline, 100, 24)}
                         fill="none"
-                        stroke="#6366f1"
+                        stroke={CHART.primary600}
                         stroke-width="1.5"
                         stroke-linecap="round"
                         stroke-linejoin="round"

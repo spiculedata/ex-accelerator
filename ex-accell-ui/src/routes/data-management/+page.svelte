@@ -343,8 +343,7 @@
 <div class="min-h-screen bg-gray-50">
   <PageHeader
     title="Data Management"
-    subtitle="Capture, process, and transform your social media data with unified workflows"
-    accentColor="teal">
+    subtitle="Capture, process, and transform your social media data with unified workflows">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">
         <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -176,7 +176,6 @@
   <PageHeader
     title="Language Detection"
     subtitle="Analyze language distribution and detection confidence in your social media data"
-    accentColor="amber"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
       <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl shadow-lg flex items-center justify-center mr-6 border border-white/20 backdrop-blur-sm">

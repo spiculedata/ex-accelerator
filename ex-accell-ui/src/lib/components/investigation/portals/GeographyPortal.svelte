@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { onMount, createEventDispatcher } from 'svelte';
   import * as d3 from 'd3';
   import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
@@ -81,9 +82,9 @@
   $: if (crossFilter !== undefined && activeView === 'hotspots' && locationData.length > 0 && svgEl) renderChart();
 
   function toneColor(tone: number): string {
-    if (tone > 1) return '#22c55e';
-    if (tone > -1) return '#eab308';
-    return '#ef4444';
+    if (tone > 1) return CHART.catGreen;
+    if (tone > -1) return CHART.catOrange;
+    return CHART.danger500;
   }
 
   // Cross-dimensional highlight set
@@ -104,7 +105,7 @@
 
     if (locationData.length === 0) {
       g.append('text').attr('x', w / 2).attr('y', h / 2).attr('text-anchor', 'middle')
-        .attr('fill', '#475569').attr('font-size', '12px').text('No location data');
+        .attr('fill', CHART.ink600).attr('font-size', '12px').text('No location data');
       return;
     }
 
@@ -141,7 +142,7 @@
       .attr('r', (d: any) => d.radius)
       .attr('fill', (d: any) => toneColor(d.avg_tone))
       .attr('fill-opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 0.5 : 0.08) : 0.25)
-      .attr('stroke', (d: any) => highlightedLocations.has(d.location) ? '#818cf8' : toneColor(d.avg_tone))
+      .attr('stroke', (d: any) => highlightedLocations.has(d.location) ? CHART.primary400 : toneColor(d.avg_tone))
       .attr('stroke-width', (d: any) => highlightedLocations.has(d.location) ? 2.5 : 1.5)
       .style('cursor', 'pointer')
       .on('click', (_event: any, d: any) => {
@@ -150,7 +151,7 @@
 
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-      .attr('fill', '#e2e8f0')
+      .attr('fill', CHART.ink200)
       .attr('opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 1 : 0.2) : 1)
       .attr('font-size', (d: any) => Math.max(7, Math.min(11, d.radius * 0.4)) + 'px')
       .text((d: any) => {
@@ -161,7 +162,7 @@
 
     bubbles.append('text')
       .attr('text-anchor', 'middle').attr('y', (d: any) => d.radius * 0.35)
-      .attr('fill', '#94a3b8')
+      .attr('fill', CHART.ink400)
       .attr('opacity', (d: any) => hasHighlight ? (highlightedLocations.has(d.location) ? 1 : 0.2) : 1)
       .attr('font-size', '7px').attr('font-family', 'monospace')
       .text((d: any) => d.event_count.toLocaleString());

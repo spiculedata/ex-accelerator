@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART, DIVERGING } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import { onMount, afterUpdate, tick } from 'svelte';
   import { androidResearchDb } from '$lib/services/androidResearchDb';
@@ -407,11 +408,11 @@
           lineStyle: { width: 5 }
         },
         categories: [
-          { name: 'Social', itemStyle: { color: '#ff6b6b' } },
-          { name: 'Productivity', itemStyle: { color: '#4ecdc4' } },
-          { name: 'Entertainment', itemStyle: { color: '#45b7d1' } },
-          { name: 'Communication', itemStyle: { color: '#f9ca24' } },
-          { name: 'Utility', itemStyle: { color: '#6c5ce7' } }
+          { name: 'Social', itemStyle: { color: CHART.danger500 } },
+          { name: 'Productivity', itemStyle: { color: CHART.primary500 } },
+          { name: 'Entertainment', itemStyle: { color: CHART.catSky } },
+          { name: 'Communication', itemStyle: { color: CHART.catOrange } },
+          { name: 'Utility', itemStyle: { color: CHART.primary600 } }
         ],
         data: nodes,
         links: links
@@ -470,7 +471,7 @@
         itemStyle: {
           color: function(params: any) {
             const ratio = params.data.value[1] / params.data.value[0];
-            return ratio > 1.2 ? '#52c41a' : ratio < 0.8 ? '#ff4d4f' : '#1890ff';
+            return ratio > 1.2 ? CHART.catGreen : ratio < 0.8 ? CHART.danger500 : CHART.catBlue;
           },
           opacity: 0.8
         },
@@ -519,21 +520,21 @@
           name: 'Engagement Score',
           type: 'bar',
           data: researchData.contentEngagement.map(d => d.engagementScore),
-          itemStyle: { color: '#5470c6' }
+          itemStyle: { color: CHART.catBlue }
         },
         {
           name: 'Avg Duration',
           type: 'line',
           yAxisIndex: 1,
           data: researchData.contentEngagement.map(d => d.avgDuration / 60),
-          itemStyle: { color: '#91cc75' },
+          itemStyle: { color: CHART.catGreen },
           lineStyle: { width: 3 }
         },
         {
           name: 'Return Rate',
           type: 'line',
           data: researchData.contentEngagement.map(d => d.returnRate * 100),
-          itemStyle: { color: '#fac858' },
+          itemStyle: { color: CHART.catOrange },
           lineStyle: { width: 3 }
         }
       ]
@@ -656,7 +657,7 @@
         left: 'center',
         bottom: '5%',
         inRange: {
-          color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+          color: [...DIVERGING]
         }
       },
       series: [{

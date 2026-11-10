@@ -4,9 +4,6 @@
 
   export let title: string;
   export let subtitle: string = '';
-  // svelte-ignore export_let_unused
-  /** @deprecated Ignored: every header now shares one brand style. Kept so existing callers compile. */
-  export let accentColor: string = 'primary';
   export let backHref: string = '';
   export let showProject: boolean = true;
 

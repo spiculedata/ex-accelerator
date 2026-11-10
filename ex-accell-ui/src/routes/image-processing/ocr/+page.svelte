@@ -69,7 +69,7 @@
   <meta name="description" content="Extract and search the text inside images." />
 </svelte:head>
 
-<PageHeader title="OCR & Text Extraction" subtitle="Extract and search text from images using PaddleOCR" accentColor="amber" />
+<PageHeader title="OCR & Text Extraction" subtitle="Extract and search text from images using PaddleOCR" />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
   {#if errorMessage}<ErrorAlert message={errorMessage} />{/if}

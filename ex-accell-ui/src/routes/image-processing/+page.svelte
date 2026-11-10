@@ -99,7 +99,6 @@
 <PageHeader
   title="Image Processing Suite"
   subtitle="Computer Vision, Content Analysis, and Visual Intelligence"
-  accentColor="indigo"
 />
 
 <div class="max-w-7xl xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

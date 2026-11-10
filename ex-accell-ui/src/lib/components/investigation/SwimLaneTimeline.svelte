@@ -16,6 +16,7 @@
 </script>
 
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
 	import { onMount, createEventDispatcher } from 'svelte';
 	import { getSentimentColor } from '$lib/utils/colorUtils';
 	import * as d3 from 'd3';
@@ -38,9 +39,9 @@
 	const laneGap = 6;
 
 	const colors = {
-		gdeltBar: '#64748b',
-		goldsteinNeg: '#d55e00',
-		goldsteinPos: '#0072b2',
+		gdeltBar: CHART.ink500,
+		goldsteinNeg: CHART.catVermilion,
+		goldsteinPos: CHART.catBlue,
 		positive: getSentimentColor('positive'),
 		negative: getSentimentColor('negative'),
 		neutral: getSentimentColor('neutral')
@@ -123,7 +124,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label
@@ -135,13 +136,13 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('GDELT');
 
 		// Goldstein colour scale: red (negative) → slate → green (positive)
 		const goldsteinColor = d3.scaleLinear<string>()
 			.domain([-10, 0, 10])
-			.range([colors.goldsteinNeg, '#64748b', colors.goldsteinPos])
+			.range([colors.goldsteinNeg, CHART.ink500, colors.goldsteinPos])
 			.clamp(true);
 
 		// Create per-segment gradient that encodes Goldstein as fill colour
@@ -180,7 +181,7 @@
 			.append('path')
 			.datum(parsedData)
 			.attr('fill', 'none')
-			.attr('stroke', '#94a3b8')
+			.attr('stroke', CHART.ink400)
 			.attr('stroke-width', 1)
 			.attr('opacity', hasGdelt ? 0.5 : 0)
 			.attr('d', gdeltLine);
@@ -193,7 +194,7 @@
 				.attr('text-anchor', 'middle')
 				.attr('dominant-baseline', 'middle')
 				.attr('font-size', '11px')
-				.attr('fill', '#94a3b8')
+				.attr('fill', CHART.ink400)
 				.text('No GDELT events for these keywords');
 		}
 
@@ -210,7 +211,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label: left of lane, vertically centered
@@ -222,7 +223,7 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('Radio');
 
 		// Stacked area for radio
@@ -263,7 +264,7 @@
 				.attr('text-anchor', 'middle')
 				.attr('dominant-baseline', 'middle')
 				.attr('font-size', '11px')
-				.attr('fill', '#94a3b8')
+				.attr('fill', CHART.ink400)
 				.text('No radio transcripts for these keywords');
 		}
 
@@ -279,7 +280,7 @@
 			.append('rect')
 			.attr('width', innerWidth)
 			.attr('height', laneHeight)
-			.attr('fill', '#1e293b')
+			.attr('fill', CHART.ink800)
 			.attr('rx', 4);
 
 		// Lane label: left of lane, vertically centered
@@ -291,7 +292,7 @@
 			.attr('dominant-baseline', 'middle')
 			.attr('font-size', '9px')
 			.attr('font-weight', '600')
-			.attr('fill', '#94a3b8')
+			.attr('fill', CHART.ink400)
 			.text('Social');
 
 		// Stacked area for social
@@ -332,7 +333,7 @@
 				.attr('text-anchor', 'middle')
 				.attr('dominant-baseline', 'middle')
 				.attr('font-size', '11px')
-				.attr('fill', '#94a3b8')
+				.attr('fill', CHART.ink400)
 				.text('No social posts for these keywords');
 		}
 
@@ -346,9 +347,9 @@
 					.ticks(d3.timeDay.every(Math.max(1, Math.floor(parsedData.length / 8))) ?? 7)
 					.tickFormat((d) => d3.timeFormat('%b %d')(d as Date))
 			)
-			.call((g2) => g2.select('.domain').attr('stroke', '#475569'))
-			.call((g2) => g2.selectAll('.tick text').attr('fill', '#94a3b8').attr('font-size', '9px'))
-			.call((g2) => g2.selectAll('.tick line').attr('stroke', '#475569'));
+			.call((g2) => g2.select('.domain').attr('stroke', CHART.ink600))
+			.call((g2) => g2.selectAll('.tick text').attr('fill', CHART.ink400).attr('font-size', '9px'))
+			.call((g2) => g2.selectAll('.tick line').attr('stroke', CHART.ink600));
 
 		// ---- BRUSH ----
 		const fmtShort = d3.timeFormat('%b %d');
@@ -362,15 +363,15 @@
 			.append('rect')
 			.attr('rx', 4)
 			.attr('ry', 4)
-			.attr('fill', '#1e293b')
-			.attr('stroke', '#3b82f6')
+			.attr('fill', CHART.ink800)
+			.attr('stroke', CHART.catBlue)
 			.attr('stroke-width', 1);
 
 		const brushLabel = labelGroup
 			.append('text')
 			.attr('text-anchor', 'middle')
 			.attr('dominant-baseline', 'middle')
-			.attr('fill', '#e2e8f0')
+			.attr('fill', CHART.ink200)
 			.attr('font-size', '11px')
 			.attr('font-weight', '600');
 
@@ -458,7 +459,7 @@
 		const brushGroup = g.append('g').attr('class', 'brush').call(brush);
 
 		// Style brush
-		brushGroup.selectAll('.selection').attr('fill', '#3b82f6').attr('fill-opacity', 0.15).attr('stroke', '#3b82f6').attr('stroke-width', 1);
+		brushGroup.selectAll('.selection').attr('fill', CHART.catBlue).attr('fill-opacity', 0.15).attr('stroke', CHART.catBlue).attr('stroke-width', 1);
 		brushGroup.selectAll('.overlay').style('cursor', 'crosshair');
 
 		// Vertical hover line (above brush, no pointer events)
@@ -466,7 +467,7 @@
 			.append('line')
 			.attr('y1', 0)
 			.attr('y2', innerHeight)
-			.attr('stroke', '#94a3b8')
+			.attr('stroke', CHART.ink400)
 			.attr('stroke-width', 1)
 			.attr('stroke-dasharray', '4,3')
 			.attr('pointer-events', 'none')

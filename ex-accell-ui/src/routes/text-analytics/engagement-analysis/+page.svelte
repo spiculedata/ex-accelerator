@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CHART } from '$lib/utils/chartColors';
   import { goto } from '$app/navigation';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
@@ -98,12 +99,12 @@
     };
 
     platformEngagement = [
-      { platform: 'Instagram', engagementRate: 6.8, totalEngagements: 156789, posts: 2341, avgLikes: 245, avgComments: 67, avgShares: 23, color: '#ff6b9d' },
-      { platform: 'TikTok', engagementRate: 5.9, totalEngagements: 134567, posts: 1876, avgLikes: 387, avgComments: 89, avgShares: 45, color: '#667eea' },
-      { platform: 'Twitter', engagementRate: 3.7, totalEngagements: 98765, posts: 4523, avgLikes: 89, avgComments: 23, avgShares: 156, color: '#26d0ce' },
-      { platform: 'LinkedIn', engagementRate: 3.1, totalEngagements: 56789, posts: 1234, avgLikes: 167, avgComments: 34, avgShares: 78, color: '#6366f1' },
-      { platform: 'Facebook', engagementRate: 2.8, totalEngagements: 34567, posts: 2987, avgLikes: 45, avgComments: 12, avgShares: 89, color: '#8b5cf6' },
-      { platform: 'YouTube', engagementRate: 4.5, totalEngagements: 23456, posts: 234, avgLikes: 456, avgComments: 123, avgShares: 67, color: '#f72585' }
+      { platform: 'Instagram', engagementRate: 6.8, totalEngagements: 156789, posts: 2341, avgLikes: 245, avgComments: 67, avgShares: 23, color: CHART.catPink },
+      { platform: 'TikTok', engagementRate: 5.9, totalEngagements: 134567, posts: 1876, avgLikes: 387, avgComments: 89, avgShares: 45, color: CHART.primary600 },
+      { platform: 'Twitter', engagementRate: 3.7, totalEngagements: 98765, posts: 4523, avgLikes: 89, avgComments: 23, avgShares: 156, color: CHART.primary500 },
+      { platform: 'LinkedIn', engagementRate: 3.1, totalEngagements: 56789, posts: 1234, avgLikes: 167, avgComments: 34, avgShares: 78, color: CHART.primary600 },
+      { platform: 'Facebook', engagementRate: 2.8, totalEngagements: 34567, posts: 2987, avgLikes: 45, avgComments: 12, avgShares: 89, color: CHART.catPink },
+      { platform: 'YouTube', engagementRate: 4.5, totalEngagements: 23456, posts: 234, avgLikes: 456, avgComments: 123, avgShares: 67, color: CHART.catPink }
     ];
 
     contentTypes = [
@@ -365,21 +366,21 @@
           name: 'Likes',
           type: 'line',
           data: engagementTrends.map(t => t.likes),
-          itemStyle: { color: '#6366f1' },
+          itemStyle: { color: CHART.primary600 },
           lineStyle: { width: 3 }
         },
         {
           name: 'Comments',
           type: 'line',
           data: engagementTrends.map(t => t.comments),
-          itemStyle: { color: '#06d6a0' },
+          itemStyle: { color: CHART.catGreen },
           lineStyle: { width: 3 }
         },
         {
           name: 'Shares',
           type: 'line',
           data: engagementTrends.map(t => t.shares),
-          itemStyle: { color: '#ff6b9d' },
+          itemStyle: { color: CHART.catPink },
           lineStyle: { width: 3 }
         }
       ]
@@ -410,7 +411,6 @@
   <PageHeader
     title="Engagement Analysis"
     subtitle="Likes, shares, comments and engagement rates across your content"
-    accentColor="cyan"
     backHref="/text-analytics">
     <svelte:fragment slot="actions">
       <button
