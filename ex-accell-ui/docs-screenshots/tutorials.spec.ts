@@ -62,8 +62,6 @@ test('tutorial walkthrough', async ({ page }) => {
     await shot(page, 'new-project', true);
     await page.fill('#project-name', PROJECT_NAME);
     await page.fill('#project-description', 'Following the first-project tutorial');
-    await page.getByText('Telegram', { exact: true }).click();
-    await page.getByText('YouTube', { exact: true }).click();
     await page.getByRole('button', { name: 'Create Project' }).click();
     await page.waitForURL(/\/projects\/\d+/);
     created.project = page.url().match(/\/projects\/(\d+)/)![1];
@@ -83,7 +81,7 @@ test('tutorial walkthrough', async ({ page }) => {
     await shot(page, 'workspace-created');
 
     // --- Tutorial: dashboards scoped to the workspace ---
-    await page.getByText('Telegram and YouTube').first().click();
+    await page.getByRole('heading', { name: 'Telegram and YouTube' }).click();
     await page.waitForURL(/\/workspaces\/\d+/);
     const workspaceId = page.url().match(/\/workspaces\/(\d+)/)![1];
     await page.goto(`/text-analytics/sentiment-analysis?workspace=${workspaceId}`, { waitUntil: 'networkidle' });
@@ -109,7 +107,7 @@ test('tutorial walkthrough', async ({ page }) => {
     created.investigation = page.url().match(/\/investigations\/(\d+)/)![1];
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(INVESTIGATION_NAME, { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /social\s*[1-9]/i })).toBeVisible(); // matching posts were found
+    await expect(page.getByRole('tab', { name: /social\s*[1-9]/i })).toBeVisible(); // matching posts were found
     await shot(page, 'investigation-workbench');
 
     // --- Tutorial: build and publish a workflow ---
@@ -123,6 +121,14 @@ test('tutorial walkthrough', async ({ page }) => {
     await expect(page.getByText('1 connections')).toBeVisible();
     await shot(page, 'workflow-connected');
 
+    // Publish stays disabled until every step has the settings it cannot run without
+    await page.getByRole('button', { name: 'Workflow step: Dataset Input' }).click();
+    await page.locator('select').filter({ hasText: 'Select dataset...' }).selectOption({ index: 1 });
+    await page.getByRole('button', { name: 'Workflow step: Sentiment Analysis' }).click();
+    await page.getByPlaceholder('text column name').fill('text');
+    await expect(page.getByText('needs setup')).toHaveCount(0);
+    await shot(page, 'workflow-configured');
+
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.getByRole('button', { name: 'Publish' }).click();
     await page.getByLabel(/Workflow Name/).fill(WORKFLOW_NAME);
@@ -133,7 +139,7 @@ test('tutorial walkthrough', async ({ page }) => {
     const body = await (await published).json();
     created.workflow = body.workflow?.id;
     expect(created.workflow, 'publishing returned a workflow id').toBeTruthy();
-    // Publishing confirms with a browser dialog (Playwright dismisses it); the workflow is then listed on Data Management
+    // Publishing confirms with a toast; the workflow is then listed on Data Management
     await page.goto('/data-management', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /Processing Workflows/ }).click();
     await expect(page.getByText(WORKFLOW_NAME).first()).toBeVisible();

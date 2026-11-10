@@ -13,10 +13,11 @@ Open **Projects** in the navigation and choose **New Project**, or go to `/proje
 
 1. Give it a **name** (required, and unique) and an optional description.
 2. Pick a **project type**. It labels the project; it does not change what the app does.
-3. Tick the **data sources** you *plan* to use. At least one is required. This records your intent;
-   it does not connect anything (the project page will still say "Sources: 0").
-4. Optionally add team members by email.
-5. Choose **Create Project**.
+3. Optionally add team members by email. Only the project's members, its creator and administrators can then see the project and its
+   workspaces (see [Authentication and roles](/guide/authentication)).
+4. Choose **Create Project**.
+
+Where the data comes from is not chosen here: you link datasets to a workspace after the project exists.
 
 You land on the project page, which is empty until you add a workspace.
 
@@ -35,12 +36,8 @@ Choose **+ New Workspace**.
 
 ![The project page listing the new workspace](/screenshots/tutorials/workspace-created.png)
 
-::: info Why the card still says "0 records"
-The records and sources counters on the project and workspace pages count data sources added through
-*Data Capture*. Datasets you link here do their work somewhere else: they decide which posts the
-dashboards show. The next step proves it. (Making these counters include linked datasets is tracked in
-[#102](https://github.com/spiculedata/social-explorer/issues/102).)
-:::
+The card and the project header now count the posts in the datasets you linked (here **921 records** from
+two data sources).
 
 If a dataset cannot be added, a notice under the workspaces heading says so and why. Administrators
 can add any dataset; other users need access to it (the demo datasets are public).

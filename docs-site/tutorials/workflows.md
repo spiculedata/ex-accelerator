@@ -23,7 +23,15 @@ filter rows), Feature Engineering (text preprocessing, feature extraction, date-
 ML & Analytics (sentiment analysis, topic modeling, clustering) and Data Output. Click a step to
 configure it; the search box above the library filters components.
 
-## 2. Publish
+## 2. Set up the steps
+
+**Publish** stays disabled while any step shows *needs setup*; hover it to see what is missing. Click
+**Dataset Input** and choose a dataset, then click **Sentiment Analysis** and enter the **text column**
+(here `text`). Both steps now read *configured*.
+
+![Both steps configured, with the Sentiment Analysis settings open](/screenshots/tutorials/workflow-configured.png)
+
+## 3. Publish
 
 Choose **Publish**.
 
@@ -33,12 +41,12 @@ Enter a **name** (required), an optional description, a **version** and any **ta
 the workflow to the database; its creator is recorded as you. Press **Publish Workflow** (or
 Ctrl+Enter).
 
-A browser dialog confirms that the workflow was published. It is then listed under **Data → Data
+A message confirms that the workflow was published. It is then listed under **Data → Data
 Management → Processing Workflows**, with its name, description and status.
 
 ![The published workflow in the Processing Workflows list](/screenshots/tutorials/workflow-published.png)
 
-## 3. Generate code, save and run
+## 4. Generate code, save and run
 
 - **Generate Code** shows the Python script the platform produces from your steps, which you can
   export.
