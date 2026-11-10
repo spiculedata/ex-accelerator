@@ -19,3 +19,46 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore"
+
+  # VitePress docs site
+  - package-ecosystem: npm
+    directory: /docs-site
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
+    groups:
+      docs-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Python: ETL pipelines, Jupyter image, WavePulse service, the UI's notebook
+  # environment (pyproject.toml/poetry.lock) and the root requirements-local.txt.
+  # One grouped PR per directory for minor and patch bumps; majors stay separate.
+  - package-ecosystem: pip
+    directories:
+      - /
+      - /etl
+      - /jupyter
+      - /wavepulse
+      - /ex-accell-ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Base images of the other Dockerfiles
+  - package-ecosystem: docker
+    directories:
+      - /etl
+      - /jupyter
+      - /wavepulse
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore"
