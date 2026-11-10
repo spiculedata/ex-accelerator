@@ -154,6 +154,21 @@ describe('buildPostSearch', () => {
     expect(params).toContain(7);
   });
 
+  it('filters to posts detected in a language by its code, through the detection and languages tables', () => {
+    const { sql, params } = ok({ language: 'es' });
+    expect(sql).toContain('language_detection');
+    expect(sql).toMatch(/JOIN languages l ON l\.id = ld\.language_id/);
+    expect(sql).toContain('l.code =');
+    expect(params).toContain('es');
+    expect(sql).not.toContain("'es'");
+  });
+
+  it.each([[{ language: '' }], [{ language: 'en; DROP TABLE posts' }], [{ language: 'x'.repeat(11) }], [{ language: 'e n' }]])('rejects the invalid language %j', (filters) => {
+    const result = buildPostSearch(filters);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('language');
+  });
+
   it('selects the timestamp so the next cursor can be built from the last row', () => {
     expect(ok({}).sql).toMatch(/p\.timestamp/);
   });

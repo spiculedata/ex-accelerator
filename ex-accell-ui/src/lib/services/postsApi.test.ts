@@ -17,6 +17,10 @@ describe('buildPostsQuery', () => {
     expect(params.has('date_end')).toBe(false);
   });
 
+  it('sends a language code as language', () => {
+    expect(new URLSearchParams(buildPostsQuery({ language: 'es' })).get('language')).toBe('es');
+  });
+
   it('sends a recent-days window as within_days', () => {
     expect(new URLSearchParams(buildPostsQuery({ withinDays: 7 })).get('within_days')).toBe('7');
   });
