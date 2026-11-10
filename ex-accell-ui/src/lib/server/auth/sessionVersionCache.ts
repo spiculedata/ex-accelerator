@@ -6,6 +6,8 @@
 export interface SessionVersionCacheOptions {
   lookup: (userId: string) => Promise<number | null>;
   ttlMs: number;
+  /** How long an answer may still be used when the database cannot be asked. After that there is no answer. */
+  maxStaleMs?: number;
   now?: () => number;
 }
 
@@ -14,22 +16,29 @@ interface Entry {
   at: number;
 }
 
-export function createSessionVersionCache({ lookup, ttlMs, now = Date.now }: SessionVersionCacheOptions) {
+const DEFAULT_MAX_STALE_MS = 5 * 60 * 1000;
+
+export function createSessionVersionCache({ lookup, ttlMs, maxStaleMs = DEFAULT_MAX_STALE_MS, now = Date.now }: SessionVersionCacheOptions) {
   const entries = new Map<string, Entry>();
   const inFlight = new Map<string, Promise<number | null>>();
+  // Raised by invalidate(), so an answer to a question asked before it is not kept
+  const generations = new Map<string, number>();
+  const generationOf = (userId: string) => generations.get(userId) ?? 0;
 
   async function refresh(userId: string): Promise<number | null> {
+    const started = generationOf(userId);
     try {
       const version = await lookup(userId);
-      entries.set(userId, { version, at: now() });
+      if (generationOf(userId) === started) entries.set(userId, { version, at: now() });
       return version;
     } catch (error) {
-      // A database blip must not sign everyone out, but nothing is known about a user never seen before
+      // A database blip must not sign everyone out, but an old answer is only good for so long, and nothing is known
+      // about a user never seen before
       const known = entries.get(userId);
-      if (known) return known.version;
+      if (known && now() - known.at < maxStaleMs) return known.version;
       throw error;
     } finally {
-      inFlight.delete(userId);
+      if (generationOf(userId) === started) inFlight.delete(userId);
     }
   }
 
@@ -48,7 +57,9 @@ export function createSessionVersionCache({ lookup, ttlMs, now = Date.now }: Ses
     },
     /** Forgets what is known about a user, so the next check asks the database. */
     invalidate(userId: string): void {
+      generations.set(userId, generationOf(userId) + 1);
       entries.delete(userId);
+      inFlight.delete(userId);
     }
   };
 }

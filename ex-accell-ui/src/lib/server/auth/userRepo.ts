@@ -1,6 +1,7 @@
 import { query } from '$lib/services/postgres';
 import { hashPassword, validatePasswordStrength } from './password';
 import type { UserRole } from './session';
+import { ADD_SESSION_VERSION_SQL, CREATE_INDEX_SQL, CREATE_TABLE_SQL } from './authSchema';
 
 export interface UserRecord {
   id: string;
@@ -31,21 +32,6 @@ interface UserRow {
 }
 
 const USER_COLUMNS = 'id, email, name, role, password_hash, session_version';
-
-const CREATE_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS app_users (
-    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    email         text NOT NULL,
-    name          text NOT NULL,
-    role          text NOT NULL CHECK (role IN ('admin', 'user', 'viewer')),
-    password_hash text NOT NULL,
-    session_version integer NOT NULL DEFAULT 0,
-    created_at    timestamptz NOT NULL DEFAULT now(),
-    last_login_at timestamptz
-  )`;
-// For a table made before session versions existed
-const ADD_SESSION_VERSION_SQL = 'ALTER TABLE app_users ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0';
-const CREATE_INDEX_SQL = 'CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_lower_idx ON app_users (lower(email))';
 
 function toRecord(row: UserRow): UserRecord {
   return { id: row.id, email: row.email, name: row.name, role: row.role, passwordHash: row.password_hash, sessionVersion: Number(row.session_version ?? 0) };

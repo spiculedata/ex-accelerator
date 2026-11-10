@@ -8,13 +8,13 @@ session cookie that is signed with `SESSION_SECRET`.
 
 A session is a signed token, so signing out on one device cannot reach a token that is still on another. Each user
 has a **session version**: the token carries the version it was issued under, and raising the version on the server
-ends every older session. **Sign out on all devices** (the arrow beside *Sign out*) raises it, as would a password
-change or removing the user (an account that no longer exists has no valid session).
+ends every older session. **Sign out on all devices** (the arrow beside *Sign out*) raises it. An account that no
+longer exists has no valid session. (There is no password change yet; when there is, it will raise the version too.)
 
 The version is checked on each request but remembered for **30 seconds**. On the instance where you sign out
 everywhere the change applies at once; on another instance a revoked session can keep working for up to those 30
-seconds. If the database cannot be asked and nothing is remembered for a user, the session is refused rather than
-trusted. Sessions issued before this existed count as version 0 and stay valid until their normal expiry.
+seconds. If the database cannot be asked, an answer remembered in the last five minutes is still used; past that, or
+for someone never checked, the request gets `503` and the cookie is kept, so an outage never signs anyone out. Sessions issued before this existed count as version 0 and stay valid until their normal expiry.
 
 Writes (`POST`, `PUT`, `PATCH`, `DELETE`) sent by a page on another site are refused with `403`, signed in or not,
 as a second layer beside `SameSite`. The check uses the `Sec-Fetch-Site` and `Origin` headers the browser attaches

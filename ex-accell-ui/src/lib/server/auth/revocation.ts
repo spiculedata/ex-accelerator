@@ -3,23 +3,32 @@
 // revocation made on another instance takes at most this long to apply; on this instance it applies at once.
 import { createLogger } from '$lib/utils/logger';
 import { createSessionVersionCache } from './sessionVersionCache';
-import { bumpSessionVersion, getSessionVersion } from './userRepo';
+import { bumpSessionVersion, ensureAuthSchema, getSessionVersion } from './userRepo';
 
 const log = createLogger('auth');
 
 const CACHE_TTL_MS = 30_000;
 
-let cache = createSessionVersionCache({ lookup: getSessionVersion, ttlMs: CACHE_TTL_MS });
+// The column may not exist yet on an install that has not signed anyone in since upgrading, so make sure it does first
+const lookupVersion = async (userId: string) => {
+  await ensureAuthSchema();
+  return getSessionVersion(userId);
+};
 
-/** True when a session issued under `sessionVersion` is still valid for this user. */
-export async function isSessionCurrent(userId: string, sessionVersion: number): Promise<boolean> {
+let cache = createSessionVersionCache({ lookup: lookupVersion, ttlMs: CACHE_TTL_MS });
+
+/** `current`: still valid. `revoked`: ended, or the user is gone. `unknown`: the database could not be asked, so nothing can be said. */
+export type SessionStatus = 'current' | 'revoked' | 'unknown';
+
+/** Whether a session issued under `sessionVersion` is still valid for this user. */
+export async function isSessionCurrent(userId: string, sessionVersion: number): Promise<SessionStatus> {
   try {
     const current = await cache.get(userId);
-    return current !== null && current === sessionVersion;
+    return current !== null && current === sessionVersion ? 'current' : 'revoked';
   } catch (error) {
-    // Nothing is known about this user and the database cannot be asked: do not let an unchecked session through
+    // Not "revoked": the user may be perfectly valid. Say so, so the session is neither trusted nor thrown away
     log.error('Could not check a session against its user', { message: error instanceof Error ? error.message : String(error) });
-    return false;
+    return 'unknown';
   }
 }
 
@@ -32,5 +41,5 @@ export async function revokeSessions(userId: string): Promise<number> {
 
 /** For tests: forget everything that was remembered. */
 export function resetRevocationCacheForTests(): void {
-  cache = createSessionVersionCache({ lookup: getSessionVersion, ttlMs: CACHE_TTL_MS });
+  cache = createSessionVersionCache({ lookup: lookupVersion, ttlMs: CACHE_TTL_MS });
 }

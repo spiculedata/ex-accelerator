@@ -12,7 +12,7 @@ vi.mock('$lib/server/auth/revocation', () => ({ isSessionCurrent }));
 
 beforeEach(() => {
   isSessionCurrent.mockReset();
-  isSessionCurrent.mockResolvedValue(true);
+  isSessionCurrent.mockResolvedValue('current');
 });
 
 import { handle } from './hooks.server';
@@ -185,14 +185,14 @@ describe('security headers', () => {
   });
 
   describe('revoked sessions', () => {
-    const request = async (revoked: boolean) => {
-      isSessionCurrent.mockResolvedValue(!revoked);
+    const request = async (status: 'current' | 'revoked' | 'unknown', path = '/api/projects') => {
+      isSessionCurrent.mockResolvedValue(status);
       const resolve = vi.fn().mockResolvedValue(new Response('ok'));
       const token = createSessionToken(admin, SECRET, 3600, Date.now(), 4);
       const deleted: string[] = [];
       const event = {
-        url: new URL('http://localhost/api/projects'),
-        request: new Request('http://localhost/api/projects'),
+        url: new URL(`http://localhost${path}`),
+        request: new Request(`http://localhost${path}`),
         cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: (name: string) => { deleted.push(name); } },
         locals: {} as { user: SessionUser | null }
       };
@@ -201,12 +201,12 @@ describe('security headers', () => {
     };
 
     it('asks whether the session\'s version is still current, using the user and version in the token', async () => {
-      await request(false);
+      await request('current');
       expect(isSessionCurrent).toHaveBeenCalledWith(admin.id, 4);
     });
 
     it('treats a revoked session as signed out, without reaching the route, and clears the cookie', async () => {
-      const { response, resolve, deleted, event } = await request(true);
+      const { response, resolve, deleted, event } = await request('revoked');
       expect(response.status).toBe(401);
       expect(resolve).not.toHaveBeenCalled();
       expect(event.locals.user).toBeNull();
@@ -214,9 +214,23 @@ describe('security headers', () => {
     });
 
     it('lets a current session through', async () => {
-      const { response, resolve } = await request(false);
+      const { response, resolve } = await request('current');
       expect(response.status).toBe(200);
       expect(resolve).toHaveBeenCalled();
+    });
+
+    it('answers 503, and keeps the cookie, when the database cannot be asked: an outage is not a sign-out', async () => {
+      const { response, resolve, deleted } = await request('unknown');
+      expect(response.status).toBe(503);
+      expect(resolve).not.toHaveBeenCalled();
+      expect(deleted).toEqual([]);
+    });
+
+    it('still serves public pages when the database cannot be asked, as if signed out, without touching the cookie', async () => {
+      const { response, resolve, deleted } = await request('unknown', '/api/health');
+      expect(response.status).toBe(200);
+      expect(resolve).toHaveBeenCalled();
+      expect(deleted).toEqual([]);
     });
 
     it('does not ask about a request with no session at all', async () => {
