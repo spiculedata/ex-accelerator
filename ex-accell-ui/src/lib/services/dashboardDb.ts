@@ -238,7 +238,6 @@ class DashboardDatabase extends BaseDatabaseService {
       processing_rate: 0,
       data_quality: 0,
       total_sources: 0,
-      active_crawlers: 0,
       last_updated: new Date().toISOString()
     };
   }
@@ -261,7 +260,6 @@ class DashboardDatabase extends BaseDatabaseService {
       processing_rate: processingRate,
       data_quality: dataQuality,
       total_sources: data.length,
-      active_crawlers: Math.min(data.length, 8),
       last_updated: new Date().toISOString()
     };
   }

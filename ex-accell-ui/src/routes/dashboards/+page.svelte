@@ -64,7 +64,6 @@
   let dashboardStats = {
     totalPosts: 0,
     totalSources: 0,
-    activeCrawlers: 0,
     lastUpdated: '',
     processingRate: 0,
     dataQuality: 0
@@ -127,7 +126,6 @@
       dashboardStats = {
         totalPosts: stats.total_posts,
         totalSources: stats.total_sources,
-        activeCrawlers: stats.active_crawlers,
         lastUpdated: stats.last_updated,
         processingRate: stats.processing_rate,
         dataQuality: stats.data_quality
@@ -426,7 +424,7 @@
 
     const option = {
       title: {
-        text: 'Top Topics',
+        text: 'Top Topics (by posts)',
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 'bold' }
       },
@@ -599,7 +597,7 @@
     </div>
 
     <!-- Key Metrics Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalPosts.toLocaleString()}</div>
         <div class="text-sm text-gray-600">Total Posts</div>
@@ -607,10 +605,6 @@
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.totalSources}</div>
         <div class="text-sm text-gray-600">Data Sources</div>
-      </div>
-      <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.activeCrawlers}</div>
-        <div class="text-sm text-gray-600">Active Crawlers</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
         <div class="text-2xl font-bold text-blue-600 mb-1">{dashboardStats.processingRate.toLocaleString()}</div>
@@ -621,8 +615,8 @@
         <div class="text-sm text-gray-600" title="Percentage of posts with sentiment classification">Enrichment Rate</div>
       </div>
       <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-        <div class="text-xs text-gray-500 mb-1">Last Updated</div>
-        <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated).split(',')[1]}</div>
+        <div class="text-xs text-gray-500 mb-1">Refreshed</div>
+        <div class="text-sm font-medium text-gray-900">{formatTimestamp(dashboardStats.lastUpdated)}</div>
       </div>
     </div>
 

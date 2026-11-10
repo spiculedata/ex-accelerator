@@ -277,7 +277,7 @@
 
     topicsChart.setOption({
       title: {
-        text: 'Top Topics',
+        text: 'Top Topics (by segments)',
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 'bold' }
       },

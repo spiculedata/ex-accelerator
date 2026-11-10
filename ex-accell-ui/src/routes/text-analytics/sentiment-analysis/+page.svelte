@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
+  import MethodNote from '$lib/components/ui/MethodNote.svelte';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
   import { page } from '$app/stores';
   import { currentProject } from '$lib/stores/projectStore';
@@ -405,13 +406,13 @@
 
 <svelte:head>
   <title>Sentiment Analysis - Text Analytics - Social Explorer</title>
-  <meta name="description" content="AI-powered sentiment analysis and emotional tone classification for social media content" />
+  <meta name="description" content="Sentiment and emotional tone of social media posts, with how each label is worked out" />
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50">
   <PageHeader
     title="Sentiment Analysis"
-    subtitle="Analyze emotional tone and sentiment across social media posts with AI-powered classification"
+    subtitle="Emotional tone and sentiment across your social media posts"
     accentColor="emerald"
     backHref="/text-analytics">
     <svelte:fragment slot="icon">
@@ -439,6 +440,24 @@
     <!-- Data Source Filter -->
     <div class="mb-6">
       <FilterBar workspaceId={workspaceId} datasetTypes={["social_media"]} onReady={handleFilterReady} on:change={handleFilterChange} />
+    </div>
+    <div class="mb-6">
+      <MethodNote>
+        <p>
+          Posts processed by the built-in enrichment are labelled by a simple word-list method, not a language model. The distinct words of a post
+          (split on spaces, so "great!" does not match "great") are checked against lists of positive and negative words. More positive than negative words
+          gives <em>Positive</em>, and more than twice as many gives <em>Very Positive</em>, and likewise for negative. A post with no matching words, or an
+          equal number of each, is <em>Neutral</em>.
+        </p>
+        <p>
+          <strong>Confidence is not a probability.</strong> It is a score from how many distinct sentiment words were found (0.5 when there are none or they
+          tie), so a post with several matching words scores higher than one with a single word. Use it to rank posts, not to say how likely a label is to be right.
+        </p>
+        <p>
+          The method does not understand sarcasm, negation ("not good") or context, and its word lists are English, so posts in other languages are mostly Neutral.
+          <strong>The demo dataset is different:</strong> its labels and confidence are generated at random to illustrate the pages, not produced by this method.
+        </p>
+      </MethodNote>
     </div>
     {#if loading}
       <div class="flex items-center justify-center py-16">

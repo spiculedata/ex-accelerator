@@ -421,7 +421,7 @@
       <button
         on:click={() => goto('/text-analytics/research-investigation')}
         class="px-6 py-3 bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg">
-        Research Investigation
+        Research Notebooks
       </button>
     </svelte:fragment>
   </PageHeader>

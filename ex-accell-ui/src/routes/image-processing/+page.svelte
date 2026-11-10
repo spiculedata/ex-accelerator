@@ -5,6 +5,7 @@
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import { ErrorAlert } from '$lib/components/ui';
   import { formatNumber } from '$lib/utils/formatUtils';
+  import { moduleBadge } from '$lib/utils/imageModules';
 
   let loading = true;
   let errorMessage = '';
@@ -60,11 +61,11 @@
     {
       name: 'Brand Recognition',
       href: '/image-processing/brand-recognition',
-      description: 'Detect logos and brand placements in visual content',
+      description: 'Preview: find logos and brand placements in images. Results are limited while this is built out.',
       icon: '🏢',
       color: 'amber',
       statKey: null,
-      statLabel: 'Stretch Goal'
+      statLabel: 'Preview'
     }
   ];
 
@@ -152,13 +153,7 @@
           <div class="flex items-start justify-between mb-3">
             <span class="text-3xl">{mod.icon}</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {colors.badge}">
-              {#if mod.statKey && stats[mod.statKey] > 0}
-                {formatNumber(stats[mod.statKey])}
-              {:else if !mod.statKey}
-                {mod.statLabel}
-              {:else}
-                Ready
-              {/if}
+              {moduleBadge(mod.statKey, stats, unavailable)}
             </span>
           </div>
           <h3 class="text-lg font-semibold text-gray-900 mb-1">{mod.name}</h3>

@@ -157,7 +157,7 @@
       />
       </div>
       <div class="mb-3">
-        <ModelTierSelector bind:selectedTier disabled={analyzing} />
+        <ModelTierSelector tool="objects" bind:selectedTier disabled={analyzing} />
       <button
         on:click={analyzeImage}
         disabled={analyzing || !imageUrl.trim()}

@@ -203,7 +203,7 @@
 </script>
 
 <svelte:head>
-  <title>Research Investigations - Social Explorer</title>
+  <title>Investigations - Social Explorer</title>
   <meta name="description" content="Cross-dataset research investigations" />
 </svelte:head>
 
@@ -218,7 +218,7 @@
           </svg>
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-white">Research Investigations</h1>
+          <h1 class="text-2xl font-bold text-white">Investigations</h1>
           <p class="text-sm text-indigo-300">
             {#if workspaceId}In workspace: {workspaceName || `#${workspaceId}`} · <a href="/investigations" class="underline hover:text-white">Show all</a>{:else}Cross-dataset correlation analysis{/if}
           </p>

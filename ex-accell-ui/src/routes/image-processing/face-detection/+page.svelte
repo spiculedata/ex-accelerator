@@ -88,9 +88,10 @@
         body: JSON.stringify({ action: 'analyze', image_url: imageUrl, tier: selectedTier })
       });
 
-      if (!res.ok) throw new Error(`Analysis failed: ${res.statusText}`);
+      const data = await res.json().catch(() => ({}));
+      // The server explains what was wrong (a bad address, an empty file); the status text alone says nothing
+      if (!res.ok) throw new Error(data.error || 'The image could not be analysed. Try again in a moment.');
 
-      const data = await res.json();
       const analysis = data.data?.analysis || {};
       singleResult = {
         face_count: analysis.face_count || 0,
@@ -237,7 +238,7 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Analyze an Image</h2>
       <div class="mb-3">
-        <ModelTierSelector bind:selectedTier disabled={analyzing} />
+        <ModelTierSelector tool="faces" bind:selectedTier disabled={analyzing} />
       </div>
       <div class="flex flex-col sm:flex-row gap-3">
         <input

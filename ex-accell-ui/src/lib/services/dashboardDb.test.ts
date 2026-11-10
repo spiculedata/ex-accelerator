@@ -33,7 +33,6 @@ describe('getDashboardStats', () => {
     expect(stats.processing_rate).toBe(0);
     expect(stats.data_quality).toBe(0);
     expect(stats.total_sources).toBe(0);
-    expect(stats.active_crawlers).toBe(0);
     expect(stats.last_updated).toBeTruthy();
   });
 
@@ -59,7 +58,6 @@ describe('getDashboardStats', () => {
     // data_quality: all categories are non-unknown so 100%
     expect(stats.data_quality).toBe(100);
     expect(stats.total_sources).toBe(3);
-    expect(stats.active_crawlers).toBe(3);
   });
 
   it('calculates data quality excluding unknown categories', async () => {
@@ -73,18 +71,6 @@ describe('getDashboardStats', () => {
     // classified = 80, total = 100 => 80%
     expect(stats.data_quality).toBe(80);
     expect(stats.total_posts).toBe(100);
-  });
-
-  it('caps active_crawlers at 8', async () => {
-    const data = Array.from({ length: 12 }, (_, i) => ({
-      sentiment_category: `Cat${i}`,
-      post_count: 10,
-      avg_confidence: 0.8
-    }));
-    mockFetch({ 'cross-platform-sentiment': data });
-
-    const stats = await dashboardDb.getDashboardStats();
-    expect(stats.active_crawlers).toBe(8);
   });
 
   it('passes workspaceId and extraParams', async () => {

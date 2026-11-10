@@ -10,6 +10,7 @@
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
   import { platformOptions } from '$lib/utils/platformOptions';
   import FilterBar from '$lib/components/ui/FilterBar.svelte';
+  import MethodNote from '$lib/components/ui/MethodNote.svelte';
   import { currentRangeQuery, rangeReloader } from '$lib/utils/filterRange';
 
   // The phrase the visitor chose; its posts open in the side panel
@@ -36,7 +37,8 @@
   // Phrases are counted over the last 7 days unless the date bar sets a range
   const DEFAULT_TIME_RANGE = '7d';
   let hasRange = false;
-  let minFrequency = 5;
+  // Two mentions is already a repeated phrase; a higher default hid most of them
+  let minFrequency = 2;
   let showChart = 'frequency';
   let searchQuery = '';
   
@@ -191,6 +193,19 @@
     {#if !hasRange}
       <p class="mt-2 text-xs text-ink-600">Showing the last 7 days. Pick dates above to analyse a different period.</p>
     {/if}
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <MethodNote title="What trigrams and trends mean">
+      <p>A trigram is a phrase of three words that appears in your posts. Only phrases that start and end with a meaningful word are counted, so "state of emergency" is kept and "this is the" is not.</p>
+      <p>
+        <strong>Trend</strong> compares the first half of the period with the second half. <em>Up</em> means the phrase appears more than one and a half times as often in the
+        later half, <em>Down</em> means more than one and a half times as often in the earlier half, and <em>Stable</em> means neither. If there are more posts than can be
+        scanned (20,000), the period starts at the oldest post that was scanned. Phrases seen only a few times can
+        change trend with one more post, so read the counts too.
+      </p>
+      <p>Min Frequency hides phrases seen fewer times than the number you set. It starts at 2; raise it to focus on the most repeated phrases.</p>
+    </MethodNote>
   </div>
 
   <!-- Controls Section -->

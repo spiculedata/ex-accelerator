@@ -5,6 +5,7 @@
   import { createEventDispatcher } from 'svelte';
   import { replaceState } from '$app/navigation';
   import { validateDayRange } from '$lib/utils/calendarDay';
+  import { noSourcesMessage } from '$lib/utils/sourceLabels';
   import { applyRangeToParams, readRange, rememberRange } from '$lib/utils/filterRange';
 
   export let workspaceId: string | null = null;
@@ -201,7 +202,7 @@
       Loading data sources...
     </div>
   {:else if !datesOnly && visibleDatasets.length === 0}
-    <p class="text-xs text-gray-500">No matching data sources{datasetTypes.length > 0 ? ` (filter: ${datasetTypes.join(', ')})` : ''}</p>
+    <p class="text-sm text-gray-600">{noSourcesMessage(datasetTypes)}</p>
   {:else}
     <div class="flex flex-wrap items-center gap-3">
       {#if !datesOnly}

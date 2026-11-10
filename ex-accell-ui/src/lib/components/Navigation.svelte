@@ -300,7 +300,7 @@
         { name: 'Brand Recognition', href: '/image-processing/brand-recognition', requiresProject: false }
       ]
     },
-    { name: 'Research', href: '/text-analytics/research-investigation', current: false, requiresProject: false },
+    { name: 'Research Notebooks', href: '/text-analytics/research-investigation', current: false, requiresProject: false },
     { name: 'Investigations', href: '/investigations', current: false, requiresProject: false },
     {
       name: 'Data',
