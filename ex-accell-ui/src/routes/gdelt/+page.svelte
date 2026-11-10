@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { getCountryNameWithFallback, getAllCountries } from '$lib/countryMapping';
+	import { getToneColor, getToneLabel } from '$lib/utils/colorUtils';
 	import DataUnavailable from '$lib/components/ui/DataUnavailable.svelte';
 	
 	let mapContainer: HTMLDivElement;
@@ -1091,12 +1092,10 @@
 		});
 	}
 	
+	// Goldstein runs -10 (conflict) to +10 (cooperation): the brand sentiment scale, blue to orange, in five bands
 	function getEventColor(goldstein: number): string {
-		if (!goldstein) return '#999';
-		if (goldstein > 5) return CHART.catGreen; // Green for very positive
-		if (goldstein > 0) return CHART.primary500; // Light green for positive
-		if (goldstein > -5) return CHART.catOrange; // Orange for slightly negative
-		return CHART.danger500; // Red for very negative
+		if (!goldstein) return CHART.ink400;
+		return getToneColor(goldstein);
 	}
 </script>
 
@@ -1754,6 +1753,17 @@
 						</div>
 						<div class="relative">
 							<div bind:this={mapContainer} class="h-[calc(100vh-220px)] min-h-[350px] max-h-[700px] w-full"></div>
+
+								<!-- Marker colour legend: Goldstein on the sentiment scale, named so colour is not the only cue -->
+								<div class="absolute bottom-3 left-3 z-[400] flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-ink-200 bg-white/90 px-2.5 py-1.5 text-xs text-ink-700 shadow-sm" aria-label="Goldstein scale legend">
+									<span class="font-medium text-ink-900">Goldstein</span>
+									{#each [8, 3, 0, -3, -8] as sample}
+										<span class="inline-flex items-center gap-1">
+											<span class="h-2.5 w-2.5 rounded-full" style="background-color: {getToneColor(sample)}"></span>
+											{getToneLabel(sample)}
+										</span>
+									{/each}
+								</div>
 							
 							<!-- Loading Overlay -->
 							{#if isUpdatingFilter}

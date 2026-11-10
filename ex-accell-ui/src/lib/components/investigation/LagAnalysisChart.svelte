@@ -149,7 +149,7 @@
 		const colorScale = d3
 			.scaleLinear<string>()
 			.domain([0, pairs.length - 1])
-			.range([CHART.catPink, CHART.catGreen]);
+			.range([CHART.primary100, CHART.primary500]);
 
 		g.append('g')
 			.attr('transform', `translate(0,${innerHeight})`)
@@ -237,10 +237,11 @@
 			});
 
 		const hasValidCorr = !isNaN(correlation);
+		// Strong correlation in the brand accent, moderate in amber, weak in grey; the figure itself carries the meaning
 		const corrColor = !hasValidCorr
 			? CHART.ink500
 			: Math.abs(correlation) > 0.5
-				? CHART.catGreen
+				? CHART.primary400
 				: Math.abs(correlation) > 0.3
 					? CHART.catOrange
 					: CHART.ink400;

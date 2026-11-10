@@ -4,7 +4,9 @@
   import * as d3 from 'd3';
   import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
   import { computeHighlightSet } from '$lib/utils/crossFilterHelpers';
+  import { getToneColor, getToneLabel } from '$lib/utils/colorUtils';
   import CrossFilterBadge from '../CrossFilterBadge.svelte';
+  import ToneLegend from '../ToneLegend.svelte';
 
   const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
@@ -80,11 +82,8 @@
     }
   }
 
-  function toneColor(tone: number): string {
-    if (tone > 1) return CHART.catGreen;
-    if (tone > -1) return CHART.catOrange;
-    return CHART.danger500;
-  }
+  // Tone takes the brand sentiment scale (blue to orange) in three bands; the legend below names them
+  const toneColor = (tone: number): string => getToneColor(tone, 3);
 
   $: maxMentions = d3.max(actorData, (d: any) => Number(d.mention_count)) ?? 1;
 
@@ -228,7 +227,7 @@
               on:click={() => dispatch('crossfilter', { dimension: 'actor', value: actor.actor, label: actor.actor })}
               role="button"
               tabindex="0">
-              <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {toneColor(tone)}"></span>
+              <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {toneColor(tone)}" role="img" aria-label="{getToneLabel(tone, 3)} tone" title="{getToneLabel(tone, 3)} tone ({tone.toFixed(1)})"></span>
               <span class="text-xs text-slate-300 font-medium truncate flex-1" title={actor.actor}>{actor.actor}</span>
               <span class="text-[9px] font-mono text-slate-500 flex-shrink-0">{actor.country_code || ''}</span>
               <div class="w-20 flex-shrink-0">
@@ -247,4 +246,7 @@
       <svg bind:this={svgEl} class="w-full"></svg>
     {/if}
   </div>
+  {#if !loading && actorData.length > 0}
+    <ToneLegend />
+  {/if}
 </div>

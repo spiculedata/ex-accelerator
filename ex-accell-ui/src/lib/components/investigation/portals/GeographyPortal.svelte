@@ -4,7 +4,9 @@
   import * as d3 from 'd3';
   import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
   import { computeHighlightSet } from '$lib/utils/crossFilterHelpers';
+  import { getToneColor, getToneLabel } from '$lib/utils/colorUtils';
   import CrossFilterBadge from '../CrossFilterBadge.svelte';
+  import ToneLegend from '../ToneLegend.svelte';
 
   const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
@@ -81,11 +83,8 @@
   // Re-render when cross-filter changes
   $: if (crossFilter !== undefined && activeView === 'hotspots' && locationData.length > 0 && svgEl) renderChart();
 
-  function toneColor(tone: number): string {
-    if (tone > 1) return CHART.catGreen;
-    if (tone > -1) return CHART.catOrange;
-    return CHART.danger500;
-  }
+  // Tone takes the brand sentiment scale (blue to orange) in three bands; the legend below names them
+  const toneColor = (tone: number): string => getToneColor(tone, 3);
 
   // Cross-dimensional highlight set
   $: highlightedLocations = computeHighlightSet(crossFilter, gdeltEvents, 'location');
@@ -218,7 +217,7 @@
             tabindex="0">
             <span class="text-xs text-slate-300 truncate" title={loc.location}>{loc.location}</span>
             <span class="text-right text-xs font-mono text-slate-400">{Number(loc.event_count).toLocaleString()}</span>
-            <span class="text-right text-xs font-mono" style="color: {toneColor(Number(loc.avg_tone))}">{Number(loc.avg_tone).toFixed(1)}</span>
+            <span class="text-right text-xs font-mono" style="color: {toneColor(Number(loc.avg_tone))}" title="{getToneLabel(Number(loc.avg_tone), 3)} tone">{Number(loc.avg_tone).toFixed(1)}</span>
             <span class="text-right text-xs font-mono text-slate-400">{Number(loc.avg_goldstein).toFixed(1)}</span>
           </div>
         {/each}
@@ -227,4 +226,7 @@
       {/if}
     {/if}
   </div>
+  {#if !loading && locationData.length > 0}
+    <ToneLegend />
+  {/if}
 </div>

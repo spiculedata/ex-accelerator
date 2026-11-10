@@ -64,6 +64,43 @@ export function getSentimentColor(sentiment: string, format: 'hex' | 'tailwind' 
   return sentimentHex[key] || sentimentHex.neutral;
 }
 
+// ─── Tone and agreement scales ──────────────────────────────────────────────
+
+export type SentimentLevel = 'very positive' | 'positive' | 'neutral' | 'negative' | 'very negative';
+
+// GDELT tone and Goldstein values run about -10 to +10. They are a sentiment, so they sit on the sentiment scale
+// above rather than on a red/amber/green traffic light, which many people cannot tell apart.
+const TONE_STRONG = 5;
+const TONE_WEAK = 1;
+
+export function getToneLevel(tone: number, bands: 3 | 5 = 5): SentimentLevel {
+  const value = Number(tone);
+  if (!Number.isFinite(value) || Math.abs(value) <= TONE_WEAK) return 'neutral';
+  const strong = bands === 5 && Math.abs(value) > TONE_STRONG;
+  if (value > 0) return strong ? 'very positive' : 'positive';
+  return strong ? 'very negative' : 'negative';
+}
+
+export function getToneColor(tone: number, bands: 3 | 5 = 5): string {
+  return getSentimentColor(getToneLevel(tone, bands));
+}
+
+/** The level as a word ("Very negative"), so a colour is never the only cue. */
+export function getToneLabel(tone: number, bands: 3 | 5 = 5): string {
+  const level = getToneLevel(tone, bands);
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+// Agreement between sources runs 0 (they disagree) to 1 (they agree): blue when they agree, orange when they do not.
+const AGREEMENT_HIGH = 0.7;
+const AGREEMENT_LOW = 0.4;
+
+export function getAgreementColor(agreement: number): string {
+  if (agreement > AGREEMENT_HIGH) return getSentimentColor('positive');
+  if (agreement > AGREEMENT_LOW) return getSentimentColor('neutral');
+  return getSentimentColor('negative');
+}
+
 export function getSentimentIcon(sentiment: string): string {
   const icons: Record<string, string> = {
     'very positive': '😊', 'positive': '🙂', 'neutral': '😐',

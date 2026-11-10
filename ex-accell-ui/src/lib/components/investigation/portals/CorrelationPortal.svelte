@@ -5,7 +5,17 @@
   import LagAnalysisChart from '../LagAnalysisChart.svelte';
   import { getPortalView, setPortalView, type CrossFilter } from '$lib/stores/investigationStore';
   import { computeTimelineHighlightDays } from '$lib/utils/crossFilterHelpers';
+  import { getAgreementColor, getSentimentColor } from '$lib/utils/colorUtils';
   import CrossFilterBadge from '../CrossFilterBadge.svelte';
+  import ToneLegend from '../ToneLegend.svelte';
+
+  // Agreement is blue when the sources agree and orange when they do not (the brand sentiment scale, not red/green)
+  const agreeHigh = getSentimentColor('positive');
+  const agreementLegend = [
+    { label: 'Agree', color: agreeHigh },
+    { label: 'Mixed', color: getSentimentColor('neutral') },
+    { label: 'Disagree', color: getSentimentColor('negative') }
+  ];
 
   const dispatch = createEventDispatcher<{ crossfilter: CrossFilter }>();
 
@@ -92,25 +102,25 @@
     if (activeView === 'agreement') {
       const yScale = d3.scaleLinear().domain([0, 1]).range([h, 0]);
 
-      // Agreement area fill — green when high, red when low
+      // Agreement area fill: blue when the sources agree, orange when they do not
       const agreementGrad = svg.append('defs').append('linearGradient')
         .attr('id', 'agree-grad').attr('gradientUnits', 'userSpaceOnUse')
         .attr('y1', yScale(1) + margin.top).attr('y2', yScale(0) + margin.top);
-      agreementGrad.append('stop').attr('offset', '0%').attr('stop-color', CHART.catGreen);
-      agreementGrad.append('stop').attr('offset', '50%').attr('stop-color', CHART.catOrange);
-      agreementGrad.append('stop').attr('offset', '100%').attr('stop-color', CHART.danger500);
+      agreementGrad.append('stop').attr('offset', '0%').attr('stop-color', getAgreementColor(1));
+      agreementGrad.append('stop').attr('offset', '50%').attr('stop-color', getAgreementColor(0.5));
+      agreementGrad.append('stop').attr('offset', '100%').attr('stop-color', getAgreementColor(0));
 
       const area = d3.area<any>()
         .x(d => xScale(d.parsedDate)).y0(h).y1(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
       g.append('path').datum(correlationData).attr('fill', 'url(#agree-grad)').attr('fill-opacity', highlightDays ? 0.08 : 0.25).attr('d', area);
 
       const line = d3.line<any>().x(d => xScale(d.parsedDate)).y(d => yScale(d.agreement)).curve(d3.curveMonotoneX);
-      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', CHART.catGreen).attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
+      g.append('path').datum(correlationData).attr('fill', 'none').attr('stroke', agreeHigh).attr('stroke-width', 2).attr('opacity', highlightDays ? 0.3 : 1).attr('d', line);
 
       g.selectAll('.dot').data(correlationData).join('circle')
         .attr('cx', d => xScale(d.parsedDate)).attr('cy', d => yScale(d.agreement))
         .attr('r', (d: any) => highlightDays?.has(d.date) ? 5 : 3)
-        .attr('fill', d => d.agreement > 0.7 ? CHART.catGreen : d.agreement > 0.4 ? CHART.catOrange : CHART.danger500)
+        .attr('fill', d => getAgreementColor(d.agreement))
         .attr('fill-opacity', (d: any) => highlightDays ? (highlightDays.has(d.date) ? 1 : 0.15) : 1)
         .attr('stroke', (d: any) => highlightDays?.has(d.date) ? CHART.primary400 : CHART.ink900)
         .attr('stroke-width', (d: any) => highlightDays?.has(d.date) ? 2 : 1)
@@ -121,9 +131,9 @@
 
       // Threshold lines
       g.append('line').attr('x1', 0).attr('x2', w).attr('y1', yScale(0.7)).attr('y2', yScale(0.7))
-        .attr('stroke', CHART.catGreen).attr('stroke-dasharray', '2,4').attr('opacity', 0.3);
+        .attr('stroke', agreeHigh).attr('stroke-dasharray', '2,4').attr('opacity', 0.3);
       g.append('text').attr('x', w).attr('y', yScale(0.7) - 3).attr('text-anchor', 'end')
-        .attr('fill', CHART.catGreen).attr('font-size', '7px').attr('opacity', 0.5).text('consensus');
+        .attr('fill', agreeHigh).attr('font-size', '7px').attr('opacity', 0.5).text('consensus');
 
       g.append('g').call(d3.axisLeft(yScale).ticks(5).tickSize(-w).tickFormat(d3.format('.1f')))
         .call(g2 => g2.select('.domain').remove())
@@ -230,4 +240,7 @@
       <svg bind:this={svgEl} class="w-full {gdeltEvents.length === 0 ? 'hidden' : ''}"></svg>
     {/if}
   </div>
+  {#if activeView === 'agreement' && gdeltEvents.length > 0}
+    <ToneLegend title="Sources" items={agreementLegend} />
+  {/if}
 </div>
