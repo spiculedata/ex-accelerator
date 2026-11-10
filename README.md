@@ -21,9 +21,13 @@ analytics database, and explore them through dashboards, investigations and note
   transcripts, and embedded Jupyter notebooks.
 - **Organise.** Projects and workspaces keep datasets separate. Accounts have admin, user and
   viewer roles.
-- **Share.** Optionally publish a dataset as a Frictionless Data Package over the IPFS peer-to-peer
-  network, so anyone with its content ID can fetch it, and import packages others publish. Off by
-  default and admin-only, because published data is public and cannot be withdrawn. See
+- **Share.** Give a collaborator, a reviewer or a journal one content ID for the dataset behind
+  your findings, and anyone with it can fetch the same package: an open Frictionless Data Package
+  (a plain CSV plus a schema) published over the IPFS peer-to-peer network, which opens in Python,
+  R or Excel and always resolves to the same bytes, so a paper can cite the exact version
+  published. Import a colleague's package by ID into a table you can query. Off by default and
+  admin-only: anything published is public, stays available only while a node holds a copy, and
+  cannot be withdrawn, so it is for open, anonymised data only. See
   [Data sharing over IPFS](https://spiculedata.github.io/social-explorer/guide/data-sharing).
 
 ## Architecture

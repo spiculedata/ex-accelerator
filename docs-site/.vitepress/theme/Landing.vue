@@ -49,6 +49,14 @@ const features = [
     points: ['Starter notebooks for GDELT, sentiment and topics', 'Same database as the dashboards', 'Visual workflow builder (early preview)'],
     src: '/screenshots/tutorials/workflow-connected.png',
     alt: 'Workflow builder'
+  },
+  {
+    kicker: 'Data sharing (optional)',
+    title: 'Give a collaborator the exact dataset you published',
+    text: 'Publish a dataset as an open Frictionless Data Package over the IPFS network and send one content ID. A collaborator, a reviewer or a replication package gets the same bytes you published, from any IPFS node or public gateway, with no account, while your node or someone who pinned it is online. The ID always resolves to the same bytes, so a paper can cite the exact version and any change gives a new ID. It is off by default, and what you publish is public for good, so it is for open data only.',
+    points: ['A plain CSV (opens in Python, R or Excel) plus a datapackage.json schema', 'Import a colleague’s package by ID into a table you can query', 'Opt-in, admin-only, and never for personal data'],
+    src: '/screenshots/data-sharing.png',
+    alt: 'Data Sharing page with peer-to-peer sharing turned off, the default, no packages yet, and the catalogued datasets a package can be generated from'
   }
 ];
 

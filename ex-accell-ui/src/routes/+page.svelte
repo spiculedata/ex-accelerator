@@ -211,6 +211,10 @@
               <li class="rounded-lg bg-slate-50 p-3"><span class="font-semibold text-slate-900">2. Link data in a workspace</span><br /><span class="text-slate-600">Open the project, add a workspace and choose its datasets.</span></li>
               <li class="rounded-lg bg-slate-50 p-3"><span class="font-semibold text-slate-900">3. Open an analysis</span><br /><a class="text-indigo-700 underline" href="/text-analytics/sentiment-analysis">Sentiment Analysis</a></li>
             </ol>
+            <!-- Sharing is opt-in and off by default, so this only points the way; the Data Sharing page explains the current state -->
+            <p class="mt-4 text-xs text-ink-500">
+              Optional, later: publish a dataset as an open data package that anyone with its content ID can fetch, for a collaborator or a paper. It is off until an administrator turns it on. <a class="text-primary-700 underline" href="/data-sharing">Open Data Sharing</a>
+            </p>
           </div>
         {/if}
         {#if projects.length === 0}
