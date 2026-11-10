@@ -3,6 +3,7 @@
   import PostDrilldown from '$lib/components/ui/PostDrilldown.svelte';
   import { filtersFromParams, type PostFilters } from '$lib/services/postsApi';
   import MethodNote from '$lib/components/ui/MethodNote.svelte';
+  import { apiErrors } from '$lib/stores/apiErrors';
   import { runExport, downloadCsv, IDLE_EXPORT, type ExportState } from '$lib/utils/exportAction';
   import { toCsv } from '$lib/utils/evidenceExport';
   import ExportStatus from '$lib/components/ui/ExportStatus.svelte';
@@ -514,7 +515,7 @@
         <p class="font-medium text-ink-900">We could not load sentiment data.</p>
         <p class="mt-1 text-sm text-ink-700">Check that the database is running, then change a filter or reload the page to try again.</p>
       </div>
-    {:else if sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
+    {:else if $apiErrors.length === 0 && sentimentStats.positive.count + sentimentStats.negative.count + sentimentStats.neutral.count === 0}
       <div role="status" class="mb-6 rounded-xl border border-ink-200 bg-white px-6 py-5">
         <p class="font-medium text-ink-900">No posts match these filters.</p>
         <p class="mt-1 text-sm text-ink-600">Try a wider date range, or turn on more sources in the bar above.</p>

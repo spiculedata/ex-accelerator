@@ -3,6 +3,7 @@ import { decideAccess } from '$lib/server/auth/guard';
 import { SESSION_COOKIE, getAuthConfig } from '$lib/server/auth/runtime';
 import { verifySessionToken } from '$lib/server/auth/session';
 import { preloadFont } from '$lib/server/fontPreload';
+import { isCrossSiteWrite, requestHosts } from '$lib/server/auth/csrf';
 
 const denial = (error: string, status: number) =>
   new Response(JSON.stringify({ success: false, data: null, error }), {
@@ -30,6 +31,11 @@ function withSecurityHeaders(response: Response, isSecure: boolean): Response {
 }
 
 const authorize: Handle = async ({ event, resolve }) => {
+  // A write sent by a page on another site is refused before anything else, signed in or not
+  if (isCrossSiteWrite(event.request, requestHosts(event.request, event.url))) {
+    return denial('Cross-site requests are not allowed', 403);
+  }
+
   const { sessionSecret } = getAuthConfig();
   event.locals.user = verifySessionToken(event.cookies.get(SESSION_COOKIE), sessionSecret);
 
