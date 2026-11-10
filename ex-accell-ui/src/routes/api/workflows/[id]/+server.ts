@@ -42,6 +42,11 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
     }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return failure('Send a JSON object', 400);
     if (body.status !== undefined && !STATUSES.has(body.status)) return failure('status must be draft, published or archived', 400);
+    if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) return failure('name must be text', 400);
+    if (body.description !== undefined && typeof body.description !== 'string') return failure('description must be text', 400);
+    if (body.metadata !== undefined && (typeof body.metadata !== 'object' || body.metadata === null || Array.isArray(body.metadata))) {
+      return failure('metadata must be an object', 400);
+    }
 
     const existing = await serverWorkflowService.getPublishedWorkflow(params.id);
     if (!existing) return failure('Workflow not found', 404);

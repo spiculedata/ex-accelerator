@@ -49,6 +49,11 @@ describe('PUT /api/workflows/[id]', () => {
     expect(service.updateWorkflow).not.toHaveBeenCalled();
   });
 
+  it.each([[{ name: 123 }], [{ name: '' }], [{ description: ['x'] }], [{ metadata: 'text' }], [{ metadata: [1] }]])('refuses %j instead of failing in the database', async (body) => {
+    expect((await put(owner, body)).status).toBe(400);
+    expect(service.updateWorkflow).not.toHaveBeenCalled();
+  });
+
   it('refuses an unknown status', async () => {
     expect((await put(owner, { status: 'hacked' })).status).toBe(400);
   });

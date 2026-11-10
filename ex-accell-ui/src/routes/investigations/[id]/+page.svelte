@@ -1165,7 +1165,7 @@
                 <div
                   class="bg-slate-900 p-3 hover:bg-slate-800/50 transition-colors cursor-pointer {isExpanded ? 'col-span-1 md:col-span-2 xl:col-span-3 bg-slate-800/50' : ''}"
                   on:click={() => expandedSocialId = isExpanded ? null : post.id}
-                  on:keydown={(e) => { if (e.key === 'Enter') expandedSocialId = isExpanded ? null : post.id; }}
+                  on:keydown={(e) => { if (e.target === e.currentTarget && e.key === 'Enter') expandedSocialId = isExpanded ? null : post.id; }}
                   role="button"
                   tabindex="0"
                 >

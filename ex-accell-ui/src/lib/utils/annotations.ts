@@ -45,15 +45,17 @@ const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
 /** A note quoting a post, ending in its citation (platform, post id, author, time) so the post can be found again. */
 export function noteFromPost(post: SocialPost, id: string, timestamp: string): Annotation {
   const { citation, text } = socialPostRecord(post);
-  const flat = oneLine(text);
-  const excerpt = flat.length > EXCERPT_LENGTH ? `${flat.slice(0, EXCERPT_LENGTH).trimEnd()}…` : flat;
+  // Counted in characters, not UTF-16 units, so an emoji is never cut in half
+  const characters = [...oneLine(text)];
+  const excerpt = characters.length > EXCERPT_LENGTH ? `${characters.slice(0, EXCERPT_LENGTH).join('').trimEnd()}…` : characters.join('');
   return { id, text: `“${excerpt}” [${citation}]`, timestamp };
 }
 
-/** Whether a note already cites this post, so adding it twice can be refused. */
+/** Whether the notes already hold this post, so adding it twice can be refused. The whole note must match, so text that
+ * merely quotes a citation, or posts without an id, are not mistaken for it. */
 export function isPostNoted(annotations: readonly Annotation[], post: SocialPost): boolean {
-  const marker = `[${socialPostRecord(post).citation}]`;
-  return annotations.some((note) => note.text.includes(marker));
+  const text = noteFromPost(post, '', '').text;
+  return annotations.some((note) => note.text === text);
 }
 
 /** The notes as a Markdown list, oldest first, for sharing or pasting into a report. */

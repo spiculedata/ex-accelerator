@@ -55,6 +55,12 @@ describe('noteFromPost', () => {
     expect(made.text.endsWith('[telegram post #42 by marlow_commuter, 2026-11-09T07:30:00.000Z]')).toBe(true);
   });
 
+  it('never cuts an emoji in half when shortening', () => {
+    const made = noteFromPost({ ...post, text: '😀'.repeat(300) }, 'n1', 't');
+    expect(made.text).toMatch(/^“(😀)+…” \[/u);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(made.text)).toBe(false);
+  });
+
   it('collapses line breaks so a note stays on one line', () => {
     expect(noteFromPost({ ...post, text: 'one\n\ntwo' }, 'n1', 't').text).toContain('“one two”');
   });
@@ -67,6 +73,19 @@ describe('isPostNoted', () => {
     const notes = [noteFromPost(post, 'n1', 't')];
     expect(isPostNoted(notes, post)).toBe(true);
     expect(isPostNoted(notes, { ...post, id: 43 })).toBe(false);
+  });
+
+  it('is not fooled by another note that merely quotes the citation text', () => {
+    const spoof = [{ id: 's', text: '“look at [telegram post #42 by a, 1970-01-01T00:00:00.000Z] here”', timestamp: 't' }];
+    expect(isPostNoted(spoof, post)).toBe(false);
+  });
+
+  it('tells apart posts that have no id', () => {
+    const a = { text: 'first', platform: 'x' };
+    const b = { text: 'second', platform: 'x' };
+    const notes = [noteFromPost(a, 'n1', 't')];
+    expect(isPostNoted(notes, a)).toBe(true);
+    expect(isPostNoted(notes, b)).toBe(false);
   });
 
   it('does not confuse post #4 with post #42', () => {

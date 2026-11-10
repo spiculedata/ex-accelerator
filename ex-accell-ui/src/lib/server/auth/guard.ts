@@ -30,6 +30,9 @@ const ADMIN_ONLY_PATTERNS = [
   /^\/api\/unified-analytics\/(query|seed)(\/|$)/
 ];
 
+/** Starting a workflow is admin-only, so cancelling or controlling a running one is too. Reading them stays open. */
+const ADMIN_ONLY_WRITE_PATTERNS = [/^\/api\/workflow-executions(\/|$)/];
+
 /**
  * `event.url.pathname` stays percent-encoded while SvelteKit routes on the decoded path, so
  * `/api/%64eploy-workflow` reaches the deploy handler. Match the patterns against the decoded,
@@ -43,8 +46,9 @@ function pathVariants(pathname: string): string[] {
   }
 }
 
-function isAdminOnly(pathname: string): boolean {
-  return pathVariants(pathname).some((path) => ADMIN_ONLY_PATTERNS.some((pattern) => pattern.test(path)));
+function isAdminOnly(pathname: string, verb: string): boolean {
+  const patterns = READ_METHODS.has(verb) ? ADMIN_ONLY_PATTERNS : [...ADMIN_ONLY_PATTERNS, ...ADMIN_ONLY_WRITE_PATTERNS];
+  return pathVariants(pathname).some((path) => patterns.some((pattern) => pattern.test(path)));
 }
 
 function isPublic(pathname: string): boolean {
@@ -71,7 +75,7 @@ export function decideAccess({ pathname, search, method, user }: AccessRequest):
   }
 
   if (pathname === LOGIN_PATH) return { action: 'redirect', location: '/' };
-  if (user.role !== 'admin' && isAdminOnly(pathname)) {
+  if (user.role !== 'admin' && isAdminOnly(pathname, verb)) {
     return { action: 'forbidden' };
   }
   if (user.role === 'viewer' && !READ_METHODS.has(verb) && !isPublic(pathname) && !SELF_SERVICE.has(pathname)) {
