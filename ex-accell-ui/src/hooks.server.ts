@@ -1,7 +1,8 @@
 import type { Handle } from '@sveltejs/kit';
 import { decideAccess } from '$lib/server/auth/guard';
 import { SESSION_COOKIE, getAuthConfig } from '$lib/server/auth/runtime';
-import { verifySessionToken } from '$lib/server/auth/session';
+import { readSessionToken } from '$lib/server/auth/session';
+import { isSessionCurrent } from '$lib/server/auth/revocation';
 import { preloadFont } from '$lib/server/fontPreload';
 import { isCrossSiteWrite, requestHosts } from '$lib/server/auth/csrf';
 
@@ -37,7 +38,14 @@ const authorize: Handle = async ({ event, resolve }) => {
   }
 
   const { sessionSecret } = getAuthConfig();
-  event.locals.user = verifySessionToken(event.cookies.get(SESSION_COOKIE), sessionSecret);
+  // A valid signature is not enough: the session must also be the user's current one (not signed out everywhere, not
+  // from before a password change, and the user must still exist)
+  const session = readSessionToken(event.cookies.get(SESSION_COOKIE), sessionSecret);
+  const status = session ? await isSessionCurrent(session.user.id, session.sessionVersion) : 'revoked';
+  event.locals.user = session && status === 'current' ? session.user : null;
+  // On a revoked session the browser's cookie is cleared when the response is rendered (the sign-in page does that); a
+  // redirect or denial built below carries no cookie changes. An outage ('unknown') never clears anything.
+  if (session && status === 'revoked') event.cookies.delete(SESSION_COOKIE, { path: '/' });
 
   const decision = decideAccess({
     pathname: event.url.pathname,
@@ -45,6 +53,9 @@ const authorize: Handle = async ({ event, resolve }) => {
     method: event.request.method,
     user: event.locals.user
   });
+
+  // The session could not be checked (the database is unreachable): say so instead of pretending the user signed out
+  if (status === 'unknown' && decision.action !== 'allow') return denial('The service is temporarily unavailable. Try again in a moment.', 503);
 
   switch (decision.action) {
     case 'redirect':

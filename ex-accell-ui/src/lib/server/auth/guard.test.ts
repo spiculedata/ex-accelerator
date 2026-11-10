@@ -102,3 +102,17 @@ describe('decideAccess: admin-only bypass attempts', () => {
     expect(req('/api/unified-analytics', 'GET', member).action).toBe('allow');
   });
 });
+
+describe('sign out everywhere', () => {
+  const logoutAll = (user: SessionUser | null) => decideAccess({ pathname: '/api/auth/logout-all', search: '', method: 'POST', user });
+
+  it('is for signed-in users only: an anonymous caller gets 401', () => {
+    expect(logoutAll(null)).toEqual({ action: 'unauthorized' });
+  });
+
+  it('works for every role, including a read-only viewer, since it only ends the caller\'s own sessions', () => {
+    for (const role of ['admin', 'user', 'viewer'] as const) {
+      expect(logoutAll({ id: '1', email: 'a@b.co', name: 'A', role })).toEqual({ action: 'allow' });
+    }
+  });
+});

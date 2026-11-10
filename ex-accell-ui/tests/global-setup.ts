@@ -1,17 +1,44 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import pg from 'pg';
 import { createSessionToken } from '../src/lib/server/auth/session';
+import { ADD_SESSION_VERSION_SQL, CREATE_INDEX_SQL, CREATE_TABLE_SQL } from '../src/lib/server/auth/authSchema';
 import { E2E_SESSION_SECRET, E2E_STORAGE_STATE } from './e2e-auth';
 
 const SESSION_TTL_SECONDS = 60 * 60;
+// A fixed id, so every run reuses the same row
+const E2E_ADMIN = { id: '00000000-0000-4000-8000-000000e2e001', email: 'e2e@example.com', name: 'E2E Admin', role: 'admin' as const };
 
-/** Writes a storageState holding a signed admin session, so tests need no database or login flow. */
+/**
+ * Makes sure the e2e admin exists in the users table. The app checks every session against its user, so a signed cookie
+ * for a user who is not in the database is refused. The password hash is not a real hash: nobody can sign in as this user.
+ * Returns the user's current session version, which the cookie must carry.
+ */
+async function ensureE2eAdmin(): Promise<number> {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('The e2e tests need DATABASE_URL: sessions are checked against the users table.');
+  const client = new pg.Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(CREATE_TABLE_SQL);
+    await client.query(ADD_SESSION_VERSION_SQL);
+    await client.query(CREATE_INDEX_SQL);
+    await client.query(
+      `INSERT INTO app_users (id, email, name, role, password_hash) VALUES ($1, $2, $3, $4, 'e2e-not-a-real-hash')
+       ON CONFLICT DO NOTHING`,
+      [E2E_ADMIN.id, E2E_ADMIN.email, E2E_ADMIN.name, E2E_ADMIN.role]
+    );
+    const rows = await client.query('SELECT session_version FROM app_users WHERE id = $1', [E2E_ADMIN.id]);
+    return Number(rows.rows[0]?.session_version ?? 0);
+  } finally {
+    await client.end();
+  }
+}
+
+/** Writes a storageState holding a signed admin session for a real (database) user, so tests need no login flow. */
 export default async function globalSetup(): Promise<void> {
-  const token = createSessionToken(
-    { id: 'e2e-admin', email: 'e2e@example.com', name: 'E2E Admin', role: 'admin' },
-    E2E_SESSION_SECRET,
-    SESSION_TTL_SECONDS
-  );
+  const sessionVersion = await ensureE2eAdmin();
+  const token = createSessionToken(E2E_ADMIN, E2E_SESSION_SECRET, SESSION_TTL_SECONDS, Date.now(), sessionVersion);
 
   const state = {
     cookies: [
