@@ -7,12 +7,26 @@ import { preloadFont } from '$lib/server/fontPreload';
 import { checkAccess } from '$lib/server/auth/accessCheck';
 import { resourcesInRequest } from '$lib/server/auth/access';
 import { isCrossSiteWrite, requestHosts } from '$lib/server/auth/csrf';
+import { createRateLimiter, parseRateLimit } from '$lib/server/rateLimit';
 
 const denial = (error: string, status: number) =>
   new Response(JSON.stringify({ success: false, data: null, error }), {
     status,
     headers: { 'content-type': 'application/json' }
   });
+
+// A limit on API requests per person (or per address when not signed in). API_RATE_LIMIT_PER_MINUTE=0 turns it off.
+const apiLimiter = createRateLimiter({ limit: parseRateLimit(process.env.API_RATE_LIMIT_PER_MINUTE), windowMs: 60_000 });
+const RATE_LIMIT_EXEMPT = new Set(['/api/health']);
+
+function clientKey(event: Parameters<Handle>[0]['event']): string {
+  if (event.locals.user) return `user:${event.locals.user.id}`;
+  try {
+    return `ip:${event.getClientAddress()}`;
+  } catch {
+    return 'ip:unknown';
+  }
+}
 
 const BASELINE_SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -77,6 +91,15 @@ const authorize: Handle = async ({ event, resolve }) => {
   // On a revoked session the browser's cookie is cleared when the response is rendered (the sign-in page does that); a
   // redirect or denial built below carries no cookie changes. An outage ('unknown') never clears anything.
   if (session && status === 'revoked') event.cookies.delete(SESSION_COOKIE, { path: '/' });
+
+  if (event.url.pathname.startsWith('/api/') && !RATE_LIMIT_EXEMPT.has(event.url.pathname)) {
+    const verdict = apiLimiter.hit(clientKey(event));
+    if (!verdict.allowed) {
+      const limited = denial('Too many requests. Slow down and try again shortly.', 429);
+      limited.headers.set('Retry-After', String(verdict.retryAfterSeconds));
+      return limited;
+    }
+  }
 
   const decision = decideAccess({
     pathname: event.url.pathname,

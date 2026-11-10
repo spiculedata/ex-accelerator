@@ -35,6 +35,7 @@ Use either `DATABASE_URL` or the individual settings. `DATABASE_URL` takes effec
 | `PORT` | Port for the production server (`node build`) |
 | `ORIGIN` | Public URL of the app (for example `https://analytics.example.com`). SvelteKit uses it to build URLs and for its cross-site request check, so set it whenever the server sits behind a proxy |
 | `BODY_SIZE_LIMIT` | Largest request body the server accepts, in bytes (suffixes `K`, `M`, `G` work). Defaults to `512K`; larger requests get a `413` before any route runs. Raise it only if you need bigger workflow definitions or uploads |
+| `API_RATE_LIMIT_PER_MINUTE` | How many `/api/*` requests one signed-in person (or one address, when not signed in) may make a minute. Defaults to `1200`; `0` turns the limit off. Over the limit the server answers `429` with a `Retry-After` header. The count is kept in memory, per server process |
 | `LOG_LEVEL` | `debug`, `info` (default), `warn` or `error` |
 | `NODE_ENV` | `development` or `production` |
 

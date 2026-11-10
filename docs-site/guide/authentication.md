@@ -99,11 +99,23 @@ Every role, including viewers, can change their own password from the user menu:
 new one. Wrong guesses at the current password are throttled like sign-in. Your other devices are signed out and
 this one stays signed in.
 
+## Request limits and page security
+
+- **API rate limit.** Each signed-in person may make 1200 `/api/*` requests a minute (one address, when not signed in).
+  Beyond that the server answers `429` with `Retry-After`. Pages and `/api/health` are not counted. Change it with
+  `API_RATE_LIMIT_PER_MINUTE` (`0` turns it off). It stops a runaway script, not a distributed flood, and each
+  server process counts separately.
+- **Content-Security-Policy.** Pages are served with a policy that runs scripts only from the site itself (the
+  framework's inline scripts carry a per-response nonce), allows no `eval`, lets pages call only their own server,
+  and blocks plugins, framing by other sites and form posts elsewhere. Images and media may come from any `https`
+  site (map tiles, post images, radio streams), and the Jupyter page may frame the Jupyter server. A reverse proxy
+  must not strip or replace this header.
+
 ## Current limitations
 
 - Roles are global. Project membership limits who can see a project, but there is no per-project role: everyone in a project has the rights of their global role (only the creator and admins manage the team or delete the project).
 - The sign-in throttle lives in memory, per server process. Behind several replicas each keeps its own count.
 - There is no password reset by email and no single sign-on; an admin resets passwords.
-- Rate limiting of the rest of `/api/*` and a Content-Security-Policy are not in place yet.
+- The rate limit, like the sign-in throttle, is per server process.
 
 These are tracked in [issue #65](https://github.com/spiculedata/social-explorer/issues/65).
