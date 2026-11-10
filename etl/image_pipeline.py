@@ -16,6 +16,7 @@ from io import BytesIO
 from datetime import datetime
 
 import requests
+from safe_http import safe_get
 from PIL import Image
 import imagehash
 
@@ -42,7 +43,8 @@ def download_image(url, max_size_mb=10):
             img_bytes = f.read()
     else:
         try:
-            resp = requests.get(url, timeout=30, headers={'User-Agent': 'SocialExplorer/1.0'}, allow_redirects=True)
+            # Only public addresses: the worker must not be made to read its own network on someone's behalf
+            resp = safe_get(url, timeout=30, headers={'User-Agent': 'SocialExplorer/1.0'})
             resp.raise_for_status()
             img_bytes = resp.content
             if len(img_bytes) > max_size_mb * 1024 * 1024:

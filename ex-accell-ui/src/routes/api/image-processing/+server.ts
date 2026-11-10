@@ -1,4 +1,5 @@
 // Image Processing API — object detection, face detection, OCR, classification, moderation
+import { fetchPublic, UnsafeUrlError } from '$lib/server/safeFetch';
 import { imageUrlProblem } from '$lib/server/imageUrl';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -298,14 +299,18 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
-        const imgResponse = await fetch(imageUrl, {
+        // Only public addresses: the server must not be made to read its own network on a visitor's behalf
+        const imgResponse = await fetchPublic(imageUrl, {
           signal: controller.signal,
-          redirect: 'follow',
           headers: { 'User-Agent': 'SocialExplorer/1.0' }
         });
         clearTimeout(timeout);
         if (!imgResponse.ok) {
           return json({ success: false, error: `That address did not return an image (it answered HTTP ${imgResponse.status}).` }, { status: 400 });
+        }
+        // Refuse a declared oversize file before reading it into memory
+        if (Number(imgResponse.headers.get('content-length')) > 10 * 1024 * 1024) {
+          return json({ success: false, error: 'Image too large (max 10MB). Use a smaller image or resize first.' }, { status: 400 });
         }
         const imgBuffer = await imgResponse.arrayBuffer();
         if (imgBuffer.byteLength === 0) {
@@ -322,6 +327,7 @@ export const POST: RequestHandler = async ({ request }) => {
           console.warn(`Large image (${sizeMB}MB) — vision processing may take several minutes on CPU`);
         }
       } catch (dlErr: any) {
+        if (dlErr instanceof UnsafeUrlError) return json({ success: false, error: dlErr.message }, { status: 400 });
         console.error('Image download error:', dlErr);
         // The cause is logged above; the browser gets a sentence it can act on
         return json({ success: false, error: 'The image could not be downloaded. Check the address, and that the site allows downloads.' }, { status: 400 });
