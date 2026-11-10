@@ -620,6 +620,8 @@
   let newAnnotation = '';
   let showAnnotations = false;
   let saveStatus: '' | 'saving' | 'saved' | 'error' = '';
+  // Why a save failed, when the reason is one the visitor can act on (someone else's investigation)
+  let saveErrorMessage = '';
   let savedSnapshot = '[]';
   // Notes that exist on screen but not yet in the database
   $: unsaved = JSON.stringify(annotations) !== savedSnapshot;
@@ -641,6 +643,7 @@
 
   async function persist(includeConfig: boolean) {
     saveStatus = 'saving';
+    saveErrorMessage = '';
     const toSave = annotations;
     try {
       const response = await fetch('/api/investigations', {
@@ -654,6 +657,7 @@
         })
       });
       const result = await response.json().catch(() => null);
+      if (response.status === 403) saveErrorMessage = 'Only the person who created this investigation, or an admin, can change it. Your changes were not saved.';
       if (!response.ok || !result?.success) throw new Error(result?.error ?? `HTTP ${response.status}`);
       savedSnapshot = JSON.stringify(toSave);
       saveStatus = 'saved';
@@ -801,7 +805,7 @@
       <button
         on:click={handleSave}
         class="relative p-1 rounded transition-colors {saveStatus === 'saved' ? 'text-emerald-400' : saveStatus === 'error' ? 'text-danger-400' : saveStatus === 'saving' ? 'text-indigo-400 animate-pulse' : 'text-slate-500 hover:text-slate-300'}"
-        title={saveStatus === 'error' ? 'Could not save. Click to try again' : unsaved ? 'Save (you have unsaved changes)' : 'Save'}
+        title={saveStatus === 'error' ? (saveErrorMessage || 'Could not save. Click to try again') : unsaved ? 'Save (you have unsaved changes)' : 'Save'}
         aria-label={saveStatus === 'error' ? 'Could not save. Try again' : unsaved ? 'Save, you have unsaved changes' : 'Save'}
       >
         {#if unsaved && saveStatus !== 'saving'}
@@ -833,7 +837,7 @@
             {/if}
           </div>
           <span role="status" class="text-[9px] {saveStatus === 'error' ? 'text-danger-400' : 'text-slate-500'}">
-            {#if saveStatus === 'error'}Could not save notes. Try again.{:else if saveStatus === 'saving'}Saving…{:else if unsaved}Unsaved{:else if annotations.length > 0}Saved, {annotations.length} note{annotations.length === 1 ? '' : 's'}{/if}
+            {#if saveStatus === 'error'}{saveErrorMessage || 'Could not save notes. Try again.'}{:else if saveStatus === 'saving'}Saving…{:else if unsaved}Unsaved{:else if annotations.length > 0}Saved, {annotations.length} note{annotations.length === 1 ? '' : 's'}{/if}
           </span>
           <input
             bind:value={newAnnotation}

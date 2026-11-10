@@ -49,6 +49,8 @@
   let sentimentStats: any = emptySentimentStats();
   // A failed load is not the same as an empty range, so the two are told apart in the page
   let loadFailed = false;
+  // Sections that failed while the rest loaded, so one bad request does not blank the whole page
+  let failedSections: string[] = [];
   // The sentiment segment whose posts are open in the side panel
   let drilldown: { title: string; filters: PostFilters } | null = null;
 
@@ -69,16 +71,27 @@
   // Load sentiment analysis data from database service
   async function loadSentimentData() {
     loadFailed = false;
+    failedSections = [];
     try {
-      // Load all sentiment data from database service
+      // The four requests are independent, so they run together and each section loads or fails on its own.
+      // Only the headline figures are essential: without them the page cannot say anything true.
       const fp = requestFilters();
-      const stats = await sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp);
-      sentimentStats = stats;
-      totalPosts = stats.total;
+      const [stats, detailed, emotions, trends] = await Promise.allSettled([
+        sentimentAnalysisDb.getSentimentStats(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getEmotionStats(workspaceId || undefined, fp),
+        sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, fp)
+      ]);
+      if (stats.status === 'rejected') throw stats.reason;
+      sentimentStats = stats.value;
+      totalPosts = stats.value.total;
 
-      detailedSentiments = await sentimentAnalysisDb.getDetailedSentiments(workspaceId || undefined, fp);
-      emotionStats = await sentimentAnalysisDb.getEmotionStats(workspaceId || undefined, fp);
-      sentimentTrends = await sentimentAnalysisDb.getSentimentTrends(timeRange, workspaceId || undefined, fp);
+      const failed: string[] = [];
+      if (detailed.status === 'fulfilled') detailedSentiments = detailed.value; else { detailedSentiments = []; failed.push('the sentiment breakdown'); }
+      if (emotions.status === 'fulfilled') emotionStats = emotions.value; else { emotionStats = []; failed.push('emotions'); }
+      if (trends.status === 'fulfilled') sentimentTrends = trends.value; else { sentimentTrends = []; failed.push('the trend over time'); }
+      for (const result of [detailed, emotions, trends]) if (result.status === 'rejected') console.error('Sentiment section failed:', result.reason);
+      failedSections = failed;
       
       // Load posts with current filters
       await loadFilteredPosts();
@@ -98,6 +111,7 @@
       // No fallback - sentiment analysis requires database connection. Clear the numbers so a failed reload
       // does not leave the previous filter's figures on screen as if they were current.
       loadFailed = true;
+      failedSections = [];
       sentimentStats = emptySentimentStats();
       totalPosts = 0;
       detailedSentiments = [];
@@ -484,6 +498,12 @@
       </div>
     {:else}
 
+    {#if failedSections.length > 0 && !loadFailed}
+      <div role="alert" class="mb-6 rounded-xl border border-danger-200 bg-danger-50 px-6 py-4">
+        <p class="font-medium text-ink-900">Some of this page could not be loaded: {failedSections.join(', ')}.</p>
+        <p class="mt-1 text-sm text-ink-700">The rest is shown. Change a filter or reload the page to try again.</p>
+      </div>
+    {/if}
     {#if loadFailed}
       <div role="alert" class="mb-6 rounded-xl border border-danger-200 bg-danger-50 px-6 py-5">
         <p class="font-medium text-ink-900">We could not load sentiment data.</p>

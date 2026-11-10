@@ -3,6 +3,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
+import { BodyTooLargeError, readJsonLimited } from '$lib/server/requestBody';
+
+// A workflow definition is a list of steps and their settings; a megabyte is far more than any real one
+const MAX_WORKFLOW_BODY_BYTES = 1024 * 1024;
 
 /**
  * POST /api/workflows/drafts
@@ -12,11 +16,13 @@ import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 export const POST: RequestHandler = async ({ request, locals }) => {
   let body: any;
   try {
-    body = await request.json();
-  } catch {
+    body = await readJsonLimited(request, MAX_WORKFLOW_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return json({ success: false, error: error.message }, { status: 413 });
     return json({ success: false, error: 'Send a JSON body' }, { status: 400 });
   }
 
+  if (!body || typeof body !== 'object') return json({ success: false, error: 'Send a JSON object' }, { status: 400 });
   const definition = body?.workflowDefinition;
   if (!definition || typeof definition !== 'object' || !Array.isArray(definition.steps)) {
     return json({ success: false, error: 'workflowDefinition must include a steps list' }, { status: 400 });

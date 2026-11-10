@@ -9,7 +9,7 @@ import { languageQueries } from '$lib/server/languageQueries';
 import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
 import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
-import { dateBoundToEpochMs } from '$lib/server/dateBounds';
+import { dateBoundToEpochMs, validateDateParams } from '$lib/server/dateBounds';
 import { isMissingRelationError, queryErrorResponse } from '$lib/server/queryErrors';
 import { exportRangeConditions } from '$lib/server/exportRange';
 import { parseDateWindow, windowConditions } from '$lib/server/dateWindow';
@@ -96,6 +96,10 @@ const EXPORT_MAX_ROWS = 10_000;
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const type = url.searchParams.get('type');
+
+    // A bad or reversed date range is the caller's mistake, whatever the endpoint: answer 400, not a database error
+    const dateProblem = validateDateParams(url.searchParams);
+    if (dateProblem) return json({ success: false, error: dateProblem }, { status: 400 });
 
     // Resolve workspace scope for dataset-scoped analytics
     const scope = await resolveWorkspaceScope(url);

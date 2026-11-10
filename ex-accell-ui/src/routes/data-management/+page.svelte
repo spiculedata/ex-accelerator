@@ -633,17 +633,11 @@
 
                   <div class="flex items-center justify-between">
                     <div class="flex space-x-2">
+                      <!-- Only actions that work are shown: a draft opens in the builder. Run, stop, logs, results and download have no handler yet -->
                       {#if workflow.status === 'draft'}
-                        <button 
+                        <button
                           on:click={() => editWorkflow(workflow)}
-                          class="text-sm text-blue-600 hover:text-blue-800 font-medium">{workflow.status === 'draft' ? 'Open in builder' : 'Edit'}</button>
-                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Run</button>
-                      {:else if workflow.status === 'running'}
-                        <button class="text-sm text-red-600 hover:text-red-800 font-medium">Stop</button>
-                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Logs</button>
-                      {:else if workflow.status === 'completed'}
-                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">View Results</button>
-                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Download</button>
+                          class="text-sm text-blue-600 hover:text-blue-800 font-medium">Open in builder</button>
                       {/if}
                     </div>
                   </div>

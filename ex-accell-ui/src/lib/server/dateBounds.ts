@@ -34,3 +34,23 @@ export function dateBoundToEpochMs(value: string, bound: 'start' | 'end'): numbe
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? null : parsed;
 }
+
+const DATE_PARAM_PAIRS = [['date_start', 'date_end'], ['dateStart', 'dateEnd']] as const;
+
+/**
+ * Checks the date range of a request (`date_start`/`date_end`, or the camel-case pair the GDELT endpoints use), so a bad or
+ * reversed range is answered with a clear 400 by every endpoint instead of reaching the database as a type error.
+ * Returns a message, or null when the dates are fine.
+ */
+export function validateDateParams(params: URLSearchParams): string | null {
+  for (const [startName, endName] of DATE_PARAM_PAIRS) {
+    const start = params.get(startName);
+    const end = params.get(endName);
+    const startMs = start ? dateBoundToEpochMs(start, 'start') : null;
+    const endMs = end ? dateBoundToEpochMs(end, 'end') : null;
+    if (start && startMs === null) return `${startName} must be a date (YYYY-MM-DD)`;
+    if (end && endMs === null) return `${endName} must be a date (YYYY-MM-DD)`;
+    if (startMs !== null && endMs !== null && startMs > endMs) return `${startName} must be on or before ${endName}`;
+  }
+  return null;
+}

@@ -4,6 +4,7 @@
 import { hybridDaprWorkflowExecutor } from './hybridDaprWorkflowExecutor';
 import { pythonDaprWorkflowGenerator, type GeneratedWorkflow } from './pythonDaprWorkflowGenerator';
 import { postgresPool } from './postgres';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Helper function to safely extract error messages
@@ -166,7 +167,7 @@ class ServerWorkflowService {
         }
       }
 
-      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `wf_${randomUUID()}`;
       await postgresPool.query(
         `INSERT INTO published_workflows
           (id, name, description, version, status, workflow_definition, generated_code, metadata, created_by, created_at, updated_at)
@@ -177,6 +178,15 @@ class ServerWorkflowService {
     } catch (error) {
       console.error('Error saving workflow draft:', error);
       throw new Error(`Failed to save workflow draft: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /** Deletes the publisher's own draft once it has been published. A failure is logged, not raised: the workflow is already stored. */
+  private async removeDraft(draftId: string, createdBy: string): Promise<void> {
+    try {
+      await postgresPool.query(`DELETE FROM published_workflows WHERE id = $1 AND status = 'draft' AND created_by = $2`, [draftId, createdBy]);
+    } catch (error) {
+      console.error('Could not remove the draft after publishing:', error);
     }
   }
 
@@ -191,6 +201,8 @@ class ServerWorkflowService {
       version?: string;
       tags?: string[];
       createdBy: string;
+      /** The draft this was published from; it is removed so the list shows one workflow, not a draft and a copy. */
+      draftId?: string;
     }
   ): Promise<PublishedWorkflow> {
     try {
@@ -199,7 +211,7 @@ class ServerWorkflowService {
       const { virtualEnvPath: _venv, activationScript: _activation, ...generatedCode } =
         await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
 
-      const id = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `wf_${randomUUID()}`;
       const now = new Date().toISOString();
       const version = metadata.version || '1.0.0';
       const tags = metadata.tags || [];
@@ -228,6 +240,8 @@ class ServerWorkflowService {
           now
         ]
       );
+
+      if (metadata.draftId) await this.removeDraft(metadata.draftId, metadata.createdBy);
 
       const publishedWorkflow: PublishedWorkflow = {
         id,
@@ -418,7 +432,7 @@ class ServerWorkflowService {
     }
 
     // Create execution record
-    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const executionId = `exec_${randomUUID()}`;
     const now = new Date().toISOString();
     const logs: WorkflowExecution['logs'] = [];
 

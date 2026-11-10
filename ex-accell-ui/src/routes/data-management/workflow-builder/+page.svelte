@@ -225,6 +225,8 @@
         },
         body: JSON.stringify({
           workflowDefinition: workflow,
+          // The draft this was saved as is removed once it is published
+          draftId: savedWorkflowId ?? undefined,
           metadata: {
             ...publishMetadata,
             tags: publishMetadata.tags.split(',').map(t => t.trim()).filter(Boolean)
@@ -240,6 +242,7 @@
 
       if (result.success) {
         notify('saved', `Workflow "${publishMetadata.name}" published.`);
+        savedWorkflowId = null; // the draft was turned into the published workflow, so a later save starts a new draft
         workflowBuilder.togglePublishDialog(false);
       } else {
         throw new Error(result.error || 'Unknown error');
