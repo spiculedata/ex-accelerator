@@ -1,4 +1,5 @@
 // ECharts utilities: lazy loading of the bundled package plus safe init, dispose and resize helpers
+import { CATEGORICAL, CHART } from './chartColors';
 
 type EChartsInstance = any;
 type EChartsStatic = any;
@@ -14,16 +15,16 @@ const SANS = "'Atkinson Hyperlegible Next Variable', ui-sans-serif, system-ui, s
  * sentiment charts set their own colours from getSentimentColor.
  */
 export const brandChartTheme = {
-  color: ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#56b4e9', '#d55e00', '#f0e442', '#0f1926'],
+  color: [...CATEGORICAL],
   backgroundColor: 'transparent',
   // ECharts writes a generated text description (title, series, values) onto the chart for screen readers
   aria: { enabled: true },
-  textStyle: { fontFamily: SANS, color: '#344253' },
-  title: { textStyle: { fontFamily: SANS, color: '#0f1926', fontWeight: 600 }, subtextStyle: { fontFamily: SANS, color: '#667384' } },
-  legend: { textStyle: { fontFamily: SANS, color: '#344253' } },
+  textStyle: { fontFamily: SANS, color: CHART.ink700 },
+  title: { textStyle: { fontFamily: SANS, color: CHART.ink900, fontWeight: 600 }, subtextStyle: { fontFamily: SANS, color: CHART.ink500 } },
+  legend: { textStyle: { fontFamily: SANS, color: CHART.ink700 } },
   tooltip: { textStyle: { fontFamily: SANS } },
-  categoryAxis: { axisLine: { lineStyle: { color: '#cfd5de' } }, axisTick: { lineStyle: { color: '#cfd5de' } }, axisLabel: { color: '#485567' }, splitLine: { lineStyle: { color: '#e3e8ee' } } },
-  valueAxis: { axisLine: { lineStyle: { color: '#cfd5de' } }, axisLabel: { color: '#485567' }, splitLine: { lineStyle: { color: '#e3e8ee' } } }
+  categoryAxis: { axisLine: { lineStyle: { color: CHART.ink300 } }, axisTick: { lineStyle: { color: CHART.ink300 } }, axisLabel: { color: CHART.ink600 }, splitLine: { lineStyle: { color: CHART.ink200 } } },
+  valueAxis: { axisLine: { lineStyle: { color: CHART.ink300 } }, axisLabel: { color: CHART.ink600 }, splitLine: { lineStyle: { color: CHART.ink200 } } }
 };
 
 /**

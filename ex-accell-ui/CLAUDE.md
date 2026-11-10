@@ -23,6 +23,7 @@ npm run test:e2e          # Playwright (needs `npx playwright install chromium`)
 npm run dev:dapr          # dev server plus Dapr sidecars from dapr.yaml
 npm run seed:demo         # load the synthetic demo dataset into an empty database
 npm run docs:screenshots  # recapture docs screenshots from a running stack with demo data
+npm run brand:palette     # regenerate docs-site/.vitepress/theme/palette.json from brand-tokens.css
 ```
 
 Local database for development:
