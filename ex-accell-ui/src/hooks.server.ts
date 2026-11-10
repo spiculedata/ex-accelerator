@@ -4,6 +4,8 @@ import { SESSION_COOKIE, getAuthConfig } from '$lib/server/auth/runtime';
 import { readSessionToken } from '$lib/server/auth/session';
 import { isSessionCurrent } from '$lib/server/auth/revocation';
 import { preloadFont } from '$lib/server/fontPreload';
+import { checkAccess } from '$lib/server/auth/accessCheck';
+import { resourcesInRequest } from '$lib/server/auth/access';
 import { isCrossSiteWrite, requestHosts } from '$lib/server/auth/csrf';
 
 const denial = (error: string, status: number) =>
@@ -29,6 +31,35 @@ function withSecurityHeaders(response: Response, isSecure: boolean): Response {
   // Only send HSTS when the site is served over HTTPS (the same signal as the Secure cookie flag)
   if (isSecure) headers.set('Strict-Transport-Security', HSTS_VALUE);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+/** Pages that are refused are shown a plain page, not JSON. */
+const forbiddenPage = () =>
+  new Response(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>No access - Social Explorer</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem"><h1>You do not have access to this</h1><p>It belongs to a project you are not a member of. Ask a member to add you, or go back to <a href="/">Home</a>.</p></body></html>',
+    { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+
+/**
+ * A signed-in user may only open projects and workspaces they are a member of (admins: all). The request names the
+ * resource in its path or query string; ids sent in a request body are checked by the route that reads them.
+ */
+async function refuseUnlessMember(event: Parameters<Handle>[0]['event']): Promise<Response | null> {
+  const user = event.locals.user;
+  if (!user) return null; // a public route reached while signed out
+  const resources = resourcesInRequest(event.url);
+  // An id that is not a plain whole number is refused, not ignored: a route may read it more loosely than this does
+  if (resources.malformed.length > 0) return denial('Invalid project or workspace id', 400);
+  if (resources.projects.length === 0 && resources.workspaces.length === 0) return null;
+  try {
+    const result = await checkAccess(user, resources);
+    if (result.allowed) return null;
+    return event.url.pathname.startsWith('/api/')
+      ? denial(`You do not have access to this ${result.what}`, 403)
+      : forbiddenPage();
+  } catch {
+    return denial('The service is temporarily unavailable. Try again in a moment.', 503);
+  }
 }
 
 const authorize: Handle = async ({ event, resolve }) => {
@@ -64,8 +95,11 @@ const authorize: Handle = async ({ event, resolve }) => {
       return denial('Authentication required', 401);
     case 'forbidden':
       return denial('You do not have permission to perform this action', 403);
-    default:
+    default: {
+      const refused = await refuseUnlessMember(event);
+      if (refused) return refused;
       return resolve(event, { preload: preloadFont });
+    }
   }
 };
 

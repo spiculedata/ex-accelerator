@@ -1,6 +1,9 @@
 // Investigations API Endpoint
 // CRUD operations for investigation configurations
 
+import type { SessionUser } from '$lib/server/auth/session';
+import { parseResourceId } from '$lib/server/auth/access';
+import { filterByWorkspaceAccess, refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { canModifyInvestigation } from '$lib/server/investigationAccess';
 import { investigationListQuery } from '$lib/server/investigationQuery';
 import { json } from '@sveltejs/kit';
@@ -39,7 +42,7 @@ async function ensureTable(): Promise<void> {
  * GET /api/investigations
  * List all investigations or get a single one by id
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
   try {
     await ensureTable();
 
@@ -48,15 +51,19 @@ export const GET: RequestHandler = async ({ url }) => {
     const projectId = url.searchParams.get('project_id');
 
     if (id) {
+      const numericId = investigationId(id);
+      if (numericId === null) return BAD_ID();
       const rows = await postgresPool.query(
         'SELECT * FROM investigations WHERE id = $1',
-        [parseInt(id)]
+        [numericId]
       );
 
       if (rows.length === 0) {
         return json({ success: false, error: 'Investigation not found' }, { status: 404 });
       }
 
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [rows[0].workspace_id] });
+      if (refused) return refused;
       return json({ success: true, investigation: rows[0] });
     }
 
@@ -68,7 +75,9 @@ export const GET: RequestHandler = async ({ url }) => {
       projectId: Number.isInteger(projectNumber) ? projectNumber : undefined
     });
 
-    const investigations = await postgresPool.query(sql, params);
+    const all = await postgresPool.query(sql, params);
+    // Only investigations of workspaces this person may see
+    const investigations = locals.user ? await filterByWorkspaceAccess(locals.user, all, (row: any) => row.workspace_id) : [];
     return json({ success: true, investigations });
   } catch (error) {
     // The cause is logged; the browser gets a generic message, never database detail
@@ -108,6 +117,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!found.length) {
         return json({ success: false, error: 'Workspace not found' }, { status: 404 });
       }
+      const refused = await refuseIfNoAccess(locals.user, { workspaces: [data.workspace_id] });
+      if (refused) return refused;
       workspaceId = data.workspace_id;
     }
 
@@ -140,6 +151,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 };
 
+const BAD_ID = () => json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
+
+/** The one reading of an id. The check and the change both use this number, never a second parse of the raw value. */
+function investigationId(raw: unknown): number | null {
+  const id = parseResourceId(raw);
+  return typeof id === 'number' ? id : null;
+}
+
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -149,11 +168,12 @@ function safeJsonParse(text: string): unknown {
 }
 
 /** A 403 when the signed-in user may not change this investigation, or null when they may (or it does not exist yet to be refused). */
-async function refuseUnlessAllowed(id: unknown, user: { email: string; role?: string } | null | undefined): Promise<Response | null> {
-  const numericId = typeof id === 'number' || typeof id === 'string' ? Number(id) : NaN;
-  if (!Number.isInteger(numericId) || numericId < 1) return json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
-  const rows = await postgresPool.query('SELECT created_by FROM investigations WHERE id = $1', [numericId]);
+async function refuseUnlessAllowed(numericId: number, user: Pick<SessionUser, 'email' | 'role'> | null | undefined): Promise<Response | null> {
+  const rows = await postgresPool.query('SELECT created_by, workspace_id FROM investigations WHERE id = $1', [numericId]);
   if (rows.length === 0) return null; // the handler reports not found
+  // The workspace's project must be one the person belongs to, as well as the investigation being theirs to change
+  const noAccess = await refuseIfNoAccess(user, { workspaces: [rows[0].workspace_id] });
+  if (noAccess) return noAccess;
   return canModifyInvestigation(user, rows[0].created_by) ? null : json({ success: false, error: 'Only the person who created this investigation, or an admin, can change it.' }, { status: 403 });
 }
 
@@ -171,7 +191,9 @@ export const PATCH: RequestHandler = async ({ request, locals }) => {
       return json({ success: false, error: 'Investigation ID required' }, { status: 400 });
     }
 
-    const denied = await refuseUnlessAllowed(data.id, locals.user);
+    const numericId = investigationId(data.id);
+    if (numericId === null) return BAD_ID();
+    const denied = await refuseUnlessAllowed(numericId, locals.user);
     if (denied) return denied;
 
     // Build dynamic SET clause from provided fields
@@ -212,7 +234,7 @@ export const PATCH: RequestHandler = async ({ request, locals }) => {
     // Always update the updated_at timestamp
     setClauses.push('updated_at = NOW()');
 
-    params.push(parseInt(data.id));
+    params.push(numericId);
     const sql = `UPDATE investigations SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
 
     const rows = await postgresPool.query(sql, params);
@@ -243,12 +265,14 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
       return json({ success: false, error: 'Investigation ID required' }, { status: 400 });
     }
 
-    const denied = await refuseUnlessAllowed(id, locals.user);
+    const numericId = investigationId(id);
+    if (numericId === null) return BAD_ID();
+    const denied = await refuseUnlessAllowed(numericId, locals.user);
     if (denied) return denied;
 
     const rows = await postgresPool.query(
       'DELETE FROM investigations WHERE id = $1 RETURNING id',
-      [parseInt(id)]
+      [numericId]
     );
 
     if (rows.length === 0) {

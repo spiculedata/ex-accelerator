@@ -7,12 +7,15 @@ vi.mock('$lib/server/auth/runtime', () => ({
   getAuthConfig: () => ({ sessionSecret: 's'.repeat(32), sessionTtlSeconds: 3600, secureCookies: config.secureCookies })
 }));
 
-const { isSessionCurrent } = vi.hoisted(() => ({ isSessionCurrent: vi.fn() }));
+const { isSessionCurrent, checkAccess } = vi.hoisted(() => ({ isSessionCurrent: vi.fn(), checkAccess: vi.fn() }));
 vi.mock('$lib/server/auth/revocation', () => ({ isSessionCurrent }));
+vi.mock('$lib/server/auth/accessCheck', () => ({ checkAccess }));
 
 beforeEach(() => {
   isSessionCurrent.mockReset();
   isSessionCurrent.mockResolvedValue('current');
+  checkAccess.mockReset();
+  checkAccess.mockResolvedValue({ allowed: true });
 });
 
 import { handle } from './hooks.server';
@@ -236,6 +239,80 @@ describe('security headers', () => {
     it('does not ask about a request with no session at all', async () => {
       await run('/login');
       expect(isSessionCurrent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('project and workspace access', () => {
+    const member: SessionUser = { id: '2', email: 'bob@example.com', name: 'B', role: 'user' };
+    const get = async (path: string, user: SessionUser | null = member) => {
+      const resolve = vi.fn().mockResolvedValue(new Response('ok'));
+      const token = user ? createSessionToken(user, SECRET, 3600) : undefined;
+      const event = {
+        url: new URL(`http://localhost${path}`),
+        request: new Request(`http://localhost${path}`),
+        cookies: { get: (name: string) => (name === 'ex_session' ? token : undefined), delete: () => {} },
+        locals: {} as { user: SessionUser | null }
+      };
+      const response = await handle({ event, resolve } as unknown as Parameters<typeof handle>[0]);
+      return { response, resolve };
+    };
+
+    it('refuses an API request for a workspace the user may not see, without reaching the route', async () => {
+      checkAccess.mockResolvedValue({ allowed: false, what: 'workspace' });
+      const { response, resolve } = await get('/api/unified-analytics?type=x&workspace_id=9');
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toContain('workspace');
+      expect(resolve).not.toHaveBeenCalled();
+      expect(checkAccess).toHaveBeenCalledWith(expect.objectContaining({ email: 'bob@example.com' }), { projects: [], workspaces: [9], malformed: [] });
+    });
+
+    it('shows a page request for a project the user may not see as a 403 page, not JSON', async () => {
+      checkAccess.mockResolvedValue({ allowed: false, what: 'project' });
+      const { response, resolve } = await get('/projects/5');
+      expect(response.status).toBe(403);
+      expect(response.headers.get('content-type')).toContain('text/html');
+      expect(await response.text()).toContain('do not have access');
+      expect(resolve).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      '/api/project-overview?id=9abc', '/api/workspace-overview?id=%209', '/api/unified-analytics?type=x&workspace_id=9abc',
+      '/api/workspaces/9abc/dataset-summary', '/api/workspaces/%209/dataset-summary', '/api/posts?workspace_id=%2B9'
+    ])('refuses %s as a malformed id with 400 before the route can read it more loosely', async (path) => {
+      const { response, resolve } = await get(path);
+      expect(response.status).toBe(400);
+      expect(resolve).not.toHaveBeenCalled();
+      expect(checkAccess).not.toHaveBeenCalled();
+    });
+
+    it('checks a request that hides the id in the path with encoding or doubled slashes, as the router would read it', async () => {
+      await get('/api/%77orkspaces/%39/dataset-summary');
+      expect(checkAccess).toHaveBeenCalledWith(expect.anything(), { projects: [], workspaces: [9], malformed: [] });
+    });
+
+    it('lets a permitted request through', async () => {
+      const { response, resolve } = await get('/api/workspaces?id=9');
+      expect(response.status).toBe(200);
+      expect(resolve).toHaveBeenCalled();
+    });
+
+    it('does not ask about a request that names no project or workspace', async () => {
+      await get('/api/health');
+      await get('/dashboards');
+      expect(checkAccess).not.toHaveBeenCalled();
+    });
+
+    it('answers 503, not a refusal, when membership cannot be checked', async () => {
+      checkAccess.mockRejectedValue(new Error('db down'));
+      const { response, resolve } = await get('/api/projects?id=5');
+      expect(response.status).toBe(503);
+      expect(resolve).not.toHaveBeenCalled();
+    });
+
+    it('asks before anything for an anonymous caller, who is refused as signed out first', async () => {
+      const { response } = await get('/api/projects?id=5', null);
+      expect(response.status).toBe(401);
+      expect(checkAccess).not.toHaveBeenCalled();
     });
   });
 });

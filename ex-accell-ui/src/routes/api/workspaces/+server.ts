@@ -1,6 +1,7 @@
 // Workspaces API Endpoint
 // CRUD operations for workspaces within projects
 
+import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { projectsDb } from '$lib/services/projectsDb';
@@ -45,6 +46,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     if (!data.project_id) {
       return json({ success: false, error: 'project_id required' }, { status: 400 });
     }
+    // A workspace can only be added to a project the person belongs to
+    const refused = await refuseIfNoAccess(locals.user, { projects: [data.project_id] });
+    if (refused) return refused;
 
     const workspace = await projectsDb.createWorkspace({
       project_id: data.project_id,
@@ -72,7 +76,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
  * PUT /api/workspaces
  * Update an existing workspace
  */
-export const PUT: RequestHandler = async ({ request }) => {
+export const PUT: RequestHandler = async ({ request, locals }) => {
   try {
     const data = await request.json();
     const { id, ...updates } = data;
@@ -80,6 +84,8 @@ export const PUT: RequestHandler = async ({ request }) => {
     if (!id) {
       return json({ success: false, error: 'Workspace ID required' }, { status: 400 });
     }
+    const refused = await refuseIfNoAccess(locals.user, { workspaces: [id] });
+    if (refused) return refused;
 
     const workspace = await projectsDb.updateWorkspace(id, updates);
 

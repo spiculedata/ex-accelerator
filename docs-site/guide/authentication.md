@@ -4,6 +4,25 @@ Social Explorer uses server-side sessions. Users are stored in PostgreSQL (`app_
 automatically) with passwords hashed using scrypt. Signing in sets an `HttpOnly`, `SameSite=Lax`
 session cookie that is signed with `SESSION_SECRET`.
 
+## Who can see which project
+
+Projects record their members (the person who creates one becomes its owner, and team members are added from the new
+project form). A signed-in user can open only the projects they are a member of, and the workspaces, investigations
+and analytics that belong to them; administrators see everything.
+
+- Lists (projects, Home, investigations) show only what you may see.
+- A request for something you may not see answers `403`, and a page shows a plain "no access" page.
+- A project from before accounts existed has no real member (its owner is a placeholder such as `default_user`), so it
+  stays open to every signed-in user until a real person is added to it. This keeps an upgrade from hiding existing
+  work.
+- An id that is not a plain whole number (`9abc`, ` 9`, `+9`, `09`) is refused with `400` rather than guessed at.
+- **What this does not cover:** raw posts and analytics requested *without* a workspace (`/api/posts`,
+  `/api/unified-analytics`, `/api/datasets`), GDELT, image processing, crawling jobs and workflows are
+  installation-wide, not project-scoped. Anyone signed in can read them; only the project, workspace and
+  investigation views above are limited by membership.
+- Membership is remembered for 30 seconds, so adding or removing a member takes effect within that time.
+- If membership cannot be checked (the database is unreachable) the request gets `503`, not a refusal.
+
 ## Ending sessions early
 
 A session is a signed token, so signing out on one device cannot reach a token that is still on another. Each user
