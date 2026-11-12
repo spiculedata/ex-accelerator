@@ -46,10 +46,24 @@ describe('POST /api/workflows', () => {
   it('returns a generic 500 without leaking internal error text', async () => {
     publishWorkflow.mockRejectedValue(new Error('connection to 10.0.0.5:5432 refused'));
 
-    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } }).catch((e) => e);
+    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } });
 
     expect(response.status).toBe(500);
-    expect(JSON.stringify(response.body ?? response)).not.toContain('10.0.0.5');
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to publish workflow' });
+  });
+
+  it('returns the envelope with data and the legacy workflow key on success', async () => {
+    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } });
+
+    expect(await response.json()).toEqual({ success: true, workflow: { id: 'wf_1' }, data: { id: 'wf_1' } });
+  });
+
+  it.each([[{}], ['text'], [{ steps: 'nope' }]])('refuses a workflowDefinition without a steps list (%j) with 400', async (workflowDefinition) => {
+    const response = await call({ workflowDefinition, metadata: { name: 'Flow' } });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ success: false, data: null });
+    expect(publishWorkflow).not.toHaveBeenCalled();
   });
 });
 

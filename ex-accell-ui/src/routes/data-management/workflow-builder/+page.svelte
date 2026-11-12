@@ -158,7 +158,7 @@
     try {
       const response = await fetch(`/api/workflows/${encodeURIComponent(id)}`);
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.workflow?.definition) throw new Error(result?.message ?? `HTTP ${response.status}`);
+      if (!response.ok || !result?.workflow?.definition) throw new Error(result?.error ?? `HTTP ${response.status}`);
       workflowBuilder.loadWorkflow(result.workflow.definition);
       // Only drafts are updated in place; saving a published workflow makes a new draft
       savedWorkflowId = result.workflow.status === 'draft' ? result.workflow.id : null;

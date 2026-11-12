@@ -12,6 +12,9 @@ export const POST: RequestHandler = async ({ request }) => {
   if ('failure' in parsed) return parsed.failure;
   const { workflowDefinition } = parsed.body;
   if (!workflowDefinition) return apiFail('Workflow definition is required', 400);
+  if (typeof workflowDefinition !== 'object' || !Array.isArray((workflowDefinition as { steps?: unknown }).steps)) {
+    return apiFail('workflowDefinition must include a steps list', 400);
+  }
 
   try {
     // Generate Python-based Dapr workflow on the server

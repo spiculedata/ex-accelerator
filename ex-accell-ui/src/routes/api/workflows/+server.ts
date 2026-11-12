@@ -41,6 +41,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const { workflowDefinition, metadata, draftId } = parsed.body as any;
 
     if (!workflowDefinition || !metadata) return apiFail('Missing workflowDefinition or metadata', 400);
+    if (typeof workflowDefinition !== 'object' || !Array.isArray(workflowDefinition.steps)) {
+      return apiFail('workflowDefinition must include a steps list', 400);
+    }
     if (!metadata.name) return apiFail('Missing required metadata: name', 400);
 
     // The creator is the signed-in user, never a name typed into the form

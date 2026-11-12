@@ -37,7 +37,7 @@ describe('POST /api/generate-python-workflow', () => {
     expect(JSON.stringify(body)).not.toContain('internalOnly');
   });
 
-  it.each([[{}], ['not json'], ['[1]']])('refuses %j with 400 and a failure envelope', async (body) => {
+  it.each([[{}], ['not json'], ['[1]'], [{ workflowDefinition: 'text' }], [{ workflowDefinition: { steps: 'x' } }]])('refuses %j with 400 and a failure envelope', async (body) => {
     const response = await post(body);
 
     expect(response.status).toBe(400);
