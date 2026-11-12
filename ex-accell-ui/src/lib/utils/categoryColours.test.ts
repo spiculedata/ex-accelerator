@@ -106,7 +106,7 @@ describe('category badges in pages and components', () => {
     ['src/routes/investigations/+page.svelte', 'dataSourceBadgeClass('],
     ['src/lib/components/ui/FilterBar.svelte', 'dataSourceBadgeClass('],
     ['src/lib/components/navigation/navItems.ts', 'dataSourceBadgeClass('],
-    ['src/routes/gdelt/+page.svelte', 'gdeltMentionTypeBadgeClass('],
+    ['src/lib/components/gdelt/MentionsTable.svelte', 'gdeltMentionTypeBadgeClass('],
     ['src/lib/services/overviewDb.ts', 'platformColour('],
     ['src/lib/services/engagementAnalysisDb.ts', 'platformColour(']
   ])('%s uses %s', (path, call) => {
