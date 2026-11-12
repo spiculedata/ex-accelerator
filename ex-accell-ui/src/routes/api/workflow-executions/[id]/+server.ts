@@ -3,19 +3,19 @@
 
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
-import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
+import { toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 /**
  * GET /api/workflow-executions/[id]
  * Get a specific workflow execution by ID
  */
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, locals }) => {
   try {
     const execution = await serverWorkflowService.getWorkflowExecution(params.id);
     if (!execution) return apiFail('Workflow execution not found', 404);
 
-    const view = toPublicExecution(execution);
+    const view = toPublicExecution(execution, { isAdmin: locals?.user?.role === 'admin' });
     return apiOk(view, { execution: view });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions/[id]', err, 'Failed to get workflow execution');

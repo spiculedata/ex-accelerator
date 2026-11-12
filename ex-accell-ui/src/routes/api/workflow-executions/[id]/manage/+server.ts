@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * GET /api/workflow-executions/[id]/manage?action=status
  * Get detailed workflow execution status from Dapr
  */
-export const GET: RequestHandler = async ({ params, url }) => {
+export const GET: RequestHandler = async ({ params, url, locals }) => {
   if (url.searchParams.get('action') !== 'status') return apiFail('Only status action is supported for GET requests', 400);
 
   const { id } = params;
@@ -61,7 +61,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
     if (!execution) return apiFail('Execution not found', 404);
 
     const daprStatus = toPublicDaprStatus(await hybridDaprWorkflowExecutor.getWorkflowStatus(id));
-    const localExecution = toPublicExecution(execution);
+    const localExecution = toPublicExecution(execution, { isAdmin: locals?.user?.role === 'admin' });
     return apiOk({ localExecution, daprStatus }, { executionId: id, localExecution, daprStatus });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions/[id]/manage', err, 'Failed to get workflow status');

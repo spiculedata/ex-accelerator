@@ -33,7 +33,23 @@ describe('GET /api/workflow-executions/[id]', () => {
 
     expect(JSON.stringify(body)).not.toContain('10.0.0.5');
     expect(body.execution.status).toBe('failed');
-    expect(body.data.error).toBeTruthy();
+    expect(body.data.error).toBe('The workflow run failed. Ask an administrator to check the server log.');
+    expect(body.data.logs[0].message).toBe('Details are visible to administrators.');
+  });
+
+  it('gives an administrator the whole execution so the cause can be diagnosed', async () => {
+    service.getWorkflowExecution.mockResolvedValue({
+      id: 'exec_1',
+      status: 'failed',
+      error: 'connect ECONNREFUSED 10.0.0.5:3500',
+      input: { a: 1 },
+      logs: [{ timestamp: 't', level: 'error', message: 'refused 10.0.0.5' }]
+    });
+
+    const body = await (await GET({ params: { id: 'exec_1' }, locals: { user: { email: 'root@example.com', role: 'admin' } } } as never)).json();
+
+    expect(body.data.error).toBe('connect ECONNREFUSED 10.0.0.5:3500');
+    expect(body.data.input).toEqual({ a: 1 });
   });
 
   it('reports a missing execution as a 404 envelope, not a SvelteKit error', async () => {

@@ -3,7 +3,7 @@
 
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
-import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
+import { toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 const MAX_LIST_LIMIT = 500;
@@ -12,7 +12,7 @@ const MAX_LIST_LIMIT = 500;
  * GET /api/workflow-executions
  * Get all workflow executions with optional filters
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ url, locals }) => {
   const rawLimit = url.searchParams.get('limit');
   const limit = rawLimit === null ? undefined : Number(rawLimit);
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT)) {
@@ -25,7 +25,8 @@ export const GET: RequestHandler = async ({ url }) => {
       status: url.searchParams.get('status') || undefined,
       limit
     });
-    const views = executions.map(toPublicExecution);
+    const viewer = { isAdmin: locals?.user?.role === 'admin' };
+    const views = executions.map((execution) => toPublicExecution(execution, viewer));
     return apiOk(views, { executions: views, count: views.length });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions', err, 'Failed to get workflow executions');
