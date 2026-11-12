@@ -21,7 +21,7 @@ faster-whisper>=1.0.0
 whisperx
 
 # NLP
-nltk>=3.8
+nltk>=3.10.4
 transformers>=4.40
 sentencepiece>=0.2
 scikit-learn
