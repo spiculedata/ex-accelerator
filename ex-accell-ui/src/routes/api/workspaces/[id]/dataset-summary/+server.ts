@@ -1,4 +1,4 @@
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { datasetsDb } from '$lib/services/datasetsDb';
 
@@ -7,23 +7,15 @@ export const GET: RequestHandler = async ({ params }) => {
     const workspaceId = parseInt(params.id);
 
     if (isNaN(workspaceId)) {
-      return json({ success: false, error: 'Invalid workspace ID' }, { status: 400 });
+      return apiFail('Invalid workspace ID', 400);
     }
 
     // Get all datasets for this workspace
     const datasets = await datasetsDb.getWorkspaceDatasets(workspaceId);
 
     if (!datasets || datasets.length === 0) {
-      return json({
-        success: true,
-        summary: {
-          types: [],
-          platforms: [],
-          recordCount: 0,
-          datasetCount: 0,
-          lastSync: null
-        }
-      });
+      const empty = { types: [], platforms: [], recordCount: 0, datasetCount: 0, lastSync: null };
+      return apiOk({ summary: empty }, { summary: empty });
     }
 
     // Extract unique dataset types
@@ -60,21 +52,9 @@ export const GET: RequestHandler = async ({ params }) => {
       }
     }
 
-    return json({
-      success: true,
-      summary: {
-        types,
-        platforms,
-        recordCount,
-        datasetCount: datasets.length,
-        lastSync
-      }
-    });
+    const summary = { types, platforms, recordCount, datasetCount: datasets.length, lastSync };
+    return apiOk({ summary }, { summary });
   } catch (error) {
-    console.error('Error getting workspace dataset summary:', error);
-    return json(
-      { success: false, error: 'Failed to retrieve dataset summary' },
-      { status: 500 }
-    );
+    return apiServerError('GET /api/workspaces/[id]/dataset-summary', error, 'Failed to retrieve dataset summary');
   }
 };

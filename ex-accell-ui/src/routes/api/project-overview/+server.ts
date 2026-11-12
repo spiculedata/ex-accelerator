@@ -2,7 +2,7 @@
 // Returns all data needed for the project detail page in one round trip:
 // project details, enriched workspace data (sparklines, sentiment, anomalies), activity feed, summary stats
 
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
@@ -11,12 +11,12 @@ export const GET: RequestHandler = async ({ url }) => {
   const projectId = url.searchParams.get('id');
 
   if (!projectId) {
-    return json({ success: false, error: 'Missing required parameter: id' }, { status: 400 });
+    return apiFail('Missing required parameter: id', 400);
   }
 
   const id = parseInt(projectId, 10);
   if (isNaN(id)) {
-    return json({ success: false, error: 'Invalid project id' }, { status: 400 });
+    return apiFail('Invalid project id', 400);
   }
 
   try {
@@ -28,7 +28,7 @@ export const GET: RequestHandler = async ({ url }) => {
     );
 
     if (!projects.length) {
-      return json({ success: false, error: 'Project not found' }, { status: 404 });
+      return apiFail('Project not found', 404);
     }
 
     const project = projects[0];
@@ -276,8 +276,7 @@ export const GET: RequestHandler = async ({ url }) => {
     );
     const alerts = enrichedWorkspaces.filter((w) => w.anomaly !== null).length;
 
-    return json({
-      success: true,
+    const payload = {
       project,
       workspaces: enrichedWorkspaces,
       activity,
@@ -288,11 +287,10 @@ export const GET: RequestHandler = async ({ url }) => {
         total_investigations: totalInvestigations,
         alerts
       }
-    });
+    };
+    return apiOk(payload, payload);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('GET /api/project-overview error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    return apiServerError('GET /api/project-overview', error, 'Failed to load the project overview');
   }
 };
 

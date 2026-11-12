@@ -21,7 +21,7 @@ const SVELTEKIT_ERROR_BASELINE = 0;
 const SVELTEKIT_ERROR = /(?<![.\w])error\(\s*\d{3}/g;
 
 // A non-logging line that reads `err.message`: the text is about to reach the client or the response shape.
-const LEAKED_MESSAGE_BASELINE = 16;
+const LEAKED_MESSAGE_BASELINE = 7;
 const LEAKED_MESSAGE = /\b(?:err|error|e)\??\.message/;
 const LOGGING_LINE = /\b(?:console|log|logger)\.\w+\(/;
 // `x instanceof SomethingError` (not plain Error) names one of our typed errors; `.message ===` and `.test(err.message)` are comparisons, not sends

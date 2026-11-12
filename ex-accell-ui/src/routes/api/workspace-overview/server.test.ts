@@ -60,3 +60,30 @@ describe('GET /api/workspace-overview', () => {
     expect(body.data_sources[0].kind).toBe('dataset');
   });
 });
+
+describe('GET /api/workspace-overview envelope', () => {
+  it('returns the payload in data and the legacy keys', async () => {
+    query.mockResolvedValueOnce([workspace]).mockResolvedValueOnce([captured, linked]).mockResolvedValue([]);
+
+    const body = await (await call()).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.workspace).toEqual(body.workspace);
+    expect(body.data.summary).toEqual(body.summary);
+  });
+
+  it('puts null data on the 400 and 404 failures', async () => {
+    expect(await (await call('abc')).json()).toMatchObject({ success: false, data: null });
+    query.mockResolvedValue([]);
+    expect(await (await call('9')).json()).toEqual({ success: false, data: null, error: 'Workspace not found' });
+  });
+
+  it('returns a generic 500 envelope without the database message', async () => {
+    query.mockRejectedValue(new Error('password authentication failed for user postgres'));
+
+    const response = await call();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to load the workspace overview' });
+  });
+});
