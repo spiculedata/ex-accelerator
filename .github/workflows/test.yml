@@ -24,6 +24,10 @@ jobs:
         working-directory: ex-accell-ui
         run: npm ci
 
+      - name: Lint (errors fail, warnings are tracked by the ratchet tests)
+        working-directory: ex-accell-ui
+        run: npm run lint
+
       - name: Type check
         working-directory: ex-accell-ui
         run: npm run check || true
