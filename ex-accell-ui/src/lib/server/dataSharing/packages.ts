@@ -239,8 +239,9 @@ export interface ExportResult {
   fields: PackageField[];
 }
 
-// Types Postgres has no ordering operator for, so a table cannot be sorted by them
-const UNSORTABLE_TYPES = new Set(['json', 'xml', 'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle']);
+// information_schema data types the export does not sort by: those Postgres has no ordering operator for, plus arrays and
+// user-defined types, whose element or member types may be among them. Leaving a column out can only weaken the order, never fail the query.
+const UNSORTABLE_TYPES = new Set(['json', 'xml', 'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle', 'jsonpath', 'ARRAY', 'USER-DEFINED']);
 
 /** The table's primary key columns in key order; empty for a view or a table without one. */
 async function primaryKeyColumns(schema: string, table: string): Promise<string[]> {
@@ -256,8 +257,9 @@ async function primaryKeyColumns(schema: string, table: string): Promise<string[
 
 /**
  * A deterministic ORDER BY for the export, so LIMIT/OFFSET batches neither repeat nor skip rows: the primary key when
- * there is one, else every sortable column (rows equal in all of them are identical in the CSV, so their order cannot
- * show). Columns are named by position, so no column name from the database ever reaches the SQL text.
+ * there is one, else every sortable column. Rows that tie on all of those (identical but for an unsortable column) may
+ * still swap places between batches; that cannot be helped without a key. Without a key each batch sorts the table, which
+ * MAX_EXPORT_ROWS bounds. Columns are named by position, so no column name from the database ever reaches the SQL text.
  */
 function exportOrderBy(columns: ColumnRow[], keyColumns: string[]): string {
   const positionOf = (name: string) => columns.findIndex((column) => column.column_name === name) + 1;

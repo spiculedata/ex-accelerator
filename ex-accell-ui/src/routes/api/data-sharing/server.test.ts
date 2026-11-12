@@ -403,14 +403,16 @@ describe('POST /api/data-sharing action=publish', () => {
       expect(callsTo('indisprimary')[0]?.[1]).toEqual(['"public"."posts"']);
     });
 
-    it('leaves out columns Postgres cannot sort (json) and still publishes a table made only of them', async () => {
+    it('leaves out columns Postgres may not be able to sort (json, arrays, user-defined types) and still publishes a table made only of them', async () => {
       writePackage('posts', 'posts');
       db.query.mockImplementation(async (sql: string) => {
         if (sql.includes('FROM datasets')) return [posts];
         if (sql.includes('information_schema.columns')) {
           return [
             { column_name: 'raw', data_type: 'json', is_nullable: 'YES' },
-            { column_name: 'id', data_type: 'integer', is_nullable: 'NO' }
+            { column_name: 'id', data_type: 'integer', is_nullable: 'NO' },
+            { column_name: 'tags', data_type: 'ARRAY', is_nullable: 'YES' },
+            { column_name: 'extra', data_type: 'USER-DEFINED', is_nullable: 'YES' }
           ];
         }
         if (sql.includes('COUNT(*)')) return [{ count: '1' }];
