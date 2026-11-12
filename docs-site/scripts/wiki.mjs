@@ -118,23 +118,37 @@ export function buildSidebar(configSource) {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
 
-/** Home.md from the VitePress home page's front matter (hero, actions and features). */
+/** The lines under a top-level front matter key, up to the next top-level key ('' when the key is absent). */
+function frontMatterBlock(front, key) {
+  const lines = front.split('\n');
+  const start = lines.findIndex((line) => line.startsWith(`${key}:`));
+  if (start < 0) return '';
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^[A-Za-z]/.test(line));
+  return (end < 0 ? rest : rest.slice(0, end)).join('\n');
+}
+
+const homeLink = (link) => (link.startsWith('http') ? link : wikiPageName(`${link.replace(/^\/|\/$/g, '')}.md`));
+
+/**
+ * Home.md from the VitePress home page's front matter. Only the `hero:` block (name, text, tagline,
+ * actions) and the `features:` block are read, so other keys (title, titleTemplate, head) never leak in.
+ */
 export function buildHome(indexSource) {
   const front = normalizeNewlines(indexSource).match(/^---\n([\s\S]*?)\n---/)?.[1] ?? '';
-  // Hero fields only: the lookup stops before `actions:` so an action's `text:` is never mistaken for the hero text
-  const hero = front.split(/^\s*actions:/m)[0].split(/^features:/m)[0];
+  // The lookup stops before `actions:` so an action's `text:` is never mistaken for the hero text
+  const [hero, actionsBlock = ''] = frontMatterBlock(front, 'hero').split(/^\s*actions:/m);
   const field = (name) => hero.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'm'))?.[1].trim() ?? '';
   const lines = [`# ${field('name')}`, '', `**${field('text')}**`, '', field('tagline'), ''];
 
-  const actions = [...front.matchAll(/-\s*theme:\s*\w+\s*\n\s*text:\s*(.+)\n\s*link:\s*(\S+)/g)];
-  for (const [, text, link] of actions) {
-    lines.push(`- [${text.trim()}](${link.startsWith('http') ? link : wikiPageName(`${link.replace(/^\/|\/$/g, '')}.md`)})`);
-  }
+  const actions = [...actionsBlock.matchAll(/-\s*theme:\s*\w+\s*\n\s*text:\s*(.+)\n\s*link:\s*(\S+)/g)];
+  for (const [, text, link] of actions) lines.push(`- [${text.trim()}](${homeLink(link)})`);
   if (actions.length > 0) lines.push('');
 
   // A feature may carry a link (and its text) on the lines after its details
-  for (const [, title, details, link, linkText] of front.matchAll(/-\s*title:\s*(.+)\n\s*details:\s*(.+)(?:\n\s*link:\s*(\S+))?(?:\n\s*linkText:\s*(.+))?/g)) {
-    const more = link ? ` [${(linkText ?? 'Read more').trim()}](${link.startsWith('http') ? link : wikiPageName(`${link.replace(/^\/|\/$/g, '')}.md`)})` : '';
+  const features = frontMatterBlock(front, 'features');
+  for (const [, title, details, link, linkText] of features.matchAll(/-\s*title:\s*(.+)\n\s*details:\s*(.+)(?:\n\s*link:\s*(\S+))?(?:\n\s*linkText:\s*(.+))?/g)) {
+    const more = link ? ` [${(linkText ?? 'Read more').trim()}](${homeLink(link)})` : '';
     lines.push(`**${title.trim()}**. ${details.trim()}${more}`, '');
   }
   return lines.join('\n').trimEnd() + '\n';

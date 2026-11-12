@@ -12,6 +12,31 @@ const tabs = [
 ];
 const active = ref(tabs[0].id);
 
+// Images in tabs the visitor has not opened are lazy and hidden, so they would only start loading on click.
+// Warm the cache when a tab is hovered, focused or pressed so the switch is instant.
+const warmed = new Set<string>();
+function warm(src: string) {
+  if (typeof Image === 'undefined' || warmed.has(src)) return;
+  warmed.add(src);
+  new Image().src = withBase(src);
+}
+
+const tabRefs = ref<HTMLButtonElement[]>([]);
+function selectTab(index: number, shouldFocus = false) {
+  const position = (index + tabs.length) % tabs.length;
+  active.value = tabs[position].id;
+  warm(tabs[position].src);
+  if (shouldFocus) tabRefs.value[position]?.focus();
+}
+function onTabKeydown(event: KeyboardEvent, index: number) {
+  // Leave browser shortcuts such as Alt+Left (back) alone
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const target = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key];
+  if (target === undefined) return;
+  event.preventDefault();
+  selectTab(target, true);
+}
+
 // The first three front matter features (Collect, Analyse, Investigate) are the steps, so the wiki Home and this page share one source
 const steps = computed(() =>
   (frontmatter.value.features ?? []).slice(0, 3).map((f: { title: string; details: string }, i: number) => ({ n: String(i + 1), title: f.title, text: f.details }))
@@ -76,11 +101,14 @@ const stack = [
 
 const demoCommands = 'git clone https://github.com/spiculedata/social-explorer.git\ncd social-explorer/ex-accell-ui\nnpm run demo';
 const copied = ref(false);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 async function copyCommands() {
   try {
     await navigator.clipboard.writeText(demoCommands);
     copied.value = true;
-    setTimeout(() => (copied.value = false), 2000);
+    // Restart the timer on repeated clicks so an earlier one cannot reset the label early
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copied.value = false), 2000);
   } catch {
     // Clipboard access can be blocked; the commands are still selectable
   }
@@ -106,19 +134,28 @@ async function copyCommands() {
 
         <div class="showcase">
           <div class="frame">
-            <div class="chrome" role="group" aria-label="Product views">
+            <div class="chrome" role="tablist" aria-label="Product views">
               <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
               <button
-                v-for="t in tabs"
+                v-for="(t, i) in tabs"
+                :id="`tab-${t.id}`"
                 :key="t.id"
+                ref="tabRefs"
                 type="button"
+                role="tab"
                 class="tab"
                 :class="{ on: active === t.id }"
-                :aria-pressed="active === t.id"
-                @click="active = t.id"
+                :aria-selected="active === t.id"
+                aria-controls="showcase-panel"
+                :tabindex="active === t.id ? 0 : -1"
+                @click="selectTab(i)"
+                @keydown="onTabKeydown($event, i)"
+                @mouseenter="warm(t.src)"
+                @focus="warm(t.src)"
+                @pointerdown="warm(t.src)"
               >{{ t.label }}</button>
             </div>
-            <div class="screen">
+            <div id="showcase-panel" class="screen" role="tabpanel" tabindex="0" :aria-labelledby="`tab-${active}`">
               <img
                 v-for="t in tabs"
                 v-show="active === t.id"

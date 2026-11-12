@@ -12,6 +12,9 @@ head:
     - property: og:description
       content: Open-source platform that brings posts, news events and broadcasts into one database and scores them for sentiment, topics and language. Try it with one command.
 
+# Note: the landing page (theme/Landing.vue) renders hero.text and hero.tagline, and the first three
+# features as its steps. hero.actions is not rendered there (its buttons are fixed in the component);
+# it feeds only the generated wiki Home (scripts/wiki.mjs), so keep it in step with the buttons.
 hero:
   name: Social Explorer
   text: Follow a story across social, news and radio
