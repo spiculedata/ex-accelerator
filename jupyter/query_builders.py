@@ -17,12 +17,12 @@ Rules every builder follows:
 import re
 from datetime import datetime, timedelta
 
-_IDENTIFIER = re.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,62}$')
+_IDENTIFIER = re.compile(r'[A-Za-z_][A-Za-z0-9_]{0,62}')
 
 
 def quote_identifier(name):
     """Return ``name`` as a double-quoted SQL identifier, or raise ValueError if it is not a plain name."""
-    if not isinstance(name, str) or not _IDENTIFIER.match(name):
+    if not isinstance(name, str) or not _IDENTIFIER.fullmatch(name):
         raise ValueError(
             f"Invalid SQL identifier {name!r}: use letters, digits and underscores only, "
             "starting with a letter or underscore (max 63 characters)"

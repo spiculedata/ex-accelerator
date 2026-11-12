@@ -17,7 +17,7 @@ class TestQuoteIdentifier:
     def test_quotes_a_plain_name(self):
         assert qb.quote_identifier('silver') == '"silver"'
 
-    @pytest.mark.parametrize('name', ['', 'a b', 'a;b', 'a"b', '1abc', 'a-b', 'a.b', HOSTILE, None, 5, 'x' * 64])
+    @pytest.mark.parametrize('name', ['', 'posts\n', 'a b', 'a;b', 'a"b', '1abc', 'a-b', 'a.b', HOSTILE, None, 5, 'x' * 64])
     def test_rejects_anything_else(self, name):
         with pytest.raises(ValueError):
             qb.quote_identifier(name)
