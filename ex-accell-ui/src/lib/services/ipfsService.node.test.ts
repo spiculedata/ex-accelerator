@@ -347,6 +347,8 @@ describe('shutdown', () => {
     await service.connect();
     expect(service.isConnected()).toBe(true);
   });
+});
+
 describe('network configuration', () => {
   it('builds the node with Helia defaults when no network variable is set', async () => {
     await service.connect();
