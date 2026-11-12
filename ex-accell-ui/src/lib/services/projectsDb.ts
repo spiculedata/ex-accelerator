@@ -4,6 +4,10 @@
 import { postgresPool } from './postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
+/** Postgres undefined_table: the schema has not been created yet, so there is genuinely nothing to list. */
+const UNDEFINED_TABLE_CODE = '42P01';
+const isMissingTable = (error: unknown): boolean => (error as { code?: string } | null)?.code === UNDEFINED_TABLE_CODE;
+
 export interface Project {
   id: number;
   name: string;
@@ -67,7 +71,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching projects:', error);
-      // A failed query is not an empty or missing result: let the route answer 500
+      if (isMissingTable(error)) return [];
+      // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
   }
@@ -182,7 +187,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching workspaces:', error);
-      // A failed query is not an empty or missing result: let the route answer 500
+      if (isMissingTable(error)) return [];
+      // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
   }
@@ -310,7 +316,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching project members:', error);
-      // A failed query is not an empty or missing result: let the route answer 500
+      if (isMissingTable(error)) return [];
+      // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
   }
@@ -346,7 +353,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching data sources:', error);
-      // A failed query is not an empty or missing result: let the route answer 500
+      if (isMissingTable(error)) return [];
+      // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
   }
