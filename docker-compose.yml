@@ -149,8 +149,20 @@ services:
     volumes:
       - ${DATA_DIR:-/data}/notebooks:/app/notebooks
     depends_on:
+      jupyter-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
+
+  # Docker creates a missing ${DATA_DIR}/notebooks as root, but Jupyter runs as uid 1000. This one-shot
+  # step hands the folder to that user, then exits. (Change both numbers if you build with other JUPYTER_UID/GID.)
+  jupyter-init:
+    image: ${REGISTRY:-local}/jupyter:${TAG:-latest}
+    user: "0:0"
+    entrypoint: ["chown", "-R", "1000:1000", "/app/notebooks"]
+    restart: "no"
+    volumes:
+      - ${DATA_DIR:-/data}/notebooks:/app/notebooks
 
   # ─── WavePulse Radio Service ──────────────────────────────────────────────────
   wavepulse:

@@ -28,3 +28,18 @@ jobs:
       - name: Run tests
         working-directory: jupyter
         run: ../.venv/bin/python -m pytest -q
+
+  image:
+    name: Jupyter image (build and smoke test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: docker build --tag jupyter-ci jupyter
+
+      # 403 without a token, 200 with one, framing limited to the app origin, samples seeded,
+      # unprivileged user, and a clear message for a notebooks folder it cannot write to
+      - name: Smoke test
+        run: jupyter/tests/smoke.sh jupyter-ci

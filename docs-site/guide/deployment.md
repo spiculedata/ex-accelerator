@@ -62,6 +62,11 @@ headers to its responses, and `Strict-Transport-Security` (180 days, including s
 proxy add `X-Content-Type-Options: nosniff` for them too. Only enable HTTPS-only cookies on a host
 whose subdomains are all served over HTTPS, because browsers will remember the HSTS policy.
 
+The Jupyter container runs as an unprivileged user (uid and gid 1000), not as root. Compose runs a one-shot
+`jupyter-init` service first that gives `$DATA_DIR/notebooks` to that user, so you need do nothing, including when upgrading from
+the earlier root image. If you run the image without compose, `chown -R 1000:1000` the notebooks folder yourself; otherwise the
+container stops and says so.
+
 Do not publish the Postgres, Redis, Ollama or Jupyter ports to the internet. The compose file maps
 them to the host for convenience; bind them to `127.0.0.1` or remove the mappings on a server.
 
