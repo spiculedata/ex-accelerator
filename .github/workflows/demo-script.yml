@@ -3,9 +3,9 @@ name: Demo script
 on:
   push:
     branches: [main]
-    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', '.github/workflows/demo-script.yml']
+    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', 'docker-compose.yml', '.github/workflows/demo-script.yml']
   pull_request:
-    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', '.github/workflows/demo-script.yml']
+    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', 'docker-compose.yml', '.github/workflows/demo-script.yml']
   workflow_dispatch:
 
 permissions:
@@ -48,8 +48,10 @@ jobs:
       - name: Fresh start
         run: |
           bash scripts/demo.sh > fresh.log 2>&1 &
+          pid=$!
           for _ in $(seq 1 90); do
             curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login" && break
+            kill -0 "$pid" 2>/dev/null || break # the script exited early; fail below instead of waiting
             sleep 2
           done
           curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login"
@@ -60,8 +62,10 @@ jobs:
         run: |
           bash scripts/demo.sh --stop
           bash scripts/demo.sh > resume.log 2>&1 &
+          pid=$!
           for _ in $(seq 1 90); do
             curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login" && break
+            kill -0 "$pid" 2>/dev/null || break
             sleep 2
           done
           curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login"

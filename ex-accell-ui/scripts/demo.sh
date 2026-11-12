@@ -106,6 +106,12 @@ ADMIN_PASSWORD="$(cat "$STATE_DIR/admin-password")"
 SESSION_SECRET="$(cat "$STATE_DIR/session-secret")"
 DB_PASSWORD="$(cat "$STATE_DIR/db-password")"
 
+# Fail early, before starting the database or printing credentials, if something already holds the app port
+if node -e "const s=require('node:net').connect({host:'127.0.0.1',port:+process.argv[1]});s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1))" "$APP_PORT"; then
+  echo "Port $APP_PORT is already in use. Free it or set DEMO_APP_PORT to another port." >&2
+  exit 1
+fi
+
 if exists; then
   guard
   docker start "$CONTAINER" >/dev/null || {
@@ -143,12 +149,6 @@ npm run --silent seed:demo -- --if-empty || {
   echo "If this is a database authentication error, the saved credentials no longer match the container: npm run demo -- --reset" >&2
   exit 1
 }
-
-# Fail before printing credentials if something else already holds the app port
-if node -e "const s=require('node:net').connect({host:'127.0.0.1',port:+process.argv[1]});s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1))" "$APP_PORT"; then
-  echo "Port $APP_PORT is already in use. Free it or set DEMO_APP_PORT to another port." >&2
-  exit 1
-fi
 
 cat <<MSG
 
