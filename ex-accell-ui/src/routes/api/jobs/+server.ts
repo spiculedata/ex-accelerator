@@ -227,11 +227,15 @@ export const GET: RequestHandler = async ({ url }) => {
 			log.warn('Could not query jobs via Dapr', { detail: daprError instanceof Error ? daprError.message : String(daprError) });
 		}
 
+		let stateFailed = false;
 		try {
 			jobStates = await jobStateStore.getAllJobStates();
 		} catch (stateError) {
+			stateFailed = true;
 			// Both sources down is an outage; one down still returns what the other has
 			if (isServiceUnavailable(stateError) && !daprJobs) return unavailable('GET /api/jobs', stateError, 'Job services');
+			// An empty list here would read as "no jobs"
+			if (!daprJobs) return apiServerError('GET /api/jobs', stateError, 'Internal server error while retrieving job(s)');
 			log.warn('Could not get job states', { detail: stateError instanceof Error ? stateError.message : String(stateError) });
 		}
 
@@ -240,7 +244,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			daprInfo: Array.isArray(daprJobs) ? daprJobs.find((dj: any) => dj.name === state.name) : daprJobs && daprJobs.name === state.name ? daprJobs : null
 		}));
 
-		const payload = { daprJobs, jobStates, combined, serviceStatus: { daprAvailable: !!daprJobs, stateAvailable: true } };
+		const payload = { daprJobs, jobStates, combined, serviceStatus: { daprAvailable: !!daprJobs, stateAvailable: !stateFailed } };
 		return apiOk(payload, payload);
 	} catch (err) {
 		if (isServiceUnavailable(err)) return unavailable('GET /api/jobs', err, 'Job services');
