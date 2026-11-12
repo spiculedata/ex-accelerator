@@ -406,14 +406,14 @@
 </script>
 
 <nav aria-label="Main navigation" class="bg-white border-b border-ink-200">
-  <div class="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl min-[1400px]:max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
       <!-- Left: Logo + Nav Links -->
       <div class="flex items-center">
-        <!-- Logo. Between 1280 and 1400px the links and switchers need the room, so only the mark shows -->
+        <!-- Logo. From 1280 to 1399px the links and switchers need the room, so only the mark shows; from 1400px the bar widens and the name returns -->
         <a href="/" class="flex items-center mr-6 text-primary-700" aria-label="Social Explorer home">
           <BrandMark size={32} />
-          <span class="ml-2.5 font-sans text-xl font-semibold tracking-tight text-ink-900 whitespace-nowrap hidden sm:block min-[1280px]:max-[1399px]:hidden!">
+          <span class="ml-2.5 font-sans text-xl font-semibold tracking-tight text-ink-900 whitespace-nowrap hidden sm:block min-[1280px]:max-[1399.9px]:hidden!">
             Social Explorer
           </span>
         </a>
