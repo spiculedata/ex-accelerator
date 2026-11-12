@@ -264,7 +264,7 @@ describe('GET /api/investigations list scope fails closed', () => {
       locals: { user: { email: 'ada@example.com' } }
     } as unknown as Parameters<typeof GET>[0]);
 
-  it.each(['?workspace_id=abc', '?workspace_id=1x', '?project_id=abc'])(
+  it.each(['?workspace_id=abc', '?workspace_id=1x', '?workspace_id=1e3', '?workspace_id=99999999999', '?project_id=abc'])(
     'answers 400, not the unscoped list, for the malformed filter %s',
     async (search) => {
       query.mockClear();

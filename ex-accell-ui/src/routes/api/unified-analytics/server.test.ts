@@ -580,3 +580,30 @@ describe('GET /api/unified-analytics workspace scope fails closed', () => {
     expect(duckdbQuery).toHaveBeenCalled();
   });
 });
+
+describe('GET /api/unified-analytics scoped workspace without social data', () => {
+  const get = (query: string) =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?${query}`) } as Parameters<typeof GET>[0]);
+
+  beforeEach(() => {
+    duckdbQuery.mockReset();
+    duckdbQuery.mockResolvedValue([]);
+  });
+
+  it.each(['trigrams', 'hashtag-analysis'])('%s returns nothing, not every post, for a workspace with no social dataset', async (type) => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: false, socialPlatforms: [] } });
+
+    const body = await (await get(`type=${type}&workspace_id=7`)).json();
+
+    expect(body).toEqual({ success: true, data: [] });
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('filters engagement by the workspace platforms when the legacy workspace parameter is used', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['telegram'] } });
+
+    await get('type=engagement-top-posts&workspace=7&limit=5');
+
+    expect(duckdbQuery.mock.calls[0][1]).toEqual([['telegram'], 5]);
+  });
+});

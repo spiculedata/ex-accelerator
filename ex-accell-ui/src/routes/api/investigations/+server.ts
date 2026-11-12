@@ -69,9 +69,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
     // List investigations, optionally limited to one workspace or to the workspaces of one project
     // A filter that was asked for but is not a whole number must not widen to the unfiltered list
-    const wsNumber = workspaceId ? Number(workspaceId) : undefined;
-    const projectNumber = projectId ? Number(projectId) : undefined;
-    const isBadFilter = (value: number | undefined) => value !== undefined && !Number.isSafeInteger(value);
+    const filterId = (raw: string | null) => (raw ? (/^\d+$/.test(raw) ? Number(raw) : NaN) : undefined);
+    const wsNumber = filterId(workspaceId);
+    const projectNumber = filterId(projectId);
+    const isBadFilter = (value: number | undefined) => value !== undefined && !(value <= MAX_INTEGER_ID);
     if (isBadFilter(wsNumber) || isBadFilter(projectNumber)) {
       return json({ success: false, error: 'workspace_id and project_id must be whole numbers' }, { status: 400 });
     }
@@ -153,6 +154,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 };
 
+/** Ids are Postgres integers: a larger value cannot exist and would only fail the query. */
+const MAX_INTEGER_ID = 2_147_483_647;
 const BAD_ID = () => json({ success: false, error: 'Investigation ID must be a whole number' }, { status: 400 });
 
 /** The one reading of an id. The check and the change both use this number, never a second parse of the raw value. */

@@ -40,6 +40,8 @@ export type WorkspaceScopeResult =
   | { kind: 'missing'; workspaceId: number | null };
 
 const WORKSPACE_ID_PATTERN = /^\d+$/;
+/** workspaces.id is a Postgres integer: a larger id cannot exist, so it is missing rather than a query error. */
+const MAX_WORKSPACE_ID = 2_147_483_647;
 
 /**
  * Resolve workspace scope from a URL's workspace_id (or legacy workspace) param.
@@ -50,7 +52,7 @@ export async function resolveWorkspaceScope(url: URL): Promise<WorkspaceScopeRes
   if (!wsId) return { kind: 'none' };
 
   const workspaceId = WORKSPACE_ID_PATTERN.test(wsId) ? Number(wsId) : NaN;
-  if (!Number.isSafeInteger(workspaceId)) return { kind: 'missing', workspaceId: null };
+  if (!Number.isSafeInteger(workspaceId) || workspaceId > MAX_WORKSPACE_ID) return { kind: 'missing', workspaceId: null };
 
   const scope = await resolveWorkspaceScopeById(workspaceId);
   return scope ? { kind: 'scoped', scope } : { kind: 'missing', workspaceId };

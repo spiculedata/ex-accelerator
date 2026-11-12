@@ -44,7 +44,7 @@ describe('resolveWorkspaceScope', () => {
     expect(await resolveWorkspaceScope(at('?workspace_id=99'))).toEqual({ kind: 'missing', workspaceId: 99 });
   });
 
-  it.each(['abc', '12abc', '-1', '1.5', '0x10'])('answers kind missing for the malformed id %s, without a query', async (bad) => {
+  it.each(['abc', '12abc', '-1', '1.5', '0x10', ' 5', '99999999999'])('answers kind missing for the malformed id %s, without a query', async (bad) => {
     expect(await resolveWorkspaceScope(at(`?workspace_id=${bad}`))).toEqual({ kind: 'missing', workspaceId: null });
     expect(query).not.toHaveBeenCalled();
   });
