@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 // A menu item is named after the page it opens, so people recognise where they landed.
-const nav = readFileSync('src/lib/components/Navigation.svelte', 'utf8');
+const nav = readFileSync('src/lib/components/navigation/navItems.ts', 'utf8');
 const items = [...nav.matchAll(/\{ name: '([^']+)', href: '(\/[^']*)'/g)].map((m) => ({ name: m[1], href: m[2] }));
 
 function titleOf(href: string): string | null {
