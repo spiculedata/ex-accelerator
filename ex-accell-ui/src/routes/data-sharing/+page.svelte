@@ -495,7 +495,7 @@
       already downloaded it, or any IPFS node that kept a copy, still has the data and can pass it on; those copies
       cannot be deleted or recalled from here. Treat the data as disclosed.
     </p>
-    <p>You can publish the package again later; the same data gets the same CID.</p>
+    <p>The package stays here as a local package, so you can publish it again later.</p>
   </div>
   <svelte:fragment slot="footer">
     <div class="flex justify-end gap-2">

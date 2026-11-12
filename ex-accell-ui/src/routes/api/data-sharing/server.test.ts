@@ -626,6 +626,18 @@ describe('POST /api/data-sharing action=withdraw', () => {
   });
 });
 
+describe('GET /api/data-sharing?action=resolve for a withdrawn package', () => {
+  it('says it was withdrawn and nothing else: no gateway link, name, description or metadata', async () => {
+    db.query.mockResolvedValue([
+      { cid: CID, package_id: 'posts', package_name: 'Telegram posts', description: 'd', gateway_url: `https://ipfs.io/ipfs/${CID}`, metadata: { a: 1 }, status: 'withdrawn', withdrawn_at: '2026-11-12T10:00:00Z' }
+    ]);
+
+    const body = await (await get(`?action=resolve&cid=${CID}`, viewer)).json();
+
+    expect(body).toEqual({ success: true, found: true, package: { cid: CID, status: 'withdrawn', withdrawn_at: '2026-11-12T10:00:00Z' } });
+  });
+});
+
 describe('GET /api/data-sharing?action=registry after a withdrawal', () => {
   it('lists only published rows and shows who withdrew to admins only', async () => {
     await get('?action=registry', admin);

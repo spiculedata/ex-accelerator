@@ -70,7 +70,7 @@ needs an account on your server. That part never leaves your server.
 | Package generation | `POST /api/data-sharing` with a `dataset_id` from the catalogue (the **Data Management** page) reads the table's columns from `information_schema`, counts the rows, takes a preview (100 rows by default, at most 1,000) and writes `datapackage.json` and `<table>-preview.csv` under `PACKAGES_DIR/<package-id>/`. |
 | Helia node | When sharing is on, the first publish or import starts a [Helia](https://helia.io/) IPFS node *inside the app process* (no separate daemon). It keeps blocks in `IPFS_BLOCKSTORE_PATH` and its peer identity and routing data in `IPFS_DATASTORE_PATH`. |
 | Publishing | Exports the full table to `<table>.csv` (up to `MAX_EXPORT_ROWS`, 500,000 by default, in primary-key order or, without one, ordered by every sortable column, so batches do not overlap), adds every file in the package directory to the node as one directory, **pins** it so the blockstore keeps it, and returns the directory's CID. |
-| Registry | The table `ipfs_published_packages` (created by migration `0007_ipfs_registry`) records every package this install published or imported: CID, gateway URL, title, row count, size, status (`published`, `imported` or `withdrawn`), who did it and when (and, for a withdrawal, `withdrawn_at` and `withdrawn_by`, added by migration `0008_ipfs_withdrawn`). The **Data Sharing** page reads it to show CIDs next to packages. |
+| Registry | The table `ipfs_published_packages` (created by migration `0007_ipfs_registry`) records every package this install published or imported: CID, gateway URL, title, row count, size, status (`published`, `imported` or `withdrawn`), who did it and when (and, for a withdrawal, `withdrawn_at` and `withdrawn_by`, added by migration `0009_ipfs_withdrawn`). The **Data Sharing** page reads it to show CIDs next to packages. |
 | Gateway | A public HTTP gateway (`IPFS_GATEWAY_URL`, `https://ipfs.io/ipfs` by default) is only used to build a shareable `https://.../ipfs/<cid>` link. The server never fetches from *this* address; see the next paragraph for the gateways Helia itself uses. |
 | Importing | Fetches the directory for a CID from the network, checks it, creates a table named `ipfs_` plus the last 40 characters of the CID (lower-cased), loads the CSV with parameterised inserts, adds a row to the `datasets` catalogue and copies the files into `PACKAGES_DIR`. The same CID cannot be imported twice (`409`). |
 
@@ -184,9 +184,11 @@ If you published something by mistake, or no longer want your server to offer it
 confirm. The server then:
 
 1. unpins the package and garbage-collects the blockstore, so this node stops serving it (blocks that another
-   package you published also uses stay, because that package still needs them);
-2. marks the registry row `withdrawn`, with who did it and when (administrators can see this), and hides it from
-   **Shared Data Packages** and from the registry list. The card offers **Publish to IPFS** again.
+   package you published also uses stay, because that package still needs them; the same collection also drops the
+   cached blocks of packages you imported, which only costs a re-fetch if you serve them again);
+2. marks the registry row `withdrawn`, with who did it and when (administrators can see this), and removes it from
+   the registry list. The package stays on **Shared Data Packages** as a local package, without its IPFS badge, and
+   the card offers **Publish to IPFS** again. `resolve` for its CID answers only that it was withdrawn.
 
 What it **cannot** do: delete copies that other people or nodes already hold, or make the CID stop resolving
 anywhere else. Anyone who fetched the data before you withdrew it still has it and can republish it. Treat the data
@@ -194,8 +196,11 @@ as disclosed, and if it was personal data, follow your own breach or takedown pr
 generated package files in `PACKAGES_DIR` (the full exported CSV and the preview); delete that directory yourself if
 you want the files gone from the disk.
 
-Publishing the same package again gives the same CID if the data is unchanged, and the row becomes `published`
-again. Only a package this install published can be withdrawn, not one it imported.
+Publishing the package again pins it again and the row becomes `published`. Only a package this install published
+can be withdrawn, not one it imported. A withdrawal takes turns with publishing, so it waits for a publish or import
+that is in progress. If you publish two packages that share a file, withdraw one, publish it again and then withdraw
+the other, Helia's pin counts for the shared blocks can come out wrong and the remaining package may lose blocks on
+this node; publish it again to restore them.
 
 ## Share the CID
 

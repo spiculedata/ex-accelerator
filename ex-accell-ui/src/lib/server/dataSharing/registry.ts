@@ -11,7 +11,7 @@ export async function listPublished(includePublisher: boolean): Promise<unknown[
   return postgresPool.query(`SELECT ${columns} FROM ipfs_published_packages WHERE status = $1 ORDER BY published_at DESC`, ['published']);
 }
 
-export async function findByCid(cid: string): Promise<{ status: string; package_id: string } | null> {
+export async function findByCid(cid: string): Promise<{ status: string; package_id: string; cid: string; withdrawn_at: string | null } | null> {
   const rows = await postgresPool.query(`SELECT ${PUBLIC_COLUMNS} FROM ipfs_published_packages WHERE cid = $1`, [cid]);
   return rows[0] ?? null;
 }

@@ -91,6 +91,7 @@ vi.mock('helia', () => ({
       pins: {
         async *add(cid: string) {
           if (fake.pinFailures.has(cid)) throw new Error('blocks not available');
+          if (fake.pins.includes(cid)) throw Object.assign(new Error('Already pinned'), { name: 'AlreadyPinnedError' });
           fake.pins.push(cid);
           fake.events.push(`pin ${cid}`);
           yield cid;
@@ -178,6 +179,17 @@ describe('publishDirectory', () => {
     expect(fake.pins).toEqual([cid]);
     expect(fake.directories.get(cid)?.map((entry) => entry.name).sort()).toEqual(['datapackage.json', 'posts.csv']);
     expect(service.isConnected()).toBe(true);
+  });
+
+  it('publishes again without failing when the directory already has a pin (a retry after a failed registry write)', async () => {
+    const pkg = join(dir, 'pkg');
+    mkdirSync(pkg);
+    writeFileSync(join(pkg, 'datapackage.json'), '{}');
+    fake.pins.push('bafydir0'); // the CID the fake gives the next directory
+
+    await expect(service.publishDirectory(pkg)).resolves.toBe('bafydir0');
+
+    expect(fake.pins).toEqual(['bafydir0']);
   });
 
   it('refuses an empty directory without pinning anything', async () => {

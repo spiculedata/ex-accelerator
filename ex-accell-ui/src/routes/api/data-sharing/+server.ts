@@ -73,6 +73,10 @@ async function resolve(cid: string | null): Promise<Response> {
   if (!isValidCid(cid)) throw badRequest('A valid cid parameter is required');
   const found = await findByCid(cid);
   if (!found) return json({ success: true, found: false, gateway_url: ipfsService.getGatewayUrl(cid) });
+  // A withdrawn package is not offered any more, so say only that it was
+  if (found.status === 'withdrawn') {
+    return json({ success: true, found: true, package: { cid: found.cid, status: found.status, withdrawn_at: found.withdrawn_at } });
+  }
   return json({ success: true, found: true, package: found });
 }
 

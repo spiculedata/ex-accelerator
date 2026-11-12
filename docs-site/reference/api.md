@@ -67,7 +67,7 @@ and importing answer `503` and the other actions still work.
 Registry rows have `id`, `dataset_id`, `package_id`, `cid`, `gateway_url`, `package_name`, `description`,
 `row_count`, `file_size_bytes`, `status` (`published`, `imported` or `withdrawn`), `published_at`, `withdrawn_at`
 and `metadata`; admins also get `published_by` and `withdrawn_by`. The `registry` action lists only `published`
-rows; `resolve` also returns a `withdrawn` one, with its status.
+rows; `resolve` answers a `withdrawn` one with only `cid`, `status` and `withdrawn_at`.
 
 ### `POST /api/data-sharing` (admin)
 

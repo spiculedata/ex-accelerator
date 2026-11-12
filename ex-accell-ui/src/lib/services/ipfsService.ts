@@ -59,7 +59,7 @@ interface UnixFs {
   cat(cid: unknown, options?: { signal?: AbortSignal }): AsyncIterable<Uint8Array>;
 }
 
-const KEEP_PIN_TIMEOUT_MS = 30_000;
+const KEEP_PIN_TIMEOUT_MS = 10_000;
 
 async function drain(iterable: AsyncIterable<unknown>): Promise<void> {
   for await (const _ of iterable) void _;
@@ -160,7 +160,8 @@ class IpfsService {
       const fileCid = await ufs.addBytes(new Uint8Array(content));
       dirCid = await ufs.cp(fileCid, dirCid, filename);
     }
-    await drain(node.pins.add(dirCid));
+    // A retry after a failed registry write finds the pin already there; adding it again would throw
+    if (!(await hasOwnPin(node, dirCid))) await drain(node.pins.add(dirCid));
 
     const cid = String(dirCid);
     log.info('Published directory to IPFS', { files: files.length, cid });
