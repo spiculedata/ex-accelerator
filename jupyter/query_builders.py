@@ -138,7 +138,11 @@ def topics_query(min_size=0):
 
 
 def describe_dataset_queries(table_name, schema='public', sample=5):
-    """The three queries behind ``describe_dataset``: row count, columns and a sample."""
+    """The three queries behind ``describe_dataset``: row count, columns and a sample.
+
+    Names are matched exactly: quoting makes them case-sensitive, so use the lower-case name a
+    table has unless it was created with a quoted mixed-case name.
+    """
     relation = f'{quote_identifier(schema)}.{quote_identifier(table_name)}'
     return {
         'count': (f'SELECT COUNT(*) as n FROM {relation}', []),
@@ -199,7 +203,7 @@ def sentiment_timeline_query(platform=None, days=30, today=None):
     conditions, params = ['sp.timestamp IS NOT NULL'], []
     if days:
         cutoff = (today or datetime.now()) - timedelta(days=_int(days, 'days'))
-        conditions.append('sp.timestamp >= %s')
+        conditions.append('DATE(sp.timestamp) >= %s')
         params.append(cutoff.strftime('%Y-%m-%d'))
     if platform:
         conditions.append('sp.platform = %s')
