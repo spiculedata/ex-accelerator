@@ -239,6 +239,36 @@ export interface ExportResult {
   fields: PackageField[];
 }
 
+// Types Postgres has no ordering operator for, so a table cannot be sorted by them
+const UNSORTABLE_TYPES = new Set(['json', 'xml', 'point', 'line', 'lseg', 'box', 'path', 'polygon', 'circle']);
+
+/** The table's primary key columns in key order; empty for a view or a table without one. */
+async function primaryKeyColumns(schema: string, table: string): Promise<string[]> {
+  const rows = await postgresPool.query<{ column_name: string }>(
+    `SELECT a.attname AS column_name
+     FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+     WHERE i.indrelid = to_regclass($1) AND i.indisprimary
+     ORDER BY array_position(i.indkey::smallint[], a.attnum)`,
+    [qualifiedTable(schema, table)]
+  );
+  return rows.map((row) => row.column_name);
+}
+
+/**
+ * A deterministic ORDER BY for the export, so LIMIT/OFFSET batches neither repeat nor skip rows: the primary key when
+ * there is one, else every sortable column (rows equal in all of them are identical in the CSV, so their order cannot
+ * show). Columns are named by position, so no column name from the database ever reaches the SQL text.
+ */
+function exportOrderBy(columns: ColumnRow[], keyColumns: string[]): string {
+  const positionOf = (name: string) => columns.findIndex((column) => column.column_name === name) + 1;
+  const keyPositions = keyColumns.map(positionOf).filter((position) => position > 0);
+  const positions =
+    keyPositions.length > 0 && keyPositions.length === keyColumns.length
+      ? keyPositions
+      : columns.flatMap((column, index) => (UNSORTABLE_TYPES.has(column.data_type) ? [] : [index + 1]));
+  return positions.length > 0 ? ` ORDER BY ${positions.join(', ')}` : '';
+}
+
 /** Exports the table (up to MAX_EXPORT_ROWS) as `<table>.csv` inside the package directory, in batches. */
 export async function exportFullCsv(dir: string, schema: string, table: string): Promise<ExportResult> {
   const columns = await columnsOf(schema, table);
@@ -246,13 +276,14 @@ export async function exportFullCsv(dir: string, schema: string, table: string):
   const totalRows = await countRows(schema, table);
   const limit = Math.min(totalRows, MAX_EXPORT_ROWS);
   const headers = columns.map((column) => column.column_name);
+  const orderBy = exportOrderBy(columns, await primaryKeyColumns(schema, table));
   const file = fs.openSync(path.join(dir, `${table}.csv`), 'w');
   let rows = 0;
   try {
     fs.writeSync(file, toCsvLine(headers));
     for (let offset = 0; offset < limit; offset += EXPORT_BATCH_SIZE) {
       const batch = await postgresPool.query<Record<string, unknown>>(
-        `SELECT * FROM ${qualifiedTable(schema, table)} LIMIT $1 OFFSET $2`,
+        `SELECT * FROM ${qualifiedTable(schema, table)}${orderBy} LIMIT $1 OFFSET $2`,
         [Math.min(EXPORT_BATCH_SIZE, limit - offset), offset]
       );
       if (batch.length === 0) break;

@@ -374,6 +374,66 @@ describe('POST /api/data-sharing action=publish', () => {
     expect(String(insert?.[0])).not.toContain('current_user');
   });
 
+  describe('export order', () => {
+    const exportSelects = () => callsTo('SELECT * FROM').map(([sql]) => String(sql));
+
+    it('orders every batch by all columns when the table has no primary key, so LIMIT/OFFSET pages never overlap', async () => {
+      writePackage('posts', 'posts');
+      scriptDatabase(posts);
+
+      await post({ action: 'publish', package_id: 'posts' });
+
+      expect(exportSelects()).toEqual(['SELECT * FROM "public"."posts" ORDER BY 1, 2 LIMIT $1 OFFSET $2']);
+    });
+
+    it('orders by the primary key when the table has one, looked up without putting names in SQL', async () => {
+      writePackage('posts', 'posts');
+      db.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM datasets')) return [posts];
+        if (sql.includes('information_schema.columns')) return columns;
+        if (sql.includes('indisprimary')) return [{ column_name: 'text' }, { column_name: 'id' }];
+        if (sql.includes('COUNT(*)')) return [{ count: '2' }];
+        if (sql.includes('SELECT * FROM')) return [{ id: 1, text: 'a' }];
+        return [];
+      });
+
+      await post({ action: 'publish', package_id: 'posts' });
+
+      expect(exportSelects()).toEqual(['SELECT * FROM "public"."posts" ORDER BY 2, 1 LIMIT $1 OFFSET $2']);
+      expect(callsTo('indisprimary')[0]?.[1]).toEqual(['"public"."posts"']);
+    });
+
+    it('leaves out columns Postgres cannot sort (json) and still publishes a table made only of them', async () => {
+      writePackage('posts', 'posts');
+      db.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM datasets')) return [posts];
+        if (sql.includes('information_schema.columns')) {
+          return [
+            { column_name: 'raw', data_type: 'json', is_nullable: 'YES' },
+            { column_name: 'id', data_type: 'integer', is_nullable: 'NO' }
+          ];
+        }
+        if (sql.includes('COUNT(*)')) return [{ count: '1' }];
+        if (sql.includes('SELECT * FROM')) return [{ raw: '{}', id: 1 }];
+        return [];
+      });
+      await post({ action: 'publish', package_id: 'posts' });
+      expect(exportSelects()).toEqual(['SELECT * FROM "public"."posts" ORDER BY 2 LIMIT $1 OFFSET $2']);
+
+      db.query.mockClear();
+      db.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM datasets')) return [posts];
+        if (sql.includes('information_schema.columns')) return [{ column_name: 'raw', data_type: 'json', is_nullable: 'YES' }];
+        if (sql.includes('COUNT(*)')) return [{ count: '1' }];
+        if (sql.includes('SELECT * FROM')) return [{ raw: '{}' }];
+        return [];
+      });
+      const response = await post({ action: 'publish', package_id: 'posts' });
+      expect(response.status).toBe(200);
+      expect(exportSelects()).toEqual(['SELECT * FROM "public"."posts" LIMIT $1 OFFSET $2']);
+    });
+  });
+
   it('brings the descriptor up to date with the exported columns and row count', async () => {
     writePackage('posts', 'posts');
     scriptDatabase(posts);
