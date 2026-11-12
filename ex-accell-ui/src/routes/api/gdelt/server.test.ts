@@ -22,6 +22,7 @@ describe('GET /api/gdelt', () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({ events: [], count: 0, unavailable: true });
     expect(JSON.stringify(body)).not.toContain('gdelt_events');
+    expect(body).toMatchObject({ success: true, data: { events: [], count: 0 }, meta: { unavailable: true } });
   });
 
   it('keeps a generic 500 for a real failure', async () => {
@@ -30,7 +31,7 @@ describe('GET /api/gdelt', () => {
     const response = await call();
 
     expect(response.status).toBe(500);
-    expect(JSON.stringify(await response.json())).not.toContain('connection');
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Internal server error' });
   });
 
   it('returns events when the table exists', async () => {
@@ -40,6 +41,8 @@ describe('GET /api/gdelt', () => {
 
     expect(body.count).toBe(1);
     expect(body.unavailable).toBeUndefined();
+    expect(body).toMatchObject({ success: true, data: { count: 1, events: [{ id: 1, lat: 51.5 }] } });
+    expect(body.events).toEqual(body.data.events);
   });
 });
 
@@ -52,6 +55,7 @@ describe('GET /api/gdelt date range', () => {
   ])('answers %s with a 400 before touching the database', async (_label, search) => {
     const response = await call(search);
     expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ success: false, data: null, error: expect.any(String) });
     expect(query).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,4 @@
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { jobStateStore } from '$lib/services/jobStateStore.js';
 
@@ -6,6 +6,9 @@ import { jobStateStore } from '$lib/services/jobStateStore.js';
  * Log monitoring endpoint that can parse live console output from dapr run
  * This monitors the console output and extracts job progress information
  */
+
+const MAX_LOG_BODY_BYTES = 512 * 1024;
+const MAX_LOG_LINES = 1000;
 
 interface LogParseResult {
   jobId?: string;
@@ -140,16 +143,17 @@ async function updateJobFromLogPattern(pattern: LogParseResult, potentialJobIds:
 }
 
 export const POST: RequestHandler = async ({ request }) => {
+  const body = await readJsonObject(request, MAX_LOG_BODY_BYTES);
+  if ('failure' in body) return body.failure;
+  const { logLines } = body.body;
+  if (!Array.isArray(logLines) || logLines.length > MAX_LOG_LINES || logLines.some((line) => typeof line !== 'string')) {
+    return apiFail(`logLines must be an array of up to ${MAX_LOG_LINES} text lines`, 400);
+  }
+
   try {
-    const { logLines } = await request.json();
-    
-    if (!Array.isArray(logLines)) {
-      return json({ error: 'logLines must be an array' }, { status: 400 });
-    }
-    
     const results = [];
     
-    for (const line of logLines) {
+    for (const line of logLines as string[]) {
       const parsed = parseLogLine(line);
       if (parsed) {
         await updateJobFromLogPattern(parsed, []);
@@ -157,19 +161,18 @@ export const POST: RequestHandler = async ({ request }) => {
       }
     }
     
-    return json({ 
+    const payload = {
       processed: results.length,
       results: results.slice(0, 5) // Return first 5 for debugging
-    });
-    
+    };
+    return apiOk(payload, payload);
   } catch (error) {
-    console.error('Log monitor error:', error);
-    return json({ error: 'Failed to process log lines' }, { status: 500 });
+    return apiServerError('POST /api/log-monitor', error, 'Failed to process log lines');
   }
 };
 
 export const GET: RequestHandler = async () => {
-  return json({
+  const usage = {
     message: 'Log Monitor API',
     usage: {
       POST: {
@@ -187,5 +190,6 @@ export const GET: RequestHandler = async () => {
       'error/failed - job failure',
       'Numbers - potential progress indicators'
     ]
-  });
+  };
+  return apiOk(usage, usage);
 };
