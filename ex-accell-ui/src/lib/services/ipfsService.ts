@@ -38,6 +38,10 @@ interface HeliaNode {
   stop(): Promise<void>;
 }
 
+interface ClosableStore {
+  close(): Promise<void>;
+}
+
 interface UnixFs {
   addBytes(bytes: Uint8Array): Promise<unknown>;
   addDirectory(): Promise<unknown>;
@@ -51,10 +55,19 @@ class IpfsService {
   private ufs: UnixFs | null = null;
   // Two requests arriving before the node is up share one start, so the datastore lock is taken once
   private starting: Promise<void> | null = null;
+  // Set while the node is being stopped; a new start waits for it, because the old node still holds the datastore lock
+  private closing: Promise<void> | null = null;
+  private stores: ClosableStore[] = [];
+  // adapter-node announces 'sveltekit:shutdown' on SIGTERM/SIGINT once it has stopped taking requests
+  private readonly onShutdown = () => {
+    this.close().catch((error) => log.error('Failed to stop the Helia node on shutdown', { detail: error instanceof Error ? error.message : String(error) }));
+  };
 
   async connect(): Promise<void> {
     if (this.node && this.ufs) return;
     if (!IPFS_ENABLED) throw new IpfsDisabledError();
+    if (this.closing) await this.closing.catch(() => undefined);
+    if (this.node && this.ufs) return;
     if (!this.starting) {
       this.starting = this.start().finally(() => {
         this.starting = null;
@@ -73,11 +86,12 @@ class IpfsService {
       fs.mkdirSync(IPFS_BLOCKSTORE_PATH, { recursive: true });
       fs.mkdirSync(IPFS_DATASTORE_PATH, { recursive: true });
 
-      const node = (await createHelia({
-        blockstore: new FsBlockstore(IPFS_BLOCKSTORE_PATH),
-        datastore: new LevelDatastore(IPFS_DATASTORE_PATH)
-      })) as unknown as HeliaNode;
+      const blockstore = new FsBlockstore(IPFS_BLOCKSTORE_PATH);
+      const datastore = new LevelDatastore(IPFS_DATASTORE_PATH);
+      const node = (await createHelia({ blockstore, datastore })) as unknown as HeliaNode;
       this.node = node;
+      this.stores = [blockstore, datastore];
+      (process as NodeJS.EventEmitter).once('sveltekit:shutdown', this.onShutdown);
       this.ufs = unixfs(node as never) as unknown as UnixFs;
       log.info('Helia node started', { peerId: node.libp2p.peerId.toString() });
     } catch (error) {
@@ -194,12 +208,36 @@ class IpfsService {
     }
   }
 
+  /**
+   * Stops the node, which also closes the blockstore and datastore and so releases the datastore's lock file. Safe to
+   * call when the node never started, while it is still starting (it waits) and from several places at once.
+   */
   async close(): Promise<void> {
-    if (!this.node) return;
-    await this.node.stop();
+    if (!this.closing) {
+      this.closing = this.stop().finally(() => {
+        this.closing = null;
+      });
+    }
+    return this.closing;
+  }
+
+  private async stop(): Promise<void> {
+    if (this.starting) await this.starting.catch(() => undefined); // never stop a half-started node
+    const node = this.node;
+    const stores = this.stores;
+    if (!node) return;
     this.node = null;
     this.ufs = null;
-    log.info('Helia node stopped');
+    this.stores = [];
+    (process as NodeJS.EventEmitter).removeListener('sveltekit:shutdown', this.onShutdown);
+    try {
+      await node.stop();
+      log.info('Helia node stopped');
+    } catch (error) {
+      // Helia closes the stores as part of stop(); if that failed, close them here so the datastore lock is released
+      await Promise.allSettled(stores.map((store) => store.close()));
+      throw error;
+    }
   }
 }
 

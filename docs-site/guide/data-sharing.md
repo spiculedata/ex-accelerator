@@ -119,8 +119,8 @@ hosts named above, or publishing works locally but nobody can fetch from you. Fo
 your node must be reachable; behind NAT or the Compose network it relies on relays (and on UPnP, if your router
 allows it), which works but is slower. The Compose file does not publish an IPFS port; a fixed listen address
 and port, and turning off UPnP, mDNS, the relay server or the HTTP gateways, are not configurable yet (see
-[issue #252](https://github.com/spiculedata/social-explorer/issues/252), which also tracks unpublishing and a
-clean node shutdown).
+[issue #252](https://github.com/spiculedata/social-explorer/issues/252), which also tracks unpublishing).
+The node is stopped cleanly when the app receives SIGTERM or SIGINT (for example `docker compose stop`), which releases the datastore lock; if the process is killed outright, remove a stale `LOCK` file in `IPFS_DATASTORE_PATH` before the next start.
 
 ### Disk use
 
