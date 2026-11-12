@@ -21,6 +21,8 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 
+import query_builders as qb
+
 
 # ─── Database ─────────────────────────────────────────────────────────────────
 
@@ -53,64 +55,24 @@ def get_connection_string():
 def gdelt_events(country=None, days=None, date_start=None, date_end=None,
                  goldstein_min=None, goldstein_max=None, limit=10000):
     """Quick access to GDELT events with common filters."""
-    conditions = []
-    if country:
-        conditions.append(f"actiongeo_countrycode = '{country}'")
-    if days:
-        cutoff = int((datetime.now() - timedelta(days=days)).strftime('%Y%m%d'))
-        conditions.append(f"sqldate >= {cutoff}")
-    if date_start:
-        conditions.append(f"sqldate >= {date_start}")
-    if date_end:
-        conditions.append(f"sqldate <= {date_end}")
-    if goldstein_min is not None:
-        conditions.append(f"goldsteinscale >= {goldstein_min}")
-    if goldstein_max is not None:
-        conditions.append(f"goldsteinscale <= {goldstein_max}")
-
-    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    return query_df(f"""
-        SELECT globaleventid, sqldate, actor1name, actor2name, eventcode, eventrootcode,
-               goldsteinscale, avgtone, numarticles, actiongeo_countrycode,
-               actiongeo_fullname, actiongeo_lat, actiongeo_long, sourceurl
-        FROM gdelt_events {where}
-        ORDER BY sqldate DESC LIMIT {limit}
-    """)
+    sql, params = qb.gdelt_events_query(country, days, date_start, date_end,
+                                        goldstein_min, goldstein_max, limit)
+    return query_df(sql, params)
 
 def gdelt_gkg(days=None, limit=5000):
     """Quick access to GDELT GKG (themes, entities, tone)."""
-    where = ""
-    if days:
-        cutoff = int((datetime.now() - timedelta(days=days)).strftime('%Y%m%d')) * 1000000
-        where = f"WHERE date >= {cutoff}"
-    return query_df(f"""
-        SELECT gkgrecordid, date, sourcecommonname, themes, v2themes,
-               locations, persons, organizations, v2tone
-        FROM gdelt_gkg {where}
-        ORDER BY date DESC LIMIT {limit}
-    """)
+    sql, params = qb.gdelt_gkg_query(days, limit)
+    return query_df(sql, params)
 
 def social_posts(platform=None, limit=500):
     """Quick access to social media posts."""
-    where = f"WHERE media_type = '{platform}'" if platform else ""
-    return query_df(f"""
-        SELECT post_id, source_channel_id, post_type, content, language,
-               likes_count, shares_count, comments_count, views_count, published_at
-        FROM silver.posts {where}
-        ORDER BY published_at DESC LIMIT {limit}
-    """)
+    sql, params = qb.social_posts_query(platform, limit)
+    return query_df(sql, params)
 
 def topics(min_size=0):
     """Get topic model data."""
-    return query_df(f"""
-        SELECT t.topic_id, t.name, t.category, t.category_color, t.size, t.weight, t.coherence_score,
-               array_agg(tk.keyword ORDER BY tk.rank_position) as keywords
-        FROM topics t
-        LEFT JOIN topic_keywords tk ON t.topic_id = tk.topic_id
-        WHERE t.size >= {min_size}
-        GROUP BY t.topic_id, t.name, t.category, t.category_color, t.size, t.weight, t.coherence_score
-        ORDER BY t.size DESC
-    """)
+    sql, params = qb.topics_query(min_size)
+    return query_df(sql, params)
 
 def sentiment_data():
     """Get sentiment analysis data with post text."""
@@ -216,19 +178,10 @@ def pull_model(model_name='mistral:7b-instruct-q4_0'):
 
 def describe_dataset(table_name, schema='public', sample=5):
     """Quick profile of a database table — columns, types, row count, sample."""
-    # Row count
-    count = query_df(f"SELECT COUNT(*) as n FROM {schema}.{table_name}").iloc[0]['n']
-
-    # Column info
-    cols = query_df(f"""
-        SELECT column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema='{schema}' AND table_name='{table_name}'
-        ORDER BY ordinal_position
-    """)
-
-    # Sample
-    sample_df = query_df(f"SELECT * FROM {schema}.{table_name} LIMIT {sample}")
+    queries = qb.describe_dataset_queries(table_name, schema, sample)
+    count = query_df(*queries['count']).iloc[0]['n']
+    cols = query_df(*queries['columns'])
+    sample_df = query_df(*queries['sample'])
 
     print(f"Table: {schema}.{table_name}")
     print(f"Rows: {count:,}")
@@ -241,30 +194,10 @@ def describe_dataset(table_name, schema='public', sample=5):
 
 def gdelt_summary(days=30):
     """Quick summary of recent GDELT activity."""
-    cutoff = int((datetime.now() - timedelta(days=days)).strftime('%Y%m%d'))
-
-    stats = query_df(f"""
-        SELECT
-            COUNT(*) as total_events,
-            COUNT(DISTINCT actiongeo_countrycode) as countries,
-            AVG(goldsteinscale) as avg_goldstein,
-            AVG(avgtone) as avg_tone,
-            MIN(sqldate) as date_min,
-            MAX(sqldate) as date_max
-        FROM gdelt_events WHERE sqldate >= {cutoff}
-    """)
-
-    top_countries = query_df(f"""
-        SELECT actiongeo_countrycode as country, COUNT(*) as events
-        FROM gdelt_events WHERE sqldate >= {cutoff} AND actiongeo_countrycode IS NOT NULL
-        GROUP BY actiongeo_countrycode ORDER BY events DESC LIMIT 10
-    """)
-
-    top_actors = query_df(f"""
-        SELECT actor1name as actor, COUNT(*) as mentions
-        FROM gdelt_events WHERE sqldate >= {cutoff} AND actor1name IS NOT NULL
-        GROUP BY actor1name ORDER BY mentions DESC LIMIT 10
-    """)
+    queries = qb.gdelt_summary_queries(days)
+    stats = query_df(*queries['stats'])
+    top_countries = query_df(*queries['top_countries'])
+    top_actors = query_df(*queries['top_actors'])
 
     print(f"GDELT Summary (last {days} days)")
     print(f"  Events: {stats.iloc[0]['total_events']:,.0f}")
@@ -374,19 +307,8 @@ def plot_gdelt_map(country_filter=None, days=90, limit=50):
     """Interactive choropleth map of GDELT events by country."""
     import plotly.express as px
 
-    conditions = ['actiongeo_countrycode IS NOT NULL']
-    if days:
-        cutoff = int((datetime.now() - timedelta(days=days)).strftime('%Y%m%d'))
-        conditions.append(f'sqldate >= {cutoff}')
-
-    where = 'WHERE ' + ' AND '.join(conditions)
-    df = query_df(f"""
-        SELECT actiongeo_countrycode as iso_alpha, COUNT(*) as events,
-               AVG(goldsteinscale) as avg_goldstein, AVG(avgtone) as avg_tone
-        FROM gdelt_events {where}
-        GROUP BY actiongeo_countrycode
-        ORDER BY events DESC LIMIT {limit}
-    """)
+    sql, params = qb.gdelt_map_query(days, limit)
+    df = query_df(sql, params)
 
     if df.empty:
         print("No GDELT data found for the given period")
@@ -405,17 +327,8 @@ def plot_sentiment_timeline(platform=None, days=30):
     """Sentiment trend over time with positive/negative/neutral lines."""
     import matplotlib.pyplot as plt
 
-    cutoff = int((datetime.now() - timedelta(days=days)).strftime('%Y%m%d'))
-    platform_filter = f"AND sp.platform = '{platform}'" if platform else ""
-
-    df = query_df(f"""
-        SELECT DATE(sp.timestamp) as date, sc.sentiment_category, COUNT(*) as count
-        FROM sentiment_posts sp
-        JOIN sentiment_classifications sc ON sp.id = sc.post_id
-        WHERE sp.timestamp IS NOT NULL {platform_filter}
-        GROUP BY DATE(sp.timestamp), sc.sentiment_category
-        ORDER BY date
-    """)
+    sql, params = qb.sentiment_timeline_query(platform, days)
+    df = query_df(sql, params)
 
     if df.empty:
         print("No sentiment data found")
@@ -445,14 +358,8 @@ def plot_topic_network(min_weight=0.05):
     import matplotlib.pyplot as plt
     import networkx as nx
 
-    df = query_df(f"""
-        SELECT t1.name as source, t2.name as target, tr.weight
-        FROM topic_relationships tr
-        JOIN topics t1 ON tr.topic_id_1 = t1.topic_id
-        JOIN topics t2 ON tr.topic_id_2 = t2.topic_id
-        WHERE tr.weight >= {min_weight}
-        LIMIT 100
-    """)
+    sql, params = qb.topic_network_query(min_weight)
+    df = query_df(sql, params)
 
     if df.empty:
         print("No topic relationships found")

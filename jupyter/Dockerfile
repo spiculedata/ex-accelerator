@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "import nltk; [nltk.download(p) for p in ['punkt', 'punkt_tab', 'stopwords', 'wordnet', 'averaged_perceptron_tagger', 'averaged_perceptron_tagger_eng', 'vader_lexicon']]"
 
 # /app/notebooks is bind-mounted by compose, so the helpers and samples live outside it
-COPY workspace_utils.py /app/lib/workspace_utils.py
+COPY workspace_utils.py query_builders.py /app/lib/
 ENV PYTHONPATH=/app/lib
 COPY notebooks/ /app/samples/
 
