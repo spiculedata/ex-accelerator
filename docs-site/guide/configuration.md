@@ -53,6 +53,11 @@ on the IPFS network and cannot be withdrawn.
 | `IPFS_FETCH_TIMEOUT_MS` | `120000` | How long an import waits for the network before answering `504` |
 | `IPFS_MAX_FETCH_BYTES` | `268435456` | Largest package an import accepts (256 MB); bigger ones get `422` |
 | `PACKAGES_DIR` | `/data/packages` | Where generated and imported data packages are written |
+| `IPFS_LISTEN_ADDRS` | libp2p defaults | Comma-separated multiaddrs the node listens on, replacing the default random ports (for example `/ip4/0.0.0.0/tcp/4001`) |
+| `IPFS_ANNOUNCE_ADDRS` | none | Comma-separated multiaddrs announced to peers instead of the detected ones |
+| `IPFS_UPNP` | `true` | `false` stops the node asking the router to open ports |
+| `IPFS_RELAY_SERVER` | `true` | `false` stops the node relaying other peers' traffic |
+| `IPFS_AUTOTLS` | `true` | `false` stops the node requesting a `libp2p.direct` TLS certificate |
 | `MAX_EXPORT_ROWS` | `500000` | Most rows exported in one publish and loaded in one import |
 
 ::: warning Keep secrets out of git

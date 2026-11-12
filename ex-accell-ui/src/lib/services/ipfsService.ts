@@ -2,7 +2,8 @@
 //
 // Off unless IPFS_ENABLED is exactly "true". When on, the first publish or fetch starts a Helia node inside the app
 // process with libp2p's defaults: it listens on random TCP, WebSocket and WebRTC-direct ports on every interface,
-// dials the public bootstrap peers and joins the public DHT. Anything published is public and cannot be withdrawn.
+// dials the public bootstrap peers and joins the public DHT. Listen/announce addresses, UPnP, the relay server and
+// AutoTLS can be set from the environment (see ipfsNetworkConfig.ts). Anything published is public and cannot be withdrawn.
 
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +11,7 @@ import { createLogger } from '$lib/utils/logger';
 import { isSafePackageFileName } from '$lib/server/dataSharing/identifiers';
 import { resolveWithin } from '$lib/utils/pathSafety';
 import { isValidCid } from './ipfsCid';
+import { buildLibp2pOverrides, readNetworkConfig } from './ipfsNetworkConfig';
 import { InvalidCidError, IpfsDisabledError, PackageTooLargeError, UnsafePackageError } from './ipfsErrors';
 
 const log = createLogger('ipfs');
@@ -85,7 +87,7 @@ class IpfsService {
   private async start(): Promise<void> {
     let stores: ClosableStore[] = [];
     try {
-      const { createHelia } = await import('helia');
+      const { createHelia, libp2pDefaults } = await import('helia');
       const { unixfs } = await import('@helia/unixfs');
       const { FsBlockstore } = await import('blockstore-fs');
       const { LevelDatastore } = await import('datastore-level');
@@ -93,10 +95,12 @@ class IpfsService {
       fs.mkdirSync(IPFS_BLOCKSTORE_PATH, { recursive: true });
       fs.mkdirSync(IPFS_DATASTORE_PATH, { recursive: true });
 
+      // Read here, not at import, so a bad value fails the start with a clear log line instead of the whole app
+      const libp2p = buildLibp2pOverrides(libp2pDefaults() as never, readNetworkConfig(process.env));
       const blockstore = new FsBlockstore(IPFS_BLOCKSTORE_PATH);
       const datastore = new LevelDatastore(IPFS_DATASTORE_PATH);
       stores = [blockstore, datastore];
-      const node = (await createHelia({ blockstore, datastore })) as unknown as HeliaNode;
+      const node = (await createHelia({ blockstore, datastore, ...(libp2p ? { libp2p } : {}) } as never)) as unknown as HeliaNode;
       this.node = node;
       this.stores = stores;
       this.ufs = unixfs(node as never) as unknown as UnixFs;

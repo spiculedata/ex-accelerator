@@ -25,6 +25,7 @@ const fake = vi.hoisted(() => {
     stopError: null as Error | null,
     startError: null as Error | null,
     closedStores: 0,
+    heliaOptions: [] as Record<string, unknown>[],
     reset() {
       files.clear();
       directories.clear();
@@ -34,6 +35,7 @@ const fake = vi.hoisted(() => {
       state.stopError = null;
       state.startError = null;
       state.closedStores = 0;
+      state.heliaOptions = [];
       nextCid = 0;
     },
     ufs: {
@@ -68,7 +70,12 @@ const fake = vi.hoisted(() => {
 });
 
 vi.mock('helia', () => ({
-  createHelia: async () => {
+  libp2pDefaults: () => ({
+    addresses: { listen: ['/ip4/0.0.0.0/tcp/0', '/p2p-circuit'] },
+    services: { upnp: 'u', relay: 'r', autoTLS: 'a', dht: 'd' }
+  }),
+  createHelia: async (options: Record<string, unknown>) => {
+    fake.heliaOptions.push(options);
     fake.starts++;
     await new Promise((resolve) => setTimeout(resolve, 5));
     if (fake.startError) throw fake.startError;
@@ -339,5 +346,34 @@ describe('shutdown', () => {
     fake.startError = null;
     await service.connect();
     expect(service.isConnected()).toBe(true);
+  });
+});
+
+describe('network configuration', () => {
+  it('builds the node with Helia defaults when no network variable is set', async () => {
+    await service.connect();
+
+    expect(fake.heliaOptions).toHaveLength(1);
+    expect(fake.heliaOptions[0]).not.toHaveProperty('libp2p');
+  });
+
+  it('passes listen addresses and switched-off services to libp2p', async () => {
+    await loadService({ IPFS_LISTEN_ADDRS: '/ip4/0.0.0.0/tcp/4001', IPFS_UPNP: 'false', IPFS_RELAY_SERVER: 'false' });
+
+    await service.connect();
+
+    expect(fake.heliaOptions[0]).toMatchObject({
+      libp2p: { addresses: { listen: ['/ip4/0.0.0.0/tcp/4001'] }, services: { autoTLS: 'a', dht: 'd' } }
+    });
+    expect(fake.heliaOptions[0].libp2p).not.toHaveProperty('services.upnp');
+  });
+
+  it('refuses to start, without creating a node, when an address is malformed', async () => {
+    await loadService({ IPFS_LISTEN_ADDRS: 'not-a-multiaddr' });
+
+    await expect(service.connect()).rejects.toThrow(/IPFS_LISTEN_ADDRS/);
+
+    expect(fake.starts).toBe(0);
+    expect(service.isConnected()).toBe(false);
   });
 });

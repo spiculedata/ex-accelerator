@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { IpfsDisabledError, PackageTooLargeError, UnsafePackageError } from '$lib/services/ipfsErrors';
+import { NetworkConfigError } from '$lib/services/ipfsNetworkConfig';
 
 // The route reads PACKAGES_DIR and MAX_EXPORT_ROWS when it loads, so both are set before the import below
 const PACKAGES_DIR = vi.hoisted(() => {
@@ -478,6 +479,17 @@ describe('POST /api/data-sharing action=publish', () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(await response.json())).not.toContain('ECONNREFUSED');
+  });
+
+  it('answers 503 with the setting to fix when the network configuration is invalid', async () => {
+    writePackage('posts', 'posts');
+    scriptDatabase(posts);
+    ipfs.publishDirectory.mockRejectedValue(new NetworkConfigError('IPFS_LISTEN_ADDRS holds a value that is not a multiaddr: "x"'));
+
+    const response = await post({ action: 'publish', package_id: 'posts' });
+
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain('IPFS_LISTEN_ADDRS');
   });
 });
 
