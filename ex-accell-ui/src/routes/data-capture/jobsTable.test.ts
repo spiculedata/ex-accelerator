@@ -7,7 +7,7 @@ import { join } from 'node:path';
  * Status, Schedule, Items and Actions cells silently vanished. Guard the row structure.
  */
 describe('data-capture jobs table', () => {
-  const source = readFileSync(join(__dirname, '+page.svelte'), 'utf8');
+  const source = readFileSync(join(__dirname, '../../lib/components/data-capture/ScheduleTab.svelte'), 'utf8');
 
   const rowStart = source.indexOf('{#each sortedJobs as job}');
   if (rowStart < 0) throw new Error('The jobs table loop was renamed or moved; update this test to find it');
