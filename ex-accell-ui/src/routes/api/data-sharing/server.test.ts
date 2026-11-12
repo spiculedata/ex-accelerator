@@ -26,6 +26,7 @@ const ipfs = vi.hoisted(() => ({
   isEnabled: vi.fn(),
   isConnected: vi.fn(),
   publishDirectory: vi.fn(),
+  unpublish: vi.fn(),
   fetchDirectory: vi.fn(),
   getGatewayUrl: vi.fn((cid: string) => `https://ipfs.io/ipfs/${cid}`)
 }));
@@ -107,6 +108,7 @@ beforeEach(() => {
   ipfs.isEnabled.mockReset().mockReturnValue(true);
   ipfs.isConnected.mockReset().mockReturnValue(false);
   ipfs.publishDirectory.mockReset().mockResolvedValue(CID);
+  ipfs.unpublish.mockReset().mockResolvedValue({ wasPinned: true });
   ipfs.fetchDirectory.mockReset();
 });
 
@@ -501,6 +503,150 @@ describe('POST /api/data-sharing action=publish', () => {
 
     expect(response.status).toBe(503);
     expect((await response.json()).error).toContain('IPFS_LISTEN_ADDRS');
+  });
+});
+
+describe('POST /api/data-sharing action=withdraw', () => {
+  const OTHER_CID = 'bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwei2yfe3ihiohm4fy';
+  const withdraw = (user = admin) => post({ action: 'withdraw', cid: CID }, user);
+
+  /** A registry holding the row for CID (given status) and one other published package. */
+  function scriptRegistry(status: string) {
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('WHERE cid = $1')) return [{ cid: CID, package_id: 'posts', status }];
+      if (sql.includes('SELECT cid FROM ipfs_published_packages')) return [{ cid: CID }, { cid: OTHER_CID }];
+      if (sql.includes('UPDATE ipfs_published_packages')) return [{ id: 1 }];
+      return [];
+    });
+  }
+
+  it('answers 503 when sharing is turned off, touching neither the node nor the registry', async () => {
+    ipfs.isEnabled.mockReturnValue(false);
+
+    const response = await withdraw();
+
+    expect(response.status).toBe(503);
+    expect(ipfs.unpublish).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed CID with 400', async () => {
+    expect((await post({ action: 'withdraw', cid: '../../x' })).status).toBe(400);
+    expect((await post({ action: 'withdraw' })).status).toBe(400);
+    expect(ipfs.unpublish).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a CID this install never published', async () => {
+    scriptDatabase(posts);
+
+    expect((await withdraw()).status).toBe(404);
+    expect(ipfs.unpublish).not.toHaveBeenCalled();
+  });
+
+  it("refuses to withdraw an imported package: it is someone else's data this node only fetched", async () => {
+    scriptRegistry('imported');
+
+    const response = await withdraw();
+
+    expect(response.status).toBe(409);
+    expect(ipfs.unpublish).not.toHaveBeenCalled();
+    expect(callsTo('UPDATE ipfs_published_packages')).toHaveLength(0);
+  });
+
+  it('unpins first, keeping the other published packages, then marks the row withdrawn with who did it', async () => {
+    scriptRegistry('published');
+
+    const response = await withdraw();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true, cid: CID, withdrawn: true, unpinned: true });
+    expect(ipfs.unpublish).toHaveBeenCalledWith(CID, [OTHER_CID]);
+    const [update] = callsTo('UPDATE ipfs_published_packages');
+    expect(String(update?.[0])).toContain("status = 'withdrawn'");
+    expect(String(update?.[0])).toContain("status = 'published'"); // only a published row can be withdrawn
+    expect(update?.[1]).toEqual([CID, 'root@example.com']);
+    const updateIndex = db.query.mock.calls.findIndex(([sql]) => String(sql).includes('UPDATE'));
+    expect(ipfs.unpublish.mock.invocationCallOrder[0]).toBeLessThan(db.query.mock.invocationCallOrder[updateIndex]);
+  });
+
+  it('is idempotent: a package that is already withdrawn answers 200 without touching the node', async () => {
+    scriptRegistry('withdrawn');
+
+    const body = await (await withdraw()).json();
+
+    expect(body).toMatchObject({ success: true, withdrawn: true, already_withdrawn: true });
+    expect(ipfs.unpublish).not.toHaveBeenCalled();
+  });
+
+  it('leaves the row published when unpinning fails, and answers a generic 500', async () => {
+    scriptRegistry('published');
+    ipfs.unpublish.mockRejectedValue(new Error('LOCK /data/ipfs/datastore'));
+
+    const response = await withdraw();
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain('/data/ipfs');
+    expect(callsTo('UPDATE ipfs_published_packages')).toHaveLength(0);
+  });
+
+  it('serialises with a publish, so a republish of the same CID cannot be unpinned underneath it', async () => {
+    writePackage('posts', 'posts');
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('WHERE cid = $1')) return [{ cid: CID, package_id: 'posts', status: 'published' }];
+      if (sql.includes('FROM datasets')) return [posts];
+      if (sql.includes('information_schema.columns')) return columns;
+      if (sql.includes('COUNT(*)')) return [{ count: '1' }];
+      if (sql.includes('SELECT * FROM')) return [{ id: 1, text: 'a' }];
+      if (sql.includes('UPDATE ipfs_published_packages')) return [{ id: 1 }];
+      return [];
+    });
+    let release: () => void = () => undefined;
+    ipfs.unpublish.mockReturnValue(new Promise((resolve) => (release = () => resolve({ wasPinned: true }))));
+
+    const withdrawing = withdraw();
+    const publishing = post({ action: 'publish', package_id: 'posts' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(ipfs.publishDirectory).not.toHaveBeenCalled();
+
+    release();
+    await Promise.all([withdrawing, publishing]);
+    expect(ipfs.publishDirectory).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishing the same content again makes the row published and clears the withdrawal', async () => {
+    writePackage('posts', 'posts');
+    scriptDatabase(posts);
+
+    await post({ action: 'publish', package_id: 'posts' });
+
+    const sql = String(callsTo('INSERT INTO ipfs_published_packages')[0]?.[0]);
+    expect(sql).toContain('withdrawn_at = NULL');
+    expect(sql).toContain('withdrawn_by = NULL');
+  });
+});
+
+describe('GET /api/data-sharing?action=resolve for a withdrawn package', () => {
+  it('says it was withdrawn and nothing else: no gateway link, name, description or metadata', async () => {
+    db.query.mockResolvedValue([
+      { cid: CID, package_id: 'posts', package_name: 'Telegram posts', description: 'd', gateway_url: `https://ipfs.io/ipfs/${CID}`, metadata: { a: 1 }, status: 'withdrawn', withdrawn_at: '2026-11-12T10:00:00Z' }
+    ]);
+
+    const body = await (await get(`?action=resolve&cid=${CID}`, viewer)).json();
+
+    expect(body).toEqual({ success: true, found: true, package: { cid: CID, status: 'withdrawn', withdrawn_at: '2026-11-12T10:00:00Z' } });
+  });
+});
+
+describe('GET /api/data-sharing?action=registry after a withdrawal', () => {
+  it('lists only published rows and shows who withdrew to admins only', async () => {
+    await get('?action=registry', admin);
+    await get('?action=registry', viewer);
+    const [forAdmin, forViewer] = callsTo('ORDER BY published_at').map(([sql]) => String(sql));
+
+    expect(forAdmin).toContain('withdrawn_by');
+    expect(forViewer).not.toContain('withdrawn_by');
+    for (const call of callsTo('ORDER BY published_at')) expect(call[1]).toEqual(['published']);
   });
 });
 

@@ -146,8 +146,10 @@ describe('data sharing', () => {
     ['/api/data-sharing', 'POST'],
     ['/api/data-sharing/', 'POST'],
     ['/api/%64ata-sharing', 'POST'],
-    ['/api//data-sharing', 'POST']
-  ])('only an admin may publish, import or generate a package via %s (%s)', (path, method) => {
+    ['/api//data-sharing', 'POST'],
+    ['/api/data-sharing', 'DELETE'],
+    ['/api/data-sharing', 'PUT']
+  ])('only an admin may publish, withdraw, import or generate a package via %s (%s)', (path, method) => {
     expect(req(path, method, member).action).toBe('forbidden');
     expect(req(path, method, viewer).action).toBe('forbidden');
     expect(req(path, method, admin).action).toBe('allow');

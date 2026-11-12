@@ -67,6 +67,7 @@ describe('ipfsService when IPFS_ENABLED is unset', () => {
     await expect(service.publishDirectory(dir)).rejects.toMatchObject(disabled);
     await expect(service.fetchDirectory('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi', dir)).rejects.toMatchObject(disabled);
     await expect(service.cat('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi')).rejects.toMatchObject(disabled);
+    await expect(service.unpublish('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi', [])).rejects.toMatchObject(disabled);
   });
 
   it.each(['false', 'FALSE', '1', 'yes', ''])('stays off for IPFS_ENABLED=%j: only the exact string "true" turns it on', async (value) => {

@@ -22,6 +22,9 @@ const fake = vi.hoisted(() => {
     pins: [] as string[],
     starts: 0,
     stopped: 0,
+    events: [] as string[],
+    pinFailures: new Set<string>(),
+    rmError: null as Error | null,
     stopError: null as Error | null,
     startError: null as Error | null,
     closedStores: 0,
@@ -32,6 +35,9 @@ const fake = vi.hoisted(() => {
       state.pins = [];
       state.starts = 0;
       state.stopped = 0;
+      state.events = [];
+      state.pinFailures = new Set();
+      state.rmError = null;
       state.stopError = null;
       state.startError = null;
       state.closedStores = 0;
@@ -81,7 +87,27 @@ vi.mock('helia', () => ({
     if (fake.startError) throw fake.startError;
     return {
       libp2p: { peerId: { toString: () => '12D3KooWfake' } },
-      pins: { add: async (cid: string) => void fake.pins.push(cid) },
+      // Like Helia's, these are async generators: nothing happens until they are iterated
+      pins: {
+        async *add(cid: string) {
+          if (fake.pinFailures.has(cid)) throw new Error('blocks not available');
+          if (fake.pins.includes(cid)) throw Object.assign(new Error('Already pinned'), { name: 'AlreadyPinnedError' });
+          fake.pins.push(cid);
+          fake.events.push(`pin ${cid}`);
+          yield cid;
+        },
+        async *rm(cid: string) {
+          if (fake.rmError) throw fake.rmError;
+          fake.pins.splice(fake.pins.indexOf(cid), 1);
+          fake.events.push(`unpin ${cid}`);
+          yield cid;
+        },
+        async get(cid: string) {
+          if (!fake.pins.includes(cid)) throw Object.assign(new Error('Not Found'), { name: 'NotFoundError' });
+          return { cid };
+        }
+      },
+      gc: async () => void fake.events.push('gc'),
       stop: async () => {
         fake.stopped++;
         if (fake.stopError) throw fake.stopError;
@@ -153,6 +179,17 @@ describe('publishDirectory', () => {
     expect(fake.pins).toEqual([cid]);
     expect(fake.directories.get(cid)?.map((entry) => entry.name).sort()).toEqual(['datapackage.json', 'posts.csv']);
     expect(service.isConnected()).toBe(true);
+  });
+
+  it('publishes again without failing when the directory already has a pin (a retry after a failed registry write)', async () => {
+    const pkg = join(dir, 'pkg');
+    mkdirSync(pkg);
+    writeFileSync(join(pkg, 'datapackage.json'), '{}');
+    fake.pins.push('bafydir0'); // the CID the fake gives the next directory
+
+    await expect(service.publishDirectory(pkg)).resolves.toBe('bafydir0');
+
+    expect(fake.pins).toEqual(['bafydir0']);
   });
 
   it('refuses an empty directory without pinning anything', async () => {
@@ -379,5 +416,67 @@ describe('network configuration', () => {
 
     expect(fake.starts).toBe(0);
     expect(service.isConnected()).toBe(false);
+  });
+});
+
+describe('unpublish', () => {
+  const OTHER = 'bafybeibwzifw52ttrkqlikfzext5akxu7lz4xiwjgwei2yfe3ihiohm4fy';
+
+  it('unpins the package, then collects garbage so the blocks are no longer served', async () => {
+    fake.pins.push(DIR_CID);
+
+    const result = await service.unpublish(DIR_CID, []);
+
+    expect(result).toEqual({ wasPinned: true });
+    expect(fake.events).toEqual([`unpin ${DIR_CID}`, 'gc']);
+    expect(fake.pins).toEqual([]);
+  });
+
+  it('still collects garbage for a package that was never pinned (older publishes were not)', async () => {
+    const result = await service.unpublish(DIR_CID, []);
+
+    expect(result).toEqual({ wasPinned: false });
+    expect(fake.events).toEqual(['gc']);
+  });
+
+  it('pins the other published packages first, so garbage collection cannot take them', async () => {
+    fake.pins.push(DIR_CID);
+
+    await service.unpublish(DIR_CID, [OTHER, DIR_CID]);
+
+    expect(fake.events).toEqual([`pin ${OTHER}`, `unpin ${DIR_CID}`, 'gc']);
+    expect(fake.pins).toEqual([OTHER]);
+  });
+
+  it('does not touch a package that is already pinned', async () => {
+    fake.pins.push(DIR_CID, OTHER);
+
+    await service.unpublish(DIR_CID, [OTHER]);
+
+    expect(fake.events).toEqual([`unpin ${DIR_CID}`, 'gc']);
+  });
+
+  it('carries on when another package cannot be pinned (its blocks are not here), and still withdraws', async () => {
+    fake.pins.push(DIR_CID);
+    fake.pinFailures.add(OTHER);
+
+    await expect(service.unpublish(DIR_CID, [OTHER])).resolves.toEqual({ wasPinned: true });
+
+    expect(fake.events).toEqual([`unpin ${DIR_CID}`, 'gc']);
+  });
+
+  it('stops without collecting garbage when the unpin itself fails', async () => {
+    fake.pins.push(DIR_CID);
+    fake.rmError = new Error('datastore closed');
+
+    await expect(service.unpublish(DIR_CID, [])).rejects.toThrow('datastore closed');
+
+    expect(fake.events).not.toContain('gc');
+  });
+
+  it('rejects a malformed CID before starting the node', async () => {
+    await expect(service.unpublish('../../etc', [])).rejects.toThrow(/CID/);
+
+    expect(fake.starts).toBe(0);
   });
 });

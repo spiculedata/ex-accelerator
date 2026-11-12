@@ -7,8 +7,9 @@ identifier, can fetch it. Another install can import a package by CID into a new
 
 ::: danger Published data is public and permanent
 Anything published to IPFS can be downloaded by **anyone who has its CID**, from any IPFS node or public gateway,
-with no sign-in. Other nodes may keep copies indefinitely. There is no way to withdraw a package once it is
-published: deleting it on your server, unpinning it or turning the feature off only stops *your* node serving it.
+with no sign-in. Other nodes may keep copies indefinitely. A published package cannot be recalled: an administrator
+can **withdraw** it, which stops *your* node serving it and removes it from the lists, but every copy someone else
+already downloaded stays where it is.
 
 Because of this, the feature is **off by default**, only administrators can publish, and the app asks for
 confirmation before each publish. Read [Before you publish](#before-you-publish) first.
@@ -46,7 +47,8 @@ What it is not:
   CID is not a secret. For data you cannot make public, use a channel you control instead, such as your
   institution's repository or a managed transfer service. The **Copy Link** button described below shares only
   the schema and a short preview with people who have an account on your server, not the dataset.
-- **Not reversible.** There is no unpublish. Once someone has fetched it, treat the data as disclosed.
+- **Not reversible.** [Withdrawing](#withdraw-a-package) stops your node serving the package, but it cannot reach
+  copies other nodes already fetched. Once someone has fetched it, treat the data as disclosed.
 - **Not guaranteed to stay available.** Content is served by whoever holds a copy, starting with your own node. If
   you stop your app and nobody else has pinned the package, the CID stops resolving. For long-term citation, keep
   your node running or pin the CID with a pinning service as well.
@@ -68,7 +70,7 @@ needs an account on your server. That part never leaves your server.
 | Package generation | `POST /api/data-sharing` with a `dataset_id` from the catalogue (the **Data Management** page) reads the table's columns from `information_schema`, counts the rows, takes a preview (100 rows by default, at most 1,000) and writes `datapackage.json` and `<table>-preview.csv` under `PACKAGES_DIR/<package-id>/`. |
 | Helia node | When sharing is on, the first publish or import starts a [Helia](https://helia.io/) IPFS node *inside the app process* (no separate daemon). It keeps blocks in `IPFS_BLOCKSTORE_PATH` and its peer identity and routing data in `IPFS_DATASTORE_PATH`. |
 | Publishing | Exports the full table to `<table>.csv` (up to `MAX_EXPORT_ROWS`, 500,000 by default, in primary-key order or, without one, ordered by every sortable column, so batches do not overlap), adds every file in the package directory to the node as one directory, **pins** it so the blockstore keeps it, and returns the directory's CID. |
-| Registry | The table `ipfs_published_packages` (created by migration `0007_ipfs_registry`) records every package this install published or imported: CID, gateway URL, title, row count, size, status (`published` or `imported`), who did it and when. The **Data Sharing** page reads it to show CIDs next to packages. |
+| Registry | The table `ipfs_published_packages` (created by migration `0007_ipfs_registry`) records every package this install published or imported: CID, gateway URL, title, row count, size, status (`published`, `imported` or `withdrawn`), who did it and when (and, for a withdrawal, `withdrawn_at` and `withdrawn_by`, added by migration `0009_ipfs_withdrawn`). The **Data Sharing** page reads it to show CIDs next to packages. |
 | Gateway | A public HTTP gateway (`IPFS_GATEWAY_URL`, `https://ipfs.io/ipfs` by default) is only used to build a shareable `https://.../ipfs/<cid>` link. The server never fetches from *this* address; see the next paragraph for the gateways Helia itself uses. |
 | Importing | Fetches the directory for a CID from the network, checks it, creates a table named `ipfs_` plus the last 40 characters of the CID (lower-cased), loads the CSV with parameterised inserts, adds a row to the `datasets` catalogue and copies the files into `PACKAGES_DIR`. The same CID cannot be imported twice (`409`). |
 
@@ -88,7 +90,7 @@ The node starts on the first publish or import and stops when the app process st
 | Action | Role |
 |--------|------|
 | See generated packages, previews and the registry | any signed-in user |
-| Generate a package, publish to IPFS, import from IPFS | administrators only |
+| Generate a package, publish to IPFS, withdraw a package, import from IPFS | administrators only |
 
 Reading stays open to every role on purpose. The registry lists only what was published, which is public anyway, and
 the packages list and previews (up to 1,000 rows of a dataset) are as visible as the dataset catalogue they come
@@ -170,9 +172,35 @@ Nothing is cleaned up automatically.
 1. Open **Data → Data Sharing**. If the page says sharing is turned off, see [Turning it on](#turning-it-on).
 2. Under **Available Datasets**, choose a dataset and click **Generate Package**. The package appears under
    **Shared Data Packages**; **Preview** shows its schema and first rows, so check them now.
-3. Click **Publish to IPFS**. A dialog explains that the data becomes public and cannot be withdrawn; click
+3. Click **Publish to IPFS**. A dialog explains that the data becomes public and that copies others download cannot
+   be recalled; click
    **Publish publicly** to go ahead. The full table is exported and pinned; this takes a while for large tables.
 4. The card now shows the CID. **Copy CID** copies it; **Copy gateway URL** copies an `https://` link anyone can open.
+
+## Withdraw a package
+
+If you published something by mistake, or no longer want your server to offer it, an administrator can click
+**Withdraw** on its card (sharing must be turned on, because the node has to be running to let go of the data) and
+confirm. The server then:
+
+1. unpins the package and garbage-collects the blockstore, so this node stops serving it (blocks that another
+   package you published also uses stay, because that package still needs them; the same collection also drops the
+   cached blocks of packages you imported, which only costs a re-fetch if you serve them again);
+2. marks the registry row `withdrawn`, with who did it and when (administrators can see this), and removes it from
+   the registry list. The package stays on **Shared Data Packages** as a local package, without its IPFS badge, and
+   the card offers **Publish to IPFS** again. `resolve` for its CID answers only that it was withdrawn.
+
+What it **cannot** do: delete copies that other people or nodes already hold, or make the CID stop resolving
+anywhere else. Anyone who fetched the data before you withdrew it still has it and can republish it. Treat the data
+as disclosed, and if it was personal data, follow your own breach or takedown process. Withdrawing also leaves the
+generated package files in `PACKAGES_DIR` (the full exported CSV and the preview); delete that directory yourself if
+you want the files gone from the disk.
+
+Publishing the package again pins it again and the row becomes `published`. Only a package this install published
+can be withdrawn, not one it imported. A withdrawal takes turns with publishing, so it waits for a publish or import
+that is in progress. If you publish two packages that share a file, withdraw one, publish it again and then withdraw
+the other, Helia's pin counts for the shared blocks can come out wrong and the remaining package may lose blocks on
+this node; publish it again to restore them.
 
 ## Share the CID
 
@@ -239,6 +267,6 @@ network.
   cataloguing that, rather than the raw crawl.
 - **Record it.** The registry keeps who published what and when; keep it, and tell the people whose data it is
   where appropriate.
-- **It cannot be unpublished.** If you publish something by mistake, stop your node (turn `IPFS_ENABLED` off and
-  restart) so it stops serving the data, remove the files from `PACKAGES_DIR` and the blockstore, and treat the
-  data as disclosed.
+- **It cannot be recalled.** If you publish something by mistake, click **Withdraw** straight away: your node stops
+  serving the data, but anyone who fetched it in the meantime keeps it. Remove the files from `PACKAGES_DIR` if you
+  do not want them on disk, and treat the data as disclosed.

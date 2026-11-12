@@ -101,6 +101,74 @@ describe('/data-sharing when sharing is on', () => {
     expect(screen.queryByRole('button', { name: /Publish to IPFS/ })).toBeNull();
   });
 
+  describe('withdrawing a published package', () => {
+    const published = { package_id: 'telegram-posts', cid: CID, gateway_url: `https://gw.example/ipfs/${CID}` };
+
+    it('asks an admin to confirm, saying copies already fetched by others remain, before withdrawing', async () => {
+      const posts = serve({ enabled: true, packages: [generated], registry: [published] });
+      render(Page);
+
+      await fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent(/stop serving/i);
+      expect(dialog).toHaveTextContent(/already downloaded/i);
+      expect(dialog).toHaveTextContent(/cannot be (deleted|recalled)/i);
+      expect(posts).toHaveLength(0);
+
+      await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(posts).toHaveLength(0);
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
+      await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Withdraw from this node' }));
+
+      expect(posts).toEqual([{ action: 'withdraw', cid: CID }]);
+      expect(await screen.findByText(/no longer serves it/i)).toHaveTextContent(/copies .* remain/i);
+    });
+
+    it('offers no withdrawal to a non-admin, for an unpublished package, or when sharing is off', async () => {
+      session.user = { ...session.user, role: 'user' };
+      serve({ enabled: true, packages: [generated], registry: [published] });
+      const first = render(Page);
+      await screen.findByRole('heading', { name: 'Telegram posts' });
+      expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+      first.unmount();
+
+      session.user = { ...session.user, role: 'admin' };
+      serve({ enabled: true, packages: [generated], registry: [] });
+      const second = render(Page);
+      await screen.findByRole('heading', { name: 'Telegram posts' });
+      expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+      second.unmount();
+
+      serve({ enabled: false, packages: [generated], registry: [published] });
+      render(Page);
+      await screen.findByRole('heading', { name: 'Telegram posts' });
+      expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+    });
+
+    it('shows the server error and keeps the package listed when the withdrawal fails', async () => {
+      serve({ enabled: true, packages: [generated], registry: [published] });
+      vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+        const reply = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+        if (init?.method === 'POST') return reply({ success: false, error: 'Request failed' });
+        const url = String(input);
+        if (url.includes('action=status')) return reply({ success: true, data: { enabled: true } });
+        if (url.includes('action=list')) return reply({ success: true, packages: [generated] });
+        if (url.includes('action=registry')) return reply({ success: true, packages: [published] });
+        return reply({ success: true, datasets: [] });
+      });
+      render(Page);
+
+      await fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
+      await fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Withdraw from this node' }));
+
+      expect(await screen.findByText('Request failed')).toBeInTheDocument();
+      expect(screen.getByText(CID)).toBeInTheDocument();
+    });
+  });
+
   it('does not offer to publish an imported package', async () => {
     serve({ enabled: true, packages: [imported] });
     render(Page);

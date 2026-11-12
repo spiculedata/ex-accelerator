@@ -50,7 +50,7 @@ returns `500` with a generic message; details are logged on the server.
 ## Data sharing
 
 `/api/data-sharing` generates Frictionless Data Packages and publishes them to, or imports them from, the IPFS
-network. See the [data sharing guide](/guide/data-sharing); publishing is public and permanent. Reads are open
+network. See the [data sharing guide](/guide/data-sharing); publishing is public, and a withdrawal only stops this node serving it. Reads are open
 to every signed-in role; `POST` is admin-only (`403` otherwise). When `IPFS_ENABLED` is not `true`, publishing
 and importing answer `503` and the other actions still work.
 
@@ -65,8 +65,9 @@ and importing answer `503` and the other actions still work.
 | `resolve` | `cid` | `{ success, found: true, package }` when the registry knows the CID, else `{ success, found: false, gateway_url }`. `400` for a malformed CID |
 
 Registry rows have `id`, `dataset_id`, `package_id`, `cid`, `gateway_url`, `package_name`, `description`,
-`row_count`, `file_size_bytes`, `status` (`published` or `imported`), `published_at` and `metadata`; admins
-also get `published_by`.
+`row_count`, `file_size_bytes`, `status` (`published`, `imported` or `withdrawn`), `published_at`, `withdrawn_at`
+and `metadata`; admins also get `published_by` and `withdrawn_by`. The `registry` action lists only `published`
+rows; `resolve` answers a `withdrawn` one with only `cid`, `status` and `withdrawn_at`.
 
 ### `POST /api/data-sharing` (admin)
 
@@ -76,6 +77,7 @@ The JSON body's `action` selects the operation; without one, a package is genera
 |------|--------------|----------|
 | `{ dataset_id, preview_rows? }` | Generates a package for a catalogued dataset: writes `datapackage.json` and a preview CSV (`preview_rows` defaults to 100, at most 1,000). A bare `table_name` is not accepted. | `{ success, package_id, datapackage, preview }`. `400` for a bad id, `404` for an unknown dataset or table, `403` for an application table, `422` when the catalogue row names a table that cannot be exported |
 | `{ action: "publish", package_id }` | Exports the full table (up to `MAX_EXPORT_ROWS`), publishes and pins the package directory, records it in the registry. | `{ success, cid, gateway_url, package_id }`. `400`, `403`, `404`, `422` as above; `503` when sharing is off |
+| `{ action: "withdraw", cid }` | Unpins a package this install published, garbage-collects the blockstore so the node stops serving it, and marks the registry row `withdrawn` (who and when). It cannot recall copies other nodes already fetched. Repeating it on a withdrawn package answers `200` with `already_withdrawn`. Takes turns with publishing. | `{ success, cid, withdrawn: true, unpinned }` (`unpinned` is false if the package had no pin of its own). `400` for a malformed CID, `404` if the CID is not in the registry, `409` for an imported package, `503` when sharing is off (the node must run to unpin) |
 | `{ action: "import", cid }` | Fetches the package, validates it and loads it into a new table named `ipfs_` plus the last 40 characters of the CID (lower-cased), cataloguing it as an `imported` dataset. | `{ success, table_name, row_count, fields, cid, package_title }`. `400` for a malformed CID, `409` if the CID was already imported, `422` when the package is not one this app can load (bad names, header, values or file count) or is over `IPFS_MAX_FETCH_BYTES`, `504` after `IPFS_FETCH_TIMEOUT_MS`, `503` when sharing is off |
 
 Any other failure is a `500` with a generic message; the detail is logged on the server.

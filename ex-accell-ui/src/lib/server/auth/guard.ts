@@ -34,8 +34,9 @@ const ADMIN_ONLY_PATTERNS = [
 
 /**
  * Starting a workflow is admin-only, so cancelling or controlling a running one is too. Reading them stays open.
- * Publishing a dataset to IPFS puts it on a public network for good, and importing one creates tables with the app's
- * full database rights, so both are admin-only; listing packages and the registry stays open.
+ * Publishing a dataset to IPFS puts it on a public network for good, withdrawing one changes what the node serves, and
+ * importing one creates tables with the app's full database rights, so all three (every non-read method on the route)
+ * are admin-only; listing packages and the registry stays open.
  */
 const ADMIN_ONLY_WRITE_PATTERNS = [/^\/api\/workflow-executions(\/|$)/, /^\/api\/data-sharing(\/|$)/];
 
