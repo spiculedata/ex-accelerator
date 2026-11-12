@@ -5,14 +5,13 @@ import { describe, expect, it } from 'vitest';
 // Ratchets: exact baselines that can only fall (see hardCodedColours.test.ts). When you remove an `any`, a console call or
 // shrink a big file, this test fails until you lower the number here, so the gain cannot be spent again later.
 
-const ANY_BASELINE = 781;
+const ANY_BASELINE = 851;
 const CONSOLE_BASELINE = 275;
 const MAX_FILE_LINES = 800;
 // Files over MAX_FILE_LINES, with their current line count. A file may only shrink (lower its number) and leaves this list
 // once it is at or under the limit. A file that is not listed must never cross the limit. See issue #47.
 const OVERSIZED_FILES: Record<string, number> = {
   'src/lib/components/Navigation.svelte': 818,
-  'src/lib/services/pythonDaprWorkflowGenerator.ts': 901,
   'src/routes/api/unified-analytics/+server.ts': 2088,
   'src/routes/data-capture/+page.svelte': 3776,
   'src/routes/data-management/+page.svelte': 924,
@@ -23,7 +22,7 @@ const OVERSIZED_FILES: Record<string, number> = {
 const SOURCE = /\.(svelte|ts|js)$/;
 const TEST_FILE = /\.(test|spec)\.(ts|js)$/;
 const LOGGER = 'src/lib/utils/logger.ts';
-const ANY = /:\s*any\b|\bas\s+any\b|<any>/g;
+const ANY = /:\s*any\b|\bas\s+any\b|<any\b|,\s*any\b|[|&]\s*any\b|\bany\s*[|&\[]/g;
 const CONSOLE = /\bconsole\.\w+/g;
 
 function walk(dir: string): string[] {
