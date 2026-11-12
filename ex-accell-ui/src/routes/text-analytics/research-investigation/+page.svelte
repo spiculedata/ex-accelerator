@@ -121,7 +121,7 @@
       }
       connection = started;
       poll = nextJupyterPoll(poll, 'running');
-      if (tab) tab.location.href = jupyterLink(started, '/lab');
+      if (tab && !tab.closed) tab.location.href = jupyterLink(started, '/lab');
     } finally {
       isLaunching = false;
     }

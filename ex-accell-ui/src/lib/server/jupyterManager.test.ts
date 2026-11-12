@@ -201,6 +201,18 @@ describe('jupyter status (never launches)', () => {
 		expect(await setup({ env, ready: false }).status()).toEqual({ state: 'stopped' });
 	});
 
+	it('keeps reporting a healthy saved Jupyter as running while another request is launching', async () => {
+		const { ensure, status } = setup({ saved: { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' }, alive: true });
+		const launch = ensure(ORIGIN); // finds the saved one, but is still in flight for a tick
+		expect((await status()).state).toBe('running');
+		await launch;
+	});
+
+	it('ignores an incomplete JUPYTER_URL (no token) and falls back to the saved launch', async () => {
+		const { status } = setup({ env: { JUPYTER_URL: 'http://j:8888' } });
+		expect(await status()).toEqual({ state: 'stopped' });
+	});
+
 	it('says starting while a launch is in flight', async () => {
 		const { ensure, status } = setup({ ready: false, readyTimeoutMs: 200 });
 		const launch = ensure(ORIGIN).catch(() => undefined);

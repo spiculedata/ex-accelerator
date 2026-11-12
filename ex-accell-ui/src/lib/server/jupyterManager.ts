@@ -151,12 +151,13 @@ export function createJupyterManager(options: ManagerOptions) {
 		if (external) {
 			return (await isReady(external.baseUrl, external.url)) ? { state: 'running', ...external } : { state: 'stopped' };
 		}
-		if (inFlight) return { state: 'starting' };
+		// A Jupyter that already answers is running even if another request is mid-launch, so an open
+		// notebook is not torn down while a second tab clicks Start
 		const saved = store.read();
 		if (saved && isAlive(saved.pid) && (await isReady(saved.baseUrl, saved.url))) {
 			return { state: 'running', url: saved.url, baseUrl: saved.baseUrl };
 		}
-		return { state: 'stopped' };
+		return inFlight ? { state: 'starting' } : { state: 'stopped' };
 	}
 
 	async function ensure(appOrigin: string): Promise<JupyterAccess> {

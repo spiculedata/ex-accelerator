@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { initialJupyterPoll, jupyterLink, nextJupyterPoll, parseJupyterStart, parseJupyterStatus } from './jupyterClient';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fetchJupyterStatus, initialJupyterPoll, jupyterLink, nextJupyterPoll, parseJupyterStart, parseJupyterStatus } from './jupyterClient';
 
 describe('parseJupyterStart', () => {
 	it('splits the server URL into base and token', () => {
@@ -84,5 +84,23 @@ describe('nextJupyterPoll', () => {
 	it('does not invent a running Jupyter from misses when it was not running', () => {
 		expect(nextJupyterPoll(initialJupyterPoll, 'error').phase).toBe('stopped');
 		expect(nextJupyterPoll({ phase: 'starting', misses: 0 }, 'stopped').phase).toBe('stopped');
+	});
+});
+
+describe('fetchJupyterStatus', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('reads the status envelope', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true, data: { state: 'starting' } }))));
+		expect(await fetchJupyterStatus()).toEqual({ observed: 'starting', connection: null });
+	});
+
+	it('reports an error for a non-ok response, bad JSON or a network failure, never running', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 403 })));
+		expect((await fetchJupyterStatus()).observed).toBe('error');
+		vi.stubGlobal('fetch', vi.fn(async () => new Response('not json')));
+		expect((await fetchJupyterStatus()).observed).toBe('error');
+		vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+		expect((await fetchJupyterStatus()).observed).toBe('error');
 	});
 });

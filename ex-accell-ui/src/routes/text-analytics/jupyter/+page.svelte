@@ -121,7 +121,7 @@
     <!-- Full Screen Controls -->
     <div class="absolute top-4 right-4 z-10 flex items-center space-x-2">
       <div class="flex items-center space-x-2 bg-black/20 backdrop-blur-sm rounded-xl px-3 py-2">
-        <div class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-blue-400' : 'bg-red-400'}"></div>
+        <div class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-blue-400' : isStarting ? 'bg-signal-400' : 'bg-red-400'}"></div>
         <span class="text-white text-sm">Jupyter Lab {statusLabel}</span>
       </div>
       

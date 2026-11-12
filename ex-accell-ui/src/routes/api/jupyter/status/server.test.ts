@@ -17,6 +17,7 @@ describe('GET /api/jupyter/status', () => {
 		jupyterStatus.mockResolvedValue({ state: 'running', url: 'u', baseUrl: 'b' });
 		const response = await call();
 		expect(response.status).toBe(200);
+		expect(response.headers.get('Cache-Control')).toBe('no-store');
 		expect(await response.json()).toEqual({ success: true, data: { state: 'running', url: 'u', baseUrl: 'b' } });
 	});
 
