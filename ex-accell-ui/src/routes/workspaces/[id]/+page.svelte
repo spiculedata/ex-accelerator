@@ -5,6 +5,7 @@
 
 <script lang="ts">
   import { platformBadgeClass, platformDotClass, workspaceTypeBadgeClass } from '$lib/utils/categoryColours';
+  import { sourceStatusBadgeClass } from '$lib/utils/sourceStatus';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
@@ -82,15 +83,6 @@
   }
   const platformColor = (sourceType: string): string => platformDotClass(platformOf(sourceType));
   const platformTextColor = (sourceType: string): string => platformBadgeClass(platformOf(sourceType));
-
-  function statusBadge(status: string): string {
-    switch ((status || '').toLowerCase()) {
-      case 'active': return 'bg-emerald-100 text-emerald-800';
-      case 'paused': return 'bg-amber-100 text-amber-800';
-      case 'error': return 'bg-red-100 text-red-800';
-      default: return 'bg-slate-100 text-slate-700';
-    }
-  }
 
   const typeBadgeColor = (t: string): string => workspaceTypeBadgeClass(t);
 
@@ -221,7 +213,7 @@
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {platformTextColor(ds.source_type)}">{ds.source_type}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {statusBadge(ds.status)}">{ds.status}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {sourceStatusBadgeClass(ds.status)}">{ds.status}</span>
                   </div>
                 </div>
                 <!-- Stats -->

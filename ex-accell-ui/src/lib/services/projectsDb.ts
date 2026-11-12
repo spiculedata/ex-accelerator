@@ -2,6 +2,7 @@
 // Manages multi-tiered project hierarchy with PostgreSQL persistence
 
 import { postgresPool } from './postgres';
+import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
 export interface Project {
   id: number;
@@ -44,6 +45,8 @@ export interface ProjectMember {
 }
 
 export interface WorkspaceDataSource {
+  /** 'capture' = added through Data Capture, 'dataset' = a catalog dataset linked to the workspace */
+  kind?: 'capture' | 'dataset';
   id: number;
   workspace_id: number;
   source_type: string;
@@ -332,7 +335,7 @@ class ProjectsDatabase {
   async getWorkspaceDataSources(workspaceId: number): Promise<WorkspaceDataSource[]> {
     try {
       const rows = await postgresPool.query<WorkspaceDataSource>(
-        'SELECT * FROM workspace_data_sources WHERE workspace_id = $1 ORDER BY created_at DESC',
+        `SELECT * FROM (${WORKSPACE_SOURCES_SQL}) s WHERE workspace_id = $1 ORDER BY created_at DESC`,
         [workspaceId]
       );
       return rows;
