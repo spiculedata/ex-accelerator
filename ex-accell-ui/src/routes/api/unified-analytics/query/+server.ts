@@ -30,12 +30,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const { sql, params = [] } = payload ?? {};
   if (!sql || typeof sql !== 'string') return apiFail('SQL query is required', 400);
+  if (!Array.isArray(params)) return apiFail('params must be an array', 400);
 
   try {
     log.info('Executing SQL query', { sql });
 
     // Execute query using DuckDB execution engine for analytical queries
-    const rows = await postgresPool.duckdbQuery(sql, Array.isArray(params) ? params : []);
+    const rows = await postgresPool.duckdbQuery(sql, params);
 
     log.info('Query executed', { rowCount: rows.length });
 

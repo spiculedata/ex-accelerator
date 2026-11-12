@@ -39,6 +39,14 @@ describe('POST /api/unified-analytics/query', () => {
     expect(duckdbQuery).not.toHaveBeenCalled();
   });
 
+  it('answers 400 when params is not an array', async () => {
+    const response = await post({ sql: 'SELECT $1', params: 'x' });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'params must be an array' });
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
   it('answers 400 for a body that is not JSON', async () => {
     const response = await post('not json');
 
