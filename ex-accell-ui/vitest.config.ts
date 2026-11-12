@@ -15,9 +15,9 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/lib/**', 'src/routes/api/**'],
       exclude: ['src/lib/services/types/**', 'src/lib/components/**/*.svelte'],
-      // Floor measured on 2026-11-12 (stmts 54.25, branches 53.30, funcs 63.55, lines 52.37).
+      // Floor measured on 2026-11-12 (stmts 58.21, branches 57.10, funcs 70.26, lines 55.87).
       // `npm run test:unit:coverage` fails if any metric drops below it. Raise it when you add tests.
-      thresholds: { statements: 54, branches: 53, functions: 63, lines: 52 }
+      thresholds: { statements: 58, branches: 57, functions: 70, lines: 55 }
     }
   }
 });
