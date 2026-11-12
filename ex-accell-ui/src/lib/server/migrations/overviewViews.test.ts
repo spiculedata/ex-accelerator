@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bundledMigrations } from './files';
+import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
 describe('overview views migration', () => {
   const migration = bundledMigrations().find((m) => m.name === '0007_overview_views_linked_datasets');
@@ -22,5 +23,11 @@ describe('overview views migration', () => {
 
     expect(sql).toContain('wm.workspace_id = w.id');
     expect(sql).not.toMatch(/w\.id\s*=\s*wm\.id/);
+  });
+
+  it('defines workspace_sources with the same union the API uses, so the two cannot drift', () => {
+    const normalise = (sql: string) => sql.replace(/--.*$/gm, '').replace(/\s+/g, ' ').trim();
+
+    expect(normalise(migration!.sql)).toContain(normalise(WORKSPACE_SOURCES_SQL));
   });
 });

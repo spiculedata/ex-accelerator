@@ -5,8 +5,10 @@
 -- (src/lib/server/workspaceSources.ts) already unions both; workspace_sources is the same union
 -- as a view, and the overview views are rebuilt on top of it.
 --
--- Like the API, only active sources count: a linked dataset reports 'active' while it is
--- 'available'. The old workspace_members join (w.id = wm.id) matched member rows to workspace ids,
+-- Behaviour change from 0002: like the API, only active sources count in the totals (0002 counted
+-- every captured source whatever its status). A linked dataset reports 'active' while it is
+-- 'available'; paused, processing and error sources are still listed on the workspace page but
+-- are left out of the counters. The old workspace_members join (w.id = wm.id) matched member rows to workspace ids,
 -- so member_count was wrong; members are now counted by workspace_id. The column names, order and
 -- types of both views are unchanged.
 
