@@ -105,8 +105,13 @@ describe('category badges in pages and components', () => {
     ['src/routes/projects/[id]/+page.svelte', 'workspaceTypeBadgeClass('],
     ['src/routes/investigations/+page.svelte', 'dataSourceBadgeClass('],
     ['src/lib/components/ui/FilterBar.svelte', 'dataSourceBadgeClass('],
+<<<<<<< HEAD
     ['src/lib/components/navigation/navItems.ts', 'dataSourceBadgeClass('],
     ['src/routes/gdelt/+page.svelte', 'gdeltMentionTypeBadgeClass('],
+=======
+    ['src/lib/components/Navigation.svelte', 'dataSourceBadgeClass('],
+    ['src/lib/components/gdelt/MentionsTable.svelte', 'gdeltMentionTypeBadgeClass('],
+>>>>>>> 70353beb (refactor: split the GDELT page into filter, map and mentions components)
     ['src/lib/services/overviewDb.ts', 'platformColour('],
     ['src/lib/services/engagementAnalysisDb.ts', 'platformColour(']
   ])('%s uses %s', (path, call) => {

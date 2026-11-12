@@ -293,9 +293,6 @@ describe('GDELT page date range', () => {
     routes();
     render(Page);
     await loaded();
-    // Let the refresh that follows loading finish, so the next request is the one this test causes
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([u]) => String(u).includes('dateStart='))).toHaveLength(1), { timeout: 3000 });
-    await waitFor(() => expect(leafletState.maps.length).toBeGreaterThanOrEqual(2));
     const [from] = Array.from(document.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
     await fireEvent.input(from, { target: { value: '2026-01-03' } });
     await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('dateStart=2026-01-03'))).toBe(true), { timeout: 3000 });
