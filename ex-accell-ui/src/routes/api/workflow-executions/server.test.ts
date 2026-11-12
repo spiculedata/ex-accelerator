@@ -22,6 +22,15 @@ describe('GET /api/workflow-executions', () => {
     expect(service.getWorkflowExecutions).toHaveBeenCalledWith({ workflowId: 'wf_1', status: 'failed', limit: 10 });
   });
 
+  it('does not send stored failure causes to the client', async () => {
+    service.getWorkflowExecutions.mockResolvedValue([{ id: 'exec_1', error: 'dial tcp 10.0.0.5:3500', logs: [{ timestamp: 't', level: 'warn', message: 'sidecar 10.0.0.5 down' }] }]);
+
+    const body = await (await list()).json();
+
+    expect(JSON.stringify(body)).not.toContain('10.0.0.5');
+    expect(body.executions[0].id).toBe('exec_1');
+  });
+
   it.each([['abc'], ['0'], ['501']])('refuses limit=%s with 400 before querying', async (limit) => {
     const response = await list(`?limit=${limit}`);
 

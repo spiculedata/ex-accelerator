@@ -39,9 +39,12 @@ describe('POST /api/workflow-executions/[id]/manage', () => {
   });
 
   it('status returns the Dapr status in data and the legacy key', async () => {
+    executor.getWorkflowStatus.mockResolvedValue({ instanceId: 'exec_1', runtimeStatus: 'FAILED', failureDetails: { message: 'dial tcp 10.0.0.5:3500' } });
+
     const body = await (await post({ action: 'status' })).json();
 
-    expect(body).toMatchObject({ success: true, status: { runtimeStatus: 'RUNNING' }, data: { status: { runtimeStatus: 'RUNNING' } } });
+    expect(body).toMatchObject({ success: true, status: { runtimeStatus: 'FAILED' }, data: { status: { runtimeStatus: 'FAILED' } } });
+    expect(JSON.stringify(body)).not.toContain('10.0.0.5');
   });
 
   it.each([[{ action: 'explode' }], [{}], ['not json'], ['[1]']])('refuses %j with 400 before touching the executor', async (body) => {
@@ -73,9 +76,12 @@ describe('POST /api/workflow-executions/[id]/manage', () => {
 
 describe('GET /api/workflow-executions/[id]/manage', () => {
   it('returns local and Dapr status', async () => {
+    service.getWorkflowExecution.mockResolvedValue({ id: 'exec_1', error: 'connect ECONNREFUSED 10.0.0.5', logs: [] });
+
     const body = await (await get('?action=status')).json();
 
     expect(body).toMatchObject({ success: true, localExecution: { id: 'exec_1' }, daprStatus: { runtimeStatus: 'RUNNING' }, data: { daprStatus: { runtimeStatus: 'RUNNING' } } });
+    expect(JSON.stringify(body)).not.toContain('10.0.0.5');
   });
 
   it('refuses any action but status with 400', async () => {
