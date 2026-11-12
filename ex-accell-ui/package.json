@@ -31,7 +31,7 @@
 		"dapr:logs": "tail -f dapr-run.log",
 		"test:integration": "node scripts/test-dapr-job-integration.js",
 		"seed:demo": "tsx scripts/seed-demo.ts",
-		"demo": "./scripts/demo.sh",
+		"demo": "bash scripts/demo.sh",
 		"docs:screenshots": "playwright test -c playwright.screenshots.config.ts"
 	},
 	"devDependencies": {

@@ -15,7 +15,8 @@ cd "$(dirname "$0")/.."
 
 CONTAINER="${DEMO_DB_CONTAINER:-social-explorer-demo-db}"
 PORT="${DEMO_DB_PORT:-55432}"
-IMAGE="pgduckdb/pgduckdb:17-main"
+# Pinned to the multi-arch index digest of 17-main (verified with `docker buildx imagetools inspect`)
+IMAGE="pgduckdb/pgduckdb:17-main@sha256:c1c6ae663570deacca7da929d562f2a41da339e1afbabc7e0f1f417c877c25ea"
 DB="analytics"
 APP_PORT="${DEMO_APP_PORT:-5173}"
 STATE_DIR=".demo"
@@ -32,7 +33,6 @@ guard() {
   }
 }
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing $1: $2" >&2; exit 1; }; }
-random() { python3 -c "import secrets; print(secrets.token_urlsafe($1))" 2>/dev/null || openssl rand -base64 "$1" | tr -d '=+/\n'; }
 
 case "${1:-}" in
   "") ;;
@@ -86,8 +86,9 @@ chmod 700 "$STATE_DIR"
 secret() { # secret <file> <bytes>: create the file only if generation produced something usable
   local file="$STATE_DIR/$1" value
   [ -s "$file" ] && return 0
-  value="$(random "$2")" || value="" # unset falls through to the friendly error below
-  [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret (need python3 or openssl)." >&2; exit 1; }
+  # node is already required, and unlike the python3 stub on macOS it never opens an install dialog
+  value="$(node -p "require('node:crypto').randomBytes($2).toString('base64url')")" || value=""
+  [ "${#value}" -ge 16 ] || { echo "Could not generate a random secret with node." >&2; exit 1; }
   (umask 077; printf '%s\n' "$value" > "$file")
 }
 # If a container exists, every saved secret must too, or the printed sign-in would not match the data
@@ -135,15 +136,17 @@ export POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="$PORT" POSTGRES_DB="$DB" POSTGRES_
 export SESSION_SECRET ADMIN_EMAIL ADMIN_PASSWORD ADMIN_NAME="Demo admin"
 export COOKIE_SECURE=false
 
-# The loader refuses a database that already has data, which is how a resumed demo is recognised
+# --if-empty makes the loader exit 0 when data exists, which is how a resumed demo is recognised.
+# Its output streams straight through, and a real failure keeps its non-zero exit status.
 echo "Loading demo data (the first run applies the schema, this takes a few seconds)..."
-if out=$(npm run --silent seed:demo 2>&1); then
-  echo "$out"
-elif echo "$out" | grep -q "already contain rows"; then
-  echo "Demo data is already loaded."
-else
-  echo "$out" >&2
+npm run --silent seed:demo -- --if-empty || {
   echo "If this is a database authentication error, the saved credentials no longer match the container: npm run demo -- --reset" >&2
+  exit 1
+}
+
+# Fail before printing credentials if something else already holds the app port
+if node -e "const s=require('node:net').connect({host:'127.0.0.1',port:+process.argv[1]});s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1))" "$APP_PORT"; then
+  echo "Port $APP_PORT is already in use. Free it or set DEMO_APP_PORT to another port." >&2
   exit 1
 fi
 
@@ -154,6 +157,8 @@ cat <<MSG
   Password               $ADMIN_PASSWORD
 
   The data is synthetic (a fictional coastal city). Open the project "Marlow Bay Civic Pulse".
+  This runs the web app and database only. Pages that need the full stack (Jupyter notebooks,
+  workflows, crawling) are not available; see docs-site/guide/deployment.md for the compose stack.
   Stop with Ctrl+C, then: npm run demo -- --stop      Wipe it: npm run demo -- --reset
 
 MSG

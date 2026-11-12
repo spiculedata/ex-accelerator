@@ -33,13 +33,12 @@ fi
 # Check if telegram-scraper exists and build if needed
 if [ ! -f "$TELEGRAM_SCRAPER_PATH/telegram-scraper" ]; then
     echo "⚠️  telegram-scraper binary not found. Building..."
-    cd "$TELEGRAM_SCRAPER_PATH"
-    go build -o telegram-scraper
-    if [ $? -ne 0 ]; then
+    cd "$TELEGRAM_SCRAPER_PATH" || exit 1
+    if ! go build -o telegram-scraper; then
         echo "❌ Failed to build telegram-scraper"
         exit 1
     fi
-    cd "$CURRENT_DIR"
+    cd "$CURRENT_DIR" || exit 1
     echo "✅ telegram-scraper built successfully"
 else
     echo "✅ telegram-scraper binary exists"

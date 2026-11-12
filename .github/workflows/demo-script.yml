@@ -1,0 +1,79 @@
+name: Demo script
+
+on:
+  push:
+    branches: [main]
+    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', '.github/workflows/demo-script.yml']
+  pull_request:
+    paths: ['ex-accell-ui/scripts/**', 'ex-accell-ui/package.json', '.github/workflows/demo-script.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-script-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # shellcheck is preinstalled on GitHub's ubuntu runners
+      - name: Lint shell scripts
+        run: shellcheck ex-accell-ui/scripts/*.sh
+
+  demo-resume:
+    name: Demo start and resume
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DEMO_APP_PORT: '5280'
+      DEMO_DB_PORT: '55432'
+    defaults:
+      run:
+        working-directory: ex-accell-ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+          cache-dependency-path: ex-accell-ui/package-lock.json
+
+      # The script runs npm ci itself on first use, so this also covers the clean-checkout path
+      - name: Fresh start
+        run: |
+          bash scripts/demo.sh > fresh.log 2>&1 &
+          for _ in $(seq 1 90); do
+            curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login" && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login"
+          grep -q "Loaded demo dataset" fresh.log
+          pkill -f "vite dev" || true
+
+      - name: Resume with data kept
+        run: |
+          bash scripts/demo.sh --stop
+          bash scripts/demo.sh > resume.log 2>&1 &
+          for _ in $(seq 1 90); do
+            curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login" && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null "http://127.0.0.1:$DEMO_APP_PORT/login"
+          grep -q "Demo data is already loaded" resume.log
+          pkill -f "vite dev" || true
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          # Logs contain the generated demo password for a throwaway container only
+          sed 's/^\( *Password\).*/\1 ***/' fresh.log resume.log 2>/dev/null | tail -80 || true
+
+      - name: Clean up
+        if: always()
+        run: bash scripts/demo.sh --reset

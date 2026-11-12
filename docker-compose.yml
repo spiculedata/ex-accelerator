@@ -2,7 +2,8 @@ services:
 
   # ─── Database ────────────────────────────────────────────────────────────────
   postgres:
-    image: pgduckdb/pgduckdb:17-main
+    # Multi-arch index digest of 17-main, verified with `docker buildx imagetools inspect`; bump it deliberately
+    image: pgduckdb/pgduckdb:17-main@sha256:c1c6ae663570deacca7da929d562f2a41da339e1afbabc7e0f1f417c877c25ea
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

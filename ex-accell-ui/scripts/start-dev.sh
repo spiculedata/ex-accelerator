@@ -1,7 +1,7 @@
 #!/bin/bash
 # Startup script for Social Explorer UI with Jupyter integration
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 echo "🚀 Starting Social Explorer UI with Jupyter Lab..."
 
@@ -41,4 +41,4 @@ echo "🌐 Starting SvelteKit development server..."
 npm run dev
 
 # When the script exits, kill Jupyter Lab
-trap "echo 'Stopping Jupyter Lab...'; kill $JUPYTER_PID 2>/dev/null" EXIT
+trap 'echo "Stopping Jupyter Lab..."; kill "$JUPYTER_PID" 2>/dev/null' EXIT
