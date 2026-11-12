@@ -22,12 +22,18 @@ const fake = vi.hoisted(() => {
     pins: [] as string[],
     starts: 0,
     stopped: 0,
+    stopError: null as Error | null,
+    startError: null as Error | null,
+    closedStores: 0,
     reset() {
       files.clear();
       directories.clear();
       state.pins = [];
       state.starts = 0;
       state.stopped = 0;
+      state.stopError = null;
+      state.startError = null;
+      state.closedStores = 0;
       nextCid = 0;
     },
     ufs: {
@@ -65,16 +71,25 @@ vi.mock('helia', () => ({
   createHelia: async () => {
     fake.starts++;
     await new Promise((resolve) => setTimeout(resolve, 5));
+    if (fake.startError) throw fake.startError;
     return {
       libp2p: { peerId: { toString: () => '12D3KooWfake' } },
       pins: { add: async (cid: string) => void fake.pins.push(cid) },
-      stop: async () => void fake.stopped++
+      stop: async () => {
+        fake.stopped++;
+        if (fake.stopError) throw fake.stopError;
+      }
     };
   }
 }));
 vi.mock('@helia/unixfs', () => ({ unixfs: () => fake.ufs }));
-vi.mock('blockstore-fs', () => ({ FsBlockstore: class {} }));
-vi.mock('datastore-level', () => ({ LevelDatastore: class {} }));
+class FakeStore {
+  async close() {
+    fake.closedStores++;
+  }
+}
+vi.mock('blockstore-fs', () => ({ FsBlockstore: FakeStore }));
+vi.mock('datastore-level', () => ({ LevelDatastore: FakeStore }));
 // A real multiformats CID is not needed: the service only passes the parsed value back to unixfs
 vi.mock('multiformats/cid', () => ({ CID: { parse: (value: string) => value } }));
 
@@ -86,6 +101,7 @@ let service: typeof import('./ipfsService').ipfsService;
 const savedEnv = { ...process.env };
 
 async function loadService(env: Record<string, string> = {}) {
+  await service?.close().catch(() => undefined); // a replaced service would otherwise keep its shutdown listener
   vi.resetModules();
   process.env = { ...savedEnv, IPFS_ENABLED: 'true', IPFS_BLOCKSTORE_PATH: join(dir, 'blocks'), IPFS_DATASTORE_PATH: join(dir, 'datastore'), ...env };
   ({ ipfsService: service } = await import('./ipfsService'));
@@ -110,7 +126,9 @@ beforeEach(async () => {
   await loadService();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Each test's service registers a process listener once its node starts; close it so none leaks into the next test
+  await service.close().catch(() => undefined);
   process.env = { ...savedEnv };
   rmSync(dir, { recursive: true, force: true });
 });
@@ -223,5 +241,103 @@ describe('cat and close', () => {
   it('reports healthy once the node is up', async () => {
     expect(await service.healthCheck()).toBe(true);
     expect(fake.starts).toBe(1);
+  });
+});
+
+describe('shutdown', () => {
+  const shutdownListeners = () => process.listenerCount('sveltekit:shutdown' as never);
+
+  it('is safe when the node never started: nothing to stop and no listener left behind', async () => {
+    const before = shutdownListeners();
+
+    await expect(service.close()).resolves.toBeUndefined();
+
+    expect(fake.stopped).toBe(0);
+    expect(shutdownListeners()).toBe(before);
+  });
+
+  it('waits for a node that is still starting, then stops it', async () => {
+    const connecting = service.connect();
+
+    await service.close();
+    await connecting;
+
+    expect(fake.starts).toBe(1);
+    expect(fake.stopped).toBe(1);
+    expect(service.isConnected()).toBe(false);
+  });
+
+  it('stops the node once when close is called twice at the same time', async () => {
+    await service.connect();
+
+    await Promise.all([service.close(), service.close()]);
+
+    expect(fake.stopped).toBe(1);
+  });
+
+  it("stops the node when adapter-node announces shutdown, and removes its listener", async () => {
+    const before = shutdownListeners();
+    await service.connect();
+    expect(shutdownListeners()).toBe(before + 1);
+
+    process.emit('sveltekit:shutdown' as never);
+    await vi.waitFor(() => expect(fake.stopped).toBe(1));
+
+    expect(service.isConnected()).toBe(false);
+    expect(shutdownListeners()).toBe(before);
+  });
+
+  it('can start again after a close', async () => {
+    await service.connect();
+    await service.close();
+
+    await service.connect();
+
+    expect(fake.starts).toBe(2);
+    expect(service.isConnected()).toBe(true);
+  });
+
+  it('closes the blockstore and datastore itself when the node fails to stop, and still forgets the node', async () => {
+    await service.connect();
+    fake.stopError = new Error('stop failed');
+
+    await expect(service.close()).rejects.toThrow('stop failed');
+
+    expect(fake.closedStores).toBe(2);
+    expect(service.isConnected()).toBe(false);
+  });
+
+  it('stops a node that finishes starting after the shutdown event, instead of leaving it running', async () => {
+    const connecting = service.connect();
+
+    process.emit('sveltekit:shutdown' as never); // arrives while createHelia is still pending
+    await connecting;
+    await vi.waitFor(() => expect(fake.stopped).toBe(1));
+
+    expect(service.isConnected()).toBe(false);
+  });
+
+  it('refuses to start a node once shutdown has begun', async () => {
+    await service.connect();
+    process.emit('sveltekit:shutdown' as never);
+    await vi.waitFor(() => expect(fake.stopped).toBe(1));
+
+    await expect(service.connect()).rejects.toThrow(/shutting down/);
+
+    expect(fake.starts).toBe(1);
+  });
+
+  it('closes the stores it opened and leaves no listener when the node fails to start, so a retry can succeed', async () => {
+    const before = shutdownListeners();
+    fake.startError = new Error('lock held');
+
+    await expect(service.connect()).rejects.toThrow('lock held');
+
+    expect(fake.closedStores).toBe(2);
+    expect(shutdownListeners()).toBe(before);
+
+    fake.startError = null;
+    await service.connect();
+    expect(service.isConnected()).toBe(true);
   });
 });
