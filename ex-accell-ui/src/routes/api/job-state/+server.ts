@@ -12,6 +12,15 @@ const JOB_STATUSES = ['scheduled', 'running', 'completed', 'failed', 'cancelled'
 
 type Data = Record<string, unknown>;
 
+/** Maps a store failure: Dapr down is a 503 the crawler can retry, an unknown job is a 404, anything else a generic 500. */
+function storeFailure(label: string, err: unknown, message: string): Response {
+	if (err instanceof Error && err.name === 'DaprConnectionError') {
+		return apiFail('Job state service unavailable. Please start the unified deployment with: npm run dev:dapr', 503);
+	}
+	if (err instanceof Error && /^Job .+ not found$/.test(err.message)) return apiFail('Job not found', 404);
+	return apiServerError(label, err, message);
+}
+
 /** Applies one crawler-reported action to a job; false when the action is not one we know. */
 async function applyAction(action: string, jobId: string, data: Data): Promise<boolean> {
 	switch (action) {
@@ -67,7 +76,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (!(await applyAction(action, jobId, data))) return apiFail(`Unknown action: ${action}`, 400);
 		return apiOk({ action, jobId }, { action, jobId });
 	} catch (err) {
-		return apiServerError('POST /api/job-state', err, 'Internal server error while updating job state');
+		return storeFailure('POST /api/job-state', err, 'Internal server error while updating job state');
 	}
 };
 
@@ -85,7 +94,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		if (status) return apiOk(await jobStateStore.getJobsByStatus(status as JobState['status']));
 		return apiOk(await jobStateStore.getAllJobStates());
 	} catch (err) {
-		return apiServerError('GET /api/job-state', err, 'Internal server error while retrieving job state');
+		return storeFailure('GET /api/job-state', err, 'Internal server error while retrieving job state');
 	}
 };
 
@@ -102,7 +111,7 @@ export const PUT: RequestHandler = async ({ request }) => {
 		await jobStateStore.updateJobStatus(jobId, status as JobState['status'], additionalData);
 		return apiOk({ jobId, status }, { jobId, status });
 	} catch (err) {
-		return apiServerError('PUT /api/job-state', err, 'Internal server error while updating job state');
+		return storeFailure('PUT /api/job-state', err, 'Internal server error while updating job state');
 	}
 };
 
@@ -114,6 +123,6 @@ export const DELETE: RequestHandler = async ({ url }) => {
 		await jobStateStore.deleteJobState(jobId);
 		return apiOk(null, { message: `Job state ${jobId} deleted successfully` });
 	} catch (err) {
-		return apiServerError('DELETE /api/job-state', err, 'Internal server error while deleting job state');
+		return storeFailure('DELETE /api/job-state', err, 'Internal server error while deleting job state');
 	}
 };

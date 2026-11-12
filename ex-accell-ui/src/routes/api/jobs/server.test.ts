@@ -95,6 +95,27 @@ describe('POST /api/jobs', () => {
   });
 });
 
+describe('POST /api/jobs dueTime', () => {
+  it.each([['30s', 30_000], ['5m', 5 * 60_000], ['2h', 2 * 3_600_000], ['5', 5 * 60_000]])('reads %s as the right delay', async (dueTime, ms) => {
+    const before = Date.now();
+
+    await post({ ...valid, dueTime });
+
+    const scheduledFor = new Date(store.createJobState.mock.calls[0][2]).getTime();
+    expect(scheduledFor - before).toBeGreaterThanOrEqual(ms - 5);
+    expect(scheduledFor - before).toBeLessThan(ms + 5000);
+  });
+
+  it('reports a failed call to the crawler as 503 when the sidecar is unreachable', async () => {
+    invoke.mockRejectedValue(new Error('fetch failed'));
+
+    const response = await post(valid);
+
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain('npm run dev:dapr');
+  });
+});
+
 describe('GET /api/jobs', () => {
   it('state=true returns the job states in data', async () => {
     const body = await (await get('?state=true')).json();
@@ -139,6 +160,26 @@ describe('GET /api/jobs', () => {
   });
 });
 
+describe('GET /api/jobs with one side down', () => {
+  it('answers 200 with daprAvailable false when only Dapr is down', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')));
+
+    const body = await (await get()).json();
+
+    expect(body).toMatchObject({ success: true, serviceStatus: { daprAvailable: false }, jobStates: [{ id: 'j1' }] });
+  });
+
+  it('answers 200 with the Dapr jobs when only the state store is down', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ name: 'crawl-1' }] }));
+    store.getAllJobStates.mockRejectedValue(dapr503());
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, daprJobs: [{ name: 'crawl-1' }], jobStates: [] });
+  });
+});
+
 describe('DELETE /api/jobs', () => {
   it('requires a name or jobId', async () => {
     const response = await del('');
@@ -152,6 +193,19 @@ describe('DELETE /api/jobs', () => {
 
     expect(store.deleteJobState).toHaveBeenCalledWith('j1');
     expect(body).toMatchObject({ success: true, deletedFromState: true, data: { deletedFromState: true } });
+  });
+
+  it('deletes by name: removes the Dapr job (a 404 counts) and finds the state id by name', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    const body = await (await del('?name=crawl%201')).json();
+
+    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain('/jobs/crawl%201');
+    expect(body).toMatchObject({ success: true, deletedFromDapr: true, deletedFromState: false });
+
+    store.getAllJobStates.mockResolvedValue([{ id: 'j9', name: 'crawl 1' }]);
+    await del('?name=crawl%201');
+    expect(store.deleteJobState).toHaveBeenCalledWith('j9');
   });
 
   it('is a 503 when the state store is unreachable, without internal text', async () => {

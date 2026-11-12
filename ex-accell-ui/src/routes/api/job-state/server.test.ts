@@ -13,7 +13,7 @@ vi.mock('$lib/services/jobStateStore.js', () => ({ jobStateStore: store }));
 import { DELETE, GET, POST, PUT } from './+server';
 
 const send = (handler: typeof POST | typeof PUT, body: unknown) =>
-  handler({ request: new Request('http://localhost/api/job-state', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) } as never);
+  handler({ request: new Request('http://localhost/api/job-state', { method: handler === PUT ? 'PUT' : 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) } as never);
 const get = (query = '') => GET({ url: new URL(`http://localhost/api/job-state${query}`) } as never);
 const del = (query = '') => DELETE({ url: new URL(`http://localhost/api/job-state${query}`) } as never);
 
@@ -48,7 +48,7 @@ describe('POST /api/job-state', () => {
     expect(store.updateJobStatus).not.toHaveBeenCalled();
   });
 
-  it.each([['not json', 'a'], ['[1]', 'b'], [{ action: 'start' }, 'c'], [{ action: 'explode', jobId: 'j1' }, 'd'], [{ action: 5, jobId: 'j1' }, 'e']])(
+  it.each([['not json'], ['[1]'], [{ action: 'start' }], [{ action: 'explode', jobId: 'j1' }], [{ action: 5, jobId: 'j1' }]])(
     'refuses %j with a 400 envelope as a client error, not a 500',
     async (body) => {
       const response = await send(POST, body);
@@ -57,6 +57,24 @@ describe('POST /api/job-state', () => {
       expect(await response.json()).toMatchObject({ success: false, data: null, error: expect.any(String) });
     }
   );
+
+  it('records the progress details on the job', async () => {
+    await send(POST, { action: 'progress', jobId: 'j1', message: 'halfway', itemsProcessed: 42 });
+    await send(POST, { action: 'fail', jobId: 'j1', error: 'blocked', errors: ['e1'] });
+
+    expect(store.updateJobStatus).toHaveBeenNthCalledWith(1, 'j1', 'running', { result: { success: true, message: 'halfway', itemsProcessed: 42 } });
+    expect(store.updateJobStatus).toHaveBeenNthCalledWith(2, 'j1', 'failed', { result: { success: false, message: 'blocked', errors: ['e1'] } });
+  });
+
+  it('reports an unknown job as 404 and Dapr being down as 503, without internal text', async () => {
+    store.updateJobStatus.mockRejectedValueOnce(new Error('Job j1 not found'));
+    expect((await send(POST, { action: 'start', jobId: 'j1' })).status).toBe(404);
+
+    store.updateJobStatus.mockRejectedValueOnce(Object.assign(new Error('sidecar 10.0.0.5 down'), { name: 'DaprConnectionError' }));
+    const response = await send(POST, { action: 'start', jobId: 'j1' });
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(await response.json())).not.toContain('10.0.0.5');
+  });
 
   it('returns a generic 500 without the store error text', async () => {
     store.updateJobStatus.mockRejectedValue(new Error('Dapr state store at 10.0.0.5 failed'));

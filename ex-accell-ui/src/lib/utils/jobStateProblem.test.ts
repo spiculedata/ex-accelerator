@@ -25,9 +25,10 @@ describe('describeJobStateFailure', () => {
     expect(JSON.stringify(problem)).not.toContain('boom');
   });
 
-  it('reads the command from the envelope error field', () => {
-    const problem = describeJobStateFailure(503, { error: 'Job services unavailable. Run `npm run dev:dapr` first' });
+  it('reads the envelope error field and falls back to the default command for the server text', () => {
+    const problem = describeJobStateFailure(503, { error: 'Job services unavailable. Please start the unified deployment with: npm run dev:dapr' });
 
+    expect(problem.title).toMatch(/job service/i);
     expect(problem.command).toBe('npm run dev:dapr');
   });
 });

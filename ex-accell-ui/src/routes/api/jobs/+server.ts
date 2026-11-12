@@ -8,7 +8,8 @@ const log = createLogger('jobs-api');
 
 const TELEGRAM_SCRAPER_APP_ID = 'telegram-scraper';
 const MAX_JOB_BODY_BYTES = 256 * 1024;
-const DUE_TIME = /^(now|\d{1,9}s?)$/;
+const DUE_TIME = /^(now|\d{1,9}[smh]?)$/;
+const DUE_UNIT_MS: Record<string, number> = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000 };
 const START_DAPR_HINT = 'Please start the unified deployment with: npm run dev:dapr';
 
 // Initialize Dapr client using the job-scheduler pattern
@@ -94,11 +95,12 @@ interface JobScheduleRequest {
 	};
 }
 
-/** When the job is due: "now", seconds ("30s") or minutes ("5"). */
+/** When the job is due: "now", a duration with a unit ("30s", "5m", "2h") or bare minutes ("5"). */
 function scheduledForTime(dueTime: string): string {
 	if (dueTime === 'now') return new Date().toISOString();
-	if (dueTime.endsWith('s')) return new Date(Date.now() + parseInt(dueTime.slice(0, -1), 10) * 1000).toISOString();
-	return new Date(Date.now() + parseInt(dueTime, 10) * 60 * 1000).toISOString();
+	const unit = /[smh]$/.test(dueTime) ? dueTime.slice(-1) : 'm';
+	const amount = parseInt(dueTime, 10);
+	return new Date(Date.now() + amount * DUE_UNIT_MS[unit]).toISOString();
 }
 
 function buildJobData(jobRequest: JobScheduleRequest, jobId: string, jobTypeName: string) {
@@ -136,10 +138,10 @@ export const POST: RequestHandler = async ({ request }) => {
 	const jobRequest = parsed.body as unknown as JobScheduleRequest;
 
 	if (!jobRequest.name || !jobRequest.dueTime || !jobRequest.data) return apiFail('Missing required fields: name, dueTime, data', 400);
-	if (typeof jobRequest.name !== 'string' || typeof jobRequest.dueTime !== 'string' || typeof jobRequest.data !== 'object') {
+	if (typeof jobRequest.name !== 'string' || typeof jobRequest.dueTime !== 'string' || typeof jobRequest.data !== 'object' || Array.isArray(jobRequest.data)) {
 		return apiFail('name and dueTime must be text and data an object', 400);
 	}
-	if (!DUE_TIME.test(jobRequest.dueTime)) return apiFail('dueTime must be "now", seconds such as "30s", or minutes such as "5"', 400);
+	if (!DUE_TIME.test(jobRequest.dueTime)) return apiFail('dueTime must be "now", a duration such as "30s", "5m" or "2h", or minutes such as "5"', 400);
 
 	try {
 		// The crawler validates the platform and URLs, which gives more accurate errors than checking here
