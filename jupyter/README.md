@@ -6,12 +6,13 @@ Builds the JupyterLab container used by `docker-compose.yml`.
 - `JUPYTER_ALLOW_ORIGIN` is the URL you open the app on (CORS and iframe embedding are limited to it).
 - Sample notebooks are baked into `/app/samples` and copied into `/app/notebooks` (the bind mount) on
   start without overwriting your edits. `workspace_utils.py` is importable from any notebook.
-- The container runs as the unprivileged user `jupyter` (uid/gid 1000), not root. The notebooks folder you
-  bind-mount at `/app/notebooks` (`${DATA_DIR}/notebooks` in compose) must be writable by that user. Docker creates a
-  missing host folder as root, so prepare it once: `sudo mkdir -p "$DATA_DIR/notebooks" && sudo chown -R 1000:1000 "$DATA_DIR/notebooks"`.
-  If your host user has a different uid, build with `--build-arg JUPYTER_UID=... --build-arg JUPYTER_GID=...`. When
-  the folder is not writable the container stops with a message saying so. **Upgrading from the root image:** run the
-  same `chown` on the existing folder before starting the new image.
+- The container runs as the unprivileged user `jupyter` (uid/gid 1000), not root. The notebooks folder bind-mounted at
+  `/app/notebooks` must be writable by that user. In `docker-compose.yml` the one-shot `jupyter-init` service does that
+  (`chown -R 1000:1000`) before Jupyter starts, including for a folder Docker just created as root and for one left
+  by the earlier root image. If you run the image yourself, prepare the folder once:
+  `sudo mkdir -p notebooks && sudo chown -R 1000:1000 notebooks`. For another uid, build with
+  `--build-arg JUPYTER_UID=... --build-arg JUPYTER_GID=...` (and change the numbers in `jupyter-init`). When the folder is not
+  writable the container stops with a message saying so.
 - Jupyter's configuration lives in `/etc/jupyter/jupyter_server_config.py`, not in a home directory.
 - Python packages are bounded in `requirements.txt` and pinned exactly in `requirements.lock` (used as a pip
   constraints file), so a rebuild gives the same versions. To update, rebuild without the lock, run

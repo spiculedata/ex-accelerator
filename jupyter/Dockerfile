@@ -5,8 +5,8 @@ FROM python:3.12-slim
 # someone else (see README.md).
 ARG JUPYTER_UID=1000
 ARG JUPYTER_GID=1000
-RUN groupadd --gid ${JUPYTER_GID} jupyter \
-    && useradd --uid ${JUPYTER_UID} --gid ${JUPYTER_GID} --create-home --shell /usr/sbin/nologin jupyter
+RUN groupadd --non-unique --gid ${JUPYTER_GID} jupyter \
+    && useradd --non-unique --uid ${JUPYTER_UID} --gid ${JUPYTER_GID} --create-home --shell /usr/sbin/nologin jupyter
 
 WORKDIR /app
 

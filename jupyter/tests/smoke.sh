@@ -1,22 +1,21 @@
 #!/bin/sh
 # Smoke test for the Jupyter image: start it with a token and check what the README promises.
 #
-#   jupyter/tests/smoke.sh IMAGE [HOST_PORT]
+#   jupyter/tests/smoke.sh IMAGE
 #
-# Needs docker and curl. Everything it starts is removed on exit.
+# Needs docker and curl. It publishes on a free loopback port and removes everything it starts on exit.
 set -eu
 
-IMAGE="${1:?usage: smoke.sh IMAGE [HOST_PORT]}"
-PORT="${2:-18888}"
+IMAGE="${1:?usage: smoke.sh IMAGE}"
 NAME="jupyter-smoke-$$"
 VOLUME="jupyter-smoke-notebooks-$$"
+ROOT_VOLUME="jupyter-smoke-rootowned-$$"
 ORIGIN="http://app.example.test"
 TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
-BASE="http://127.0.0.1:${PORT}"
 
 cleanup() {
     docker rm -f "$NAME" >/dev/null 2>&1 || true
-    docker volume rm "$VOLUME" >/dev/null 2>&1 || true
+    docker volume rm "$VOLUME" "$ROOT_VOLUME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -29,16 +28,23 @@ pass() { echo "ok: $*"; }
 
 # A named volume starts with the image's ownership of /app/notebooks, like a correctly prepared bind mount
 docker run -d --name "$NAME" -e JUPYTER_TOKEN="$TOKEN" -e JUPYTER_ALLOW_ORIGIN="${ORIGIN}/" \
-    -p "127.0.0.1:${PORT}:8888" -v "${VOLUME}:/app/notebooks" "$IMAGE" >/dev/null
+    -p 127.0.0.1::8888 -v "${VOLUME}:/app/notebooks" "$IMAGE" >/dev/null
 
-echo "waiting for Jupyter on ${BASE}"
-i=0
-until curl -s -o /dev/null "${BASE}/api/status"; do
-    i=$((i + 1))
-    [ "$i" -le 60 ] || fail "Jupyter did not answer within 60 seconds"
-    docker inspect -f '{{.State.Running}}' "$NAME" | grep -q true || fail "the container stopped"
-    sleep 1
-done
+port_of_container() { docker port "$NAME" 8888/tcp | head -n 1 | sed 's/.*://'; }
+
+wait_until_ready() {
+    i=0
+    until curl -s -o /dev/null "http://127.0.0.1:$(port_of_container)/api/status"; do
+        i=$((i + 1))
+        [ "$i" -le 60 ] || fail "Jupyter did not answer within 60 seconds"
+        docker inspect -f '{{.State.Running}}' "$NAME" | grep -q true || fail "the container stopped"
+        sleep 1
+    done
+}
+
+echo "waiting for Jupyter"
+wait_until_ready
+BASE="http://127.0.0.1:$(port_of_container)"
 
 status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 
@@ -70,17 +76,33 @@ docker exec "$NAME" python -c 'import workspace_utils, query_builders' >/dev/nul
     || fail "workspace_utils is not importable"
 pass "workspace_utils and query_builders import"
 
-# Without a token the container must refuse to start rather than invent one
-if docker run --rm "$IMAGE" >/dev/null 2>&1; then
-    fail "the container started without JUPYTER_TOKEN"
-fi
-pass "refuses to start without JUPYTER_TOKEN"
+# A restart over a volume that is already seeded must still come up (the samples are copied without overwriting)
+docker restart "$NAME" >/dev/null
+wait_until_ready
+BASE="http://127.0.0.1:$(port_of_container)"
+[ "$(status -H "Authorization: token ${TOKEN}" "${BASE}/api/contents")" = "200" ] || fail "no 200 after a restart"
+pass "restarts over an already seeded volume"
 
-# A read-only notebooks folder must produce the explanatory message, not a stack trace
-message="$(docker run --rm -e JUPYTER_TOKEN="$TOKEN" -v "${VOLUME}:/app/notebooks:ro" "$IMAGE" 2>&1 || true)"
+# Without a token the container must refuse to start rather than invent one
+message="$(docker run --rm "$IMAGE" 2>&1 || true)"
 case "$message" in
-    *"is not writable by uid"*) pass "explains an unwritable notebooks folder" ;;
-    *) fail "no clear message for an unwritable folder: ${message}" ;;
+    *"JUPYTER_TOKEN must be set"*) pass "refuses to start without JUPYTER_TOKEN" ;;
+    *) fail "unexpected output without a token: ${message}" ;;
 esac
+
+# The real failure: a root-owned folder (what Docker creates for a missing bind mount) must give a clear message.
+# Docker Desktop on macOS and Windows maps ownership and ignores the chown, so only check where it took effect.
+docker volume create "$ROOT_VOLUME" >/dev/null
+docker run --rm -u 0 -v "${ROOT_VOLUME}:/app/notebooks" --entrypoint chown "$IMAGE" root:root /app/notebooks
+owner="$(docker run --rm -v "${ROOT_VOLUME}:/app/notebooks" --entrypoint stat "$IMAGE" -c %U /app/notebooks)"
+if [ "$owner" = "root" ]; then
+    message="$(docker run --rm -e JUPYTER_TOKEN="$TOKEN" -v "${ROOT_VOLUME}:/app/notebooks" "$IMAGE" 2>&1 || true)"
+    case "$message" in
+        *"is not writable by uid"*) pass "explains a notebooks folder it cannot write to" ;;
+        *) fail "no clear message for a root-owned folder: ${message}" ;;
+    esac
+else
+    echo "skip: this Docker does not honour chown on volumes (owner is ${owner}); the root-owned folder check runs on Linux"
+fi
 
 echo "all smoke checks passed"
