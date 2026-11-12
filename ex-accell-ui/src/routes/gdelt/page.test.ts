@@ -288,6 +288,42 @@ describe('GDELT page stats and filters', () => {
   });
 });
 
+describe('GDELT page date range', () => {
+  it('refreshes from the server a second after a date is changed', async () => {
+    routes();
+    render(Page);
+    await loaded();
+    // Let the refresh that follows loading finish, so the next request is the one this test causes
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([u]) => String(u).includes('dateStart='))).toHaveLength(1), { timeout: 3000 });
+    await waitFor(() => expect(leafletState.maps.length).toBeGreaterThanOrEqual(2));
+    const [from] = Array.from(document.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
+    await fireEvent.input(from, { target: { value: '2026-01-03' } });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('dateStart=2026-01-03'))).toBe(true), { timeout: 3000 });
+  }, 10000);
+
+  it('sets the last seven days and all dates from the quick buttons', async () => {
+    routes();
+    render(Page);
+    await loaded();
+    const [from, to] = Array.from(document.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
+    await fireEvent.click(screen.getByText('Last 7 days'));
+    await waitFor(() => expect(to.value).toBe(new Date().toISOString().split('T')[0]));
+    expect(from.value).toBe(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    await fireEvent.click(screen.getByText('All dates'));
+    await waitFor(() => expect(from.value).toBe('2026-01-01'));
+    expect(to.value).toBe('2026-01-05');
+  });
+
+  it('narrows the visible events to the chosen dates', async () => {
+    routes();
+    render(Page);
+    await loaded();
+    const [from] = Array.from(document.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
+    await fireEvent.input(from, { target: { value: '2026-01-05' } });
+    await waitFor(() => expect(stat('Visible Events')).toBe('2'));
+  });
+});
+
 describe('GDELT page map', () => {
   it('draws one marker per located event, coloured and sized from the event', async () => {
     routes();
@@ -487,4 +523,28 @@ describe('GDELT page mentions', () => {
     const post = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
     expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({ eventIds: [3] });
   });
+  it('loads mentions in batches of 1000 and shows the progress', async () => {
+    const many = [
+      ...Array.from({ length: 1001 }, (_, i) => event(1000 + i, { eventCode: '40', country: 'US' })),
+      event(5, { eventCode: '80', country: 'FR' })
+    ];
+    const posts: number[][] = [];
+    routes({
+      gdelt: () => ({ events: many }),
+      mentions: (_url, init) => {
+        const ids = JSON.parse(init?.body as string).eventIds as number[];
+        posts.push(ids);
+        return { mentions: ids.slice(0, 2).map((id) => mention(id, { mentionSourceName: `batch-${id}.com` })) };
+      }
+    });
+    render(Page);
+    await loaded();
+    await fireEvent.click(screen.getByText('Support & Agreements').closest('button') as HTMLElement);
+    await fireEvent.click(await screen.findByText('Show All Mentions (1001)'));
+    await screen.findByText(/Batch 1\/2/, {}, { timeout: 3000 }).catch(() => undefined);
+    await waitFor(() => expect(posts).toHaveLength(2), { timeout: 4000 });
+    expect(posts.map((p) => p.length)).toEqual([1000, 1]);
+    await waitFor(() => expect(screen.getByText('All Filtered Events (3 mentions)')).toBeTruthy(), { timeout: 4000 });
+    expect(screen.queryByText(/loading\.\.\./)).toBeNull();
+  }, 15000);
 });
