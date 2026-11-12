@@ -68,12 +68,14 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     }
 
     // List investigations, optionally limited to one workspace or to the workspaces of one project
-    const wsNumber = workspaceId ? parseInt(workspaceId) : NaN;
-    const projectNumber = projectId ? parseInt(projectId) : NaN;
-    const { sql, params } = investigationListQuery({
-      workspaceId: Number.isInteger(wsNumber) ? wsNumber : undefined,
-      projectId: Number.isInteger(projectNumber) ? projectNumber : undefined
-    });
+    // A filter that was asked for but is not a whole number must not widen to the unfiltered list
+    const wsNumber = workspaceId ? Number(workspaceId) : undefined;
+    const projectNumber = projectId ? Number(projectId) : undefined;
+    const isBadFilter = (value: number | undefined) => value !== undefined && !Number.isSafeInteger(value);
+    if (isBadFilter(wsNumber) || isBadFilter(projectNumber)) {
+      return json({ success: false, error: 'workspace_id and project_id must be whole numbers' }, { status: 400 });
+    }
+    const { sql, params } = investigationListQuery({ workspaceId: wsNumber, projectId: projectNumber });
 
     const all = await postgresPool.query(sql, params);
     // Only investigations of workspaces this person may see

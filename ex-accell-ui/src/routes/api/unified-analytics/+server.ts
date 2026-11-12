@@ -102,7 +102,10 @@ export const GET: RequestHandler = async ({ url }) => {
     if (dateProblem) return json({ success: false, error: dateProblem }, { status: 400 });
 
     // Resolve workspace scope for dataset-scoped analytics
-    const scope = await resolveWorkspaceScope(url);
+    const resolved = await resolveWorkspaceScope(url);
+    // A requested workspace that does not exist must never fall through to unscoped data
+    if (resolved.kind === 'missing') return json({ success: false, data: null, error: 'Workspace not found' }, { status: 404 });
+    const scope = resolved.kind === 'scoped' ? resolved.scope : null;
 
     if (type === 'test') {
       // Test PostgreSQL connection with pg_duckdb
@@ -1459,8 +1462,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         let platformFilter = '';
         const filterParams: any[] = [];
         if (wsId) {
-          const scope = await resolveWorkspaceScope(url);
-          if (scope.hasSocialMedia && scope.socialPlatforms.length > 0) {
+          if (scope?.hasSocialMedia && scope.socialPlatforms.length > 0) {
             platformFilter = `AND ${source.platformColumn} = ANY($1)`;
             filterParams.push(scope.socialPlatforms);
           }

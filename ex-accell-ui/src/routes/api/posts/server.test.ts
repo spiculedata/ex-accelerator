@@ -19,7 +19,7 @@ const row = (id: number, total = 3) => ({
 
 beforeEach(() => {
   resolveWorkspaceScope.mockReset();
-  resolveWorkspaceScope.mockResolvedValue(null);
+  resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
   query.mockReset();
   query.mockResolvedValue([row(1), row(2), row(3)]);
 });
@@ -117,7 +117,7 @@ describe('GET /api/posts', () => {
 
   describe('workspace scope', () => {
     it("uses the workspace's social platforms when none are chosen, like the page endpoints", async () => {
-      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['Telegram'] });
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['Telegram'] } });
 
       await call('?workspace_id=3&hashtag=TramDelays');
 
@@ -125,7 +125,7 @@ describe('GET /api/posts', () => {
     });
 
     it('lets an explicit platform choice override the workspace', async () => {
-      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram'] });
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['telegram'] } });
 
       await call('?workspace_id=3&platforms=bluesky');
 
@@ -134,7 +134,7 @@ describe('GET /api/posts', () => {
     });
 
     it('returns nothing, without querying, for a workspace with no social datasets', async () => {
-      resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: false, socialPlatforms: [] });
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: false, socialPlatforms: [] } });
 
       const body = await (await call('?workspace_id=3')).json();
 
@@ -174,6 +174,15 @@ describe('GET /api/posts', () => {
     const response = await call('?workspace_id=3');
 
     expect(response.status).toBe(500);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('answers an empty page, not unscoped posts, for a workspace that does not exist', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'missing', workspaceId: 3 });
+
+    const body = await (await call('?workspace_id=3')).json();
+
+    expect(body.data.posts).toEqual([]);
     expect(query).not.toHaveBeenCalled();
   });
 });

@@ -28,7 +28,7 @@ beforeEach(() => {
   duckdbQuery.mockReset();
   duckdbQuery.mockResolvedValue([]);
   resolveWorkspaceScope.mockReset();
-  resolveWorkspaceScope.mockResolvedValue(null);
+  resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
 });
 
 describe('workspace scoping of the social dashboards', () => {
@@ -47,7 +47,7 @@ describe('workspace scoping of the social dashboards', () => {
   ];
 
   it.each(SCOPED_TYPES)('%s returns nothing for a workspace with no social media dataset, instead of every post', async (type) => {
-    resolveWorkspaceScope.mockResolvedValue(NO_SOCIAL);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: NO_SOCIAL });
 
     const body = await (await get(`type=${type}&workspace_id=7`)).json();
 
@@ -58,7 +58,7 @@ describe('workspace scoping of the social dashboards', () => {
   it.each(['language-stats', 'language-mixing', 'language-trends'])(
     '%s is limited to the platforms of the workspace datasets',
     async (type) => {
-      resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: TELEGRAM });
 
       await get(`type=${type}&workspace_id=7`);
 
@@ -69,7 +69,7 @@ describe('workspace scoping of the social dashboards', () => {
   );
 
   it('language-posts adds the workspace platforms after its own filters, keeping parameter order', async () => {
-    resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: TELEGRAM });
 
     await get('type=language-posts&workspace_id=7&language=es&limit=5');
 
@@ -81,7 +81,7 @@ describe('workspace scoping of the social dashboards', () => {
   });
 
   it('language-detection-detail combines the language and the workspace platforms', async () => {
-    resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: TELEGRAM });
 
     await get('type=language-detection-detail&workspace_id=7&language=es');
 
@@ -92,7 +92,7 @@ describe('workspace scoping of the social dashboards', () => {
   });
 
   it('numbers the date window after the workspace platforms', async () => {
-    resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: TELEGRAM });
 
     await get('type=language-stats&workspace_id=7&date_start=2026-01-01&date_end=2026-01-31');
 
@@ -103,7 +103,7 @@ describe('workspace scoping of the social dashboards', () => {
   });
 
   it('still rejects a bad date range for a workspace with no social data', async () => {
-    resolveWorkspaceScope.mockResolvedValue(NO_SOCIAL);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: NO_SOCIAL });
 
     const response = await get('type=language-posts&workspace_id=7&date_start=not-a-date');
 
@@ -111,7 +111,7 @@ describe('workspace scoping of the social dashboards', () => {
   });
 
   it('still answers 400 to an unknown engagement query for a workspace with no social data', async () => {
-    resolveWorkspaceScope.mockResolvedValue(NO_SOCIAL);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: NO_SOCIAL });
 
     const response = await get('type=engagement-nope&workspace_id=7');
 
@@ -153,7 +153,7 @@ describe('GET /api/unified-analytics language-trends', () => {
 
 describe('GET /api/unified-analytics language-mixing scope', () => {
   it('applies the workspace platforms and the date window inside the scoped rows that both counts read', async () => {
-    resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: TELEGRAM });
 
     await get('type=language-mixing&workspace_id=7&date_start=2026-01-01');
 

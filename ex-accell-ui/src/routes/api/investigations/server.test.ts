@@ -256,3 +256,22 @@ describe('investigation ids are read one way for the check and the change', () =
     expect(del[1]).toEqual([7]);
   });
 });
+
+describe('GET /api/investigations list scope fails closed', () => {
+  const list = (search: string) =>
+    GET({
+      url: new URL(`http://localhost/api/investigations${search}`),
+      locals: { user: { email: 'ada@example.com' } }
+    } as unknown as Parameters<typeof GET>[0]);
+
+  it.each(['?workspace_id=abc', '?workspace_id=1x', '?project_id=abc'])(
+    'answers 400, not the unscoped list, for the malformed filter %s',
+    async (search) => {
+      query.mockClear();
+      const response = await list(search);
+
+      expect(response.status).toBe(400);
+      expect(query.mock.calls.some(([sql]) => String(sql).includes('FROM investigations'))).toBe(false);
+    }
+  );
+});
