@@ -32,6 +32,15 @@ describe('POST /api/workflows/[id]/execute', () => {
     expect(service.executeWorkflow).toHaveBeenCalledWith('wf_1', { a: 1 }, { priority: 'high' });
   });
 
+  it('does not send stored failure causes back from a run or a list', async () => {
+    const failed = { id: 'exec_1', status: 'failed', error: 'dial tcp 10.0.0.5:3500', logs: [{ timestamp: 't', level: 'error', message: 'refused 10.0.0.5' }] };
+    service.executeWorkflow.mockResolvedValue(failed);
+    service.getWorkflowExecutions.mockResolvedValue([failed]);
+
+    expect(JSON.stringify(await (await post({})).json())).not.toContain('10.0.0.5');
+    expect(JSON.stringify(await (await list()).json())).not.toContain('10.0.0.5');
+  });
+
   it.each([['not json'], ['[1]']])('refuses a body that is not a JSON object (%s) with 400', async (raw) => {
     const response = await post(raw);
 

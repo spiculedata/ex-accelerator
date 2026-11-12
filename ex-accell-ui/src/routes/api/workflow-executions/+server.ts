@@ -3,6 +3,7 @@
 
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
+import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 const MAX_LIST_LIMIT = 500;
@@ -24,7 +25,8 @@ export const GET: RequestHandler = async ({ url }) => {
       status: url.searchParams.get('status') || undefined,
       limit
     });
-    return apiOk(executions, { executions, count: executions.length });
+    const views = executions.map(toPublicExecution);
+    return apiOk(views, { executions: views, count: views.length });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions', err, 'Failed to get workflow executions');
   }

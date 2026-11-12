@@ -4,6 +4,7 @@
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { hybridDaprWorkflowExecutor } from '$lib/services/hybridDaprWorkflowExecutor';
+import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 const MAX_MANAGE_BODY_BYTES = 16 * 1024;
@@ -38,7 +39,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       await hybridDaprWorkflowExecutor.purgeWorkflow(id);
       result = { message: 'Workflow purged successfully' };
     } else {
-      result = { status: await hybridDaprWorkflowExecutor.getWorkflowStatus(id) };
+      result = { status: toPublicDaprStatus(await hybridDaprWorkflowExecutor.getWorkflowStatus(id)) };
     }
 
     return apiOk(result, { action, executionId: id, ...result });
@@ -59,8 +60,9 @@ export const GET: RequestHandler = async ({ params, url }) => {
     const execution = await serverWorkflowService.getWorkflowExecution(id);
     if (!execution) return apiFail('Execution not found', 404);
 
-    const daprStatus = await hybridDaprWorkflowExecutor.getWorkflowStatus(id);
-    return apiOk({ localExecution: execution, daprStatus }, { executionId: id, localExecution: execution, daprStatus });
+    const daprStatus = toPublicDaprStatus(await hybridDaprWorkflowExecutor.getWorkflowStatus(id));
+    const localExecution = toPublicExecution(execution);
+    return apiOk({ localExecution, daprStatus }, { executionId: id, localExecution, daprStatus });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions/[id]/manage', err, 'Failed to get workflow status');
   }

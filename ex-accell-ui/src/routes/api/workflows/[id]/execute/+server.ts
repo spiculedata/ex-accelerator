@@ -3,6 +3,7 @@
 
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
+import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 const MAX_EXECUTE_BODY_BYTES = 1024 * 1024;
@@ -24,7 +25,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
     if (workflow.status !== 'published') return apiFail('Only published workflows can be run: publish it first.', 409);
 
     const execution = await serverWorkflowService.executeWorkflow(params.id, input, options);
-    return apiOk(execution, { execution });
+    const view = toPublicExecution(execution);
+    return apiOk(view, { execution: view });
   } catch (err) {
     return apiServerError('POST /api/workflows/[id]/execute', err, 'Failed to execute workflow');
   }
@@ -47,7 +49,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
       status: url.searchParams.get('status') || undefined,
       limit
     });
-    return apiOk(executions, { executions, count: executions.length });
+    const views = executions.map(toPublicExecution);
+    return apiOk(views, { executions: views, count: views.length });
   } catch (err) {
     return apiServerError('GET /api/workflows/[id]/execute', err, 'Failed to get workflow executions');
   }

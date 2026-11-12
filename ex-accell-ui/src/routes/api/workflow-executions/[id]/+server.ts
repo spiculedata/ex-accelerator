@@ -3,6 +3,7 @@
 
 import type { RequestHandler } from './$types';
 import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
+import { toPublicDaprStatus, toPublicExecution } from '$lib/server/workflowExecutionView';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 /**
@@ -14,7 +15,8 @@ export const GET: RequestHandler = async ({ params }) => {
     const execution = await serverWorkflowService.getWorkflowExecution(params.id);
     if (!execution) return apiFail('Workflow execution not found', 404);
 
-    return apiOk(execution, { execution });
+    const view = toPublicExecution(execution);
+    return apiOk(view, { execution: view });
   } catch (err) {
     return apiServerError('GET /api/workflow-executions/[id]', err, 'Failed to get workflow execution');
   }

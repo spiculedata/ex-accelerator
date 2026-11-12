@@ -21,6 +21,21 @@ describe('GET /api/workflow-executions/[id]', () => {
     expect(await response.json()).toEqual({ success: true, execution: { id: 'exec_1', status: 'running' }, data: { id: 'exec_1', status: 'running' } });
   });
 
+  it('replaces the stored failure cause and error log text with generic text', async () => {
+    service.getWorkflowExecution.mockResolvedValue({
+      id: 'exec_1',
+      status: 'failed',
+      error: 'connect ECONNREFUSED 10.0.0.5:3500',
+      logs: [{ timestamp: 't', level: 'error', message: 'Hybrid workflow execution failed: ECONNREFUSED 10.0.0.5' }]
+    });
+
+    const body = await (await GET(event)).json();
+
+    expect(JSON.stringify(body)).not.toContain('10.0.0.5');
+    expect(body.execution.status).toBe('failed');
+    expect(body.data.error).toBeTruthy();
+  });
+
   it('reports a missing execution as a 404 envelope, not a SvelteKit error', async () => {
     service.getWorkflowExecution.mockResolvedValue(null);
 
