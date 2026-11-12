@@ -78,7 +78,9 @@ so other peers can find the content it pins. It also asks the router to open por
 on the local network with **mDNS**, acts as a **circuit relay** for other peers' traffic, registers with
 `libp2p.direct` for a TLS certificate (**AutoTLS**), uses delegated routing over HTTPS (`delegated-ipfs.dev`) and
 fetches blocks over HTTPS from public trustless gateways (`trustless-gateway.link`, `4everland.io`) when peers
-are slow. None of this is configurable today ([issue #252](https://github.com/spiculedata/social-explorer/issues/252)).
+are slow. You can pin the listen ports and turn off UPnP, the relay server and AutoTLS (see
+[Network and firewall](#network-and-firewall)); mDNS, the bootstrap peers, delegated routing and the HTTP gateways
+are not configurable ([issue #252](https://github.com/spiculedata/social-explorer/issues/252)).
 The node starts on the first publish or import and stops when the app process stops.
 
 ## Who may do what
@@ -104,22 +106,52 @@ Non-admins see the page with those controls hidden; the API answers `403` if the
 | `IPFS_GATEWAY_URL` | `https://ipfs.io/ipfs` | Gateway used to build shareable links. Point it at your own gateway if you run one. |
 | `IPFS_FETCH_TIMEOUT_MS` | `120000` | How long an import waits for the network before answering `504`. |
 | `IPFS_MAX_FETCH_BYTES` | `268435456` (256 MB) | Largest package an import accepts; bigger ones are refused with `422`. |
+| `IPFS_LISTEN_ADDRS` | libp2p defaults (random TCP, WebSocket and WebRTC-direct ports on every interface, plus circuit relay) | Comma-separated multiaddrs to listen on instead, for example `/ip4/0.0.0.0/tcp/4001,/ip4/0.0.0.0/tcp/4002/ws`. See [Network and firewall](#network-and-firewall). |
+| `IPFS_ANNOUNCE_ADDRS` | none | Comma-separated multiaddrs to announce instead of the addresses the node detects, for example `/dns4/data.example.org/tcp/4001` behind NAT or a proxy. |
+| `IPFS_UPNP` | `true` | Set to exactly `false` to stop the node asking your router to open ports. |
+| `IPFS_RELAY_SERVER` | `true` | Set to exactly `false` to stop the node relaying other peers' traffic. |
+| `IPFS_AUTOTLS` | `true` | Set to exactly `false` to stop the node requesting a `libp2p.direct` TLS certificate. |
 | `PACKAGES_DIR` | `/data/packages` | Where generated and imported packages are written. |
 | `MAX_EXPORT_ROWS` | `500000` | Most rows exported in one publish and loaded in one import. |
 
 With Docker Compose the storage paths are fixed inside the container and mounted from `${DATA_DIR:-/data}/ipfs`
 and `${DATA_DIR:-/data}/packages`. The compose file forwards `IPFS_ENABLED`, `IPFS_GATEWAY_URL`,
-`IPFS_FETCH_TIMEOUT_MS`, `IPFS_MAX_FETCH_BYTES` and `MAX_EXPORT_ROWS` from `.env`; put `IPFS_ENABLED=true` there.
+`IPFS_FETCH_TIMEOUT_MS`, `IPFS_MAX_FETCH_BYTES`, `MAX_EXPORT_ROWS` and the five network variables above from `.env`;
+put `IPFS_ENABLED=true` there.
 
 ### Network and firewall
 
-The node picks random ports, so there is nothing fixed to open. Outbound traffic must be allowed to the
+By default the node picks random ports, so there is nothing fixed to open. Outbound traffic must be allowed to the
 bootstrap peers and the DHT (TCP and UDP, any port) and over HTTPS to the delegated-routing and trustless-gateway
 hosts named above, or publishing works locally but nobody can fetch from you. For other peers to connect *in*,
 your node must be reachable; behind NAT or the Compose network it relies on relays (and on UPnP, if your router
-allows it), which works but is slower. The Compose file does not publish an IPFS port; a fixed listen address
-and port, and turning off UPnP, mDNS, the relay server or the HTTP gateways, are not configurable yet (see
-[issue #252](https://github.com/spiculedata/social-explorer/issues/252), which also tracks unpublishing).
+allows it), which works but is slower.
+
+To make inbound connections predictable, set `IPFS_LISTEN_ADDRS` to fixed ports, open them on your firewall and
+publish them from the container, and set `IPFS_ANNOUNCE_ADDRS` to the public address peers should dial:
+
+```bash
+# .env
+IPFS_LISTEN_ADDRS=/ip4/0.0.0.0/tcp/4001
+IPFS_ANNOUNCE_ADDRS=/dns4/data.example.org/tcp/4001
+```
+
+```yaml
+# docker-compose.override.yml
+services:
+  ex-accell-ui:
+    ports:
+      - "4001:4001"
+```
+
+Setting `IPFS_LISTEN_ADDRS` replaces the whole default list, including the circuit-relay entry, so list every
+transport you want (`/ip4/0.0.0.0/tcp/4001/ws` for WebSockets, `/ip6/::/tcp/4001` for IPv6) and add `/p2p-circuit` if
+the node should still be reachable through relays. A value that is not a multiaddr is refused when the node starts
+(the publish or import answers `503` naming the variable). `IPFS_UPNP=false`, `IPFS_RELAY_SERVER=false` and
+`IPFS_AUTOTLS=false` remove those services from the node; only the exact string `false` does, and anything else
+leaves the default. mDNS, the bootstrap peers, delegated routing and the HTTP gateways cannot be switched off with
+the options Helia exposes, so the node always uses them (see [issue #252](https://github.com/spiculedata/social-explorer/issues/252)).
+Unpublishing is tracked there too.
 The node is stopped cleanly when the app receives SIGTERM or SIGINT (for example `docker compose stop`), which releases the datastore lock; if the process is killed outright, remove a stale `LOCK` file in `IPFS_DATASTORE_PATH` before the next start.
 
 ### Disk use

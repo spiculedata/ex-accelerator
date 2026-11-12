@@ -6,6 +6,7 @@ import { postgresPool } from '$lib/services/postgres';
 import { ipfsService } from '$lib/services/ipfsService';
 import { isValidCid } from '$lib/services/ipfsCid';
 import { InvalidCidError, IpfsDisabledError, PackageTooLargeError, UnsafePackageError } from '$lib/services/ipfsErrors';
+import { NetworkConfigError } from '$lib/services/ipfsNetworkConfig';
 import { parseResourceId } from '$lib/server/auth/access';
 import { createLogger } from '$lib/utils/logger';
 import { DataSharingError, badRequest, notFound, unprocessable } from '$lib/server/dataSharing/errors';
@@ -31,7 +32,7 @@ const fail = (status: number, error: string) => json({ success: false, error }, 
 /** 4xx for a caller's mistake or a refused package, 503 when sharing is off, 504 for a fetch that timed out; else a generic 500. */
 function errorResponse(label: string, error: unknown): Response {
   if (error instanceof DataSharingError) return fail(error.status, error.message);
-  if (error instanceof IpfsDisabledError) return fail(503, error.message);
+  if (error instanceof IpfsDisabledError || error instanceof NetworkConfigError) return fail(503, error.message);
   if (error instanceof InvalidCidError) return fail(400, error.message);
   if (error instanceof UnsafePackageError || error instanceof PackageTooLargeError) return fail(422, error.message);
   if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
