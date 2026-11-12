@@ -19,6 +19,8 @@ const defaultRun = (command: string, args: string[]) => {
  */
 export function killProcessGroup(pid: number, deps: KillDeps = {}): void {
 	const { platform = process.platform, signal = defaultSignal, run = defaultRun } = deps;
+	// A pid of 0 or 1 (or a negative one) would address a whole group or init, never a Jupyter we launched
+	if (!Number.isInteger(pid) || pid <= 1) return;
 	if (platform === 'win32') {
 		run('taskkill', ['/pid', String(pid), '/T', '/F']);
 		return;

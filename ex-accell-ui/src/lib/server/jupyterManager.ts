@@ -62,11 +62,16 @@ const ENV_ALLOWLIST = new RegExp(
 		')$'
 );
 
+// Even an allowed prefix (POETRY_*, PYTHON*) can carry credentials, e.g. POETRY_PYPI_TOKEN_X. Anything that
+// looks like a secret is dropped; PGPASSWORD stays because notebooks need it to reach the database.
+const SECRET_LOOKING = /(TOKEN|SECRET|PASSWORD|API_?KEY|HTTP_BASIC|CREDENTIAL)/i;
+const SECRET_EXCEPTIONS = new Set(['PGPASSWORD']);
+
 export function jupyterEnvironment(
 	source: Record<string, string | undefined>,
 	overrides: Record<string, string>
 ): Record<string, string> {
-	const kept = Object.entries(source).filter(([key, value]) => value !== undefined && ENV_ALLOWLIST.test(key));
+	const kept = Object.entries(source).filter(([key, value]) => value !== undefined && ENV_ALLOWLIST.test(key) && (SECRET_EXCEPTIONS.has(key) || !SECRET_LOOKING.test(key)));
 	return { ...(Object.fromEntries(kept) as Record<string, string>), ...overrides };
 }
 

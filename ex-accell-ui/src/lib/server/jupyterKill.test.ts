@@ -24,4 +24,12 @@ describe('killProcessGroup', () => {
 		expect(run).toHaveBeenCalledWith('taskkill', ['/pid', '42', '/T', '/F']);
 		expect(signal).not.toHaveBeenCalled();
 	});
+
+	it('refuses pids that could address a group or init', () => {
+		const signal = vi.fn();
+		const run = vi.fn();
+		for (const pid of [0, 1, -5, 1.5, Number.NaN]) killProcessGroup(pid, { platform: 'linux', signal, run });
+		expect(signal).not.toHaveBeenCalled();
+		expect(run).not.toHaveBeenCalled();
+	});
 });

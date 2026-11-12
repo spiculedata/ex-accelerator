@@ -60,7 +60,7 @@ When the app starts Jupyter, it passes on only a short list of variables, not it
 `ADMIN_PASSWORD` never reach a notebook): the usual shell basics, `DATABASE_URL` and `PG*`, `OLLAMA_HOST`, `JUPYTER_*`, Python and Poetry
 settings, proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` in either case), CA bundle paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`,
 `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`) and model-cache locations (`HF_HOME`, `TRANSFORMERS_CACHE`, `TORCH_HOME`, `NLTK_DATA`, `XDG_CACHE_HOME`).
-API tokens such as `HF_TOKEN` are deliberately not passed; set them inside the notebook. Starting Jupyter yourself with
+Any variable whose name contains `TOKEN`, `SECRET`, `PASSWORD`, `API_KEY` or `CREDENTIAL` is dropped (so `HF_TOKEN` is not passed; set it inside the notebook), except `PGPASSWORD`, which notebooks need for the database. Proxy URLs are passed as they are, so a password embedded in one reaches notebooks too. Starting Jupyter yourself with
 `npm run jupyter:start` uses your shell's full environment instead.
 :::
 

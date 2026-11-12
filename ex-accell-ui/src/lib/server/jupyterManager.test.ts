@@ -190,4 +190,20 @@ describe('jupyterEnvironment', () => {
 		};
 		expect(jupyterEnvironment({ ...kept, SESSION_SECRET: 's', HF_TOKEN: 'secret' }, {})).toEqual(kept);
 	});
+
+	it('drops credentials hiding under an allowed prefix, but keeps PGPASSWORD for the database', () => {
+		const env = jupyterEnvironment(
+			{
+				POETRY_PYPI_TOKEN_INTERNAL: 't',
+				POETRY_HTTP_BASIC_INTERNAL_PASSWORD: 'p',
+				PYTHON_API_KEY: 'k',
+				X_HTTP_PROXY: 'not allowed',
+				PIP_INDEX_URL: 'https://u:p@index',
+				POETRY_VIRTUALENVS_IN_PROJECT: 'true',
+				PGPASSWORD: 'db'
+			},
+			{}
+		);
+		expect(env).toEqual({ POETRY_VIRTUALENVS_IN_PROJECT: 'true', PGPASSWORD: 'db' });
+	});
 });
