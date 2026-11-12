@@ -29,6 +29,8 @@ function selectTab(index: number, shouldFocus = false) {
   if (shouldFocus) tabRefs.value[position]?.focus();
 }
 function onTabKeydown(event: KeyboardEvent, index: number) {
+  // Leave browser shortcuts such as Alt+Left (back) alone
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   const target = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key];
   if (target === undefined) return;
   event.preventDefault();
@@ -153,7 +155,7 @@ async function copyCommands() {
                 @pointerdown="warm(t.src)"
               >{{ t.label }}</button>
             </div>
-            <div id="showcase-panel" class="screen" role="tabpanel" :aria-labelledby="`tab-${active}`">
+            <div id="showcase-panel" class="screen" role="tabpanel" tabindex="0" :aria-labelledby="`tab-${active}`">
               <img
                 v-for="t in tabs"
                 v-show="active === t.id"
