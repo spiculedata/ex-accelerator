@@ -28,7 +28,7 @@ This will:
 After running `npm run dev:jupyter`, verify everything is working:
 
 1. **Check SvelteKit**: http://localhost:5173 should show the application
-2. **Check Jupyter Lab**: http://localhost:8888 should show Jupyter Lab interface
+2. **Check Jupyter Lab**: the start script prints a `http://localhost:8888/?token=...` link; Jupyter refuses requests without the token
 3. **Check Notebooks**: Navigate to Research Investigation page and test embedded viewer
 
 ## 📚 Available Notebooks
@@ -82,11 +82,12 @@ npm run dev
 ## 🛠️ Configuration Details
 
 ### Jupyter Lab Configuration
-Located in `~/.jupyter/jupyter_lab_config.py`:
-- **CORS enabled** for embedding in SvelteKit
-- **Authentication disabled** for local development
-- **Default directory** set to `./notebooks`
-- **Port 8888** for consistency
+`npm run jupyter:bootstrap` writes the project-local `.jupyter/jupyter_lab_config.py` (your own `~/.jupyter` is not touched). It
+sets the **allowed origin** for cross-origin access and framing (`JUPYTER_ALLOW_ORIGIN`, default `http://localhost:5173`) and the
+**default directory** (`./notebooks`). Authentication and XSRF checks stay at Jupyter's secure defaults.
+
+The start scripts and the app's Start button add the rest on the command line and in the environment: **loopback only**, **port 8888
+with no fallback** to another port, and a **random token** on every start (set `JUPYTER_TOKEN` to choose one).
 
 ### Python Environment
 Managed by Poetry (`pyproject.toml`):
@@ -127,7 +128,7 @@ npm run jupyter:start
 
 #### Embedding Not Working
 1. Check that Jupyter Lab is running: http://localhost:8888
-2. Verify CORS configuration in `~/.jupyter/jupyter_lab_config.py`
+2. Verify the project-local `.jupyter/jupyter_lab_config.py` exists (run `npm run jupyter:bootstrap`) and that `JUPYTER_ALLOW_ORIGIN` matches the address you open the app on
 3. Try opening notebook directly in Jupyter Lab first
 
 #### Poetry Issues
