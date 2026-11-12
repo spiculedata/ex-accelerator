@@ -178,6 +178,25 @@ describe('GET /api/jobs with one side down', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, daprJobs: [{ name: 'crawl-1' }], jobStates: [] });
   });
+
+  it('flags the state store as unavailable when it fails for another reason but Dapr answers', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [{ name: 'crawl-1' }] }));
+    store.getAllJobStates.mockRejectedValue(new Error('Failed to read the job registry: 500'));
+
+    const body = await (await get()).json();
+
+    expect(body.serviceStatus).toMatchObject({ daprAvailable: true, stateAvailable: false });
+  });
+
+  it('answers a 500, not an empty list, when the state store fails and Dapr has nothing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    store.getAllJobStates.mockRejectedValue(new Error('Failed to read the job registry: 500'));
+
+    const response = await get();
+
+    expect(response.status).toBe(500);
+    expect((await response.json()).success).toBe(false);
+  });
 });
 
 describe('DELETE /api/jobs', () => {

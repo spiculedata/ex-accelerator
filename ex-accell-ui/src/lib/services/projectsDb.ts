@@ -4,6 +4,10 @@
 import { postgresPool } from './postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
+/** Postgres undefined_table: the schema has not been created yet, so there is genuinely nothing to list. */
+const UNDEFINED_TABLE_CODE = '42P01';
+const isMissingTable = (error: unknown): boolean => (error as { code?: string } | null)?.code === UNDEFINED_TABLE_CODE;
+
 export interface Project {
   id: number;
   name: string;
@@ -66,8 +70,10 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Project>('SELECT * FROM project_overview ORDER BY created_at DESC');
       return rows;
     } catch (error) {
+      if (isMissingTable(error)) return [];
       console.error('Error fetching projects:', error);
-      return [];
+      // Any other failure is not an empty result: let the route answer 500
+      throw error;
     }
   }
 
@@ -155,7 +161,8 @@ class ProjectsDatabase {
       return rows[0] || null;
     } catch (error) {
       console.error('Error updating project:', error);
-      return null;
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -179,8 +186,10 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
+      if (isMissingTable(error)) return [];
       console.error('Error fetching workspaces:', error);
-      return [];
+      // Any other failure is not an empty result: let the route answer 500
+      throw error;
     }
   }
 
@@ -258,7 +267,8 @@ class ProjectsDatabase {
       return rows[0] || null;
     } catch (error) {
       console.error('Error updating workspace:', error);
-      return null;
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -305,8 +315,10 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
+      if (isMissingTable(error)) return [];
       console.error('Error fetching project members:', error);
-      return [];
+      // Any other failure is not an empty result: let the route answer 500
+      throw error;
     }
   }
 
@@ -340,8 +352,10 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
+      if (isMissingTable(error)) return [];
       console.error('Error fetching data sources:', error);
-      return [];
+      // Any other failure is not an empty result: let the route answer 500
+      throw error;
     }
   }
 

@@ -260,9 +260,13 @@ export class JobStateStore {
 				method: 'GET',
 			});
 
-			if (!registryResponse.ok) {
-				console.warn('Job registry not found, returning empty array');
+			if (registryResponse.status === 404) {
+				// No job has been registered yet: genuinely empty
 				return [];
+			}
+			if (!registryResponse.ok) {
+				// A failing state store is not "no jobs": let the route answer with an error
+				throw new Error(`Failed to read the job registry: ${registryResponse.status}`);
 			}
 
 			const responseText = await registryResponse.text();

@@ -69,6 +69,7 @@ class DashboardDatabase extends BaseDatabaseService {
     try {
       const dsParams = workspaceId ? `?workspace_id=${workspaceId}` : '?status=available';
       const dsRes = await fetch(`/api/datasets${dsParams}`);
+      if (!dsRes.ok) throw new Error(`HTTP ${dsRes.status}`);
       const dsData = await dsRes.json();
       if (dsData.datasets) {
         for (const ds of dsData.datasets) {
@@ -78,7 +79,10 @@ class DashboardDatabase extends BaseDatabaseService {
           }
         }
       }
-    } catch { /* fallback to platform name */ }
+    } catch (error) {
+      // Dataset names only enrich the labels; the platform name is a true fallback, but say why
+      this.log('warn', `Could not load dataset names, showing platform names: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     const totalPosts = data.reduce((sum: number, item: any) => sum + item.total_posts, 0);
 
