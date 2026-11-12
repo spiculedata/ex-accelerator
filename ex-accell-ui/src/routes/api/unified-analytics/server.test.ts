@@ -6,7 +6,7 @@ const { duckdbQuery, healthCheck } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/services/postgres', () => ({ postgresPool: { duckdbQuery, healthCheck } }));
-const { resolveWorkspaceScope } = vi.hoisted(() => ({ resolveWorkspaceScope: vi.fn().mockResolvedValue(null) }));
+const { resolveWorkspaceScope } = vi.hoisted(() => ({ resolveWorkspaceScope: vi.fn().mockResolvedValue({ kind: 'none' }) }));
 
 vi.mock('$lib/services/workspaceContextResolver', () => ({
   resolveWorkspaceScope,
@@ -158,13 +158,13 @@ describe('GET /api/unified-analytics engagement edge cases', () => {
   });
 
   it('filters by the workspace platforms, passing them as $1 and the limit as $2', async () => {
-    resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram'] });
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['telegram'] } });
     duckdbQuery.mockResolvedValue([]);
 
     try {
       await get('type=engagement-top-posts&workspace_id=7&limit=5');
     } finally {
-      resolveWorkspaceScope.mockResolvedValue(null);
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
     }
 
     const [sql, params] = duckdbQuery.mock.calls[0];
@@ -291,13 +291,13 @@ describe('GET /api/unified-analytics trigrams', () => {
   });
 
   it('limits the scan to the workspace platforms and combines them with the platform filter', async () => {
-    resolveWorkspaceScope.mockResolvedValue({ hasSocialMedia: true, socialPlatforms: ['telegram', 'bluesky'] });
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['telegram', 'bluesky'] } });
     duckdbQuery.mockResolvedValue([]);
 
     try {
       await get('platform=bluesky&workspace_id=3');
     } finally {
-      resolveWorkspaceScope.mockResolvedValue(null);
+      resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
     }
 
     const [sql, params] = duckdbQuery.mock.calls[0];
@@ -540,4 +540,70 @@ describe('GET /api/unified-analytics date ranges', () => {
       expect(duckdbQuery).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('GET /api/unified-analytics workspace scope fails closed', () => {
+  const get = (query: string) =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?${query}`) } as Parameters<typeof GET>[0]);
+
+  beforeEach(() => {
+    resolveWorkspaceScope.mockReset();
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
+  });
+
+  it('answers a generic 500, and runs no query, when the scope cannot be resolved', async () => {
+    resolveWorkspaceScope.mockRejectedValue(new Error('connection refused'));
+
+    const response = await get('type=emotion-stats&workspace_id=7');
+
+    expect(response.status).toBe(500);
+    expect(JSON.stringify(await response.json())).not.toContain('connection refused');
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('answers 404, and runs no query, for a workspace that does not exist', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'missing', workspaceId: 7 });
+
+    const response = await get('type=emotion-stats&workspace_id=7');
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).success).toBe(false);
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('still runs the query when no workspace was requested', async () => {
+    duckdbQuery.mockResolvedValue([]);
+
+    const response = await get('type=emotion-stats');
+
+    expect(response.status).toBe(200);
+    expect(duckdbQuery).toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/unified-analytics scoped workspace without social data', () => {
+  const get = (query: string) =>
+    GET({ url: new URL(`http://localhost/api/unified-analytics?${query}`) } as Parameters<typeof GET>[0]);
+
+  beforeEach(() => {
+    duckdbQuery.mockReset();
+    duckdbQuery.mockResolvedValue([]);
+  });
+
+  it.each(['trigrams', 'hashtag-analysis'])('%s returns nothing, not every post, for a workspace with no social dataset', async (type) => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: false, socialPlatforms: [] } });
+
+    const body = await (await get(`type=${type}&workspace_id=7`)).json();
+
+    expect(body).toEqual({ success: true, data: [] });
+    expect(duckdbQuery).not.toHaveBeenCalled();
+  });
+
+  it('filters engagement by the workspace platforms when the legacy workspace parameter is used', async () => {
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: { hasSocialMedia: true, socialPlatforms: ['telegram'] } });
+
+    await get('type=engagement-top-posts&workspace=7&limit=5');
+
+    expect(duckdbQuery.mock.calls[0][1]).toEqual([['telegram'], 5]);
+  });
 });

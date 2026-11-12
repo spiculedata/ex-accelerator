@@ -32,13 +32,18 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({ success: true, data: emptyPage });
   }
 
-  let scope: Awaited<ReturnType<typeof resolveWorkspaceScope>>;
+  let resolved: Awaited<ReturnType<typeof resolveWorkspaceScope>>;
   try {
-    scope = await resolveWorkspaceScope(url);
+    resolved = await resolveWorkspaceScope(url);
   } catch (error) {
     // Never fall back to unscoped posts when the workspace could not be resolved
     return queryErrorResponse('Post search', error, emptyPage);
   }
+  // A workspace that does not exist has no posts; it must not widen to every post
+  if (resolved.kind === 'missing') {
+    return json({ success: true, data: emptyPage });
+  }
+  const scope = resolved.kind === 'scoped' ? resolved.scope : null;
   if (scope && !scope.hasSocialMedia) {
     return json({ success: true, data: emptyPage });
   }

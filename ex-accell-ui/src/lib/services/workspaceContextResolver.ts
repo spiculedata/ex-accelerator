@@ -27,22 +27,41 @@ export interface WorkspaceDataScope {
 }
 
 /**
- * Resolve workspace scope from a URL's workspace_id param.
- * Returns null if no workspace_id param (= global/unfiltered view).
+ * What a request asked for, as three cases a caller cannot confuse:
+ * - none: no workspace was requested, so the request is unscoped by choice
+ * - scoped: the workspace exists; filter by `scope`
+ * - missing: a workspace was requested but is unknown or its id is malformed.
+ *   Callers must answer 404 or an empty result, never unscoped data.
+ * A database failure is not a result: it throws.
  */
-export async function resolveWorkspaceScope(url: URL): Promise<WorkspaceDataScope | null> {
+export type WorkspaceScopeResult =
+  | { kind: 'none' }
+  | { kind: 'scoped'; scope: WorkspaceDataScope }
+  | { kind: 'missing'; workspaceId: number | null };
+
+const WORKSPACE_ID_PATTERN = /^\d+$/;
+/** workspaces.id is a Postgres integer: a larger id cannot exist, so it is missing rather than a query error. */
+const MAX_WORKSPACE_ID = 2_147_483_647;
+
+/**
+ * Resolve workspace scope from a URL's workspace_id (or legacy workspace) param.
+ * Throws if the database fails.
+ */
+export async function resolveWorkspaceScope(url: URL): Promise<WorkspaceScopeResult> {
   const wsId = url.searchParams.get('workspace_id') || url.searchParams.get('workspace');
-  if (!wsId) return null;
+  if (!wsId) return { kind: 'none' };
 
-  const workspaceId = parseInt(wsId);
-  if (isNaN(workspaceId)) return null;
+  const workspaceId = WORKSPACE_ID_PATTERN.test(wsId) ? Number(wsId) : NaN;
+  if (!Number.isSafeInteger(workspaceId) || workspaceId > MAX_WORKSPACE_ID) return { kind: 'missing', workspaceId: null };
 
-  return resolveWorkspaceScopeById(workspaceId);
+  const scope = await resolveWorkspaceScopeById(workspaceId);
+  return scope ? { kind: 'scoped', scope } : { kind: 'missing', workspaceId };
 }
 
 /**
  * Resolve workspace scope by ID.
  */
+/** Returns null if the workspace does not exist; throws if the database fails. */
 export async function resolveWorkspaceScopeById(workspaceId: number): Promise<WorkspaceDataScope | null> {
   try {
     // Get workspace name
@@ -171,7 +190,9 @@ export interface QueryFilters {
 }
 
 export async function resolveFilters(url: URL): Promise<QueryFilters> {
-  const scope = await resolveWorkspaceScope(url);
+  const resolved = await resolveWorkspaceScope(url);
+  if (resolved.kind === 'missing') throw new Error('Workspace not found');
+  const scope = resolved.kind === 'scoped' ? resolved.scope : null;
 
   // Explicit platform filter (comma-separated)
   const platformsParam = url.searchParams.get('platforms');

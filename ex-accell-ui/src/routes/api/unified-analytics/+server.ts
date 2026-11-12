@@ -102,7 +102,10 @@ export const GET: RequestHandler = async ({ url }) => {
     if (dateProblem) return json({ success: false, error: dateProblem }, { status: 400 });
 
     // Resolve workspace scope for dataset-scoped analytics
-    const scope = await resolveWorkspaceScope(url);
+    const resolved = await resolveWorkspaceScope(url);
+    // A requested workspace that does not exist must never fall through to unscoped data
+    if (resolved.kind === 'missing') return json({ success: false, data: null, error: 'Workspace not found' }, { status: 404 });
+    const scope = resolved.kind === 'scoped' ? resolved.scope : null;
 
     if (type === 'test') {
       // Test PostgreSQL connection with pg_duckdb
@@ -1360,9 +1363,8 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       // Only known engagement queries: an unknown type is still a 400 below
       if (ENGAGEMENT_TYPES.includes(type) && hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
-        const wsId = url.searchParams.get('workspace_id');
         let platforms: string[] = [];
-        if (wsId && scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
+        if (scope?.hasSocialMedia && scope.socialPlatforms.length > 0) platforms = scope.socialPlatforms;
         const filter = platforms.length > 0;
         const params: any[] = filter ? [platforms] : [];
         const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
@@ -1393,6 +1395,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
     if (type === 'trigrams') {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const intParam = (name: string, fallback: number, min: number, max: number): number => {
           const parsed = parseInt(url.searchParams.get(name) || '');
@@ -1448,9 +1451,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
     }
 
     if (type === 'hashtag-analysis') {
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50') || 50, 1), 500);
-        const wsId = url.searchParams.get('workspace_id');
 
         // ETL installs keep posts in silver.posts; otherwise use the core posts table
         const source = await hashtagPostSource();
@@ -1458,12 +1461,9 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
         // Only apply platform filter if workspace is specified
         let platformFilter = '';
         const filterParams: any[] = [];
-        if (wsId) {
-          const scope = await resolveWorkspaceScope(url);
-          if (scope.hasSocialMedia && scope.socialPlatforms.length > 0) {
-            platformFilter = `AND ${source.platformColumn} = ANY($1)`;
-            filterParams.push(scope.socialPlatforms);
-          }
+        if (scope?.hasSocialMedia && scope.socialPlatforms.length > 0) {
+          platformFilter = `AND ${source.platformColumn} = ANY($1)`;
+          filterParams.push(scope.socialPlatforms);
         }
         const limitParam = `$${filterParams.length + 1}`;
 
