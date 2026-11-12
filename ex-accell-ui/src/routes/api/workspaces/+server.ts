@@ -18,24 +18,24 @@ export const GET: RequestHandler = async ({ url }) => {
   try {
     const workspaceId = url.searchParams.get('id');
     const projectId = url.searchParams.get('project_id');
-    if ((workspaceId && Number.isNaN(parseInt(workspaceId))) || (projectId && Number.isNaN(parseInt(projectId)))) {
-      return apiFail('id and project_id must be whole numbers', 400);
-    }
+    const workspaceIdNum = parseResourceId(workspaceId);
+    const projectIdNum = parseResourceId(projectId);
+    if (workspaceIdNum === 'invalid' || projectIdNum === 'invalid') return apiFail('id and project_id must be whole numbers', 400);
 
-    if (workspaceId) {
-      const workspace = await projectsDb.getWorkspaceById(parseInt(workspaceId));
+    if (workspaceIdNum !== null) {
+      const workspace = await projectsDb.getWorkspaceById(workspaceIdNum);
       if (!workspace) return apiFail('Workspace not found', 404);
-      const dataSources = await projectsDb.getWorkspaceDataSources(parseInt(workspaceId));
+      const dataSources = await projectsDb.getWorkspaceDataSources(workspaceIdNum);
       const detailed = { ...workspace, dataSources };
       return apiOk(detailed, { workspace: detailed });
     }
 
-    if (projectId) {
-      const workspaces = await projectsDb.getWorkspacesByProject(parseInt(projectId));
+    if (projectIdNum !== null) {
+      const workspaces = await projectsDb.getWorkspacesByProject(projectIdNum);
       return apiOk(workspaces, { workspaces });
     }
 
-    return apiFail('workspace_id or project_id required', 400);
+    return apiFail('id or project_id required', 400);
   } catch (error) {
     return apiServerError('GET /api/workspaces', error, 'Failed to load workspaces');
   }

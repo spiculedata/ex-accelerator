@@ -1,6 +1,7 @@
 // Dataset API Endpoints
 // RESTful API for managing datasets, permissions, and workspace associations
 
+import { parseResourceId } from '$lib/server/auth/access';
 import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
 import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
@@ -33,11 +34,12 @@ export const GET: RequestHandler = async ({ url }) => {
     const userEmail = url.searchParams.get('user_email') || undefined;
     const workspaceId = url.searchParams.get('workspace_id');
     const search = url.searchParams.get('search');
-    if (workspaceId && !Number.isInteger(Number(workspaceId))) return apiFail('workspace_id must be a whole number', 400);
+    const workspaceIdNum = parseResourceId(workspaceId);
+    if (workspaceIdNum === 'invalid') return apiFail('workspace_id must be a whole number', 400);
 
     // If workspace_id is provided, get datasets for that workspace
-    if (workspaceId) {
-      const datasets = await datasetsDb.getWorkspaceDatasets(Number(workspaceId));
+    if (workspaceIdNum !== null) {
+      const datasets = await datasetsDb.getWorkspaceDatasets(workspaceIdNum);
       return apiOk(datasets, { datasets, count: datasets.length });
     }
 
@@ -120,6 +122,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!workspace_id || !dataset_id || !addedBy) {
         return apiFail('Missing required fields: workspace_id, dataset_id', 400);
       }
+      if (typeof parseResourceId(dataset_id) !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
       // Admins may use any dataset; everyone else needs access to it
       const isAdmin = locals.user?.role === 'admin';
@@ -145,16 +148,19 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return apiFail('Only administrators can grant dataset access', 403);
       }
 
+      const expiresAt = expires_at ? new Date(expires_at) : null;
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) return apiFail('expires_at must be a date', 400);
       if (!dataset_id || !user_email) {
         return apiFail('Missing required fields: dataset_id, user_email', 400);
       }
+      if (typeof parseResourceId(dataset_id) !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
       const permission = await datasetsDb.grantDatasetPermission(
         dataset_id,
         user_email,
         access_level || 'read',
         locals.user.email,
-        expires_at ? new Date(expires_at) : null
+        expiresAt
       );
 
       return apiOk(permission, { permission, message: 'Permission granted successfully' });
@@ -176,7 +182,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
  * - dataset_id: Dataset ID (required)
  * - user_email: User email (for revoke_permission)
  */
-export const DELETE: RequestHandler = async ({ url }) => {
+export const DELETE: RequestHandler = async ({ url, locals }) => {
   try {
     const action = url.searchParams.get('action');
     const datasetId = url.searchParams.get('dataset_id');
@@ -185,8 +191,8 @@ export const DELETE: RequestHandler = async ({ url }) => {
       return apiFail('Missing required parameter: dataset_id', 400);
     }
 
-    const datasetIdNum = Number(datasetId);
-    if (!Number.isInteger(datasetIdNum)) return apiFail('dataset_id must be a whole number', 400);
+    const datasetIdNum = parseResourceId(datasetId);
+    if (typeof datasetIdNum !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
     if (action === 'unlink') {
       const workspaceId = url.searchParams.get('workspace_id');
@@ -195,11 +201,14 @@ export const DELETE: RequestHandler = async ({ url }) => {
         return apiFail('Missing required parameter: workspace_id', 400);
       }
 
-      if (!Number.isInteger(Number(workspaceId))) return apiFail('workspace_id must be a whole number', 400);
-      await datasetsDb.unlinkDatasetFromWorkspace(Number(workspaceId), datasetIdNum);
+      const workspaceIdNum = parseResourceId(workspaceId);
+      if (typeof workspaceIdNum !== 'number') return apiFail('workspace_id must be a whole number', 400);
+      await datasetsDb.unlinkDatasetFromWorkspace(workspaceIdNum, datasetIdNum);
 
       return apiOk(null, { message: 'Dataset unlinked from workspace successfully' });
     } else if (action === 'revoke_permission') {
+      // Like granting access, revoking it is an administrator action
+      if (locals.user?.role !== 'admin') return apiFail('Only administrators can revoke dataset access', 403);
       const userEmail = url.searchParams.get('user_email');
 
       if (!userEmail) {

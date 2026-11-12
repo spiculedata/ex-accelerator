@@ -114,6 +114,7 @@ describe('workspaces envelope', () => {
 
     expect((await get('')).status).toBe(400);
     expect((await get('?id=abc')).status).toBe(400);
+    expect((await get('?id=4abc')).status).toBe(400);
 
     getWorkspaceById.mockResolvedValue(null);
     expect(await (await get('?id=9')).json()).toEqual({ success: false, data: null, error: 'Workspace not found' });

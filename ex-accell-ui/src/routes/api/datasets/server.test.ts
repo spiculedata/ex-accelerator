@@ -95,7 +95,7 @@ describe('POST /api/datasets action=link and project membership', () => {
 
 describe('datasets envelope', () => {
   const get = (query = '') => GET({ url: new URL(`http://localhost/api/datasets${query}`) } as never);
-  const del = (query: string) => DELETE({ url: new URL(`http://localhost/api/datasets${query}`) } as never);
+  const del = (query: string, role: Role = 'admin') => DELETE({ url: new URL(`http://localhost/api/datasets${query}`), locals: { user: user(role) } } as never);
 
   it('GET returns the datasets in data and the legacy keys', async () => {
     db.getDatasets.mockResolvedValue([{ id: 1 }]);
@@ -153,11 +153,27 @@ describe('datasets envelope', () => {
     expect(await (await del('?action=revoke_permission&dataset_id=2&user_email=a@b.c')).json()).toMatchObject({ success: true });
     expect(db.revokeDatasetPermission).toHaveBeenCalledWith(2, 'a@b.c');
 
-    for (const query of ['', '?action=unlink&dataset_id=x', '?action=unlink&dataset_id=2', '?action=unlink&dataset_id=2&workspace_id=x', '?action=nope&dataset_id=2']) {
+    for (const query of ['', '?action=unlink&dataset_id=x', '?action=unlink&dataset_id=2abc&workspace_id=4', '?action=unlink&dataset_id=1e3&workspace_id=4', '?action=unlink&dataset_id=2', '?action=unlink&dataset_id=2&workspace_id=x', '?action=nope&dataset_id=2']) {
       const response = await del(query);
       expect(response.status, query).toBe(400);
       expect(await response.json()).toMatchObject({ success: false, data: null });
     }
+  });
+
+  it('DELETE refuses a non-admin who tries to revoke dataset access, as granting already does', async () => {
+    const response = await del('?action=revoke_permission&dataset_id=2&user_email=a@b.c', 'user');
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ success: false, data: null });
+    expect(db.revokeDatasetPermission).not.toHaveBeenCalled();
+  });
+
+  it('POST refuses a non-numeric dataset_id and an unreadable expires_at with 400, not a database error', async () => {
+    expect((await call({ action: 'link', workspace_id: 4, dataset_id: 'abc' }, user('admin'))).status).toBe(400);
+    expect((await call({ action: 'grant_permission', dataset_id: 'abc', user_email: 'a@b.c' }, user('admin'))).status).toBe(400);
+    expect((await call({ action: 'grant_permission', dataset_id: 2, user_email: 'a@b.c', expires_at: 'someday' }, user('admin'))).status).toBe(400);
+    expect(db.linkDatasetToWorkspace).not.toHaveBeenCalled();
+    expect(db.grantDatasetPermission).not.toHaveBeenCalled();
   });
 
   it('DELETE returns a generic 500 when the database fails', async () => {

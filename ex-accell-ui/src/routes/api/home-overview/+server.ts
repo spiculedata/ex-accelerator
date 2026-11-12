@@ -3,7 +3,7 @@
 // projects with sparklines/sentiment/anomalies, activity feed, summary stats
 
 import { visibleProjectIds } from '$lib/server/auth/accessGuard';
-import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
+import { apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';

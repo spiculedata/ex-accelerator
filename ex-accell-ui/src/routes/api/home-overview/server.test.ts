@@ -62,6 +62,8 @@ describe('GET /api/home-overview envelope', () => {
   it('returns the payload in data and the legacy keys', async () => {
     const body = await (await call()).json();
 
+    expect(body.success).toBe(true);
+    expect(body.data.projects).toHaveLength(1);
     expect(body.data.projects).toEqual(body.projects);
     expect(body.data.summary).toEqual(body.summary);
   });

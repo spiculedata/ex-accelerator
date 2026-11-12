@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
     if (!datasets || datasets.length === 0) {
       const empty = { types: [], platforms: [], recordCount: 0, datasetCount: 0, lastSync: null };
-      return apiOk({ summary: empty }, { summary: empty });
+      return apiOk(empty, { summary: empty });
     }
 
     // Extract unique dataset types
@@ -53,7 +53,7 @@ export const GET: RequestHandler = async ({ params }) => {
     }
 
     const summary = { types, platforms, recordCount, datasetCount: datasets.length, lastSync };
-    return apiOk({ summary }, { summary });
+    return apiOk(summary, { summary });
   } catch (error) {
     return apiServerError('GET /api/workspaces/[id]/dataset-summary', error, 'Failed to retrieve dataset summary');
   }

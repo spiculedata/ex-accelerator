@@ -22,7 +22,7 @@ describe('GET /api/workspaces/[id]/dataset-summary', () => {
 
     expect(body.success).toBe(true);
     expect(body.summary).toMatchObject({ types: ['social_media'], platforms: ['telegram', 'bluesky'], recordCount: 15, datasetCount: 2, lastSync: 'Just now' });
-    expect(body.data.summary).toEqual(body.summary);
+    expect(body.data).toEqual(body.summary);
   });
 
   it('adds record counts that the database returns as strings and treats a missing count as zero', async () => {
@@ -44,7 +44,7 @@ describe('GET /api/workspaces/[id]/dataset-summary', () => {
 
     const body = await (await get()).json();
 
-    expect(body.data.summary).toEqual({ types: [], platforms: [], recordCount: 0, datasetCount: 0, lastSync: null });
+    expect(body.data).toEqual({ types: [], platforms: [], recordCount: 0, datasetCount: 0, lastSync: null });
   });
 
   it('refuses a non-numeric id with a failure envelope', async () => {
