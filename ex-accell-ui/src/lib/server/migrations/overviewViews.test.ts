@@ -3,7 +3,7 @@ import { bundledMigrations } from './files';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
 
 describe('overview views migration', () => {
-  const migration = bundledMigrations().find((m) => m.name === '0007_overview_views_linked_datasets');
+  const migration = bundledMigrations().find((m) => m.name === '0008_overview_views_linked_datasets');
 
   it('is shipped after the baseline migrations that created the views', () => {
     expect(migration).toBeDefined();
