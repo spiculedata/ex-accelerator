@@ -4,6 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
+# shellcheck source=jupyter-env.sh
 source "$SCRIPT_DIR/jupyter-env.sh"
 
 echo "JupyterLab: $JUPYTER_URL/?token=$JUPYTER_TOKEN"

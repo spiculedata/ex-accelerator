@@ -14,6 +14,7 @@ poetry install
 # and is not repeated here.
 
 # Shared token, origin and launch settings (also checks that `npm run jupyter:bootstrap` has run)
+# shellcheck source=jupyter-env.sh
 source "$SCRIPT_DIR/jupyter-env.sh"
 
 # Start Jupyter Lab in the background, and stop it however this script ends

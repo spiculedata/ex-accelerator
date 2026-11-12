@@ -24,6 +24,7 @@ if [ ! -f "$JUPYTER_CONFIG_DIR/jupyter_lab_config.py" ]; then
     exit 1
 fi
 
+# shellcheck disable=SC2034  # used by the scripts that source this file
 # The same command everywhere: `"${JUPYTER_LAB_CMD[@]}"`, with & or exec as the caller needs
 JUPYTER_LAB_CMD=(poetry run jupyter lab "--port=$JUPYTER_PORT" --ServerApp.ip=127.0.0.1 --ServerApp.port_retries=0 --no-browser)
 
@@ -34,8 +35,8 @@ jupyter_is_ready() {
 
 # Polls for up to ~30 seconds so a slow start is not reported as a failure
 jupyter_wait_until_ready() {
-    local attempt
-    for attempt in $(seq 1 30); do
+    local _
+    for _ in $(seq 1 30); do
         jupyter_is_ready && return 0
         sleep 1
     done
