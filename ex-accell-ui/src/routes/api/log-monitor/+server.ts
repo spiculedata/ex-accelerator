@@ -157,7 +157,7 @@ export const POST: RequestHandler = async ({ request }) => {
       const parsed = parseLogLine(line);
       if (parsed) {
         await updateJobFromLogPattern(parsed, []);
-        results.push({ line, parsed });
+        results.push({ parsed });
       }
     }
     

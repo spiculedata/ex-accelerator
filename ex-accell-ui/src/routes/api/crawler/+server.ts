@@ -9,13 +9,6 @@ const DAPR_URL = `http://localhost:${DAPR_HTTP_PORT}`;
 const MAX_CRAWL_BODY_BYTES = 64 * 1024;
 const MAX_URLS = 500;
 
-/** Drops the keys the envelope owns, so an upstream reply cannot overwrite `success`, `data` or `error`. */
-function withoutEnvelopeKeys(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const { success: _success, data: _data, error: _error, ...rest } = value as Record<string, unknown>;
-  return rest;
-}
-
 /**
  * POST /api/crawler — schedule a crawl job
  */
@@ -52,9 +45,8 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     if (response.ok) {
-      const result = withoutEnvelopeKeys(await response.json().catch(() => ({})));
       const method = 'service-invocation';
-      return apiOk({ jobName, method, result }, { jobName, method, result });
+      return apiOk({ jobName, method }, { jobName, method });
     }
 
     // Fallback: try Dapr Jobs API
@@ -85,8 +77,7 @@ export const GET: RequestHandler = async () => {
     });
 
     if (response.ok) {
-      const payload = { ...withoutEnvelopeKeys(await response.json().catch(() => ({}))), status: 'running' };
-      return apiOk(payload, payload);
+      return apiOk({ status: 'running' }, { status: 'running' });
     }
     return apiOk({ status: 'unavailable' }, { status: 'unavailable' });
   } catch {

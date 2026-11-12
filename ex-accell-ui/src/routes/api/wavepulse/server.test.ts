@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET, POST } from './+server';
 
 const fetchMock = vi.fn();
-const upstream = (body: unknown) => Promise.resolve({ json: async () => body });
+const upstream = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
 const get = (query: string) => GET({ url: new URL(`http://localhost/api/wavepulse${query}`) } as never);
 const post = (body: unknown) =>
   POST({ request: new Request('http://localhost/api/wavepulse', { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }) } as never);
@@ -56,13 +56,31 @@ describe('GET /api/wavepulse', () => {
     expect(await response.json()).toEqual({ success: false, data: null, error: 'WavePulse service unavailable' });
   });
 
-  it('is a 502 with a generic message when WavePulse reports an error', async () => {
+  it('is a 502 with a generic message when WavePulse reports an error that looks like a trace or path', async () => {
     fetchMock.mockReturnValue(upstream({ error: 'traceback at /app/main.py line 3' }));
 
     const response = await get('?action=status');
 
     expect(response.status).toBe(502);
-    expect(JSON.stringify(await response.json())).not.toContain('traceback');
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'WavePulse reported an error' });
+  });
+
+  it('passes on a short plain-text reason so the user can act on it', async () => {
+    fetchMock.mockReturnValue(upstream({ error: 'No streams configured' }));
+
+    const response = await post({ action: 'start', config: {} });
+
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toBe('No streams configured');
+  });
+
+  it('treats a non-2xx reply with a FastAPI detail body as a failure, not a success', async () => {
+    fetchMock.mockReturnValue(Promise.resolve({ ok: false, status: 422, json: async () => ({ detail: [{ msg: 'x' }] }) }));
+
+    const response = await post({ action: 'start', config: {} });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'WavePulse reported an error' });
   });
 });
 

@@ -23,6 +23,7 @@ describe('POST /api/log-monitor', () => {
 
     expect(body).toMatchObject({ success: true, processed: 1, data: { processed: 1 } });
     expect(body.results[0].parsed.action).toBe('start');
+    expect(JSON.stringify(body)).not.toContain('Raw data');
   });
 
   it('marks the newest active job running on a start line', async () => {
@@ -42,6 +43,15 @@ describe('POST /api/log-monitor', () => {
       expect(await response.json()).toMatchObject({ success: false, data: null, error: expect.any(String) });
     }
   );
+});
+
+describe('POST /api/log-monitor size limit', () => {
+  it('refuses an oversized body with a 413 failure envelope', async () => {
+    const big = await post({ logLines: ['x'.repeat(600 * 1024)] });
+
+    expect(big.status).toBe(413);
+    expect(await big.json()).toMatchObject({ success: false, data: null });
+  });
 });
 
 describe('GET /api/log-monitor', () => {

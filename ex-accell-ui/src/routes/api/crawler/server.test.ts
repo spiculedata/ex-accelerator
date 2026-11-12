@@ -14,13 +14,15 @@ beforeEach(() => {
 
 describe('POST /api/crawler', () => {
   it('schedules through service invocation and returns the envelope', async () => {
-    fetchMock.mockResolvedValue(reply(true, { accepted: true }));
+    fetchMock.mockResolvedValue(reply(true, { accepted: true, internalHost: 'crawler-7:9000' }));
 
     const response = await post({ platform: 'telegram', urls: ['@a'], crawlId: 'c1' });
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true, jobName: 'c1', method: 'service-invocation', result: { accepted: true }, data: { jobName: 'c1', method: 'service-invocation', result: { accepted: true } } });
+    expect(body).toEqual({ success: true, jobName: 'c1', method: 'service-invocation', data: { jobName: 'c1', method: 'service-invocation' } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ platform: 'telegram', urls: ['@a'], crawlId: 'c1', maxPosts: 1000 });
   });
 
   it('falls back to the Dapr jobs API and does not echo the job config or the API key back', async () => {
@@ -33,6 +35,7 @@ describe('POST /api/crawler', () => {
     expect(text).toContain('dapr-jobs');
     expect(text).not.toContain('SECRET-KEY');
     expect(fetchMock.mock.calls[1][0]).toContain('/v1.0-alpha1/jobs/c2');
+    expect(JSON.parse(JSON.parse(fetchMock.mock.calls[1][1].body).data.value)).toMatchObject({ platform: 'youtube', urls: ['chan'], youtubeApiKey: 'SECRET-KEY' });
   });
 
   it.each([['not json'], ['[1]'], [{ urls: ['@a'] }], [{ platform: 'telegram' }], [{ platform: 'telegram', urls: [] }], [{ platform: 'telegram', urls: [5] }], [{ platform: 7, urls: ['@a'] }]])(
@@ -66,12 +69,12 @@ describe('POST /api/crawler', () => {
 });
 
 describe('GET /api/crawler', () => {
-  it('reports running and cannot be overwritten by the crawler reply', async () => {
-    fetchMock.mockResolvedValue(reply(true, { status: 'weird', success: false, version: '1' }));
+  it('reports running and sends nothing else from the crawler health reply', async () => {
+    fetchMock.mockResolvedValue(reply(true, { status: 'weird', success: false, version: '1', host: 'crawler-7' }));
 
     const body = await (await GET({} as never)).json();
 
-    expect(body).toMatchObject({ success: true, status: 'running', version: '1', data: { status: 'running', version: '1' } });
+    expect(body).toEqual({ success: true, status: 'running', data: { status: 'running' } });
   });
 
   it.each([
