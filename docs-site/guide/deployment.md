@@ -62,6 +62,11 @@ headers to its responses, and `Strict-Transport-Security` (180 days, including s
 proxy add `X-Content-Type-Options: nosniff` for them too. Only enable HTTPS-only cookies on a host
 whose subdomains are all served over HTTPS, because browsers will remember the HSTS policy.
 
+The Jupyter container runs as an unprivileged user (uid and gid 1000), not as root, so the folder it mounts
+(`$DATA_DIR/notebooks`, `/data/notebooks` by default) must be writable by that user:
+`sudo mkdir -p /data/notebooks && sudo chown -R 1000:1000 /data/notebooks`. If you ran an earlier, root-owned image, run the
+`chown` on the existing folder before upgrading; otherwise the container stops and says so.
+
 Do not publish the Postgres, Redis, Ollama or Jupyter ports to the internet. The compose file maps
 them to the host for convenience; bind them to `127.0.0.1` or remove the mappings on a server.
 
