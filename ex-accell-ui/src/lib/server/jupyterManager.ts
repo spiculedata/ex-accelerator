@@ -1,6 +1,9 @@
 import type { ChildProcess, SpawnOptions } from 'child_process';
 import { resolve } from 'node:path';
+import { createLogger } from '$lib/utils/logger';
 import { buildJupyterLaunch, resolveExternalJupyter } from './jupyter';
+
+const log = createLogger('jupyter');
 
 export type SpawnFn = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 
@@ -115,12 +118,12 @@ export function createJupyterManager(options: ManagerOptions) {
 			if (store.read()?.pid === child.pid) store.clear();
 		};
 		child.on('error', (error: Error) => {
-			console.error('Failed to start JupyterLab:', error);
+			log.error('Failed to start JupyterLab', { message: error.message });
 			failure = error;
 			forgetIfMine();
 		});
 		child.on('exit', (code: number | null) => {
-			console.log(`JupyterLab process exited with code ${code}`);
+			log.info(`JupyterLab process exited with code ${code}`);
 			hasExited = true;
 			forgetIfMine();
 		});
