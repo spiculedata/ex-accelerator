@@ -32,7 +32,13 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({ success: true, data: emptyPage });
   }
 
-  const scope = await resolveWorkspaceScope(url);
+  let scope: Awaited<ReturnType<typeof resolveWorkspaceScope>>;
+  try {
+    scope = await resolveWorkspaceScope(url);
+  } catch (error) {
+    // Never fall back to unscoped posts when the workspace could not be resolved
+    return queryErrorResponse('Post search', error, emptyPage);
+  }
   if (scope && !scope.hasSocialMedia) {
     return json({ success: true, data: emptyPage });
   }

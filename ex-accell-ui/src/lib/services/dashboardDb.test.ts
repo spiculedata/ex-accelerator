@@ -139,7 +139,7 @@ describe('getDataSources', () => {
     const sources = await dashboardDb.getDataSources();
 
     expect(sources[0].platform).toBe('Twitter');
-    expect(warn.mock.calls.some((args) => String(args[1]).includes('Could not load dataset names'))).toBe(true);
+    expect(warn.mock.calls.flat().join(' ')).toContain('Could not load dataset names');
     warn.mockRestore();
   });
 

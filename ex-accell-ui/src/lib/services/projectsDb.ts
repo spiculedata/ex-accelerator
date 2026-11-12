@@ -70,8 +70,8 @@ class ProjectsDatabase {
       const rows = await postgresPool.query<Project>('SELECT * FROM project_overview ORDER BY created_at DESC');
       return rows;
     } catch (error) {
-      console.error('Error fetching projects:', error);
       if (isMissingTable(error)) return [];
+      console.error('Error fetching projects:', error);
       // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
@@ -186,8 +186,8 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
-      console.error('Error fetching workspaces:', error);
       if (isMissingTable(error)) return [];
+      console.error('Error fetching workspaces:', error);
       // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
@@ -315,8 +315,8 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
-      console.error('Error fetching project members:', error);
       if (isMissingTable(error)) return [];
+      console.error('Error fetching project members:', error);
       // Any other failure is not an empty result: let the route answer 500
       throw error;
     }
@@ -352,8 +352,8 @@ class ProjectsDatabase {
       );
       return rows;
     } catch (error) {
-      console.error('Error fetching data sources:', error);
       if (isMissingTable(error)) return [];
+      console.error('Error fetching data sources:', error);
       // Any other failure is not an empty result: let the route answer 500
       throw error;
     }

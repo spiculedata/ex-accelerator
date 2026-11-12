@@ -103,8 +103,9 @@ export async function resolveWorkspaceScopeById(workspaceId: number): Promise<Wo
       gdeltDateRange
     };
   } catch (error) {
+    // null means "no workspace filter": a failure must not widen the data a caller sees
     console.error('Failed to resolve workspace scope:', error);
-    return null;
+    throw error;
   }
 }
 

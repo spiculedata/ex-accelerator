@@ -167,4 +167,13 @@ describe('GET /api/posts', () => {
 
     expect(body.data.limit).toBe(25);
   });
+
+  it('answers an error, not unscoped posts, when the workspace cannot be resolved', async () => {
+    resolveWorkspaceScope.mockRejectedValue(new Error('connection refused'));
+
+    const response = await call('?workspace_id=3');
+
+    expect(response.status).toBe(500);
+    expect(query).not.toHaveBeenCalled();
+  });
 });
