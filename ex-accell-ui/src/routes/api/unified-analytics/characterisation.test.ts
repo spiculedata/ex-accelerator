@@ -70,8 +70,8 @@ async function record(type: string, query: string, setup: () => void = () => {})
 const SHAPES: Array<[string, string, () => void]> = [
   ['plain', '', () => {}],
   ['rich', RICH_QUERY, () => {}],
-  ['social workspace', 'workspace_id=7&date_start=2024-01-01&date_end=2024-01-31&platform=x&sentiment=negative', () => resolveWorkspaceScope.mockResolvedValue(SOCIAL_SCOPE)],
-  ['empty workspace', 'workspace_id=7&keywords=alpha', () => resolveWorkspaceScope.mockResolvedValue(EMPTY_SCOPE)],
+  ['social workspace', 'workspace_id=7&date_start=2024-01-01&date_end=2024-01-31&platform=x&sentiment=negative', () => resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: SOCIAL_SCOPE })],
+  ['empty workspace', 'workspace_id=7&keywords=alpha', () => resolveWorkspaceScope.mockResolvedValue({ kind: 'scoped', scope: EMPTY_SCOPE })],
   ['platforms switched off', 'platforms=', () => {}],
   ['platforms listed', 'platforms=Telegram,X', () => {}],
   ['bad date', 'date_start=nope', () => {}],
@@ -85,7 +85,7 @@ describe('unified-analytics characterisation', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-03-01T00:00:00Z'));
     resolveWorkspaceScope.mockReset();
-    resolveWorkspaceScope.mockResolvedValue(null);
+    resolveWorkspaceScope.mockResolvedValue({ kind: 'none' });
     healthCheck.mockReset();
     healthCheck.mockResolvedValue(true);
     getPoolStats.mockReset();
@@ -111,6 +111,13 @@ describe('unified-analytics characterisation', () => {
 
   it('answers a request with no type like an unknown type', async () => {
     expect(await record('', '')).toMatchSnapshot();
+  });
+
+  it('answers 404 for a workspace that does not exist, whatever the type', async () => {
+    const result = await record('sample-posts', 'workspace_id=99', () => resolveWorkspaceScope.mockResolvedValue({ kind: 'missing', workspaceId: 99 }));
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({ success: false, data: null, error: 'Workspace not found' });
+    expect(result.queries).toEqual([]);
   });
 
   it('serves an unknown type with an empty 200 envelope and no database call', async () => {

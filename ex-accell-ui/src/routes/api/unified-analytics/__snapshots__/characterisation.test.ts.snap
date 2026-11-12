@@ -5479,72 +5479,10 @@ exports[`unified-analytics characterisation > hashtag-analysis > database error 
 exports[`unified-analytics characterisation > hashtag-analysis > empty workspace 1`] = `
 {
   "body": {
-    "data": {
-      "cooccurrence": [
-        {
-          "actor": "A",
-          "avg_goldstein": -2,
-          "avg_tone": 2,
-          "cnt": 4,
-          "content": "hello #tag world",
-          "count": 3,
-          "created_at": "2024-01-02T00:00:00Z",
-          "engagement_rate": 1.5,
-          "eventrootcode": "14",
-          "id": 1,
-          "keyword": "k",
-          "mentions": 2,
-          "platform": "telegram",
-          "present": true,
-          "sentiment_category": "Positive",
-          "text": "hello world",
-          "total_events": 5,
-          "unique_actors": 3,
-        },
-      ],
-      "hashtags": [
-        {
-          "actor": "A",
-          "avg_goldstein": -2,
-          "avg_tone": 2,
-          "cnt": 4,
-          "content": "hello #tag world",
-          "count": 3,
-          "created_at": "2024-01-02T00:00:00Z",
-          "engagement_rate": 1.5,
-          "eventrootcode": "14",
-          "id": 1,
-          "keyword": "k",
-          "mentions": 2,
-          "platform": "telegram",
-          "present": true,
-          "sentiment_category": "Positive",
-          "text": "hello world",
-          "total_events": 5,
-          "unique_actors": 3,
-        },
-      ],
-      "totalHashtags": 1,
-      "totalPosts": 0,
-    },
+    "data": [],
     "success": true,
   },
-  "queries": [
-    [
-      "SELECT to_regclass('silver.posts') IS NOT NULL AS present",
-      [],
-    ],
-    [
-      "WITH hashtag_extract AS ( SELECT unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag, post_id as post_id, media_type as media_type FROM silver.posts WHERE content IS NOT NULL AND content LIKE '%#%' ) SELECT lower(hashtag) as hashtag, COUNT(*) as count, COUNT(DISTINCT post_id) as post_count, array_agg(DISTINCT media_type) as platforms FROM hashtag_extract GROUP BY lower(hashtag) HAVING COUNT(*) >= 2 ORDER BY count DESC LIMIT $1",
-      [
-        50,
-      ],
-    ],
-    [
-      "WITH hashtag_extract AS ( SELECT post_id as post_id, unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag FROM silver.posts WHERE content IS NOT NULL AND content LIKE '%#%' ), pairs AS ( SELECT a.hashtag as h1, b.hashtag as h2 FROM hashtag_extract a JOIN hashtag_extract b ON a.post_id = b.post_id AND lower(a.hashtag) < lower(b.hashtag) ) SELECT lower(h1) as hashtag1, lower(h2) as hashtag2, COUNT(*) as co_count FROM pairs GROUP BY lower(h1), lower(h2) HAVING COUNT(*) >= 2 ORDER BY co_count DESC LIMIT 20",
-      [],
-    ],
-  ],
+  "queries": [],
   "status": 200,
 }
 `;
@@ -5744,17 +5682,73 @@ exports[`unified-analytics characterisation > hashtag-analysis > reversed dates 
 exports[`unified-analytics characterisation > hashtag-analysis > rich 1`] = `
 {
   "body": {
-    "data": null,
-    "error": "Query failed",
-    "success": false,
+    "data": {
+      "cooccurrence": [
+        {
+          "actor": "A",
+          "avg_goldstein": -2,
+          "avg_tone": 2,
+          "cnt": 4,
+          "content": "hello #tag world",
+          "count": 3,
+          "created_at": "2024-01-02T00:00:00Z",
+          "engagement_rate": 1.5,
+          "eventrootcode": "14",
+          "id": 1,
+          "keyword": "k",
+          "mentions": 2,
+          "platform": "telegram",
+          "present": true,
+          "sentiment_category": "Positive",
+          "text": "hello world",
+          "total_events": 5,
+          "unique_actors": 3,
+        },
+      ],
+      "hashtags": [
+        {
+          "actor": "A",
+          "avg_goldstein": -2,
+          "avg_tone": 2,
+          "cnt": 4,
+          "content": "hello #tag world",
+          "count": 3,
+          "created_at": "2024-01-02T00:00:00Z",
+          "engagement_rate": 1.5,
+          "eventrootcode": "14",
+          "id": 1,
+          "keyword": "k",
+          "mentions": 2,
+          "platform": "telegram",
+          "present": true,
+          "sentiment_category": "Positive",
+          "text": "hello world",
+          "total_events": 5,
+          "unique_actors": 3,
+        },
+      ],
+      "totalHashtags": 1,
+      "totalPosts": 0,
+    },
+    "success": true,
   },
   "queries": [
     [
       "SELECT to_regclass('silver.posts') IS NOT NULL AS present",
       [],
     ],
+    [
+      "WITH hashtag_extract AS ( SELECT unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag, post_id as post_id, media_type as media_type FROM silver.posts WHERE content IS NOT NULL AND content LIKE '%#%' ) SELECT lower(hashtag) as hashtag, COUNT(*) as count, COUNT(DISTINCT post_id) as post_count, array_agg(DISTINCT media_type) as platforms FROM hashtag_extract GROUP BY lower(hashtag) HAVING COUNT(*) >= 2 ORDER BY count DESC LIMIT $1",
+      [
+        7,
+      ],
+    ],
+    [
+      "WITH hashtag_extract AS ( SELECT post_id as post_id, unnest(regexp_matches(content, '#([A-Za-z0-9_]+)', 'g')) as hashtag FROM silver.posts WHERE content IS NOT NULL AND content LIKE '%#%' ), pairs AS ( SELECT a.hashtag as h1, b.hashtag as h2 FROM hashtag_extract a JOIN hashtag_extract b ON a.post_id = b.post_id AND lower(a.hashtag) < lower(b.hashtag) ) SELECT lower(h1) as hashtag1, lower(h2) as hashtag2, COUNT(*) as co_count FROM pairs GROUP BY lower(h1), lower(h2) HAVING COUNT(*) >= 2 ORDER BY co_count DESC LIMIT 20",
+      [],
+    ],
   ],
-  "status": 500,
+  "status": 200,
 }
 `;
 
@@ -13687,18 +13681,9 @@ exports[`unified-analytics characterisation > trigrams > empty workspace 1`] = `
 {
   "body": {
     "data": [],
-    "meta": {
-      "scannedPosts": 1,
-      "truncated": false,
-    },
     "success": true,
   },
-  "queries": [
-    [
-      "SELECT p.id, p.content AS text, ds.platform, p.created_at, (SELECT sc.sentiment_category FROM sentiment_classifications sc WHERE sc.post_id = p.id ORDER BY sc.id DESC LIMIT 1) AS sentiment_category, COALESCE((SELECT pe.engagement_rate FROM post_engagement pe WHERE pe.post_id = p.id ORDER BY pe.id DESC LIMIT 1), 0) AS engagement_rate FROM posts p JOIN data_sources ds ON ds.id = p.data_source_id WHERE p.content IS NOT NULL AND p.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days' ORDER BY p.created_at DESC LIMIT 20000",
-      [],
-    ],
-  ],
+  "queries": [],
   "status": 200,
 }
 `;
