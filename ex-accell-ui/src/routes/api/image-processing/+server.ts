@@ -4,6 +4,7 @@ import { imageUrlProblem } from '$lib/server/imageUrl';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
+import { readJsonObject } from '$lib/server/apiResponse';
 import { queryErrorResponse } from '$lib/server/queryErrors';
 import { emptyImageData } from '$lib/server/imageProcessingEmpty';
 
@@ -260,14 +261,12 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (action === 'models') {
-      return json({
-        success: true,
-        tiers: {
+      const tiers = {
           fast: { label: 'Quick Scan', description: 'YOLOv8n + Haar cascade + heuristics (no OCR)', speed: '<1s per image', models: ['YOLOv8n', 'Haar Cascade', 'Heuristic'] },
           standard: { label: 'Standard Analysis', description: 'YOLOv8s + Haar cascade + CLIP ViT-B/32 + PaddleOCR', speed: '2-5s per image', models: ['YOLOv8s', 'Haar Cascade', 'CLIP ViT-B/32', 'PaddleOCR'] },
           accurate: { label: 'Deep Analysis', description: 'YOLOv8m + RetinaFace + CLIP ViT-B/32 + PaddleOCR', speed: 'Slowest', models: ['YOLOv8m', 'RetinaFace', 'CLIP ViT-B/32', 'PaddleOCR'] }
-        }
-      });
+      };
+      return json({ success: true, tiers, data: { tiers } });
     }
 
     return json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
@@ -283,9 +282,12 @@ export const GET: RequestHandler = async ({ url }) => {
  */
 const DOWNLOAD_TIMEOUT_MS = 30_000;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_REQUEST_BODY_BYTES = 64 * 1024;
 
 export const POST: RequestHandler = async ({ request }) => {
-  const body = await request.json();
+  const parsed = await readJsonObject(request, MAX_REQUEST_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const body = parsed.body as Record<string, any>;
   const { action } = body;
 
   try {
@@ -457,7 +459,7 @@ export const POST: RequestHandler = async ({ request }) => {
       } catch (dbErr: any) {
         console.error('Failed to store image analysis:', dbErr.message);
         analysis._stored = false;
-        analysis._store_error = dbErr.message;
+        analysis._store_error = 'The analysis could not be saved';
       }
 
       return json({

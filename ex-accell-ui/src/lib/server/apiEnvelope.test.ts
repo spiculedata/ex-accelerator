@@ -21,14 +21,14 @@ const SVELTEKIT_ERROR_BASELINE = 0;
 const SVELTEKIT_ERROR = /(?<![.\w])error\(\s*\d{3}/g;
 
 // A non-logging line that reads `err.message`: the text is about to reach the client or the response shape.
-const LEAKED_MESSAGE_BASELINE = 19;
+const LEAKED_MESSAGE_BASELINE = 16;
 const LEAKED_MESSAGE = /\b(?:err|error|e)\??\.message/;
 const LOGGING_LINE = /\b(?:console|log|logger)\.\w+\(/;
 // `x instanceof SomethingError` (not plain Error) names one of our typed errors; `.message ===` and `.test(err.message)` are comparisons, not sends
 const CLIENT_SAFE_LINE = /instanceof (?!Error\b)[A-Z]\w*Error|\.message\s*===|\.test\(\w+\.message\)/;
 
 // Routes whose responses do not mention `success` (or apiOk/apiFail) at all. Exact: remove an entry when the route is migrated.
-const NON_ENVELOPE_ROUTES: string[] = ['gdelt/+server.ts', 'gdelt/mentions/+server.ts', 'health/+server.ts', 'job-monitor/+server.ts'];
+const NON_ENVELOPE_ROUTES: string[] = ['health/+server.ts'];
 
 function routeFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

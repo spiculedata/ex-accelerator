@@ -1,6 +1,8 @@
 // GDELT Mentions API — queries PostgreSQL via pg_duckdb
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { postgresPool } from '$lib/services/postgres';
+
+const MAX_BODY_BYTES = 256 * 1024;
 
 async function fetchMentions(eventIds: number[]) {
 	if (eventIds.length === 0) return [];
@@ -59,45 +61,42 @@ export async function GET({ url }) {
 		const eventId = url.searchParams.get('eventId');
 
 		if (!eventId) {
-			return json({ error: 'Event ID is required' }, { status: 400 });
+			return apiFail('Event ID is required', 400);
 		}
 
 		const eventIdNum = parseInt(eventId);
 		if (isNaN(eventIdNum)) {
-			return json({ error: 'Invalid event ID' }, { status: 400 });
+			return apiFail('Invalid event ID', 400);
 		}
 
 		const mentions = await fetchMentions([eventIdNum]);
-		return json({ mentions, count: mentions.length });
+		return apiOk({ mentions, count: mentions.length }, { mentions, count: mentions.length });
 
 	} catch (err) {
-		console.error('Mentions API Error (GET):', err);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return apiServerError('GET /api/gdelt/mentions', err, 'Internal server error');
 	}
 }
 
 export async function POST({ request }) {
-	try {
-		const body = await request.json();
-		const { eventIds } = body;
+	const parsed = await readJsonObject(request, MAX_BODY_BYTES);
+	if ('failure' in parsed) return parsed.failure;
+	const { eventIds } = parsed.body;
+	if (!eventIds || !Array.isArray(eventIds)) return apiFail('Event IDs array is required', 400);
 
-		if (!eventIds || !Array.isArray(eventIds)) {
-			return json({ error: 'Event IDs array is required' }, { status: 400 });
-		}
+	try {
 
 		const eventIdArray = eventIds.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
 		if (eventIdArray.length === 0) {
-			return json({ error: 'No valid event IDs' }, { status: 400 });
+			return apiFail('No valid event IDs', 400);
 		}
 		if (eventIdArray.length > 1000) {
-			return json({ error: 'Maximum 1000 event IDs allowed' }, { status: 400 });
+			return apiFail('Maximum 1000 event IDs allowed', 400);
 		}
 
 		const mentions = await fetchMentions(eventIdArray);
-		return json({ mentions, count: mentions.length });
+		return apiOk({ mentions, count: mentions.length }, { mentions, count: mentions.length });
 
 	} catch (err) {
-		console.error('Mentions API Error (POST):', err);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return apiServerError('POST /api/gdelt/mentions', err, 'Internal server error');
 	}
 }

@@ -1,5 +1,6 @@
 // GDELT Events API — optimised for map display
 import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import { validateDateParams } from '$lib/server/dateBounds';
 import { isMissingRelationError } from '$lib/server/queryErrors';
 import { postgresPool } from '$lib/services/postgres';
@@ -9,7 +10,7 @@ export async function GET({ url }) {
 		const goldsteinMin = parseFloat(url.searchParams.get('goldsteinMin') || '-10');
 		const goldsteinMax = parseFloat(url.searchParams.get('goldsteinMax') || '10');
 		if (!Number.isFinite(goldsteinMin) || !Number.isFinite(goldsteinMax)) {
-			return json({ error: 'Invalid goldstein scale values' }, { status: 400 });
+			return apiFail('Invalid goldstein scale values', 400);
 		}
 
 		// GDELT days may come as 2026-01-31 or 20260131; both are checked as real days, and a reversed range is refused
@@ -19,7 +20,7 @@ export async function GET({ url }) {
 			if (value) days.set(name, /^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value);
 		}
 		const dateProblem = validateDateParams(days);
-		if (dateProblem) return json({ error: dateProblem }, { status: 400 });
+		if (dateProblem) return apiFail(dateProblem, 400);
 		const dateStart = days.get('dateStart');
 		const dateEnd = days.get('dateEnd');
 
@@ -87,14 +88,13 @@ export async function GET({ url }) {
 			date: typeof row.sqldate === 'bigint' ? Number(row.sqldate) : row.sqldate
 		}));
 
-		return json({ events, count: events.length });
+		return apiOk({ events, count: events.length }, { events, count: events.length });
 
 	} catch (err) {
 		// No gdelt_events table means GDELT has not been loaded: report no events, flagged, not an error
 		if (isMissingRelationError(err)) {
-			return json({ events: [], count: 0, unavailable: true });
+			return json({ success: true, events: [], count: 0, unavailable: true, data: { events: [], count: 0 }, meta: { unavailable: true } });
 		}
-		console.error('GDELT API Error:', err);
-		return json({ error: 'Internal server error' }, { status: 500 });
+		return apiServerError('GET /api/gdelt', err, 'Internal server error');
 	}
 }
