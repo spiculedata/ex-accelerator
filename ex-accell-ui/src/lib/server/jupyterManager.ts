@@ -1,4 +1,5 @@
 import type { ChildProcess, SpawnOptions } from 'child_process';
+import { resolve } from 'node:path';
 import { buildJupyterLaunch, resolveExternalJupyter } from './jupyter';
 
 export type SpawnFn = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
@@ -37,14 +38,40 @@ interface ManagerOptions {
 	pollMs?: number;
 }
 
-// Jupyter and its kernels get only what they need, not the app's secrets (SESSION_SECRET, ADMIN_PASSWORD)
-const ENV_ALLOWLIST = /^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LC_.*|TMPDIR|VIRTUAL_ENV|POETRY_.*|PYTHON.*|DATABASE_URL|PG[A-Z]+|OLLAMA_HOST|JUPYTER_.*)$/;
+/** Raised when the one-time `npm run jupyter:bootstrap` has not run; a setup problem, not a server fault. */
+export class JupyterNotSetUpError extends Error {
+	constructor() {
+		super('Jupyter is not set up yet: run `npm run jupyter:bootstrap` first');
+		this.name = 'JupyterNotSetUpError';
+	}
+}
+
+// Jupyter and its kernels get only what they need, not the app's secrets (SESSION_SECRET, ADMIN_PASSWORD).
+// Beyond the basics that is the database and Ollama settings, plus the proxy, CA bundle and model-cache
+// variables that notebooks need to download packages and models (NLTK, Hugging Face, torch, pip) behind
+// a corporate proxy. Anything else is dropped; set it in the notebook or in .jupyter/ instead.
+const ENV_ALLOWLIST = new RegExp(
+	'^(' +
+		[
+			'PATH|HOME|USER|LOGNAME|SHELL|LANG|LC_.*|TMPDIR|VIRTUAL_ENV|POETRY_.*|PYTHON.*',
+			'DATABASE_URL|PG[A-Z]+|OLLAMA_HOST|JUPYTER_.*',
+			'(?:HTTP|HTTPS|ALL|NO)_PROXY|(?:http|https|all|no)_proxy',
+			'SSL_CERT_FILE|SSL_CERT_DIR|REQUESTS_CA_BUNDLE|CURL_CA_BUNDLE|PIP_CERT',
+			'XDG_CACHE_HOME|XDG_DATA_HOME|XDG_CONFIG_HOME|HF_(?:HOME|HUB_CACHE|ENDPOINT|HUB_OFFLINE)|TRANSFORMERS_(?:CACHE|OFFLINE)|TORCH_HOME|NLTK_DATA'
+		].join('|') +
+		')$'
+);
+
+// Even an allowed prefix (POETRY_*, PYTHON*) can carry credentials, e.g. POETRY_PYPI_TOKEN_X. Anything that
+// looks like a secret is dropped; PGPASSWORD stays because notebooks need it to reach the database.
+const SECRET_LOOKING = /(TOKEN|SECRET|PASSWORD|API_?KEY|HTTP_BASIC|CREDENTIAL)/i;
+const SECRET_EXCEPTIONS = new Set(['PGPASSWORD']);
 
 export function jupyterEnvironment(
 	source: Record<string, string | undefined>,
 	overrides: Record<string, string>
 ): Record<string, string> {
-	const kept = Object.entries(source).filter(([key, value]) => value !== undefined && ENV_ALLOWLIST.test(key));
+	const kept = Object.entries(source).filter(([key, value]) => value !== undefined && ENV_ALLOWLIST.test(key) && (SECRET_EXCEPTIONS.has(key) || !SECRET_LOOKING.test(key)));
 	return { ...(Object.fromEntries(kept) as Record<string, string>), ...overrides };
 }
 
@@ -64,9 +91,9 @@ export function createJupyterManager(options: ManagerOptions) {
 		// If it really is a stuck Jupyter, the relaunch fails fast with a "port in use" message instead.
 		store.clear();
 
-		if (!hasConfig()) throw new Error('Jupyter is not set up yet: run `npm run jupyter:bootstrap` first');
+		if (!hasConfig()) throw new JupyterNotSetUpError();
 
-		const launch = buildJupyterLaunch(env.JUPYTER_ALLOW_ORIGIN || appOrigin);
+		const launch = buildJupyterLaunch(env.JUPYTER_ALLOW_ORIGIN || appOrigin, resolve(cwd, '.jupyter'));
 		const child = spawn('poetry', ['run', 'jupyter', ...launch.args], {
 			cwd,
 			env: jupyterEnvironment(env, launch.env),
@@ -76,7 +103,7 @@ export function createJupyterManager(options: ManagerOptions) {
 		child.unref();
 
 		let failure: Error | null = null;
-		let exitedEarly = false;
+		let hasExited = false;
 		// A stale child must never wipe the record of a newer launch
 		const forgetIfMine = () => {
 			if (store.read()?.pid === child.pid) store.clear();
@@ -88,7 +115,7 @@ export function createJupyterManager(options: ManagerOptions) {
 		});
 		child.on('exit', (code: number | null) => {
 			console.log(`JupyterLab process exited with code ${code}`);
-			exitedEarly = true;
+			hasExited = true;
 			forgetIfMine();
 		});
 
@@ -96,7 +123,7 @@ export function createJupyterManager(options: ManagerOptions) {
 
 		const deadline = Date.now() + readyTimeoutMs;
 		let ready = false;
-		while (!failure && !exitedEarly && !ready && Date.now() < deadline) {
+		while (!failure && !hasExited && !ready && Date.now() < deadline) {
 			ready = await isReady(launch.baseUrl, launch.url);
 			if (!ready) await sleep(pollMs);
 		}
@@ -105,7 +132,7 @@ export function createJupyterManager(options: ManagerOptions) {
 		if (child.pid !== undefined) kill(child.pid);
 		forgetIfMine();
 		if (failure) throw new Error('JupyterLab could not be launched (is Poetry installed?)');
-		if (exitedEarly) throw new Error('JupyterLab exited straight away; port 8888 may already be in use by another Jupyter');
+		if (hasExited) throw new Error('JupyterLab exited straight away; port 8888 may already be in use by another Jupyter');
 		throw new Error('JupyterLab did not become ready in time');
 	}
 

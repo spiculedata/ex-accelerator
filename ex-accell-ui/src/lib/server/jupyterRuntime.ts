@@ -1,6 +1,8 @@
 import { spawn } from 'child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import { jupyterReadinessRequest, tokenFromJupyterUrl } from './jupyter';
+import { killProcessGroup } from './jupyterKill';
 import { createJupyterManager, type LaunchStore, type SavedLaunch } from './jupyterManager';
 
 const READY_PROBE_MS = 1500;
@@ -36,20 +38,10 @@ function isAlive(pid: number): boolean {
 	}
 }
 
-function killProcessGroup(pid: number): void {
-	try {
-		process.kill(-pid, 'SIGTERM');
-	} catch {
-		// already gone
-	}
-}
-
 async function isReady(baseUrl: string, url: string): Promise<boolean> {
 	try {
-		const token = new URL(url).searchParams.get('token') ?? '';
-		const response = await fetch(`${baseUrl}/api?token=${encodeURIComponent(token)}`, {
-			signal: AbortSignal.timeout(READY_PROBE_MS)
-		});
+		const request = jupyterReadinessRequest(baseUrl, tokenFromJupyterUrl(url));
+		const response = await fetch(request.url, { headers: request.headers, signal: AbortSignal.timeout(READY_PROBE_MS) });
 		return response.ok;
 	} catch {
 		return false;
