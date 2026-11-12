@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitepress';
+import { defineConfig, type HeadConfig } from 'vitepress';
 
 export default defineConfig({
   title: 'Social Explorer',
@@ -14,6 +14,17 @@ export default defineConfig({
     ['meta', { property: 'og:image', content: 'https://spiculedata.github.io/social-explorer/screenshots/sentiment-analysis.png' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }]
   ],
+  // Every page gets og:title and og:description from its own front matter (title, description), falling back to
+  // the page heading and the site defaults. A page that sets its own (the landing page) is left as written.
+  transformHead({ pageData, head, siteData }) {
+    const hasMeta = (property: string) => head.some(([tag, attrs]) => tag === 'meta' && attrs?.property === property);
+    const title = pageData.frontmatter.title || pageData.title || siteData.title;
+    const description = pageData.frontmatter.description || pageData.description || siteData.description;
+    const extra: HeadConfig[] = [];
+    if (!hasMeta('og:title')) extra.push(['meta', { property: 'og:title', content: String(title) }]);
+    if (!hasMeta('og:description')) extra.push(['meta', { property: 'og:description', content: String(description) }]);
+    return extra;
+  },
   lastUpdated: true,
   themeConfig: {
     logo: { light: '/brand/mark.svg', dark: '/brand/mark-on-dark.svg', alt: 'Social Explorer' },

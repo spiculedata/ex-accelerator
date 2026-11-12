@@ -153,6 +153,55 @@ features:
   assert.ok(!out.includes('link:'));
 });
 
+test('buildHome reads only the hero and features blocks of the current front matter shape', () => {
+  const index = `---
+layout: landing
+sidebar: false
+title: Decoy title
+titleTemplate: Decoy template
+head:
+  - - meta
+    - name: decoy-name
+      text: Decoy text
+      tagline: Decoy tagline
+      link: /decoy/head
+    - title: Decoy feature
+      details: Decoy details
+
+hero:
+  name: Real name
+  text: Real text
+  tagline: Real tagline.
+  actions:
+    - theme: brand
+      text: Try the demo
+      link: /guide/demo-data
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/example/repo
+
+features:
+  - title: Share
+    details: Publish over IPFS.
+    link: /guide/data-sharing
+    linkText: How sharing works
+---
+`;
+  const out = buildHome(index);
+  assert.match(out, /^# Real name\n\n\*\*Real text\*\*\n\nReal tagline\./);
+  assert.ok(out.includes('[Try the demo](Guide-Demo-data)'));
+  assert.ok(out.includes('[View on GitHub](https://github.com/example/repo)'));
+  assert.ok(out.includes('**Share**. Publish over IPFS. [How sharing works](Guide-Data-sharing)'));
+  assert.ok(!/decoy/i.test(out), out);
+});
+
+test('buildHome ignores a hero key that appears only after another block', () => {
+  const index = '---\ntitle: T\nhero:\n  name: Only\n  text: Hero text\nfeatures:\n  - title: F\n    details: D\n---\n';
+  const out = buildHome(index);
+  assert.match(out, /^# Only/);
+  assert.ok(out.includes('**F**. D'));
+});
+
 // --- the real docs, converted ---
 const docsDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 let outputDir;
