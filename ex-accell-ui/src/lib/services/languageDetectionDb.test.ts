@@ -196,17 +196,51 @@ describe('getLanguageMixing', () => {
   it('maps real language pairs with their share of all mixed posts', async () => {
     mockFetch({
       'language-mixing': [
-        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30' },
-        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10' }
+        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30', mixed_posts: '40' },
+        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10', mixed_posts: '40' }
       ]
     });
 
     const mixing = await languageDetectionDb.getLanguageMixing();
 
     expect(mixing).toEqual([
-      { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: 30, percentage: 75 },
-      { primary_language: 'English', secondary_language: 'French', occurrence_count: 10, percentage: 25 }
+      { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: 30, percentage: 75, mixed_posts: 40 },
+      { primary_language: 'English', secondary_language: 'French', occurrence_count: 10, percentage: 25, mixed_posts: 40 }
     ]);
+  });
+});
+
+describe('getLanguageTrends date range', () => {
+  it('asks for the date range chosen on the page, like the other language calls', async () => {
+    mockFetch({ 'language-trends': [] });
+    window.history.pushState({}, '', '/?date_start=2026-01-01&date_end=2026-01-31');
+
+    try {
+      await languageDetectionDb.getLanguageTrends('7d', '4');
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+
+    const requested = new URL(String((fetch as any).mock.calls[0][0]), 'http://localhost').searchParams;
+    expect(requested.get('date_start')).toBe('2026-01-01');
+    expect(requested.get('date_end')).toBe('2026-01-31');
+    expect(requested.get('workspace_id')).toBe('4');
+  });
+});
+
+describe('getLanguageMixing mixed posts', () => {
+  it('measures each pair against all mixed posts, not against the sum of the top pairs', async () => {
+    mockFetch({
+      'language-mixing': [
+        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30', mixed_posts: '200' },
+        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10', mixed_posts: '200' }
+      ]
+    });
+
+    const mixing = await languageDetectionDb.getLanguageMixing();
+
+    expect(mixing.map((pair) => pair.percentage)).toEqual([15, 5]);
+    expect(mixing.every((pair) => pair.mixed_posts === 200)).toBe(true);
   });
 });
 

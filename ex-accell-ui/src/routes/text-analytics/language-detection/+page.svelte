@@ -147,7 +147,7 @@
     ...band,
     percent: percentOf(distribution[band.key], distributionTotal)
   }));
-  $: mixedPercent = percentOf(mixingData.reduce((sum, pair) => sum + pair.occurrence_count, 0), totalPosts);
+  $: mixedPercent = percentOf(mixingData[0]?.mixed_posts ?? 0, totalPosts);
   $: highQualityPercent = percentOf(distribution.veryHigh + distribution.high, distributionTotal);
   $: totalPosts = detectionStats.totalPosts || languageStats.reduce((sum, lang) => sum + lang.count, 0);
 
