@@ -17,11 +17,11 @@ import { describe, expect, it } from 'vitest';
 const API_DIR = join('src', 'routes', 'api');
 
 // SvelteKit `error(status, ...)` throws a non-envelope body and, returned inside a `try`, turns a 4xx into a 500.
-const SVELTEKIT_ERROR_BASELINE = 25;
+const SVELTEKIT_ERROR_BASELINE = 0;
 const SVELTEKIT_ERROR = /(?<![.\w])error\(\s*\d{3}/g;
 
 // A non-logging line that reads `err.message`: the text is about to reach the client or the response shape.
-const LEAKED_MESSAGE_BASELINE = 21;
+const LEAKED_MESSAGE_BASELINE = 19;
 const LEAKED_MESSAGE = /\b(?:err|error|e)\??\.message/;
 const LOGGING_LINE = /\b(?:console|log|logger)\.\w+\(/;
 // `x instanceof SomethingError` (not plain Error) names one of our typed errors; `.message ===` is a comparison, not a send

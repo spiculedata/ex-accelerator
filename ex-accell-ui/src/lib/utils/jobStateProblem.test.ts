@@ -24,4 +24,10 @@ describe('describeJobStateFailure', () => {
     expect(problem.command).toBeUndefined();
     expect(JSON.stringify(problem)).not.toContain('boom');
   });
+
+  it('reads the command from the envelope error field', () => {
+    const problem = describeJobStateFailure(503, { error: 'Job services unavailable. Run `npm run dev:dapr` first' });
+
+    expect(problem.command).toBe('npm run dev:dapr');
+  });
 });

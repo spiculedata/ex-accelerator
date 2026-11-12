@@ -10,12 +10,12 @@ export interface JobStateProblem {
 const DEFAULT_COMMAND = 'npm run dev:dapr';
 
 /** Turns a failed job-state request into something a person can act on. Server detail is never shown as is. */
-export function describeJobStateFailure(status: number, body: { message?: string } | null): JobStateProblem {
+export function describeJobStateFailure(status: number, body: { error?: string; message?: string } | null): JobStateProblem {
   if (status === 503) {
     return {
       title: 'The job service is not running',
       detail: 'Crawl jobs are scheduled through Dapr, which is not reachable, so job history cannot be shown. Start it, then try again.',
-      command: extractCommand(body?.message ?? '') ?? DEFAULT_COMMAND
+      command: extractCommand(body?.error ?? body?.message ?? '') ?? DEFAULT_COMMAND
     };
   }
   return {
