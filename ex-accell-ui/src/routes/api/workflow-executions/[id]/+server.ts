@@ -1,8 +1,8 @@
 // Individual Workflow Execution API
 // Handles operations on specific workflow executions
 
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
 /**
@@ -11,21 +11,12 @@ import { serverWorkflowService } from '$lib/services/serverWorkflowService';
  */
 export const GET: RequestHandler = async ({ params }) => {
   try {
-    const { id } = params;
-    
-    const execution = await serverWorkflowService.getWorkflowExecution(id);
-    
-    if (!execution) {
-      return error(404, 'Workflow execution not found');
-    }
+    const execution = await serverWorkflowService.getWorkflowExecution(params.id);
+    if (!execution) return apiFail('Workflow execution not found', 404);
 
-    return json({
-      success: true,
-      execution
-    });
+    return apiOk(execution, { execution });
   } catch (err) {
-    console.error('Error getting workflow execution:', err);
-    return error(500, 'Failed to get workflow execution');
+    return apiServerError('GET /api/workflow-executions/[id]', err, 'Failed to get workflow execution');
   }
 };
 
@@ -35,16 +26,12 @@ export const GET: RequestHandler = async ({ params }) => {
  */
 export const DELETE: RequestHandler = async ({ params }) => {
   try {
-    const { id } = params;
-    
-    await serverWorkflowService.cancelWorkflowExecution(id);
+    const execution = await serverWorkflowService.getWorkflowExecution(params.id);
+    if (!execution) return apiFail('Workflow execution not found', 404);
 
-    return json({
-      success: true,
-      message: 'Workflow execution cancelled'
-    });
+    await serverWorkflowService.cancelWorkflowExecution(params.id);
+    return apiOk(null, { message: 'Workflow execution cancelled' });
   } catch (err) {
-    console.error('Error cancelling workflow execution:', err);
-    return error(500, 'Failed to cancel workflow execution');
+    return apiServerError('DELETE /api/workflow-executions/[id]', err, 'Failed to cancel workflow execution');
   }
 };

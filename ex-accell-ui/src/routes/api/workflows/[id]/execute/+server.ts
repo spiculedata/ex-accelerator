@@ -1,30 +1,32 @@
 // Workflow Execution API
 // Handles executing workflows and managing executions
 
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
+
+const MAX_EXECUTE_BODY_BYTES = 1024 * 1024;
+const MAX_LIST_LIMIT = 500;
 
 /**
  * POST /api/workflows/[id]/execute
- * Execute a workflow with given input
+ * Execute a published workflow with the given input
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+  const parsed = await readJsonObject(request, MAX_EXECUTE_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const { input, options = {} } = parsed.body as { input?: unknown; options?: Record<string, unknown> };
+  if (typeof options !== 'object' || options === null || Array.isArray(options)) return apiFail('options must be an object', 400);
+
   try {
-    const { id } = params;
-    const body = await request.json();
-    const { input, options = {} } = body;
+    const workflow = await serverWorkflowService.getPublishedWorkflow(params.id);
+    if (!workflow) return apiFail('Workflow not found', 404);
+    if (workflow.status !== 'published') return apiFail('Only published workflows can be run: publish it first.', 409);
 
-    // Execute the workflow
-    const execution = await serverWorkflowService.executeWorkflow(id, input, options);
-
-    return json({
-      success: true,
-      execution
-    });
-  } catch (err: any) {
-    console.error('Error executing workflow:', err);
-    return error(500, `Failed to execute workflow: ${err.message}`);
+    const execution = await serverWorkflowService.executeWorkflow(params.id, input, options);
+    return apiOk(execution, { execution });
+  } catch (err) {
+    return apiServerError('POST /api/workflows/[id]/execute', err, 'Failed to execute workflow');
   }
 };
 
@@ -33,24 +35,20 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * Get executions for a specific workflow
  */
 export const GET: RequestHandler = async ({ params, url }) => {
-  try {
-    const { id } = params;
-    const status = url.searchParams.get('status') || undefined;
-    const limit = url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!) : undefined;
+  const rawLimit = url.searchParams.get('limit');
+  const limit = rawLimit === null ? undefined : Number(rawLimit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT)) {
+    return apiFail(`limit must be a whole number from 1 to ${MAX_LIST_LIMIT}`, 400);
+  }
 
+  try {
     const executions = await serverWorkflowService.getWorkflowExecutions({
-      workflowId: id,
-      status,
+      workflowId: params.id,
+      status: url.searchParams.get('status') || undefined,
       limit
     });
-
-    return json({
-      success: true,
-      executions,
-      count: executions.length
-    });
+    return apiOk(executions, { executions, count: executions.length });
   } catch (err) {
-    console.error('Error getting workflow executions:', err);
-    return error(500, 'Failed to get workflow executions');
+    return apiServerError('GET /api/workflows/[id]/execute', err, 'Failed to get workflow executions');
   }
 };

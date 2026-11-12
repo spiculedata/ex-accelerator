@@ -1,7 +1,7 @@
 // Individual Workflow API
 // Handles operations on specific workflows
 
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { canModifyOwned } from '$lib/server/ownership';
 import { BodyTooLargeError, readJsonLimited } from '$lib/server/requestBody';
@@ -10,7 +10,7 @@ import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 const MAX_UPDATE_BODY_BYTES = 1024 * 1024;
 const STATUSES = new Set(['draft', 'published', 'archived']);
 
-const failure = (message: string, status: number) => json({ success: false, error: message }, { status });
+const failure = apiFail;
 
 /**
  * GET /api/workflows/[id]
@@ -20,10 +20,9 @@ export const GET: RequestHandler = async ({ params }) => {
   try {
     const workflow = await serverWorkflowService.getPublishedWorkflow(params.id);
     if (!workflow) return failure('Workflow not found', 404);
-    return json({ success: true, workflow });
+    return apiOk(workflow, { workflow });
   } catch (err) {
-    console.error('Error getting workflow:', err);
-    return failure('Failed to get workflow', 500);
+    return apiServerError('GET /api/workflows/[id]', err, 'Failed to get workflow');
   }
 };
 
@@ -62,10 +61,9 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
     });
     if (!updated) return failure('Workflow not found', 404);
 
-    return json({ success: true, workflow: updated });
+    return apiOk(updated, { workflow: updated });
   } catch (err) {
-    console.error('Error updating workflow:', err);
-    return failure('Failed to update workflow', 500);
+    return apiServerError('PUT /api/workflows/[id]', err, 'Failed to update workflow');
   }
 };
 
@@ -84,9 +82,8 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
     const deleted = await serverWorkflowService.deleteWorkflow(params.id);
     if (!deleted) return failure('Workflow not found', 404);
 
-    return json({ success: true });
+    return apiOk(null);
   } catch (err) {
-    console.error('Error deleting workflow:', err);
-    return failure('Failed to delete workflow', 500);
+    return apiServerError('DELETE /api/workflows/[id]', err, 'Failed to delete workflow');
   }
 };

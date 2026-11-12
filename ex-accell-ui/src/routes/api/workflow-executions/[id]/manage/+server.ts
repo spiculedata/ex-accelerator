@@ -1,64 +1,49 @@
 // Workflow Execution Management API
 // Handles pause, resume, status, and purge operations for workflow executions
 
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { hybridDaprWorkflowExecutor } from '$lib/services/hybridDaprWorkflowExecutor';
 import { serverWorkflowService } from '$lib/services/serverWorkflowService';
 
+const MAX_MANAGE_BODY_BYTES = 16 * 1024;
+const ACTIONS = ['pause', 'resume', 'purge', 'status'] as const;
+type ManageAction = (typeof ACTIONS)[number];
+
+const isAction = (value: unknown): value is ManageAction => ACTIONS.includes(value as ManageAction);
+
 /**
  * POST /api/workflow-executions/[id]/manage
- * Manage workflow execution (pause, resume, purge)
+ * Manage workflow execution (pause, resume, purge, status)
  */
 export const POST: RequestHandler = async ({ params, request }) => {
-  let body: any;
+  const parsed = await readJsonObject(request, MAX_MANAGE_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const { action } = parsed.body;
+  if (!isAction(action)) return apiFail(`Invalid action. Supported actions: ${ACTIONS.join(', ')}`, 400);
+
+  const { id } = params;
   try {
-    const { id } = params;
-    body = await request.json();
-    const { action } = body;
-
     const execution = await serverWorkflowService.getWorkflowExecution(id);
-    if (!execution) {
-      return error(404, 'Execution not found');
+    if (!execution) return apiFail('Execution not found', 404);
+
+    let result: Record<string, unknown>;
+    if (action === 'pause') {
+      await hybridDaprWorkflowExecutor.pauseWorkflow(id);
+      result = { message: 'Workflow paused successfully' };
+    } else if (action === 'resume') {
+      await hybridDaprWorkflowExecutor.resumeWorkflow(id);
+      result = { message: 'Workflow resumed successfully' };
+    } else if (action === 'purge') {
+      await hybridDaprWorkflowExecutor.purgeWorkflow(id);
+      result = { message: 'Workflow purged successfully' };
+    } else {
+      result = { status: await hybridDaprWorkflowExecutor.getWorkflowStatus(id) };
     }
 
-    let result: any = {};
-
-    switch (action) {
-      case 'pause':
-        await hybridDaprWorkflowExecutor.pauseWorkflow(id);
-        result = { message: 'Workflow paused successfully' };
-        break;
-
-      case 'resume':
-        await hybridDaprWorkflowExecutor.resumeWorkflow(id);
-        result = { message: 'Workflow resumed successfully' };
-        break;
-
-      case 'purge':
-        await hybridDaprWorkflowExecutor.purgeWorkflow(id);
-        result = { message: 'Workflow purged successfully' };
-        break;
-
-      case 'status':
-        const status = await hybridDaprWorkflowExecutor.getWorkflowStatus(id);
-        result = { status };
-        break;
-
-      default:
-        return error(400, `Invalid action: ${action}. Supported actions: pause, resume, purge, status`);
-    }
-
-    return json({
-      success: true,
-      action,
-      executionId: id,
-      ...result
-    });
-
-  } catch (err: any) {
-    console.error(`Error performing ${body?.action || 'unknown'} action on workflow execution:`, err);
-    return error(500, `Failed to ${body?.action || 'manage'} workflow: ${err.message}`);
+    return apiOk(result, { action, executionId: id, ...result });
+  } catch (err) {
+    return apiServerError(`POST /api/workflow-executions/[id]/manage (${action})`, err, `Failed to ${action} workflow`);
   }
 };
 
@@ -67,30 +52,16 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * Get detailed workflow execution status from Dapr
  */
 export const GET: RequestHandler = async ({ params, url }) => {
+  if (url.searchParams.get('action') !== 'status') return apiFail('Only status action is supported for GET requests', 400);
+
+  const { id } = params;
   try {
-    const { id } = params;
-    const action = url.searchParams.get('action');
-
-    if (action !== 'status') {
-      return error(400, 'Only status action is supported for GET requests');
-    }
-
     const execution = await serverWorkflowService.getWorkflowExecution(id);
-    if (!execution) {
-      return error(404, 'Execution not found');
-    }
+    if (!execution) return apiFail('Execution not found', 404);
 
-    const status = await hybridDaprWorkflowExecutor.getWorkflowStatus(id);
-
-    return json({
-      success: true,
-      executionId: id,
-      localExecution: execution,
-      daprStatus: status
-    });
-
-  } catch (err: any) {
-    console.error('Error getting workflow execution status:', err);
-    return error(500, `Failed to get workflow status: ${err.message}`);
+    const daprStatus = await hybridDaprWorkflowExecutor.getWorkflowStatus(id);
+    return apiOk({ localExecution: execution, daprStatus }, { executionId: id, localExecution: execution, daprStatus });
+  } catch (err) {
+    return apiServerError('GET /api/workflow-executions/[id]/manage', err, 'Failed to get workflow status');
   }
 };

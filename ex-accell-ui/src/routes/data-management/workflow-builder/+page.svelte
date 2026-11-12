@@ -337,7 +337,7 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          workflow: workflow,
+          workflowDefinition: workflow,
           options: {
             language: 'python',
             framework: 'dapr',
