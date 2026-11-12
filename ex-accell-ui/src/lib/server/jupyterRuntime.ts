@@ -48,7 +48,7 @@ async function isReady(baseUrl: string, url: string): Promise<boolean> {
 	}
 }
 
-export const ensureJupyter = createJupyterManager({
+const manager = createJupyterManager({
 	spawn,
 	env: process.env,
 	cwd: process.cwd(),
@@ -58,3 +58,6 @@ export const ensureJupyter = createJupyterManager({
 	kill: killProcessGroup,
 	hasConfig: () => existsSync(join(process.cwd(), '.jupyter', 'jupyter_lab_config.py'))
 });
+
+export const ensureJupyter = manager.ensure;
+export const jupyterStatus = manager.status;

@@ -22,7 +22,7 @@ The bootstrap never overwrites a notebook. It writes Jupyter's settings to the p
 
 In the app, open **Research** (`/text-analytics/research-investigation`), choose a notebook template
 and select **Start JupyterLab**. You can view the notebook embedded in the page or open it directly in
-Jupyter Lab.
+Jupyter Lab. If Jupyter is already running (started with `npm run jupyter:start`, by another tab or before a server restart), the page finds it on load and shows it as running; while a start is under way the button reads **Starting…**. If your browser blocks the new tab, the page says so and shows a link instead.
 
 Templates live in `ex-accell-ui/notebooks/`, including:
 

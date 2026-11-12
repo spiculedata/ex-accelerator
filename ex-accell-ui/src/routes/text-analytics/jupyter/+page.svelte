@@ -3,7 +3,15 @@
   import { goto } from '$app/navigation';
   import { currentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
-  import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
+  import {
+    connectJupyter,
+    fetchJupyterStatus,
+    initialJupyterPoll,
+    jupyterLink,
+    nextJupyterPoll,
+    type JupyterConnection,
+    type JupyterPoll
+  } from '$lib/utils/jupyterClient';
   import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
   
   // Redirect to projects if no current project
@@ -14,30 +22,45 @@
   });
 
   let connection: JupyterConnection | null = null;
-  let isJupyterRunning = false;
+  let poll: JupyterPoll = initialJupyterPoll;
+  let isLaunching = false;
   let showFullScreen = false;
-  
-  // Only an explicit click starts the server; polling just checks the connection we already have
+
+  $: isJupyterRunning = poll.phase === 'running' && connection !== null;
+  $: isStarting = isLaunching || poll.phase === 'starting';
+  $: statusLabel = isJupyterRunning ? 'Running' : isStarting ? 'Starting…' : 'Stopped';
+
+  // Only an explicit click starts the server; the status check below never launches anything
   let errorMessage = '';
 
   async function startJupyter() {
+    if (isLaunching) return;
     errorMessage = '';
-    connection = await connectJupyter((message) => (errorMessage = message));
-    if (!connection) return;
-    await checkJupyterStatus();
+    isLaunching = true;
+    try {
+      const started = await connectJupyter((message) => (errorMessage = message));
+      if (!started) return;
+      connection = started;
+      poll = nextJupyterPoll(poll, 'running');
+    } finally {
+      isLaunching = false;
+    }
   }
 
+  let isChecking = false;
+
+  // Asks the server, which can see a Jupyter that was already running before this page loaded. One failed
+  // check does not drop an open notebook (see nextJupyterPoll).
   async function checkJupyterStatus() {
-    if (!connection) {
-      isJupyterRunning = false;
-      return;
-    }
+    if (isChecking || isLaunching) return;
+    isChecking = true;
     try {
-      const response = await fetch(jupyterLink(connection, '/api/status'));
-      isJupyterRunning = response.ok;
-      if (response.status === 401 || response.status === 403) connection = null; // restarted with a new token
-    } catch {
-      isJupyterRunning = false;
+      const { observed, connection: found } = await fetchJupyterStatus();
+      poll = nextJupyterPoll(poll, observed);
+      if (found) connection = found;
+      else if (poll.phase !== 'running') connection = null;
+    } finally {
+      isChecking = false;
     }
   }
 
@@ -50,8 +73,9 @@
     showFullScreen = !showFullScreen;
   }
 
-  // Check Jupyter status on mount and periodically
+  // Check Jupyter status as soon as the page loads, then periodically
   onMount(() => {
+    void checkJupyterStatus();
     const interval = setInterval(checkJupyterStatus, 5000);
     return () => clearInterval(interval);
   });
@@ -71,8 +95,8 @@
       iconPath="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
       <svelte:fragment slot="actions">
         <span class="inline-flex items-center gap-2 text-sm text-white">
-          <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : 'bg-danger-400'}" aria-hidden="true"></span>
-          Jupyter Lab {isJupyterRunning ? 'Running' : 'Stopped'}
+          <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : isStarting ? 'bg-signal-400' : 'bg-danger-400'}" aria-hidden="true"></span>
+          Jupyter Lab {statusLabel}
         </span>
         <button
           on:click={toggleFullScreen}
@@ -98,7 +122,7 @@
     <div class="absolute top-4 right-4 z-10 flex items-center space-x-2">
       <div class="flex items-center space-x-2 bg-black/20 backdrop-blur-sm rounded-xl px-3 py-2">
         <div class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-blue-400' : 'bg-red-400'}"></div>
-        <span class="text-white text-sm">Jupyter Lab {isJupyterRunning ? 'Running' : 'Stopped'}</span>
+        <span class="text-white text-sm">Jupyter Lab {statusLabel}</span>
       </div>
       
       <button 
@@ -136,8 +160,12 @@
             <svg class="w-24 h-24 text-gray-500 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
             </svg>
-            <h3 class="text-2xl font-bold text-gray-900 mb-4">Jupyter Lab Not Running</h3>
-            <p class="text-gray-600 mb-6 max-w-md">Jupyter Lab server is not currently running. Please start it to access the interactive Python environment.</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">{isStarting ? 'Starting Jupyter Lab…' : 'Jupyter Lab Not Running'}</h3>
+            <p class="text-gray-600 mb-6 max-w-md">
+              {isStarting
+                ? 'Jupyter Lab is starting. It opens here as soon as it is ready.'
+                : 'Jupyter Lab server is not currently running. Please start it to access the interactive Python environment.'}
+            </p>
             
             <div class="space-y-4">
               <div class="max-w-lg mx-auto text-left space-y-3">
