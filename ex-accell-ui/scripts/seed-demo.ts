@@ -2,6 +2,7 @@
  * Loads a synthetic demo dataset (a fictional city, no real content) into the configured database.
  *
  *   npm run seed:demo                      load into an empty database
+ *   npm run seed:demo -- --if-empty        exit 0 without changes if data is already there
  *   ALLOW_DEMO_RESET=1 npm run seed:demo -- --reset   wipe the demo tables first (destructive)
  */
 import 'dotenv/config';
@@ -33,6 +34,7 @@ async function occupiedTables(client: pg.Client): Promise<string[]> {
 
 async function main() {
   const reset = process.argv.includes('--reset');
+  const ifEmpty = process.argv.includes('--if-empty');
   if (reset && process.env.ALLOW_DEMO_RESET !== '1') {
     throw new Error('--reset deletes data. Re-run with ALLOW_DEMO_RESET=1 if you are sure.');
   }
@@ -48,7 +50,10 @@ async function main() {
 
     const occupied = await occupiedTables(client);
     if (occupied.length > 0 && !reset) {
-      // scripts/demo.sh recognises this message to tell a resumed demo from a failure; keep the wording in step
+      if (ifEmpty) {
+        console.log('Demo data is already loaded.');
+        return;
+      }
       throw new Error(`Demo data only loads into an empty database, but ${occupied.join(', ')} already contain rows.`);
     }
 

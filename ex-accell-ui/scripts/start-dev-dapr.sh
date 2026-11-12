@@ -1,7 +1,7 @@
 #!/bin/bash
 # Startup script for Social Explorer UI with Jupyter integration and Dapr sidecar
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 echo "🚀 Starting Social Explorer UI with Jupyter Lab and Dapr..."
 
@@ -42,4 +42,4 @@ echo "🔗 Dapr sidecar will be available at http://localhost:3500"
 dapr run --app-id ex-accell-ui --app-port 5173 --dapr-http-port 3500 --dapr-grpc-port 50001 --components-path ./components --config ./dapr.yaml -- npm run dev
 
 # When the script exits, kill Jupyter Lab
-trap "echo 'Stopping Jupyter Lab...'; kill $JUPYTER_PID 2>/dev/null" EXIT
+trap 'echo "Stopping Jupyter Lab..."; kill "$JUPYTER_PID" 2>/dev/null' EXIT
