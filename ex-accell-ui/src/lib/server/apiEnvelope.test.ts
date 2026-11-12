@@ -15,12 +15,15 @@ import { describe, expect, it } from 'vitest';
 //     (`message === 'No such user'`). CLIENT_SAFE_LINE matches those lines, so a new leak in the same file is still counted.
 
 const API_DIR = join('src', 'routes', 'api');
+// The unified-analytics handlers live here, not in the route: their responses are API responses too.
+const ANALYTICS_HANDLERS_DIR = join('src', 'lib', 'server', 'analytics');
 
 // SvelteKit `error(status, ...)` throws a non-envelope body and, returned inside a `try`, turns a 4xx into a 500.
 const SVELTEKIT_ERROR_BASELINE = 0;
 const SVELTEKIT_ERROR = /(?<![.\w])error\(\s*\d{3}/g;
 
 // A non-logging line that reads `err.message`: the text is about to reach the client or the response shape.
+// Includes unified-analytics/query, which sends a Postgres syntax error (SQLSTATE 42601) to the admin who wrote the SQL, on purpose.
 const LEAKED_MESSAGE_BASELINE = 7;
 const LEAKED_MESSAGE = /\b(?:err|error|e)\??\.message/;
 const LOGGING_LINE = /\b(?:console|log|logger)\.\w+\(/;
@@ -38,6 +41,10 @@ function routeFiles(dir: string): string[] {
   });
 }
 
+const handlerFiles = readdirSync(ANALYTICS_HANDLERS_DIR)
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+  .map((name) => join(ANALYTICS_HANDLERS_DIR, name));
+
 const files = routeFiles(API_DIR).map((path) => ({ path: path.split(sep).join('/'), text: readFileSync(path, 'utf8') }));
 
 describe('API response envelope ratchet', () => {
@@ -52,7 +59,8 @@ describe('API response envelope ratchet', () => {
 
   it('does not add routes that read err.message outside a log call', () => {
     const isLeak = (line: string) => LEAKED_MESSAGE.test(line) && !LOGGING_LINE.test(line) && !CLIENT_SAFE_LINE.test(line);
-    const count = files.reduce((total, file) => total + file.text.split('\n').filter(isLeak).length, 0);
+    const scanned = [...files, ...handlerFiles.map((path) => ({ path, text: readFileSync(path, 'utf8') }))];
+    const count = scanned.reduce((total, file) => total + file.text.split('\n').filter(isLeak).length, 0);
     expect(count, `err.message reads outside logging: found ${count}, baseline ${LEAKED_MESSAGE_BASELINE}. Log the detail and send a generic message.`).toBe(LEAKED_MESSAGE_BASELINE);
   });
 
