@@ -1,37 +1,36 @@
 // Server-side Python Workflow Generation API
 // Handles Python workflow code generation on the server
 
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { pythonDaprWorkflowGenerator } from '$lib/services/pythonDaprWorkflowGenerator';
 
+const MAX_WORKFLOW_BODY_BYTES = 1024 * 1024;
+
 export const POST: RequestHandler = async ({ request }) => {
+  const parsed = await readJsonObject(request, MAX_WORKFLOW_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const { workflowDefinition } = parsed.body;
+  if (!workflowDefinition) return apiFail('Workflow definition is required', 400);
+  if (typeof workflowDefinition !== 'object' || !Array.isArray((workflowDefinition as { steps?: unknown }).steps)) {
+    return apiFail('workflowDefinition must include a steps list', 400);
+  }
+
   try {
-    const { workflowDefinition } = await request.json();
-    
-    if (!workflowDefinition) {
-      return error(400, 'Workflow definition is required');
-    }
-
     // Generate Python-based Dapr workflow on the server
-    const pythonWorkflow = await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition);
-    
-    return json({
-      success: true,
-      pythonWorkflow: {
-        pythonScript: pythonWorkflow.pythonScript,
-        requirements: pythonWorkflow.requirements,
-        workflowCode: pythonWorkflow.workflowCode,
-        activityCode: pythonWorkflow.activityCode,
-        appCode: pythonWorkflow.appCode,
-        workflowPattern: pythonWorkflow.workflowPattern,
-        executionOrder: pythonWorkflow.executionOrder,
-        workflowName: pythonWorkflow.workflowName
-      }
-    });
-
+    const generated = await pythonDaprWorkflowGenerator.generatePythonDaprWorkflow(workflowDefinition as never);
+    const pythonWorkflow = {
+      pythonScript: generated.pythonScript,
+      requirements: generated.requirements,
+      workflowCode: generated.workflowCode,
+      activityCode: generated.activityCode,
+      appCode: generated.appCode,
+      workflowPattern: generated.workflowPattern,
+      executionOrder: generated.executionOrder,
+      workflowName: generated.workflowName
+    };
+    return apiOk(pythonWorkflow, { pythonWorkflow });
   } catch (err) {
-    console.error('Error generating Python workflow:', err);
-    return error(500, `Failed to generate Python workflow: ${err instanceof Error ? err.message : String(err)}`);
+    return apiServerError('POST /api/generate-python-workflow', err, 'Failed to generate Python workflow');
   }
 };

@@ -86,3 +86,38 @@ describe('GET /api/workflows/[id]', () => {
     expect((await GET({ params: { id: 'nope' } } as any)).status).toBe(404);
   });
 });
+
+describe('envelope shape', () => {
+  it('GET returns data and the legacy workflow key', async () => {
+    const body = await (await GET({ params: { id: 'wf_1' } } as any)).json();
+
+    expect(body).toEqual({ success: true, workflow: { id: 'wf_1', createdBy: 'ada@example.com' }, data: { id: 'wf_1', createdBy: 'ada@example.com' } });
+  });
+
+  it('PUT returns the updated workflow in data and the legacy key', async () => {
+    const body = await (await put(owner, { name: 'x' })).json();
+
+    expect(body).toEqual({ success: true, workflow: { id: 'wf_1', name: 'x' }, data: { id: 'wf_1', name: 'x' } });
+  });
+
+  it('DELETE returns success with null data', async () => {
+    expect(await (await del(owner)).json()).toEqual({ success: true, data: null });
+  });
+
+  it('failures carry success false, null data and the message', async () => {
+    service.getPublishedWorkflow.mockResolvedValue(null);
+
+    expect(await (await del(owner)).json()).toEqual({ success: false, data: null, error: 'Workflow not found' });
+  });
+
+  it('GET and DELETE return a generic 500 without the internal error text', async () => {
+    service.getPublishedWorkflow.mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
+
+    const get = await GET({ params: { id: 'wf_1' } } as any);
+    const remove = await del(owner);
+
+    expect([get.status, remove.status]).toEqual([500, 500]);
+    expect(await get.json()).toEqual({ success: false, data: null, error: 'Failed to get workflow' });
+    expect(await remove.json()).toEqual({ success: false, data: null, error: 'Failed to delete workflow' });
+  });
+});

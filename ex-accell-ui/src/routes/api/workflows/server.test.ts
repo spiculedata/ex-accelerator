@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const publishWorkflow = vi.hoisted(() => vi.fn());
+const getPublishedWorkflows = vi.hoisted(() => vi.fn());
 
 vi.mock('$lib/services/serverWorkflowService', () => ({
-  serverWorkflowService: { publishWorkflow, getPublishedWorkflows: vi.fn() }
+  serverWorkflowService: { publishWorkflow, getPublishedWorkflows }
 }));
 
-import { POST } from './+server';
+import { GET, POST } from './+server';
 
 const definition = { name: 'd', steps: [], connections: [] };
 
@@ -45,9 +46,46 @@ describe('POST /api/workflows', () => {
   it('returns a generic 500 without leaking internal error text', async () => {
     publishWorkflow.mockRejectedValue(new Error('connection to 10.0.0.5:5432 refused'));
 
-    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } }).catch((e) => e);
+    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } });
 
     expect(response.status).toBe(500);
-    expect(JSON.stringify(response.body ?? response)).not.toContain('10.0.0.5');
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to publish workflow' });
+  });
+
+  it('returns the envelope with data and the legacy workflow key on success', async () => {
+    const response = await call({ workflowDefinition: definition, metadata: { name: 'Flow' } });
+
+    expect(await response.json()).toEqual({ success: true, workflow: { id: 'wf_1' }, data: { id: 'wf_1' } });
+  });
+
+  it.each([[{}], ['text'], [{ steps: 'nope' }]])('refuses a workflowDefinition without a steps list (%j) with 400', async (workflowDefinition) => {
+    const response = await call({ workflowDefinition, metadata: { name: 'Flow' } });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ success: false, data: null });
+    expect(publishWorkflow).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/workflows', () => {
+  const list = (query = '') => GET({ url: new URL(`http://localhost/api/workflows${query}`) } as unknown as Parameters<typeof GET>[0]);
+
+  it('returns the envelope with data and the legacy workflows key', async () => {
+    getPublishedWorkflows.mockResolvedValue([{ id: 'wf_1' }]);
+
+    const response = await list('?status=published');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, workflows: [{ id: 'wf_1' }], count: 1, data: [{ id: 'wf_1' }] });
+    expect(getPublishedWorkflows).toHaveBeenCalledWith({ status: 'published', pattern: undefined, search: undefined });
+  });
+
+  it('returns a generic 500 envelope instead of throwing a SvelteKit error', async () => {
+    getPublishedWorkflows.mockRejectedValue(new Error('connection to 10.0.0.5:5432 refused'));
+
+    const response = await list();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to get workflows' });
   });
 });

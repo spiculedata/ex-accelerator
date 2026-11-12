@@ -1,37 +1,29 @@
 // Workflow Deployment API
 // Handles deploying workflow code to the runtime environment
 
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import { isSafeIdentifier, resolveWithin } from '$lib/utils/pathSafety';
 
 const DEPLOY_DIR_NAME = 'deployed-workflows';
+const MAX_DEPLOY_BODY_BYTES = 2 * 1024 * 1024;
 
 /**
  * POST /api/deploy-workflow
  * Deploy workflow code for execution
  */
 export const POST: RequestHandler = async ({ request }) => {
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    throw error(400, 'Request body must be valid JSON');
-  }
+  const parsed = await readJsonObject(request, MAX_DEPLOY_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const { workflowId, workflowName, code, definition } = parsed.body;
 
-  const { workflowId, workflowName, code, definition } = body;
-
-  if (!workflowId || !workflowName || !code) {
-    throw error(400, 'Missing required fields: workflowId, workflowName, code');
-  }
+  if (!workflowId || !workflowName || !code) return apiFail('Missing required fields: workflowId, workflowName, code', 400);
   if (!isSafeIdentifier(workflowId)) {
-    throw error(400, 'Invalid workflowId: use letters, digits, "-" or "_" only (max 128 characters)');
+    return apiFail('Invalid workflowId: use letters, digits, "-" or "_" only (max 128 characters)', 400);
   }
-  if (typeof code !== 'string') {
-    throw error(400, 'code must be a string');
-  }
+  if (typeof code !== 'string') return apiFail('code must be a string', 400);
 
   try {
     const workflowsDir = join(process.cwd(), DEPLOY_DIR_NAME);
@@ -43,26 +35,11 @@ export const POST: RequestHandler = async ({ request }) => {
     await writeFile(workflowFile, code);
     await writeFile(
       metadataFile,
-      JSON.stringify(
-        {
-          workflowId,
-          workflowName,
-          definition,
-          deployedAt: new Date().toISOString(),
-          filePath: workflowFile
-        },
-        null,
-        2
-      )
+      JSON.stringify({ workflowId, workflowName, definition, deployedAt: new Date().toISOString(), filePath: workflowFile }, null, 2)
     );
 
-    return json({
-      success: true,
-      message: 'Workflow deployed successfully',
-      workflowId
-    });
+    return apiOk({ workflowId }, { message: 'Workflow deployed successfully', workflowId });
   } catch (err) {
-    console.error('Error deploying workflow:', err);
-    throw error(500, 'Failed to deploy workflow');
+    return apiServerError('POST /api/deploy-workflow', err, 'Failed to deploy workflow');
   }
 };
