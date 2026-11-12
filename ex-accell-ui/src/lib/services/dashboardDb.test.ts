@@ -124,6 +124,25 @@ describe('getDataSources', () => {
     expect(sources[1].percentage).toBe(40);
   });
 
+  it('keeps the platform labels and logs a warning when the dataset names cannot be loaded', async () => {
+    mockFetch({ 'platform-performance': [{ platform: 'twitter', total_posts: 10, avg_confidence: 0.9 }] });
+    const originalFetch = fetch as ReturnType<typeof vi.fn>;
+    const baseFn = originalFetch.getMockImplementation()!;
+    originalFetch.mockImplementation(async (url: string, opts?: any) => {
+      if (url.includes('/api/datasets')) {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
+      return baseFn(url, opts);
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const sources = await dashboardDb.getDataSources();
+
+    expect(sources[0].platform).toBe('Twitter');
+    expect(warn.mock.calls.some((args) => String(args[1]).includes('Could not load dataset names'))).toBe(true);
+    warn.mockRestore();
+  });
+
   it('marks zero-post sources as inactive', async () => {
     const platformData = [
       { platform: 'reddit', total_posts: 0, avg_confidence: 0.5 }

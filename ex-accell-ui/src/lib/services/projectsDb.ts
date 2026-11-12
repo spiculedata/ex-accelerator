@@ -67,7 +67,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching projects:', error);
-      return [];
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -155,7 +156,8 @@ class ProjectsDatabase {
       return rows[0] || null;
     } catch (error) {
       console.error('Error updating project:', error);
-      return null;
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -180,7 +182,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching workspaces:', error);
-      return [];
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -258,7 +261,8 @@ class ProjectsDatabase {
       return rows[0] || null;
     } catch (error) {
       console.error('Error updating workspace:', error);
-      return null;
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -306,7 +310,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching project members:', error);
-      return [];
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 
@@ -341,7 +346,8 @@ class ProjectsDatabase {
       return rows;
     } catch (error) {
       console.error('Error fetching data sources:', error);
-      return [];
+      // A failed query is not an empty or missing result: let the route answer 500
+      throw error;
     }
   }
 

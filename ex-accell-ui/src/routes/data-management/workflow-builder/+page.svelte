@@ -142,6 +142,8 @@
       if (mounted) {
         console.error('Error loading datasets:', error);
         availableDatasets = [];
+        // An empty picker would read as "no datasets exist"; say the load failed instead
+        notify('error', 'The datasets could not be loaded, so the picker is empty. Refresh the list to try again.');
       }
     } finally {
       if (mounted) {
