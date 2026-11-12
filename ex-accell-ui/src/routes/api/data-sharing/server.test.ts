@@ -24,6 +24,7 @@ vi.mock('$lib/services/postgres', () => ({ postgresPool: db }));
 
 const ipfs = vi.hoisted(() => ({
   isEnabled: vi.fn(),
+  isConnected: vi.fn(),
   publishDirectory: vi.fn(),
   fetchDirectory: vi.fn(),
   getGatewayUrl: vi.fn((cid: string) => `https://ipfs.io/ipfs/${cid}`)
@@ -104,6 +105,7 @@ beforeEach(() => {
   db.query.mockResolvedValue([]);
   db.transaction.mockClear();
   ipfs.isEnabled.mockReset().mockReturnValue(true);
+  ipfs.isConnected.mockReset().mockReturnValue(false);
   ipfs.publishDirectory.mockReset().mockResolvedValue(CID);
   ipfs.fetchDirectory.mockReset();
 });
@@ -116,7 +118,16 @@ describe('GET /api/data-sharing?action=status', () => {
   it('says whether peer-to-peer sharing is turned on', async () => {
     ipfs.isEnabled.mockReturnValue(false);
     const body = await (await get('?action=status')).json();
-    expect(body).toEqual({ success: true, data: { enabled: false } });
+    expect(body).toEqual({ success: true, data: { enabled: false, connected: false } });
+  });
+
+  it('reports whether the node is running, without starting it', async () => {
+    ipfs.isConnected.mockReturnValue(true);
+    expect((await (await get('?action=status', viewer)).json()).data).toEqual({ enabled: true, connected: true });
+
+    ipfs.isConnected.mockReturnValue(false);
+    expect((await (await get('?action=status')).json()).data).toEqual({ enabled: true, connected: false });
+    expect(ipfs.publishDirectory).not.toHaveBeenCalled();
   });
 });
 

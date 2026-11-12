@@ -212,16 +212,6 @@ class IpfsService {
     return this.node !== null;
   }
 
-  async healthCheck(): Promise<boolean> {
-    if (!IPFS_ENABLED) return false;
-    try {
-      await this.connect();
-      return this.node !== null;
-    } catch {
-      return false;
-    }
-  }
-
   /**
    * Stops the node, which also closes the blockstore and datastore and so releases the datastore's lock file. Safe to
    * call when the node never started, while it is still starting (it waits) and from several places at once.
