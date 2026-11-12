@@ -7,7 +7,15 @@ import { describe, expect, it } from 'vitest';
 // viewer are the exceptions, because these tones read well on a dark surface.
 // Variant-prefixed forms (md:, hover:, group-hover:) are caught too; only dark: is allowed, since it applies on dark surfaces
 const PALE_SIGNAL_TEXT = /(?<![\w-])(?!dark:)(?:[a-z-]+:)*text-(amber|yellow|orange)-(400|500|600)\b/;
-const DARK_SURFACES = ['investigations/[id]/+page.svelte', 'TopicsPortal.svelte'];
+const DARK_SURFACES = [
+  'investigations/[id]/+page.svelte',
+  'TopicsPortal.svelte',
+  // Pieces of the dark investigation workbench
+  'investigation/WorkbenchToolbar.svelte',
+  'investigation/SourceTabs.svelte',
+  'investigation/GdeltEventTable.svelte',
+  'investigation/SocialPostList.svelte'
+];
 
 function svelteFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
