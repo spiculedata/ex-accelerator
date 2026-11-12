@@ -55,6 +55,15 @@ but any other `jupyter lab` you run still does, so delete it unless you rely on 
 warns when it finds that file.
 :::
 
+::: tip Which environment variables notebooks see
+When the app starts Jupyter, it passes on only a short list of variables, not its own environment (so `SESSION_SECRET` and
+`ADMIN_PASSWORD` never reach a notebook): the usual shell basics, `DATABASE_URL` and `PG*`, `OLLAMA_HOST`, `JUPYTER_*`, Python and Poetry
+settings, proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` in either case), CA bundle paths (`SSL_CERT_FILE`, `SSL_CERT_DIR`,
+`REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`) and model-cache locations (`HF_HOME`, `TRANSFORMERS_CACHE`, `TORCH_HOME`, `NLTK_DATA`, `XDG_CACHE_HOME`).
+API tokens such as `HF_TOKEN` are deliberately not passed; set them inside the notebook. Starting Jupyter yourself with
+`npm run jupyter:start` uses your shell's full environment instead.
+:::
+
 ::: warning Notebooks run code with access to your database
 Jupyter Lab listens on `127.0.0.1` only, requires a token (random on every start unless you set `JUPYTER_TOKEN`), keeps cross-site
 request checks on and accepts cross-origin requests only from the app's own address. The Research

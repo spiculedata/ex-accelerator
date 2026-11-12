@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChildProcess } from 'child_process';
-import { createJupyterManager, jupyterEnvironment, type LaunchStore, type SavedLaunch, type SpawnFn } from './jupyterManager';
+import { isAbsolute } from 'node:path';
+import { createJupyterManager, JupyterNotSetUpError, jupyterEnvironment, type LaunchStore, type SavedLaunch, type SpawnFn } from './jupyterManager';
 
 function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved?: SavedLaunch | null; alive?: boolean; config?: boolean; readyTimeoutMs?: number } = {}) {
 	const handlers: Record<string, (...args: unknown[]) => void> = {};
@@ -43,6 +44,10 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 }
 
 const ORIGIN = 'http://localhost:5173';
+
+afterEach(() => {
+	vi.useRealTimers();
+});
 
 describe('createJupyterManager', () => {
 	it('uses the configured Jupyter without spawning', async () => {
@@ -108,7 +113,16 @@ describe('createJupyterManager', () => {
 	it('asks for the bootstrap when the project-local config is missing', async () => {
 		const { ensure, spawn } = setup({ config: false });
 		await expect(ensure(ORIGIN)).rejects.toThrow(/jupyter:bootstrap/);
+		await expect(ensure(ORIGIN)).rejects.toBeInstanceOf(JupyterNotSetUpError);
 		expect(spawn).not.toHaveBeenCalled();
+	});
+
+	it('hands Jupyter an absolute config folder so it does not depend on the working directory', async () => {
+		const { ensure, spawn } = setup();
+		await ensure(ORIGIN);
+		const options = (spawn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }])[2];
+		expect(isAbsolute(options.env.JUPYTER_CONFIG_DIR)).toBe(true);
+		expect(options.env.JUPYTER_CONFIG_DIR).toMatch(/\.jupyter$/);
 	});
 
 	it('does not let a stale child clear a newer launch', async () => {
@@ -128,13 +142,14 @@ describe('createJupyterManager', () => {
 	});
 
 	it('fails fast, naming the port, when Jupyter exits before it is ready', async () => {
+		vi.useFakeTimers();
 		const { ensure, handlers, isReadyCalls } = setup({ ready: false, readyTimeoutMs: 5000 });
-		const started = Date.now();
 		const pending = ensure(ORIGIN);
-		await Promise.resolve();
+		const assertion = expect(pending).rejects.toThrow(/8888/);
+		await vi.advanceTimersByTimeAsync(0);
 		handlers.exit(1);
-		await expect(pending).rejects.toThrow(/8888/);
-		expect(Date.now() - started).toBeLessThan(1000);
+		await vi.advanceTimersByTimeAsync(10); // one poll interval, far short of the 5s timeout
+		await assertion;
 		expect(isReadyCalls()).toBeLessThan(5);
 	});
 
@@ -160,5 +175,19 @@ describe('jupyterEnvironment', () => {
 			{ JUPYTER_TOKEN: 't' }
 		);
 		expect(env).toEqual({ PATH: '/bin', HOME: '/h', DATABASE_URL: 'postgres://x', PGHOST: 'h', JUPYTER_TOKEN: 't' });
+	});
+
+	it('keeps proxy, CA bundle and model-cache settings so notebooks can download behind a proxy', () => {
+		const kept = {
+			HTTPS_PROXY: 'http://p:3128',
+			no_proxy: 'localhost',
+			SSL_CERT_FILE: '/etc/ca.pem',
+			REQUESTS_CA_BUNDLE: '/etc/ca.pem',
+			HF_HOME: '/cache/hf',
+			TRANSFORMERS_CACHE: '/cache/tf',
+			TORCH_HOME: '/cache/torch',
+			NLTK_DATA: '/cache/nltk'
+		};
+		expect(jupyterEnvironment({ ...kept, SESSION_SECRET: 's', HF_TOKEN: 'secret' }, {})).toEqual(kept);
 	});
 });
