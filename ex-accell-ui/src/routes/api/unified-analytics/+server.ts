@@ -1353,10 +1353,12 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
       }
     }
 
+    const ENGAGEMENT_TYPES = ['engagement-stats', 'engagement-platforms', 'engagement-content-types', 'engagement-trends', 'engagement-top-posts', 'engagement-timing'];
     if (type?.startsWith('engagement-')) {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
-      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
+      // Only known engagement queries: an unknown type is still a 400 below
+      if (ENGAGEMENT_TYPES.includes(type) && hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const wsId = url.searchParams.get('workspace_id');
         let platforms: string[] = [];

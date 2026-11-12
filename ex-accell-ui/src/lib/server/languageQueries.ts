@@ -72,7 +72,7 @@ export const languageQueries = {
     ORDER BY p.created_at DESC
     LIMIT ${limitParam}`,
 
-  /** The top pairs, each with the number of distinct mixed posts overall (a post can appear in several pairs). */
+  /** The top pairs by distinct posts, each with the number of distinct mixed posts overall (a post can appear in several pairs). */
   mixing: (conditions: string[] = []): string => `
     WITH scoped AS (
       SELECT lm.post_id, lm.primary_language_id, lm.secondary_language_id
@@ -82,7 +82,7 @@ export const languageQueries = {
     SELECT
       l1.name AS primary_language,
       l2.name AS secondary_language,
-      COUNT(*) AS occurrence_count,
+      COUNT(DISTINCT scoped.post_id) AS occurrence_count,
       (SELECT COUNT(DISTINCT post_id) FROM scoped) AS mixed_posts
     FROM scoped
     JOIN languages l1 ON l1.id = scoped.primary_language_id

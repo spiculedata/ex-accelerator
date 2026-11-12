@@ -150,7 +150,7 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
   async getLanguageTrends(timeRange: string = '7d', workspaceId?: string): Promise<LanguageTrend[]> {
     const data = await this.queryAPI<any>({
       endpoint: 'language-trends',
-      params: workspaceId ? { workspace_id: workspaceId } : {}
+      params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
 
     if (!data || data.length === 0) {

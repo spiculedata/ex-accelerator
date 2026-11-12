@@ -40,7 +40,10 @@ describe('workspace scoping of the social dashboards', () => {
     'language-detection-detail',
     'engagement-stats',
     'engagement-platforms',
-    'engagement-top-posts'
+    'engagement-content-types',
+    'engagement-trends',
+    'engagement-top-posts',
+    'engagement-timing'
   ];
 
   it.each(SCOPED_TYPES)('%s returns nothing for a workspace with no social media dataset, instead of every post', async (type) => {
@@ -96,8 +99,23 @@ describe('workspace scoping of the social dashboards', () => {
     const [sql, params] = duckdbQuery.mock.calls[0];
     expect(String(sql)).toContain('LOWER(ds.platform) = ANY($1)');
     expect(String(sql)).toContain('p.created_at >= $2');
-    expect(params[0]).toEqual(['telegram']);
-    expect(params).toHaveLength(3);
+    expect(params).toEqual([['telegram'], expect.stringContaining('2026-01-01'), expect.stringContaining('2026-02-01')]);
+  });
+
+  it('still rejects a bad date range for a workspace with no social data', async () => {
+    resolveWorkspaceScope.mockResolvedValue(NO_SOCIAL);
+
+    const response = await get('type=language-posts&workspace_id=7&date_start=not-a-date');
+
+    expect(response.status).toBe(400);
+  });
+
+  it('still answers 400 to an unknown engagement query for a workspace with no social data', async () => {
+    resolveWorkspaceScope.mockResolvedValue(NO_SOCIAL);
+
+    const response = await get('type=engagement-nope&workspace_id=7');
+
+    expect(response.status).toBe(400);
   });
 
   it('stays unfiltered without a workspace', async () => {
@@ -113,7 +131,9 @@ describe('GET /api/unified-analytics language-mixing', () => {
 
     const body = await (await get('type=language-mixing')).json();
 
-    expect(String(duckdbQuery.mock.calls[0][0])).toContain('COUNT(DISTINCT');
+    const sql = String(duckdbQuery.mock.calls[0][0]);
+    expect(sql).toContain('COUNT(DISTINCT');
+    expect(sql).toContain('WITH scoped AS');
     expect(body.data[0]).toMatchObject({ occurrence_count: '30', mixed_posts: 120 });
   });
 });
@@ -128,5 +148,19 @@ describe('GET /api/unified-analytics language-trends', () => {
     expect(sql).not.toContain('language_trends');
     expect(sql).toContain('FROM language_detection ld');
     expect(body.data).toEqual([{ language_code: 'en', analysis_date: '2026-01-02', document_count: 4, avg_confidence: 0.9 }]);
+  });
+});
+
+describe('GET /api/unified-analytics language-mixing scope', () => {
+  it('applies the workspace platforms and the date window inside the scoped rows that both counts read', async () => {
+    resolveWorkspaceScope.mockResolvedValue(TELEGRAM);
+
+    await get('type=language-mixing&workspace_id=7&date_start=2026-01-01');
+
+    const [sql, params] = duckdbQuery.mock.calls[0];
+    const scoped = String(sql).split('SELECT\n      l1.name')[0];
+    expect(scoped).toContain('LOWER(ds.platform) = ANY($1)');
+    expect(scoped).toContain('p.created_at >= $2');
+    expect(params).toEqual([['telegram'], expect.stringContaining('2026-01-01')]);
   });
 });
