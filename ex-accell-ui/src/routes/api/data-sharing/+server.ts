@@ -51,7 +51,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   try {
     switch (action) {
       case 'status':
-        return json({ success: true, data: { enabled: ipfsService.isEnabled() } });
+        return json({ success: true, data: { enabled: ipfsService.isEnabled(), connected: ipfsService.isConnected() } });
       case 'list':
         return json({ success: true, packages: listPackages() });
       case 'get':

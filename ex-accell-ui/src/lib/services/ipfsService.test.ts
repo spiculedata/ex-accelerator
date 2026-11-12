@@ -69,10 +69,6 @@ describe('ipfsService when IPFS_ENABLED is unset', () => {
     await expect(service.cat('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi')).rejects.toMatchObject(disabled);
   });
 
-  it('reports unhealthy without trying to start a node', async () => {
-    expect(await service.healthCheck()).toBe(false);
-  });
-
   it.each(['false', 'FALSE', '1', 'yes', ''])('stays off for IPFS_ENABLED=%j: only the exact string "true" turns it on', async (value) => {
     const { ipfsService } = await loadService({ IPFS_ENABLED: value });
     expect(ipfsService.isEnabled()).toBe(false);

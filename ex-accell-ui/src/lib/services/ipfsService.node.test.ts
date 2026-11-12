@@ -245,9 +245,13 @@ describe('cat and close', () => {
     expect(fake.stopped).toBe(1);
   });
 
-  it('reports healthy once the node is up', async () => {
-    expect(await service.healthCheck()).toBe(true);
-    expect(fake.starts).toBe(1);
+  it('reports whether the node is up without starting one', async () => {
+    expect(service.isConnected()).toBe(false);
+    expect(fake.starts).toBe(0);
+
+    await service.connect();
+
+    expect(service.isConnected()).toBe(true);
   });
 });
 

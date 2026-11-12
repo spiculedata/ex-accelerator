@@ -90,6 +90,11 @@ The node starts on the first publish or import and stops when the app process st
 | See generated packages, previews and the registry | any signed-in user |
 | Generate a package, publish to IPFS, import from IPFS | administrators only |
 
+Reading stays open to every role on purpose. The registry lists only what was published, which is public anyway, and
+the packages list and previews (up to 1,000 rows of a dataset) are as visible as the dataset catalogue they come
+from, which is not scoped to projects today. If dataset access ever becomes per-project, package previews should
+follow it.
+
 Non-admins see the page with those controls hidden; the API answers `403` if they call it anyway. See
 [Authentication and roles](/guide/authentication).
 

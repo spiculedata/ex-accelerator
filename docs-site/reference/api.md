@@ -58,7 +58,7 @@ and importing answer `503` and the other actions still work.
 
 | Action | Parameters | Response (`200`) |
 |--------|------------|------------------|
-| `status` | none | `{ success, data: { enabled } }` |
+| `status` | none | `{ success, data: { enabled, connected } }`: `connected` is true once the node has started; asking never starts it |
 | `list` (default) | none | `{ success, packages: [{ id, name, title, description, version, created, resources, totalRows, previewRows, publishable }] }` (`publishable` is false for an imported package) |
 | `get` | `id` (package id: letters, digits, `-`, `_`) | `{ success, datapackage, preview }` with up to 20 preview rows as objects. `400` for a malformed id, `404` if unknown |
 | `registry` | none | `{ success, enabled, packages: [registry rows] }`: packages this install published (rows with status `imported` are kept in the table but not listed) |
