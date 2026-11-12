@@ -20,19 +20,24 @@ Builds the JupyterLab container used by `docker-compose.yml`.
   and let the CI image job confirm the result.
 - `gdelt_sample_export.csv` is a small sample of the public [GDELT](https://www.gdeltproject.org/) event data.
 
-## Notebooks that need extra setup
+## Example notebooks that need extra setup
 
-These are examples from earlier experiments and will not run out of the box in the container:
+The notebooks in `notebooks/examples/` are experiments from earlier work. They are not ported to
+`workspace_utils` and Postgres, so they will not run out of the box in the container; they are kept as
+starting points. (A notebook that does run against the database, such as `sentiment_analysis`, lives
+one level up.)
 
 - `duckdb_gdelt_analysis`, `ollama_gdelt_integration` and `deepseek_gdelt_integration` read a local
   `etl/duckdatabase` file that the container does not have.
 - `deepseek_openllm_demo` and `deepseek_gdelt_integration` expect an OpenLLM server at
   `http://localhost:3000`, which is not installed here.
 
-Notebooks are committed without outputs; clear them before committing (`jupyter nbconvert --clear-output`).
+Notebooks are committed without outputs or execution counts. `.pre-commit-config.yaml` runs `nbstripout` for you
+(`pip install pre-commit && pre-commit install`), and a test in CI fails if one slips through; to fix a notebook by hand run
+`pip install nbstripout && nbstripout path/to/notebook.ipynb`.
 
 ## Tests
 
-- `cd jupyter && python -m pytest` runs the unit tests for the SQL builders (needs only pytest).
+- `cd jupyter && python -m pytest` runs the unit tests for the SQL builders and the notebook-output check (needs only pytest).
 - `jupyter/tests/smoke.sh IMAGE` starts a built image with a token and checks 403 without it, 200 with it, the
   framing header, seeded samples and that it does not run as root. The `Jupyter` workflow runs both.

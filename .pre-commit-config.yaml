@@ -4,3 +4,8 @@ repos:
     rev: v8.24.2
     hooks:
       - id: gitleaks
+  # Notebooks are committed without outputs; CI (jupyter/tests/test_notebook_outputs.py) enforces the same
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout

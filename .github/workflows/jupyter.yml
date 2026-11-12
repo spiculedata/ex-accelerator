@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'jupyter/**'
+      - 'ex-accell-ui/notebooks/**'
       - '.github/workflows/jupyter.yml'
   pull_request:
     branches: [main]
     paths:
       - 'jupyter/**'
+      - 'ex-accell-ui/notebooks/**'
       - '.github/workflows/jupyter.yml'
 
 permissions:
