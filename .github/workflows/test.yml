@@ -61,7 +61,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: ex-accell-ui
-        run: npx vitest run --reporter=default
+        run: npx vitest run --coverage --reporter=default
 
       - name: Upload coverage report
         if: always()

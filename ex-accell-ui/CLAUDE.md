@@ -82,6 +82,9 @@ set `DATABASE_URL`, `SESSION_SECRET` (32+ chars) and, for the first login, `ADMI
 - E2E tests authenticate through `tests/global-setup.ts`, which creates an admin row in `app_users` (needs
   `DATABASE_URL`) and mints a signed session cookie for it, so they need no login flow. The app checks every
   session against its user, so a cookie for a user who is not in the database is refused.
+- Coverage: `npm run test:unit:coverage` measures `src/lib` and `src/routes/api` and fails (locally and in CI)
+  below the `coverage.thresholds` floor in `vitest.config.ts`. Raise the floor, rounded down, whenever your
+  tests raise coverage; never lower it to make a change pass.
 - Commits use `type: description` (feat, fix, refactor, docs, test, chore, perf, ci).
 - Run `npm run test:unit`, `npm run build` and `npm run check` (no new errors) before opening a PR.
 

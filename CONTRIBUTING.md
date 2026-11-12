@@ -50,6 +50,11 @@ npm run build
 npm run test:e2e       # Playwright; first run: npx playwright install chromium
 ```
 
+Unit-test coverage is enforced. `npm run test:unit:coverage` (also run by the Unit Tests CI job) fails
+when statements, branches, functions or lines fall below the floor in `ex-accell-ui/vitest.config.ts`
+(`coverage.thresholds`). The floor sits just under the measured baseline, so new code needs tests. When
+your change raises coverage, raise the floor to the new measured value, rounded down, in the same PR.
+
 ## Dependency overrides
 
 `ex-accell-ui/package.json` pins two nested dependencies through npm `overrides`, because the
