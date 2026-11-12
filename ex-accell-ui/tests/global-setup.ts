@@ -1,6 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import pg from 'pg';
+import { runMigrations, type Migration } from '../src/lib/server/migrations/runner';
 import { createSessionToken } from '../src/lib/server/auth/session';
 import { ADD_SESSION_VERSION_SQL, CREATE_INDEX_SQL, CREATE_TABLE_SQL } from '../src/lib/server/auth/authSchema';
 import { E2E_SESSION_SECRET, E2E_STORAGE_STATE } from './e2e-auth';
@@ -8,6 +9,14 @@ import { E2E_SESSION_SECRET, E2E_STORAGE_STATE } from './e2e-auth';
 const SESSION_TTL_SECONDS = 60 * 60;
 // A fixed id, so every run reuses the same row
 const E2E_ADMIN = { id: '00000000-0000-4000-8000-000000e2e001', email: 'e2e@example.com', name: 'E2E Admin', role: 'admin' as const };
+
+const MIGRATIONS_DIR = 'db/migrations';
+
+/** The shipped migrations, read from disk: the app only applies them on a sign-in, which the e2e tests skip. */
+async function shippedMigrations(): Promise<Migration[]> {
+  const files = (await readdir(MIGRATIONS_DIR)).filter((file) => file.endsWith('.sql')).sort();
+  return Promise.all(files.map(async (file) => ({ name: file.replace(/\.sql$/, ''), sql: await readFile(join(MIGRATIONS_DIR, file), 'utf8') })));
+}
 
 /**
  * Makes sure the e2e admin exists in the users table. The app checks every session against its user, so a signed cookie
@@ -20,6 +29,8 @@ async function ensureE2eAdmin(): Promise<number> {
   const client = new pg.Client({ connectionString });
   await client.connect();
   try {
+    // Tests that create projects and workspaces need the schema; this is idempotent and shares the app's tracking table
+    await runMigrations(client, await shippedMigrations());
     await client.query(CREATE_TABLE_SQL);
     await client.query(ADD_SESSION_VERSION_SQL);
     await client.query(CREATE_INDEX_SQL);
