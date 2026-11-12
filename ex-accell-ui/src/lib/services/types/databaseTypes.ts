@@ -256,7 +256,10 @@ export interface LanguageMixing {
   primary_language: string;
   secondary_language: string;
   occurrence_count: number;
+  /** Share of all mixed posts, in percent */
   percentage: number;
+  /** Distinct posts with any language mixing, in the same scope; a post can appear in several pairs */
+  mixed_posts: number;
 }
 
 /**

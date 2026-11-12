@@ -202,13 +202,15 @@ class LanguageDetectionDatabase extends BaseDatabaseService {
       endpoint: 'language-mixing',
       params: { ...(workspaceId ? { workspace_id: workspaceId } : {}), ...currentRangeQuery() }
     });
-    const total = data.reduce((sum: number, row: any) => sum + toNumber(row.occurrence_count), 0);
+    // Only the top pairs come back, so their sum understates the mixed posts: the endpoint reports the real total
+    const mixedPosts = data.length > 0 ? toNumber(data[0].mixed_posts) : 0;
 
     return data.map((row: any) => ({
       primary_language: row.primary_language,
       secondary_language: row.secondary_language,
       occurrence_count: toNumber(row.occurrence_count),
-      percentage: total > 0 ? round((toNumber(row.occurrence_count) / total) * 100, 2) : 0
+      percentage: mixedPosts > 0 ? round((toNumber(row.occurrence_count) / mixedPosts) * 100, 2) : 0,
+      mixed_posts: mixedPosts
     }));
   }
 

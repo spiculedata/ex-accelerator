@@ -5,7 +5,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { ENGAGEMENT_TRENDS_DAYS, engagementQueries } from '$lib/server/engagementQueries';
-import { languageQueries } from '$lib/server/languageQueries';
+import { PLATFORM_CONDITION, hasNoSocialData, languageQueries, languageScope } from '$lib/server/languageQueries';
 import { WORKFLOW_DATASET_COUNT_QUERIES, buildWorkflowDatasets, type WorkflowDatasetCounts } from '$lib/server/workflowDatasets';
 import { TRIGRAM_DEFAULT_DAYS, TRIGRAM_MAX_POSTS, TRIGRAM_TIME_RANGE_DAYS, trigramPostsQuery } from '$lib/server/trigramQueries';
 import { computeTrigrams, trendWindow } from '$lib/server/trigrams';
@@ -712,9 +712,10 @@ export const GET: RequestHandler = async ({ url }) => {
     if (type === 'language-stats') {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
-        const dated = windowConditions('p.created_at', parsed.window, 1);
-        const data = await executeQuery(languageQueries.stats(dated.conditions), dated.params);
+        const scoped = languageScope(scope, parsed.window);
+        const data = await executeQuery(languageQueries.stats(scoped.conditions), scoped.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language stats', error, []);
@@ -724,6 +725,7 @@ export const GET: RequestHandler = async ({ url }) => {
     if (type === 'language-posts') {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const params: any[] = [];
         const conditions: string[] = [];
@@ -733,6 +735,7 @@ export const GET: RequestHandler = async ({ url }) => {
         if (platform && platform !== 'all') { params.push(platform); conditions.push(`ds.platform = $${params.length}`); }
         if (language && language !== 'all') { params.push(language); conditions.push(`l.code = $${params.length}`); }
         if (Number.isFinite(minConfidence)) { params.push(minConfidence); conditions.push(`ld.confidence_score >= $${params.length}`); }
+        if (scope?.hasSocialMedia) { params.push(scope.socialPlatforms); conditions.push(PLATFORM_CONDITION(`$${params.length}`)); }
         const dated = windowConditions('p.created_at', parsed.window, params.length + 1);
         params.push(...dated.params);
         conditions.push(...dated.conditions);
@@ -748,9 +751,10 @@ export const GET: RequestHandler = async ({ url }) => {
     if (type === 'language-mixing') {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
-        const dated = windowConditions('p.created_at', parsed.window, 1);
-        const data = await executeQuery(languageQueries.mixing(dated.conditions), dated.params);
+        const scoped = languageScope(scope, parsed.window);
+        const data = await executeQuery(languageQueries.mixing(scoped.conditions), scoped.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language mixing', error, []);
@@ -758,16 +762,12 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (type === 'language-trends') {
+      const parsed = parseDateWindow(url.searchParams);
+      if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
-        const data = await executeQuery(`
-          SELECT
-            language_code,
-            analysis_date,
-            document_count,
-            avg_confidence
-          FROM language_trends
-          ORDER BY analysis_date DESC, document_count DESC
-        `);
+        const scoped = languageScope(scope, parsed.window);
+        const data = await executeQuery(languageQueries.trends(scoped.conditions), scoped.params);
         return json({ success: true, data });
       } catch (error) {
         return queryErrorResponse('Language trends', error, []);
@@ -775,14 +775,20 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     if (type === 'language-detection-detail') {
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const langCode = url.searchParams.get('language') || 'all';
         const params: any[] = [];
-        let whereClause = '';
+        const detailConditions: string[] = [];
         if (langCode !== 'all') {
           params.push(langCode);
-          whereClause = `WHERE l.code = $1`;
+          detailConditions.push(`l.code = $${params.length}`);
         }
+        if (scope?.hasSocialMedia) {
+          params.push(scope.socialPlatforms);
+          detailConditions.push(PLATFORM_CONDITION(`$${params.length}`));
+        }
+        const whereClause = detailConditions.length > 0 ? `WHERE ${detailConditions.join(' AND ')}` : '';
         const data = await executeQuery(`
           SELECT
             ld.post_id AS document_id,
@@ -1350,6 +1356,7 @@ Be factual and analytical. Do not speculate beyond what the data suggests.`;
     if (type?.startsWith('engagement-')) {
       const parsed = parseDateWindow(url.searchParams);
       if (!parsed.ok) return json({ success: false, error: parsed.error }, { status: 400 });
+      if (hasNoSocialData(scope)) return json({ success: true, data: [] });
       try {
         const wsId = url.searchParams.get('workspace_id');
         let platforms: string[] = [];

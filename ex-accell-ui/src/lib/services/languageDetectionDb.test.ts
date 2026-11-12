@@ -196,17 +196,33 @@ describe('getLanguageMixing', () => {
   it('maps real language pairs with their share of all mixed posts', async () => {
     mockFetch({
       'language-mixing': [
-        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30' },
-        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10' }
+        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30', mixed_posts: '40' },
+        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10', mixed_posts: '40' }
       ]
     });
 
     const mixing = await languageDetectionDb.getLanguageMixing();
 
     expect(mixing).toEqual([
-      { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: 30, percentage: 75 },
-      { primary_language: 'English', secondary_language: 'French', occurrence_count: 10, percentage: 25 }
+      { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: 30, percentage: 75, mixed_posts: 40 },
+      { primary_language: 'English', secondary_language: 'French', occurrence_count: 10, percentage: 25, mixed_posts: 40 }
     ]);
+  });
+});
+
+describe('getLanguageMixing mixed posts', () => {
+  it('measures each pair against all mixed posts, not against the sum of the top pairs', async () => {
+    mockFetch({
+      'language-mixing': [
+        { primary_language: 'English', secondary_language: 'Spanish', occurrence_count: '30', mixed_posts: '200' },
+        { primary_language: 'English', secondary_language: 'French', occurrence_count: '10', mixed_posts: '200' }
+      ]
+    });
+
+    const mixing = await languageDetectionDb.getLanguageMixing();
+
+    expect(mixing.map((pair) => pair.percentage)).toEqual([15, 5]);
+    expect(mixing.every((pair) => pair.mixed_posts === 200)).toBe(true);
   });
 });
 

@@ -29,8 +29,8 @@ describe('date range conditions', () => {
   });
 
   it('join the post date for language stats and mixing, and leave them untouched without a range', () => {
-    expect(languageQueries.stats(['p.created_at >= $1'])).toContain('JOIN posts p ON p.id = ld.post_id WHERE p.created_at >= $1');
-    expect(languageQueries.mixing(['p.created_at >= $1'])).toContain('JOIN posts p ON p.id = lm.post_id WHERE p.created_at >= $1');
+    expect(languageQueries.stats(['p.created_at >= $1'])).toContain('JOIN posts p ON p.id = ld.post_id JOIN data_sources ds ON ds.id = p.data_source_id WHERE p.created_at >= $1');
+    expect(languageQueries.mixing(['p.created_at >= $1'])).toContain('JOIN posts p ON p.id = lm.post_id JOIN data_sources ds ON ds.id = p.data_source_id WHERE p.created_at >= $1');
     expect(languageQueries.stats()).not.toContain('JOIN posts');
     expect(languageQueries.mixing()).not.toContain('JOIN posts');
   });
