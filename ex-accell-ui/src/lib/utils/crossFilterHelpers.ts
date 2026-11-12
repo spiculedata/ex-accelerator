@@ -7,33 +7,56 @@ import type { CrossFilter } from '$lib/stores/investigationStore';
  * without additional API calls.
  */
 
-function normalizeForMatch(value: string): string {
+/** The GDELT event fields the cross-filter reads; rows carry many more, and either tone spelling can appear. */
+export interface GdeltEventRow {
+  actor1name?: string | null;
+  actor2name?: string | null;
+  actiongeo_fullname?: string | null;
+  sqldate?: string | number | null;
+  avgtone?: number | string | null;
+  avg_tone?: number | string | null;
+}
+
+/** One day of the fused timeline, with the per-source counts the sentiment fusion reads. */
+export interface TimelineDayRow {
+  date: string;
+  gdelt_events?: number | null;
+  gdelt_avg_tone?: number | null;
+  radio_segments?: number | null;
+  radio_positive?: number | null;
+  radio_negative?: number | null;
+  social_posts?: number | null;
+  social_positive?: number | null;
+  social_negative?: number | null;
+}
+
+function normalizeForMatch(value?: string | null): string {
   return (value || '').toLowerCase().trim();
 }
 
-function actorMatches(event: any, actor: string): boolean {
+function actorMatches(event: GdeltEventRow, actor: string): boolean {
   const norm = normalizeForMatch(actor);
   return normalizeForMatch(event.actor1name).includes(norm) ||
          normalizeForMatch(event.actor2name).includes(norm);
 }
 
-function locationMatches(event: any, location: string): boolean {
+function locationMatches(event: GdeltEventRow, location: string): boolean {
   return normalizeForMatch(event.actiongeo_fullname).includes(normalizeForMatch(location));
 }
 
-function keywordMatches(event: any, keyword: string): boolean {
+function keywordMatches(event: GdeltEventRow, keyword: string): boolean {
   const norm = normalizeForMatch(keyword);
   const text = `${event.actor1name || ''} ${event.actor2name || ''} ${event.actiongeo_fullname || ''}`.toLowerCase();
   return text.includes(norm);
 }
 
-function eventDate(event: any): string {
+function eventDate(event: GdeltEventRow): string {
   const s = String(event.sqldate || '');
   if (s.length === 8) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
   return s.split('T')[0];
 }
 
-function eventSentiment(event: any): string {
+function eventSentiment(event: GdeltEventRow): string {
   const tone = Number(event.avgtone ?? event.avg_tone ?? 0);
   if (tone > 1) return 'positive';
   if (tone < -1) return 'negative';
@@ -41,7 +64,7 @@ function eventSentiment(event: any): string {
 }
 
 /** Given an actor, find all locations where they appear in GDELT events */
-export function extractActorLocations(gdeltEvents: any[], actor: string): Set<string> {
+export function extractActorLocations(gdeltEvents: GdeltEventRow[], actor: string): Set<string> {
   const locations = new Set<string>();
   for (const e of gdeltEvents) {
     if (actorMatches(e, actor) && e.actiongeo_fullname) {
@@ -52,7 +75,7 @@ export function extractActorLocations(gdeltEvents: any[], actor: string): Set<st
 }
 
 /** Given an actor, find co-occurring terms (other actors + locations) */
-export function extractActorKeywords(gdeltEvents: any[], actor: string): Set<string> {
+export function extractActorKeywords(gdeltEvents: GdeltEventRow[], actor: string): Set<string> {
   const terms = new Set<string>();
   for (const e of gdeltEvents) {
     if (!actorMatches(e, actor)) continue;
@@ -68,7 +91,7 @@ export function extractActorKeywords(gdeltEvents: any[], actor: string): Set<str
 }
 
 /** Given a location, find all actors present there */
-export function extractLocationActors(gdeltEvents: any[], location: string): Set<string> {
+export function extractLocationActors(gdeltEvents: GdeltEventRow[], location: string): Set<string> {
   const actors = new Set<string>();
   for (const e of gdeltEvents) {
     if (!locationMatches(e, location)) continue;
@@ -79,7 +102,7 @@ export function extractLocationActors(gdeltEvents: any[], location: string): Set
 }
 
 /** Given a location, find co-occurring terms (actors at that location) */
-export function extractLocationKeywords(gdeltEvents: any[], location: string): Set<string> {
+export function extractLocationKeywords(gdeltEvents: GdeltEventRow[], location: string): Set<string> {
   const terms = new Set<string>();
   for (const e of gdeltEvents) {
     if (!locationMatches(e, location)) continue;
@@ -90,7 +113,7 @@ export function extractLocationKeywords(gdeltEvents: any[], location: string): S
 }
 
 /** Given a keyword, find actors from events mentioning it */
-export function extractKeywordActors(gdeltEvents: any[], keyword: string): Set<string> {
+export function extractKeywordActors(gdeltEvents: GdeltEventRow[], keyword: string): Set<string> {
   const actors = new Set<string>();
   for (const e of gdeltEvents) {
     if (!keywordMatches(e, keyword)) continue;
@@ -101,7 +124,7 @@ export function extractKeywordActors(gdeltEvents: any[], keyword: string): Set<s
 }
 
 /** Given a keyword, find locations from events mentioning it */
-export function extractKeywordLocations(gdeltEvents: any[], keyword: string): Set<string> {
+export function extractKeywordLocations(gdeltEvents: GdeltEventRow[], keyword: string): Set<string> {
   const locations = new Set<string>();
   for (const e of gdeltEvents) {
     if (!keywordMatches(e, keyword)) continue;
@@ -111,7 +134,7 @@ export function extractKeywordLocations(gdeltEvents: any[], keyword: string): Se
 }
 
 /** Given a date, extract all entities active on that date */
-export function extractDateEntities(gdeltEvents: any[], date: string): { actors: Set<string>; locations: Set<string> } {
+export function extractDateEntities(gdeltEvents: GdeltEventRow[], date: string): { actors: Set<string>; locations: Set<string> } {
   const actors = new Set<string>();
   const locations = new Set<string>();
   for (const e of gdeltEvents) {
@@ -124,7 +147,7 @@ export function extractDateEntities(gdeltEvents: any[], date: string): { actors:
 }
 
 /** Given a sentiment bucket, extract all entities matching that sentiment */
-export function extractSentimentEntities(gdeltEvents: any[], sentiment: string): { actors: Set<string>; locations: Set<string>; keywords: Set<string> } {
+export function extractSentimentEntities(gdeltEvents: GdeltEventRow[], sentiment: string): { actors: Set<string>; locations: Set<string>; keywords: Set<string> } {
   const actors = new Set<string>();
   const locations = new Set<string>();
   const keywords = new Set<string>();
@@ -138,7 +161,7 @@ export function extractSentimentEntities(gdeltEvents: any[], sentiment: string):
 }
 
 /** Given a date, extract keywords (actor names + locations) active on that date */
-export function extractDateKeywords(gdeltEvents: any[], date: string): Set<string> {
+export function extractDateKeywords(gdeltEvents: GdeltEventRow[], date: string): Set<string> {
   const keywords = new Set<string>();
   for (const e of gdeltEvents) {
     if (eventDate(e) !== date) continue;
@@ -165,8 +188,8 @@ export function classifySentiment(score: number): string {
  */
 export function computeTimelineHighlightDays(
   crossFilter: CrossFilter | null,
-  timelineData: any[],
-  gdeltEvents: any[]
+  timelineData: TimelineDayRow[],
+  gdeltEvents: GdeltEventRow[]
 ): Set<string> | null {
   if (!crossFilter) return null;
 
@@ -178,7 +201,7 @@ export function computeTimelineHighlightDays(
       // Highlight days where fused sentiment matches the filter
       const matchingDays = new Set<string>();
       for (const d of timelineData) {
-        const gdeltSent = d.gdelt_events > 0 ? (d.gdelt_avg_tone ?? 0) / 10 : null;
+        const gdeltSent = (d.gdelt_events ?? 0) > 0 ? (d.gdelt_avg_tone ?? 0) / 10 : null;
         const radioTotal = d.radio_segments ?? 0;
         const radioSent = radioTotal > 0 ? ((d.radio_positive ?? 0) - (d.radio_negative ?? 0)) / radioTotal : null;
         const socialTotal = d.social_posts ?? 0;
@@ -233,7 +256,7 @@ export function computeTimelineHighlightDays(
  */
 export function computeHighlightSet(
   crossFilter: CrossFilter | null,
-  gdeltEvents: any[],
+  gdeltEvents: GdeltEventRow[],
   targetDimension: 'actor' | 'location' | 'keyword'
 ): Set<string> {
   if (!crossFilter || gdeltEvents.length === 0) return new Set();

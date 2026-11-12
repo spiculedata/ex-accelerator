@@ -11,9 +11,9 @@ const currentLevel: LogLevel = (
 
 const REDACT_KEYS = new Set(['password', 'secret', 'token', 'key', 'authorization', 'cookie']);
 
-function redact(obj: any): any {
+function redact(obj: unknown): unknown {
   if (!obj || typeof obj !== 'object') return obj;
-  const result: any = {};
+  const result: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (REDACT_KEYS.has(k.toLowerCase())) {
       result[k] = '[REDACTED]';
@@ -26,7 +26,7 @@ function redact(obj: any): any {
   return result;
 }
 
-function formatMessage(level: LogLevel, context: string, message: string, data?: any): string {
+function formatMessage(level: LogLevel, context: string, message: string, data?: unknown): string {
   const ts = new Date().toISOString();
   const base = `[${ts}] ${level.toUpperCase()} [${context}] ${message}`;
   if (data) return `${base} ${JSON.stringify(redact(data))}`;
@@ -39,16 +39,16 @@ function shouldLog(level: LogLevel): boolean {
 
 export function createLogger(context: string) {
   return {
-    debug(message: string, data?: any) {
+    debug(message: string, data?: unknown) {
       if (shouldLog('debug')) console.debug(formatMessage('debug', context, message, data));
     },
-    info(message: string, data?: any) {
+    info(message: string, data?: unknown) {
       if (shouldLog('info')) console.log(formatMessage('info', context, message, data));
     },
-    warn(message: string, data?: any) {
+    warn(message: string, data?: unknown) {
       if (shouldLog('warn')) console.warn(formatMessage('warn', context, message, data));
     },
-    error(message: string, data?: any) {
+    error(message: string, data?: unknown) {
       if (shouldLog('error')) console.error(formatMessage('error', context, message, data));
     }
   };
