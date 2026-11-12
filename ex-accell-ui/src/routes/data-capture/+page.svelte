@@ -25,7 +25,7 @@
       const response = await fetch(`/api/jobs?state=true${timestamp}`);
       
       if (response.ok) {
-        jobStates = await response.json();
+        jobStates = (await response.json()).data ?? [];
         console.log('Loaded job states:', jobStates.length, 'jobs found');
         
         // Convert job states to UI format
@@ -73,7 +73,7 @@
     try {
       const response = await fetch(`/api/job-state?jobId=${jobId}`);
       if (response.ok) {
-        const updatedState = await response.json();
+        const updatedState = (await response.json()).data;
         
         // Update the specific job in crawlJobs
         const jobIndex = crawlJobs.findIndex(job => job.id === jobId);
@@ -1162,6 +1162,8 @@
           // Try to extract the actual error message from various response formats
           if (typeof errorData === 'string') {
             errorMessage = errorData;
+          } else if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
           } else if (errorData.message) {
             errorMessage = errorData.message;
           } else if (errorData.error?.message) {

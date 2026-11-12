@@ -43,6 +43,19 @@ export interface ScheduledJob {
 	crawlId?: string;
 }
 
+/** The `error` text of an envelope failure, or the raw body when it is not one. */
+async function errorFrom(response: Response): Promise<string> {
+	const text = await response.text();
+	try {
+		const parsed = JSON.parse(text);
+		if (typeof parsed?.error === 'string') return parsed.error;
+		if (typeof parsed?.message === 'string') return parsed.message;
+	} catch {
+		// not JSON: fall through to the raw text
+	}
+	return text;
+}
+
 class JobSchedulerService {
 	private readonly apiBaseUrl = '/api/jobs';
 
@@ -56,8 +69,7 @@ class JobSchedulerService {
 		});
 
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(`Failed to schedule job: ${errorText}`);
+			throw new Error(`Failed to schedule job: ${await errorFrom(response)}`);
 		}
 
 		return await response.json();
@@ -67,8 +79,7 @@ class JobSchedulerService {
 		const response = await fetch(this.apiBaseUrl);
 
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(`Failed to get jobs: ${errorText}`);
+			throw new Error(`Failed to get jobs: ${await errorFrom(response)}`);
 		}
 
 		return await response.json();
@@ -78,8 +89,7 @@ class JobSchedulerService {
 		const response = await fetch(`${this.apiBaseUrl}?name=${encodeURIComponent(name)}`);
 
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(`Failed to get job: ${errorText}`);
+			throw new Error(`Failed to get job: ${await errorFrom(response)}`);
 		}
 
 		return await response.json();
@@ -91,8 +101,7 @@ class JobSchedulerService {
 		});
 
 		if (!response.ok) {
-			const errorText = await response.text();
-			throw new Error(`Failed to delete job: ${errorText}`);
+			throw new Error(`Failed to delete job: ${await errorFrom(response)}`);
 		}
 
 		return await response.json();
