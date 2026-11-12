@@ -44,8 +44,12 @@ Templates live in `ex-accell-ui/notebooks/`, including:
 
 ## With Docker Compose
 
-The compose file has a `jupyter` service that mounts `DATA_DIR/notebooks`. Its build context
-(`./jupyter`) is not complete in the repository yet, so use the local Poetry route above for now.
+The compose file has a `jupyter` service built from `./jupyter`. It mounts `DATA_DIR/notebooks`, which a one-shot `jupyter-init`
+service hands to the container's unprivileged user. It refuses to start without `JUPYTER_TOKEN`, so set one in `.env`
+(`openssl rand -hex 32`), then run `docker compose up -d jupyter`. The app opens that service for administrators through
+`JUPYTER_URL` (default `http://localhost:8888`) and the same token. `JUPYTER_TOKEN` in `.env` matters only for this route, or when you
+point the dev server at your own Jupyter with `JUPYTER_URL`; `npm run dev:jupyter` and the **Start JupyterLab** button create a random
+token for every launch and ignore it.
 
 ::: tip Upgrading from an earlier version
 Re-run `npm run jupyter:bootstrap` once so the project-local `.jupyter/` config exists; without it the
@@ -65,9 +69,19 @@ Any variable whose name contains `TOKEN`, `SECRET`, `PASSWORD`, `API_KEY` or `CR
 :::
 
 ::: warning Notebooks run code with access to your database
-Jupyter Lab listens on `127.0.0.1` only, requires a token (random on every start unless you set `JUPYTER_TOKEN`), keeps cross-site
-request checks on and accepts cross-origin requests only from the app's own address. The Research
-page's launch controls are administrator-only, and they hand the tokenised link to the signed-in
-administrator. Notebooks receive the app's database credentials (`DATABASE_URL`), so use a database role with only the rights you want notebooks to have. Do not publish port 8888 to a network, and stop Jupyter when you are not using it. The
-compose file publishes it on `127.0.0.1`; set `JUPYTER_TOKEN` in `.env` so the app can open it. `JUPYTER_ALLOW_ORIGIN` defaults to `http://localhost:3000` for compose and to `http://localhost:5173` for the local dev scripts.
+Notebooks can do anything the account running Jupyter can, and they receive database credentials (`DATABASE_URL`, `PGPASSWORD`), so use a database
+role with only the rights you want notebooks to have. Stop Jupyter when you are not using it, and never publish port 8888 to a network.
+
+What protects the two routes is set in different places, so check the one you use:
+
+- **Local (`npm run dev:jupyter`, `npm run jupyter:start`, the Start button).** Jupyter listens on `127.0.0.1` only, requires a token
+  that is random on every start, keeps cross-site request checks on and accepts cross-origin requests and framing only from the app's own
+  address (`JUPYTER_ALLOW_ORIGIN`, default `http://localhost:5173`). This comes from the project-local `.jupyter/` config that
+  `npm run jupyter:bootstrap` writes and from the launch settings. The launch controls are administrator-only and hand the tokenised link to the
+  signed-in administrator.
+- **Compose.** The same guarantees come from the image's own `jupyter/jupyter_server_config.py`: token required, XSRF checks on, origin and
+  framing limited to `JUPYTER_ALLOW_ORIGIN` (default `http://localhost:3000`, set it to the URL you open the app on), no root, and the port
+  published on `127.0.0.1` only.
+- **Your own Jupyter (`JUPYTER_URL` and `JUPYTER_TOKEN`).** The app only passes the token on. It cannot check that the server you point it at
+  enforces a token, an origin or framing limits, so configure those yourself.
 :::
