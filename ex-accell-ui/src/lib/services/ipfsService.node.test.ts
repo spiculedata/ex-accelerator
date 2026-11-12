@@ -23,6 +23,7 @@ const fake = vi.hoisted(() => {
     starts: 0,
     stopped: 0,
     stopError: null as Error | null,
+    startError: null as Error | null,
     closedStores: 0,
     reset() {
       files.clear();
@@ -31,6 +32,7 @@ const fake = vi.hoisted(() => {
       state.starts = 0;
       state.stopped = 0;
       state.stopError = null;
+      state.startError = null;
       state.closedStores = 0;
       nextCid = 0;
     },
@@ -69,6 +71,7 @@ vi.mock('helia', () => ({
   createHelia: async () => {
     fake.starts++;
     await new Promise((resolve) => setTimeout(resolve, 5));
+    if (fake.startError) throw fake.startError;
     return {
       libp2p: { peerId: { toString: () => '12D3KooWfake' } },
       pins: { add: async (cid: string) => void fake.pins.push(cid) },
@@ -302,5 +305,39 @@ describe('shutdown', () => {
 
     expect(fake.closedStores).toBe(2);
     expect(service.isConnected()).toBe(false);
+  });
+
+  it('stops a node that finishes starting after the shutdown event, instead of leaving it running', async () => {
+    const connecting = service.connect();
+
+    process.emit('sveltekit:shutdown' as never); // arrives while createHelia is still pending
+    await connecting;
+    await vi.waitFor(() => expect(fake.stopped).toBe(1));
+
+    expect(service.isConnected()).toBe(false);
+  });
+
+  it('refuses to start a node once shutdown has begun', async () => {
+    await service.connect();
+    process.emit('sveltekit:shutdown' as never);
+    await vi.waitFor(() => expect(fake.stopped).toBe(1));
+
+    await expect(service.connect()).rejects.toThrow(/shutting down/);
+
+    expect(fake.starts).toBe(1);
+  });
+
+  it('closes the stores it opened and leaves no listener when the node fails to start, so a retry can succeed', async () => {
+    const before = shutdownListeners();
+    fake.startError = new Error('lock held');
+
+    await expect(service.connect()).rejects.toThrow('lock held');
+
+    expect(fake.closedStores).toBe(2);
+    expect(shutdownListeners()).toBe(before);
+
+    fake.startError = null;
+    await service.connect();
+    expect(service.isConnected()).toBe(true);
   });
 });

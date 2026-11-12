@@ -59,16 +59,22 @@ class IpfsService {
   private closing: Promise<void> | null = null;
   private stores: ClosableStore[] = [];
   // adapter-node announces 'sveltekit:shutdown' on SIGTERM/SIGINT once it has stopped taking requests
+  private shuttingDown = false;
   private readonly onShutdown = () => {
+    this.shuttingDown = true;
     this.close().catch((error) => log.error('Failed to stop the Helia node on shutdown', { detail: error instanceof Error ? error.message : String(error) }));
   };
 
   async connect(): Promise<void> {
+    if (this.shuttingDown) throw new Error('The server is shutting down');
     if (this.node && this.ufs) return;
     if (!IPFS_ENABLED) throw new IpfsDisabledError();
     if (this.closing) await this.closing.catch(() => undefined);
+    if (this.shuttingDown) throw new Error('The server is shutting down');
     if (this.node && this.ufs) return;
     if (!this.starting) {
+      // Listen before the node exists: a shutdown that arrives while it is starting is then stopped once it is up
+      (process as NodeJS.EventEmitter).once('sveltekit:shutdown', this.onShutdown);
       this.starting = this.start().finally(() => {
         this.starting = null;
       });
@@ -77,6 +83,7 @@ class IpfsService {
   }
 
   private async start(): Promise<void> {
+    let stores: ClosableStore[] = [];
     try {
       const { createHelia } = await import('helia');
       const { unixfs } = await import('@helia/unixfs');
@@ -88,14 +95,17 @@ class IpfsService {
 
       const blockstore = new FsBlockstore(IPFS_BLOCKSTORE_PATH);
       const datastore = new LevelDatastore(IPFS_DATASTORE_PATH);
+      stores = [blockstore, datastore];
       const node = (await createHelia({ blockstore, datastore })) as unknown as HeliaNode;
       this.node = node;
-      this.stores = [blockstore, datastore];
-      (process as NodeJS.EventEmitter).once('sveltekit:shutdown', this.onShutdown);
+      this.stores = stores;
       this.ufs = unixfs(node as never) as unknown as UnixFs;
       log.info('Helia node started', { peerId: node.libp2p.peerId.toString() });
     } catch (error) {
       log.error('Failed to start the Helia node', { detail: error instanceof Error ? error.message : String(error) });
+      // Release whatever was opened, or a retry would find the datastore still locked
+      await Promise.allSettled(stores.map((store) => store.close()));
+      (process as NodeJS.EventEmitter).removeListener('sveltekit:shutdown', this.onShutdown);
       throw error;
     }
   }
