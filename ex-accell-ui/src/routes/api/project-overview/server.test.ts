@@ -65,3 +65,28 @@ describe('GET /api/project-overview', () => {
     expect((await call('99')).status).toBe(404);
   });
 });
+
+describe('GET /api/project-overview envelope', () => {
+  it('returns the payload in data and the legacy keys', async () => {
+    const body = await (await call()).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.project).toEqual(body.project);
+    expect(body.data.summary).toEqual(body.summary);
+  });
+
+  it('puts null data on the 400 and 404 failures', async () => {
+    expect(await (await call('abc')).json()).toMatchObject({ success: false, data: null });
+    query.mockImplementation(async () => []);
+    expect(await (await call('9')).json()).toEqual({ success: false, data: null, error: 'Project not found' });
+  });
+
+  it('returns a generic 500 envelope without the database message', async () => {
+    query.mockRejectedValue(new Error('password authentication failed for user postgres'));
+
+    const response = await call();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to load the project overview' });
+  });
+});

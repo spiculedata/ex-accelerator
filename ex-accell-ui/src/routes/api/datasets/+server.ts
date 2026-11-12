@@ -1,10 +1,13 @@
 // Dataset API Endpoints
 // RESTful API for managing datasets, permissions, and workspace associations
 
+import { parseResourceId } from '$lib/server/auth/access';
 import { refuseIfNoAccess } from '$lib/server/auth/accessGuard';
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError, readJsonObject } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { datasetsDb } from '$lib/services/datasetsDb';
+
+const MAX_BODY_BYTES = 64 * 1024;
 
 /**
  * GET /api/datasets
@@ -31,15 +34,13 @@ export const GET: RequestHandler = async ({ url }) => {
     const userEmail = url.searchParams.get('user_email') || undefined;
     const workspaceId = url.searchParams.get('workspace_id');
     const search = url.searchParams.get('search');
+    const workspaceIdNum = parseResourceId(workspaceId);
+    if (workspaceIdNum === 'invalid') return apiFail('workspace_id must be a whole number', 400);
 
     // If workspace_id is provided, get datasets for that workspace
-    if (workspaceId) {
-      const datasets = await datasetsDb.getWorkspaceDatasets(parseInt(workspaceId));
-      return json({
-        success: true,
-        datasets,
-        count: datasets.length
-      });
+    if (workspaceIdNum !== null) {
+      const datasets = await datasetsDb.getWorkspaceDatasets(workspaceIdNum);
+      return apiOk(datasets, { datasets, count: datasets.length });
     }
 
     // If search term is provided, search datasets
@@ -51,11 +52,7 @@ export const GET: RequestHandler = async ({ url }) => {
         visibility,
         tags
       });
-      return json({
-        success: true,
-        datasets,
-        count: datasets.length
-      });
+      return apiOk(datasets, { datasets, count: datasets.length });
     }
 
     // If user_email is provided, get accessible datasets for that user
@@ -67,11 +64,7 @@ export const GET: RequestHandler = async ({ url }) => {
         visibility,
         tags
       });
-      return json({
-        success: true,
-        datasets,
-        count: datasets.length
-      });
+      return apiOk(datasets, { datasets, count: datasets.length });
     }
 
     // Otherwise, get all datasets with filters
@@ -83,21 +76,9 @@ export const GET: RequestHandler = async ({ url }) => {
       tags
     });
 
-    return json({
-      success: true,
-      datasets,
-      count: datasets.length
-    });
-  } catch (error: any) {
-    console.error('Error fetching datasets:', error);
-    return json(
-      {
-        success: false,
-        error: 'Failed to fetch datasets',
-        message: error.message
-      },
-      { status: 500 }
-    );
+    return apiOk(datasets, { datasets, count: datasets.length });
+  } catch (error) {
+    return apiServerError('GET /api/datasets', error, 'Failed to fetch datasets');
   }
 };
 
@@ -123,9 +104,12 @@ export const GET: RequestHandler = async ({ url }) => {
  * }
  */
 export const POST: RequestHandler = async ({ request, locals }) => {
+  const parsed = await readJsonObject(request, MAX_BODY_BYTES);
+  if ('failure' in parsed) return parsed.failure;
+  const body = parsed.body as Record<string, any>;
+  const { action } = body;
+
   try {
-    const body = await request.json();
-    const { action } = body;
 
     if (action === 'link') {
       const { workspace_id, dataset_id, settings } = body;
@@ -136,27 +120,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (refused) return refused;
 
       if (!workspace_id || !dataset_id || !addedBy) {
-        return json(
-          {
-            success: false,
-            error: 'Missing required fields: workspace_id, dataset_id'
-          },
-          { status: 400 }
-        );
+        return apiFail('Missing required fields: workspace_id, dataset_id', 400);
       }
+      if (typeof parseResourceId(dataset_id) !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
       // Admins may use any dataset; everyone else needs access to it
       const isAdmin = locals.user?.role === 'admin';
       const { hasAccess } = isAdmin ? { hasAccess: true } : await datasetsDb.checkUserAccess(dataset_id, addedBy);
 
       if (!hasAccess) {
-        return json(
-          {
-            success: false,
-            error: 'Access denied: User does not have permission to use this dataset'
-          },
-          { status: 403 }
-        );
+        return apiFail('Access denied: User does not have permission to use this dataset', 403);
       }
 
       const workspaceDataset = await datasetsDb.linkDatasetToWorkspace(
@@ -166,61 +139,36 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         settings || {}
       );
 
-      return json({
-        success: true,
-        workspace_dataset: workspaceDataset,
-        message: 'Dataset linked to workspace successfully'
-      });
+      return apiOk(workspaceDataset, { workspace_dataset: workspaceDataset, message: 'Dataset linked to workspace successfully' });
     } else if (action === 'grant_permission') {
       const { dataset_id, user_email, access_level, expires_at } = body;
 
       // Granting access to a dataset is an administrator action
       if (locals.user?.role !== 'admin') {
-        return json({ success: false, error: 'Only administrators can grant dataset access' }, { status: 403 });
+        return apiFail('Only administrators can grant dataset access', 403);
       }
 
+      const expiresAt = expires_at ? new Date(expires_at) : null;
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) return apiFail('expires_at must be a date', 400);
       if (!dataset_id || !user_email) {
-        return json(
-          {
-            success: false,
-            error: 'Missing required fields: dataset_id, user_email'
-          },
-          { status: 400 }
-        );
+        return apiFail('Missing required fields: dataset_id, user_email', 400);
       }
+      if (typeof parseResourceId(dataset_id) !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
       const permission = await datasetsDb.grantDatasetPermission(
         dataset_id,
         user_email,
         access_level || 'read',
         locals.user.email,
-        expires_at ? new Date(expires_at) : null
+        expiresAt
       );
 
-      return json({
-        success: true,
-        permission,
-        message: 'Permission granted successfully'
-      });
+      return apiOk(permission, { permission, message: 'Permission granted successfully' });
     } else {
-      return json(
-        {
-          success: false,
-          error: 'Invalid action. Supported actions: link, grant_permission'
-        },
-        { status: 400 }
-      );
+      return apiFail('Invalid action. Supported actions: link, grant_permission', 400);
     }
-  } catch (error: any) {
-    console.error('Error in POST /api/datasets:', error);
-    return json(
-      {
-        success: false,
-        error: 'Failed to process request',
-        message: error.message
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return apiServerError('POST /api/datasets', error, 'Failed to process request');
   }
 };
 
@@ -234,79 +182,46 @@ export const POST: RequestHandler = async ({ request, locals }) => {
  * - dataset_id: Dataset ID (required)
  * - user_email: User email (for revoke_permission)
  */
-export const DELETE: RequestHandler = async ({ url }) => {
+export const DELETE: RequestHandler = async ({ url, locals }) => {
   try {
     const action = url.searchParams.get('action');
     const datasetId = url.searchParams.get('dataset_id');
 
     if (!datasetId) {
-      return json(
-        {
-          success: false,
-          error: 'Missing required parameter: dataset_id'
-        },
-        { status: 400 }
-      );
+      return apiFail('Missing required parameter: dataset_id', 400);
     }
 
-    const datasetIdNum = parseInt(datasetId);
+    const datasetIdNum = parseResourceId(datasetId);
+    if (typeof datasetIdNum !== 'number') return apiFail('dataset_id must be a whole number', 400);
 
     if (action === 'unlink') {
       const workspaceId = url.searchParams.get('workspace_id');
 
       if (!workspaceId) {
-        return json(
-          {
-            success: false,
-            error: 'Missing required parameter: workspace_id'
-          },
-          { status: 400 }
-        );
+        return apiFail('Missing required parameter: workspace_id', 400);
       }
 
-      await datasetsDb.unlinkDatasetFromWorkspace(parseInt(workspaceId), datasetIdNum);
+      const workspaceIdNum = parseResourceId(workspaceId);
+      if (typeof workspaceIdNum !== 'number') return apiFail('workspace_id must be a whole number', 400);
+      await datasetsDb.unlinkDatasetFromWorkspace(workspaceIdNum, datasetIdNum);
 
-      return json({
-        success: true,
-        message: 'Dataset unlinked from workspace successfully'
-      });
+      return apiOk(null, { message: 'Dataset unlinked from workspace successfully' });
     } else if (action === 'revoke_permission') {
+      // Like granting access, revoking it is an administrator action
+      if (locals.user?.role !== 'admin') return apiFail('Only administrators can revoke dataset access', 403);
       const userEmail = url.searchParams.get('user_email');
 
       if (!userEmail) {
-        return json(
-          {
-            success: false,
-            error: 'Missing required parameter: user_email'
-          },
-          { status: 400 }
-        );
+        return apiFail('Missing required parameter: user_email', 400);
       }
 
       await datasetsDb.revokeDatasetPermission(datasetIdNum, userEmail);
 
-      return json({
-        success: true,
-        message: 'Permission revoked successfully'
-      });
+      return apiOk(null, { message: 'Permission revoked successfully' });
     } else {
-      return json(
-        {
-          success: false,
-          error: 'Invalid action. Supported actions: unlink, revoke_permission'
-        },
-        { status: 400 }
-      );
+      return apiFail('Invalid action. Supported actions: unlink, revoke_permission', 400);
     }
-  } catch (error: any) {
-    console.error('Error in DELETE /api/datasets:', error);
-    return json(
-      {
-        success: false,
-        error: 'Failed to process request',
-        message: error.message
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return apiServerError('DELETE /api/datasets', error, 'Failed to process request');
   }
 };

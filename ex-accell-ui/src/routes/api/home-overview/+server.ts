@@ -3,7 +3,7 @@
 // projects with sparklines/sentiment/anomalies, activity feed, summary stats
 
 import { visibleProjectIds } from '$lib/server/auth/accessGuard';
-import { json } from '@sveltejs/kit';
+import { apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
@@ -259,8 +259,7 @@ export const GET: RequestHandler = async ({ locals }) => {
     // Items tied to a project are shown only for projects this person may see; installation-wide items have no project
     const activity = visible === null ? allActivity : allActivity.filter((item: any) => item.project_id === null || visible.has(Number(item.project_id)));
 
-    return json({
-      success: true,
+    const payload = {
       projects: enrichedProjects,
       activity,
       summary: {
@@ -268,11 +267,10 @@ export const GET: RequestHandler = async ({ locals }) => {
         total_events: totalEvents,
         alerts
       }
-    });
+    };
+    return apiOk(payload, payload);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('GET /api/home-overview error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    return apiServerError('GET /api/home-overview', error, 'Failed to load the home overview');
   }
 };
 

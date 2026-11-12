@@ -57,3 +57,23 @@ describe('GET /api/home-overview', () => {
     expect(body.projects).toEqual([]);
   });
 });
+
+describe('GET /api/home-overview envelope', () => {
+  it('returns the payload in data and the legacy keys', async () => {
+    const body = await (await call()).json();
+
+    expect(body.success).toBe(true);
+    expect(body.data.projects).toHaveLength(1);
+    expect(body.data.projects).toEqual(body.projects);
+    expect(body.data.summary).toEqual(body.summary);
+  });
+
+  it('returns a generic 500 envelope without the database message', async () => {
+    query.mockRejectedValue(new Error('password authentication failed for user postgres'));
+
+    const response = await call();
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, data: null, error: 'Failed to load the home overview' });
+  });
+});

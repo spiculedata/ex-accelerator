@@ -1,7 +1,7 @@
 // Workspace Overview API Endpoint
 // Returns workspace details, data sources, investigations, and summary in one round trip
 
-import { json } from '@sveltejs/kit';
+import { apiFail, apiOk, apiServerError } from '$lib/server/apiResponse';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
 import { WORKSPACE_SOURCES_SQL } from '$lib/server/workspaceSources';
@@ -10,12 +10,12 @@ export const GET: RequestHandler = async ({ url }) => {
   const workspaceId = url.searchParams.get('id');
 
   if (!workspaceId) {
-    return json({ success: false, error: 'Missing required parameter: id' }, { status: 400 });
+    return apiFail('Missing required parameter: id', 400);
   }
 
   const id = parseInt(workspaceId, 10);
   if (isNaN(id)) {
-    return json({ success: false, error: 'Invalid workspace id' }, { status: 400 });
+    return apiFail('Invalid workspace id', 400);
   }
 
   try {
@@ -30,7 +30,7 @@ export const GET: RequestHandler = async ({ url }) => {
     );
 
     if (!workspaces.length) {
-      return json({ success: false, error: 'Workspace not found' }, { status: 404 });
+      return apiFail('Workspace not found', 404);
     }
 
     const workspace = workspaces[0];
@@ -61,8 +61,7 @@ export const GET: RequestHandler = async ({ url }) => {
       0
     );
 
-    return json({
-      success: true,
+    const payload = {
       workspace: {
         id: workspace.id,
         name: workspace.name,
@@ -96,10 +95,9 @@ export const GET: RequestHandler = async ({ url }) => {
         total_data_sources: activeSources.length,
         total_investigations: investigations.length
       }
-    });
+    };
+    return apiOk(payload, payload);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('GET /api/workspace-overview error:', msg);
-    return json({ success: false, error: msg }, { status: 500 });
+    return apiServerError('GET /api/workspace-overview', error, 'Failed to load the workspace overview');
   }
 };
