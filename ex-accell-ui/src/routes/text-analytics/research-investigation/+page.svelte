@@ -4,7 +4,16 @@
   import { currentProject, loadCurrentProject } from '$lib/stores/projectStore';
   import { onMount } from 'svelte';
   import ErrorAlert from '$lib/components/ui/ErrorAlert.svelte';
-  import { connectJupyter, jupyterLink, type JupyterConnection } from '$lib/utils/jupyterClient';
+  import {
+    connectJupyter,
+    fetchJupyterStatus,
+    initialJupyterPoll,
+    jupyterLink,
+    nextJupyterPoll,
+    openStartingTab,
+    type JupyterConnection,
+    type JupyterPoll
+  } from '$lib/utils/jupyterClient';
   import { extractCommand } from '$lib/utils/commandHint';
   import CopyCommand from '$lib/components/ui/CopyCommand.svelte';
 
@@ -20,7 +29,13 @@
 
   let errorMessage = '';
   let connection: JupyterConnection | null = null;
-  let isJupyterRunning = false;
+  let poll: JupyterPoll = initialJupyterPoll;
+  let isLaunching = false;
+  let isPopupBlocked = false;
+
+  $: isJupyterRunning = poll.phase === 'running' && connection !== null;
+  $: isStarting = isLaunching || poll.phase === 'starting';
+  $: statusLabel = isJupyterRunning ? 'Running' : isStarting ? 'Starting…' : 'Stopped';
   let notebookFile = '';
   let notebookTemplate = 'sentiment_analysis';
   
@@ -91,16 +106,25 @@
   let selectedTemplate = notebookTemplates[0];
 
   async function startJupyter() {
-    // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready
-    const tab = window.open('', '_blank');
+    if (isLaunching) return;
+    // Open the tab inside the click so popup blockers allow it, then point it at Jupyter once it is ready.
+    // When the browser blocks it we carry on and offer a link instead.
+    const tab = openStartingTab();
+    isPopupBlocked = tab === null;
     errorMessage = '';
-    connection = await connectJupyter((message) => (errorMessage = message));
-    if (!connection) {
-      tab?.close();
-      return;
+    isLaunching = true;
+    try {
+      const started = await connectJupyter((message) => (errorMessage = message));
+      if (!started) {
+        tab?.close();
+        return;
+      }
+      connection = started;
+      poll = nextJupyterPoll(poll, 'running');
+      if (tab && !tab.closed) tab.location.href = jupyterLink(started, '/lab');
+    } finally {
+      isLaunching = false;
     }
-    if (tab) tab.opener = null;
-    if (tab) tab.location.href = jupyterLink(connection, '/lab');
   }
 
   let showEmbeddedNotebook = false;
@@ -117,23 +141,27 @@
     window.open(jupyterLink(connection, `/lab/tree/${encodeURIComponent(notebookFile)}`), '_blank');
   }
 
+  let isChecking = false;
+
+  // Asks the server, so a Jupyter that was already running is found on load. One failed check does not drop
+  // an open notebook (see nextJupyterPoll).
   async function checkJupyterStatus() {
-    if (!connection) {
-      isJupyterRunning = false;
-      return;
-    }
+    if (isChecking || isLaunching) return;
+    isChecking = true;
     try {
-      const response = await fetch(jupyterLink(connection, '/api'), { method: 'GET' });
-      isJupyterRunning = response.ok;
-      if (response.status === 401 || response.status === 403) connection = null;
-    } catch (error) {
-      isJupyterRunning = false;
+      const { observed, connection: found } = await fetchJupyterStatus();
+      poll = nextJupyterPoll(poll, observed);
+      if (found) connection = found;
+      else if (poll.phase !== 'running') connection = null;
+    } finally {
+      isChecking = false;
     }
   }
 
-  // Check Jupyter status periodically
+  // Check as soon as the page loads, then periodically
   onMount(() => {
-    const interval = setInterval(checkJupyterStatus, 2000);
+    void checkJupyterStatus();
+    const interval = setInterval(checkJupyterStatus, 5000);
     return () => clearInterval(interval);
   });
 
@@ -238,8 +266,8 @@
     iconPath="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
     <svelte:fragment slot="actions">
       <span class="inline-flex items-center gap-2 text-sm text-white">
-        <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : 'bg-danger-400'}" aria-hidden="true"></span>
-        JupyterLab {isJupyterRunning ? 'Running' : 'Stopped'}
+        <span class="w-3 h-3 rounded-full {isJupyterRunning ? 'bg-success-400' : isStarting ? 'bg-signal-400' : 'bg-danger-400'}" aria-hidden="true"></span>
+        JupyterLab {statusLabel}
       </span>
     </svelte:fragment>
   </PageHeader>
@@ -310,19 +338,23 @@
               <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-gray-900">Step 1: Start JupyterLab Server</span>
                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {isJupyterRunning ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                  {isJupyterRunning ? 'Running' : 'Stopped'}
+                  {statusLabel}
                 </span>
               </div>
 
               {#if !isJupyterRunning}
                 <button
                   on:click={startJupyter}
-                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">
-                  Start JupyterLab
+                  disabled={isStarting}
+                  class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-wait">
+                  {isStarting ? 'Starting…' : 'Start JupyterLab'}
                 </button>
               {:else}
                 <div class="bg-green-50 rounded-xl p-4 text-sm">
                   <p class="font-medium text-green-900 mb-2">✓ JupyterLab is running</p>
+                  {#if isPopupBlocked}
+                    <p class="mb-2 text-amber-800" role="status">Your browser blocked the new tab. Use the link below to open JupyterLab.</p>
+                  {/if}
                   <p class="text-green-700">Server available at <a href="{jupyterLink(connection, '/lab')}" target="_blank" class="text-blue-600 hover:underline font-medium">{connection?.baseUrl}</a></p>
                 </div>
               {/if}

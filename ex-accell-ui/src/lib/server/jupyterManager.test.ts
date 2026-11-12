@@ -25,7 +25,7 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 	};
 	const kill = vi.fn();
 	let readyCalls = 0;
-	const ensure = createJupyterManager({
+	const manager = createJupyterManager({
 		spawn,
 		env: overrides.env ?? {},
 		cwd: '.',
@@ -40,7 +40,7 @@ function setup(overrides: { env?: Record<string, string>; ready?: boolean; saved
 		readyTimeoutMs: overrides.readyTimeoutMs ?? 30,
 		pollMs: 5
 	});
-	return { ensure, spawn, handlers, store, kill, isReadyCalls: () => readyCalls };
+	return { ensure: manager.ensure, status: manager.status, spawn, handlers, store, kill, isReadyCalls: () => readyCalls };
 }
 
 const ORIGIN = 'http://localhost:5173';
@@ -165,6 +165,61 @@ describe('createJupyterManager', () => {
 		await ensure(ORIGIN);
 		const options = (spawn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }])[2];
 		expect(options.env.JUPYTER_ALLOW_ORIGIN).toBe('https://app.example.com');
+	});
+});
+
+describe('jupyter status (never launches)', () => {
+	const saved = { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' };
+
+	it('is stopped when nothing was launched and does not spawn', async () => {
+		const { status, spawn } = setup();
+		expect(await status()).toEqual({ state: 'stopped' });
+		expect(spawn).not.toHaveBeenCalled();
+	});
+
+	it('finds a Jupyter that is already running, including after a server restart', async () => {
+		const { status, spawn } = setup({ saved });
+		expect(await status()).toEqual({ state: 'running', url: saved.url, baseUrl: saved.baseUrl });
+		expect(spawn).not.toHaveBeenCalled();
+	});
+
+	it('is stopped, without touching the record or the process, when the saved launch does not answer', async () => {
+		const { status, store, kill } = setup({ saved, ready: false });
+		expect(await status()).toEqual({ state: 'stopped' });
+		expect(store.read()).toEqual(saved);
+		expect(kill).not.toHaveBeenCalled();
+	});
+
+	it('is stopped when the saved process is gone', async () => {
+		const { status } = setup({ saved, alive: false });
+		expect(await status()).toEqual({ state: 'stopped' });
+	});
+
+	it('reports a configured external Jupyter as running when it answers, stopped when it does not', async () => {
+		const env = { JUPYTER_URL: 'http://j:8888', JUPYTER_TOKEN: 'abc' };
+		expect(await setup({ env }).status()).toEqual({ state: 'running', url: 'http://j:8888/?token=abc', baseUrl: 'http://j:8888' });
+		expect(await setup({ env, ready: false }).status()).toEqual({ state: 'stopped' });
+	});
+
+	it('keeps reporting a healthy saved Jupyter as running while another request is launching', async () => {
+		const { ensure, status } = setup({ saved: { pid: 7, url: 'http://localhost:8888/?token=old', baseUrl: 'http://localhost:8888' }, alive: true });
+		const launch = ensure(ORIGIN); // finds the saved one, but is still in flight for a tick
+		expect((await status()).state).toBe('running');
+		await launch;
+	});
+
+	it('ignores an incomplete JUPYTER_URL (no token) and falls back to the saved launch', async () => {
+		const { status } = setup({ env: { JUPYTER_URL: 'http://j:8888' } });
+		expect(await status()).toEqual({ state: 'stopped' });
+	});
+
+	it('says starting while a launch is in flight', async () => {
+		const { ensure, status } = setup({ ready: false, readyTimeoutMs: 200 });
+		const launch = ensure(ORIGIN).catch(() => undefined);
+		await Promise.resolve();
+		expect(await status()).toEqual({ state: 'starting' });
+		await launch;
+		expect(await status()).toEqual({ state: 'stopped' });
 	});
 });
 

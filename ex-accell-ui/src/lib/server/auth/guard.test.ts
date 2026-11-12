@@ -59,6 +59,12 @@ describe('decideAccess: authenticated', () => {
     expect(req(path, 'POST', admin).action).toBe('allow');
   });
 
+  it('keeps the Jupyter status endpoint, which returns the tokenised link, admin-only even for reads', () => {
+    expect(req('/api/jupyter/status', 'GET', member).action).toBe('forbidden');
+    expect(req('/api/jupyter/status', 'GET', viewer).action).toBe('forbidden');
+    expect(req('/api/jupyter/status', 'GET', admin).action).toBe('allow');
+  });
+
   it('sends signed-in users away from the login page', () => {
     expect(req('/login', 'GET', member)).toEqual({ action: 'redirect', location: '/' });
   });

@@ -77,6 +77,12 @@ export function jupyterEnvironment(
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** What the pages need to know without launching anything. */
+export type JupyterStatus =
+	| { state: 'running'; url: string; baseUrl: string }
+	| { state: 'starting' }
+	| { state: 'stopped' };
+
 /** Keeps track of the one JupyterLab this app started so later requests (even after a restart) reuse it. */
 export function createJupyterManager(options: ManagerOptions) {
 	const { spawn, env, cwd, store, isAlive, isReady, kill, hasConfig, readyTimeoutMs = 20_000, pollMs = 500 } = options;
@@ -136,7 +142,25 @@ export function createJupyterManager(options: ManagerOptions) {
 		throw new Error('JupyterLab did not become ready in time');
 	}
 
-	return async function ensureJupyter(appOrigin: string): Promise<JupyterAccess> {
+	/**
+	 * Looks without touching: never spawns, kills or rewrites the saved launch. Pages call it on load and
+	 * on a timer to find a Jupyter that is already running, so the launch controls only appear when needed.
+	 */
+	async function status(): Promise<JupyterStatus> {
+		const external = resolveExternalJupyter(env);
+		if (external) {
+			return (await isReady(external.baseUrl, external.url)) ? { state: 'running', ...external } : { state: 'stopped' };
+		}
+		// A Jupyter that already answers is running even if another request is mid-launch, so an open
+		// notebook is not torn down while a second tab clicks Start
+		const saved = store.read();
+		if (saved && isAlive(saved.pid) && (await isReady(saved.baseUrl, saved.url))) {
+			return { state: 'running', url: saved.url, baseUrl: saved.baseUrl };
+		}
+		return inFlight ? { state: 'starting' } : { state: 'stopped' };
+	}
+
+	async function ensure(appOrigin: string): Promise<JupyterAccess> {
 		const external = resolveExternalJupyter(env);
 		if (external) return { ...external, message: 'Using the configured JupyterLab' };
 		if (env.JUPYTER_URL) throw new Error('JUPYTER_URL is set but JUPYTER_TOKEN is empty: set JUPYTER_TOKEN in .env');
@@ -146,5 +170,7 @@ export function createJupyterManager(options: ManagerOptions) {
 			inFlight = null;
 		});
 		return inFlight;
-	};
+	}
+
+	return { ensure, status };
 }
