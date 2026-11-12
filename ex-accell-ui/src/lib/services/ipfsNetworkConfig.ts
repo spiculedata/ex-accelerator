@@ -35,7 +35,9 @@ export interface Libp2pOverrides {
 }
 
 // A multiaddr is a slash-separated path of protocol names and values: /ip4/0.0.0.0/tcp/4001, /dns4/host/tcp/4001/ws
-const MULTIADDR_PATTERN = /^(\/[A-Za-z0-9._:%~-]+)+$/;
+// Values may be base64url (certhash) or base58/base32 (p2p), so _ = + are allowed too. This checks the shape only; libp2p rejects
+// an unknown protocol when the node starts, and the log has the detail.
+const MULTIADDR_PATTERN = /^(\/[A-Za-z0-9._:%~=+-]+)+$/;
 
 function parseMultiaddrs(name: string, value: string | undefined): string[] | null {
   const addrs = (value ?? '')

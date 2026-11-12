@@ -18,6 +18,15 @@ describe('readNetworkConfig', () => {
     expect(config.announce).toEqual(['/dns4/node.example.org/tcp/4001']);
   });
 
+  it.each([
+    '/dns4/node.example.org/tcp/443/wss',
+    '/ip6/::1/tcp/4001',
+    '/ip4/0.0.0.0/udp/4001/webrtc-direct/certhash/uEiAkH5a4DPGKUuOBjYw0CgwjvcJCJMD2SJtYZKeUHi_fyQ',
+    '/ip4/1.2.3.4/tcp/4001/p2p/12D3KooWQqbMXv9oaRbCxuNzu1XRr3TTcnbUR9tLFMPzyWUcqeoi'
+  ])('accepts the valid multiaddr %s', (addr) => {
+    expect(readNetworkConfig({ IPFS_LISTEN_ADDRS: addr }).listen).toEqual([addr]);
+  });
+
   it('treats a blank list as unset', () => {
     expect(readNetworkConfig({ IPFS_LISTEN_ADDRS: '  ', IPFS_ANNOUNCE_ADDRS: '' })).toMatchObject({ listen: null, announce: null });
   });
