@@ -42,7 +42,7 @@ Use either `DATABASE_URL` or the individual settings. `DATABASE_URL` takes effec
 ## Data sharing (IPFS)
 
 Off by default. Read [Data sharing over IPFS](./data-sharing) before turning it on: anything published is public
-on the IPFS network and cannot be withdrawn.
+on the IPFS network; an administrator can stop your node serving it, but copies others fetched cannot be recalled.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

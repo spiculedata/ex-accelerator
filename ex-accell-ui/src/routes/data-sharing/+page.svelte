@@ -20,6 +20,8 @@
   let ipfsEnabled = false;
   let publishingFor: string | null = null;
   let confirmPublishFor: any = null;
+  let confirmWithdrawFor: any = null;
+  let withdrawingCid: string | null = null;
   let ipfsRegistry: Map<string, any> = new Map();
   let importCid = '';
   let importing = false;
@@ -152,6 +154,36 @@
       errorMessage = `IPFS publish failed: ${err.message}`;
     } finally {
       publishingFor = null;
+    }
+  }
+
+  /** Withdrawing stops this node serving the package; copies other nodes already fetched stay, so the person confirms first. */
+  function askToWithdraw(pkg: any, ipfs: { cid: string }) {
+    confirmWithdrawFor = { pkg, cid: ipfs.cid };
+  }
+
+  async function withdrawFromIpfs(target: { pkg: any; cid: string }) {
+    confirmWithdrawFor = null;
+    withdrawingCid = target.cid;
+    errorMessage = '';
+    successMessage = '';
+    try {
+      const response = await fetch('/api/data-sharing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', cid: target.cid })
+      });
+      const result = await response.json();
+      if (result.success) {
+        successMessage = 'Withdrawn: this node no longer serves it. Copies other nodes already fetched remain.';
+        await loadData();
+      } else {
+        errorMessage = result.error || 'Failed to withdraw the package';
+      }
+    } catch (err: any) {
+      errorMessage = `Withdrawal failed: ${err.message}`;
+    } finally {
+      withdrawingCid = null;
     }
   }
 
@@ -313,6 +345,16 @@
                   {publishingFor === pkg.id ? 'Publishing...' : 'Publish to IPFS'}
                 </button>
               {/if}
+              {#if ipfs && ipfsEnabled && isAdmin}
+                <span class="text-gray-300">|</span>
+                <button
+                  on:click={() => askToWithdraw(pkg, ipfs)}
+                  disabled={withdrawingCid === ipfs.cid}
+                  class="text-xs text-danger-700 hover:text-danger-900 font-medium disabled:opacity-50"
+                >
+                  {withdrawingCid === ipfs.cid ? 'Withdrawing...' : 'Withdraw'}
+                </button>
+              {/if}
             </div>
             <div class="text-xs text-gray-500 mt-2">Created {formatDate(pkg.created)}</div>
           </div>
@@ -422,7 +464,8 @@
     <p class="font-semibold">This cannot be undone.</p>
     <p>
       Anyone with the content identifier (CID) can download the whole dataset from any IPFS node or gateway, with no
-      sign-in. Copies may be kept by other nodes indefinitely, so the data cannot be withdrawn later.
+      sign-in. Copies may be kept by other nodes indefinitely. You can later make this server stop serving it, but
+      copies that others have already downloaded cannot be recalled.
     </p>
     <p>Check first that the data holds no personal information you may not share and that its licence allows publication.</p>
   </div>
@@ -433,6 +476,34 @@
       </button>
       <button type="button" on:click={() => publishToIpfs(confirmPublishFor)} class="px-4 py-2 text-sm font-medium text-white bg-danger-600 hover:bg-danger-700 rounded-lg">
         Publish publicly
+      </button>
+    </div>
+  </svelte:fragment>
+</Modal>
+
+<!-- Withdraw confirmation: this node stops serving the package, but copies already fetched by others remain -->
+<Modal
+  open={confirmWithdrawFor !== null}
+  title="Withdraw this package from this node?"
+  description={confirmWithdrawFor ? `"${confirmWithdrawFor.pkg.title || confirmWithdrawFor.pkg.name}" will no longer be listed as published.` : ''}
+  onclose={() => (confirmWithdrawFor = null)}
+>
+  <div class="bg-danger-50 border border-danger-200 rounded-lg p-4 text-sm text-danger-900 space-y-2">
+    <p class="font-semibold">This does not delete copies other people already have.</p>
+    <p>
+      This server will unpin the package and stop serving it, and it will be hidden from the lists here. Anyone who has
+      already downloaded it, or any IPFS node that kept a copy, still has the data and can pass it on; those copies
+      cannot be deleted or recalled from here. Treat the data as disclosed.
+    </p>
+    <p>You can publish the package again later; the same data gets the same CID.</p>
+  </div>
+  <svelte:fragment slot="footer">
+    <div class="flex justify-end gap-2">
+      <button type="button" on:click={() => (confirmWithdrawFor = null)} class="px-4 py-2 text-sm text-ink-700 bg-ink-100 hover:bg-ink-200 rounded-lg" data-autofocus>
+        Cancel
+      </button>
+      <button type="button" on:click={() => withdrawFromIpfs(confirmWithdrawFor)} class="px-4 py-2 text-sm font-medium text-white bg-danger-600 hover:bg-danger-700 rounded-lg">
+        Withdraw from this node
       </button>
     </div>
   </svelte:fragment>

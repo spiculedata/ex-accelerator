@@ -3,11 +3,11 @@
 
 import { postgresPool } from '$lib/services/postgres';
 
-const PUBLIC_COLUMNS = 'id, dataset_id, package_id, cid, gateway_url, package_name, description, row_count, file_size_bytes, status, published_at, metadata';
+const PUBLIC_COLUMNS = 'id, dataset_id, package_id, cid, gateway_url, package_name, description, row_count, file_size_bytes, status, published_at, withdrawn_at, metadata';
 
-/** Published packages, newest first. Who published is shown to admins only. */
+/** Published packages, newest first; withdrawn and imported rows are not listed. Who published or withdrew is shown to admins only. */
 export async function listPublished(includePublisher: boolean): Promise<unknown[]> {
-  const columns = includePublisher ? `${PUBLIC_COLUMNS}, published_by` : PUBLIC_COLUMNS;
+  const columns = includePublisher ? `${PUBLIC_COLUMNS}, published_by, withdrawn_by` : PUBLIC_COLUMNS;
   return postgresPool.query(`SELECT ${columns} FROM ipfs_published_packages WHERE status = $1 ORDER BY published_at DESC`, ['published']);
 }
 
@@ -37,7 +37,7 @@ export async function recordPublished(record: PublishedRecord): Promise<void> {
        dataset_id = EXCLUDED.dataset_id, package_id = EXCLUDED.package_id, gateway_url = EXCLUDED.gateway_url,
        package_name = EXCLUDED.package_name, description = EXCLUDED.description, row_count = EXCLUDED.row_count,
        file_size_bytes = EXCLUDED.file_size_bytes, status = 'published', published_at = CURRENT_TIMESTAMP,
-       published_by = EXCLUDED.published_by`,
+       published_by = EXCLUDED.published_by, withdrawn_at = NULL, withdrawn_by = NULL`,
     [
       record.datasetId,
       record.packageId,
@@ -50,6 +50,24 @@ export async function recordPublished(record: PublishedRecord): Promise<void> {
       record.publishedBy
     ]
   );
+}
+
+/** The CIDs of every package this install currently publishes. */
+export async function listPublishedCids(): Promise<string[]> {
+  const rows = await postgresPool.query<{ cid: string }>('SELECT cid FROM ipfs_published_packages WHERE status = $1', ['published']);
+  return rows.map((row) => row.cid);
+}
+
+/** Marks a published package as withdrawn, recording who and when. False when it was not published (nothing changed). */
+export async function markWithdrawn(cid: string, withdrawnBy: string | null): Promise<boolean> {
+  const rows = await postgresPool.query(
+    `UPDATE ipfs_published_packages
+     SET status = 'withdrawn', withdrawn_at = CURRENT_TIMESTAMP, withdrawn_by = $2
+     WHERE cid = $1 AND status = 'published'
+     RETURNING id`,
+    [cid, withdrawnBy]
+  );
+  return rows.length > 0;
 }
 
 export interface ImportedRecord {

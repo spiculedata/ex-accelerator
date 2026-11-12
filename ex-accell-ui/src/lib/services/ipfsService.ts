@@ -3,7 +3,8 @@
 // Off unless IPFS_ENABLED is exactly "true". When on, the first publish or fetch starts a Helia node inside the app
 // process with libp2p's defaults: it listens on random TCP, WebSocket and WebRTC-direct ports on every interface,
 // dials the public bootstrap peers and joins the public DHT. Listen/announce addresses, UPnP, the relay server and
-// AutoTLS can be set from the environment (see ipfsNetworkConfig.ts). Anything published is public and cannot be withdrawn.
+// AutoTLS can be set from the environment (see ipfsNetworkConfig.ts). Anything published is public: this node can stop
+// serving it (unpublish), but copies other nodes already fetched cannot be recalled.
 
 import fs from 'fs';
 import path from 'path';
@@ -36,7 +37,13 @@ function positiveInt(value: string | undefined, fallback: number): number {
 /** The parts of Helia and @helia/unixfs this service uses. Both are ESM-only, so they are imported on first use. */
 interface HeliaNode {
   libp2p: { peerId: { toString(): string } };
-  pins: { add(cid: unknown): Promise<unknown> | AsyncIterable<unknown> };
+  // Helia's pins.add and pins.rm are async generators: they do nothing until iterated
+  pins: {
+    add(cid: unknown, options?: { signal?: AbortSignal }): AsyncIterable<unknown>;
+    rm(cid: unknown): AsyncIterable<unknown>;
+    get(cid: unknown): Promise<unknown>;
+  };
+  gc(): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -50,6 +57,23 @@ interface UnixFs {
   cp(source: unknown, target: unknown, name: string): Promise<unknown>;
   ls(cid: unknown, options?: { signal?: AbortSignal }): AsyncIterable<{ type: string; name: string; cid: unknown; size?: bigint }>;
   cat(cid: unknown, options?: { signal?: AbortSignal }): AsyncIterable<Uint8Array>;
+}
+
+const KEEP_PIN_TIMEOUT_MS = 30_000;
+
+async function drain(iterable: AsyncIterable<unknown>): Promise<void> {
+  for await (const _ of iterable) void _;
+}
+
+/** True when `cid` has a pin of its own (a block kept only because a bigger pin contains it does not). */
+async function hasOwnPin(node: HeliaNode, cid: unknown): Promise<boolean> {
+  try {
+    await node.pins.get(cid);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'NotFoundError') return false;
+    throw error;
+  }
 }
 
 class IpfsService {
@@ -136,7 +160,7 @@ class IpfsService {
       const fileCid = await ufs.addBytes(new Uint8Array(content));
       dirCid = await ufs.cp(fileCid, dirCid, filename);
     }
-    await node.pins.add(dirCid);
+    await drain(node.pins.add(dirCid));
 
     const cid = String(dirCid);
     log.info('Published directory to IPFS', { files: files.length, cid });
@@ -188,6 +212,32 @@ class IpfsService {
       chunks.push(chunk);
     }
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * Stops this node serving a package: removes its pin and garbage-collects the blockstore. Copies other nodes already
+   * fetched stay where they are. `keepCids` are the other packages this node publishes; they are pinned first, because
+   * garbage collection deletes every block that is not pinned and earlier versions of this service never pinned any.
+   */
+  async unpublish(cidStr: string, keepCids: string[]): Promise<{ wasPinned: boolean }> {
+    const cid = await this.parseCid(cidStr);
+    const { node } = await this.ready();
+
+    for (const keepStr of keepCids.filter((keep) => keep !== cidStr)) {
+      try {
+        const keep = await this.parseCid(keepStr);
+        if (!(await hasOwnPin(node, keep))) await drain(node.pins.add(keep, { signal: AbortSignal.timeout(KEEP_PIN_TIMEOUT_MS) }));
+      } catch (error) {
+        // Its blocks are not on this node, so there is nothing for garbage collection to take from it
+        log.warn('Could not pin a published package before garbage collection', { cid: keepStr, detail: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    const wasPinned = await hasOwnPin(node, cid);
+    if (wasPinned) await drain(node.pins.rm(cid));
+    await node.gc();
+    log.info('Stopped serving a package', { cid: cidStr, wasPinned });
+    return { wasPinned };
   }
 
   private async parseCid(value: string): Promise<unknown> {

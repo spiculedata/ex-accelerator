@@ -10,13 +10,14 @@ const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'regis
 function writtenColumns(): string[] {
   const inserts = [...source.matchAll(/INSERT INTO ipfs_published_packages\s*\(([^)]*)\)/g)].flatMap((m) => m[1].split(','));
   const updates = [...source.matchAll(/DO UPDATE SET([\s\S]*?)`/g)].flatMap((m) => [...m[1].matchAll(/(?:^|,)\s*([a-z_]+)\s*=/g)].map((c) => c[1]));
-  return [...new Set([...inserts, ...updates].map((c) => c.trim()).filter(Boolean))];
+  const sets = [...source.matchAll(/UPDATE ipfs_published_packages\s+SET([\s\S]*?)WHERE/g)].flatMap((m) => [...m[1].matchAll(/(?:^|,)\s*([a-z_]+)\s*=/g)].map((c) => c[1]));
+  return [...new Set([...inserts, ...updates, ...sets].map((c) => c.trim()).filter(Boolean))];
 }
 
 /** Columns named in the SELECT lists of the registry source. */
 function selectedColumns(): string[] {
   const publicColumns = source.match(/PUBLIC_COLUMNS =\s*'([^']*)'/)?.[1] ?? '';
-  return [...publicColumns.split(','), 'published_by'].map((c) => c.trim());
+  return [...publicColumns.split(','), 'published_by', 'withdrawn_by'].map((c) => c.trim());
 }
 
 describe('the ipfs_published_packages registry schema', () => {

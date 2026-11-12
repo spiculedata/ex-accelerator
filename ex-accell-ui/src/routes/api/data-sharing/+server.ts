@@ -1,5 +1,5 @@
 // Data Sharing API: Frictionless Data Packages on disk, published to and imported from IPFS.
-// Reads are open to every signed-in role; POST (generate, publish, import) is admin-only (see auth/guard.ts).
+// Reads are open to every signed-in role; POST (generate, publish, withdraw, import) is admin-only (see auth/guard.ts).
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { postgresPool } from '$lib/services/postgres';
@@ -9,7 +9,8 @@ import { InvalidCidError, IpfsDisabledError, PackageTooLargeError, UnsafePackage
 import { NetworkConfigError } from '$lib/services/ipfsNetworkConfig';
 import { parseResourceId } from '$lib/server/auth/access';
 import { createLogger } from '$lib/utils/logger';
-import { DataSharingError, badRequest, notFound, unprocessable } from '$lib/server/dataSharing/errors';
+import { DataSharingError, badRequest, conflict, notFound, unprocessable } from '$lib/server/dataSharing/errors';
+import { exclusive } from '$lib/server/dataSharing/exclusive';
 import { importFromCid } from '$lib/server/dataSharing/importPackage';
 import {
   checkSourceTable,
@@ -23,7 +24,7 @@ import {
   readPackage,
   writeDataPackage
 } from '$lib/server/dataSharing/packages';
-import { findByCid, listPublished, recordPublished } from '$lib/server/dataSharing/registry';
+import { findByCid, listPublished, listPublishedCids, markWithdrawn, recordPublished } from '$lib/server/dataSharing/registry';
 
 const log = createLogger('data-sharing-api');
 
@@ -90,7 +91,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   try {
     switch (action) {
       case 'publish':
-        return await publish(body.package_id, actor);
+        return await exclusive(() => publish(body.package_id, actor));
+      case 'withdraw':
+        return await withdraw(body.cid, actor);
       case 'import':
         return await importPackage(body.cid, actor);
       case 'generate':
@@ -149,6 +152,28 @@ async function publish(packageId: unknown, publishedBy: string | null): Promise<
   });
   log.info('Published package to IPFS', { packageId, cid, rows: exported.rows, publishedBy });
   return json({ success: true, cid, gateway_url: gatewayUrl, package_id: packageId });
+}
+
+/**
+ * Stops this node serving a published package and marks it withdrawn in the registry. This cannot recall copies other
+ * nodes already fetched. Takes turns with publishing so the pin and the registry row never disagree.
+ */
+async function withdraw(cid: unknown, withdrawnBy: string | null): Promise<Response> {
+  requireEnabled();
+  if (!isValidCid(cid)) throw badRequest('A valid cid is required');
+  return exclusive(async () => {
+    const found = await findByCid(cid);
+    if (!found) throw notFound('That package is not in this install\'s registry');
+    if (found.status === 'withdrawn') return json({ success: true, cid, withdrawn: true, already_withdrawn: true });
+    if (found.status !== 'published') throw conflict('Only a package this install published can be withdrawn');
+
+    // Unpin first: if it fails the row stays published and the withdrawal can be retried
+    const keep = (await listPublishedCids()).filter((published) => published !== cid);
+    const { wasPinned } = await ipfsService.unpublish(cid, keep);
+    if (!(await markWithdrawn(cid, withdrawnBy))) throw conflict('The package is no longer published');
+    log.info('Withdrew package from this node', { cid, wasPinned, withdrawnBy });
+    return json({ success: true, cid, withdrawn: true, unpinned: wasPinned });
+  });
 }
 
 async function importPackage(cid: unknown, importedBy: string | null): Promise<Response> {
