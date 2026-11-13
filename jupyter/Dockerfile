@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Jupyter runs notebooks, which are arbitrary code with the database credentials, so it must not be root.
 # 1000:1000 is the usual first user on a Linux host; change both numbers if your bind mount is owned by
